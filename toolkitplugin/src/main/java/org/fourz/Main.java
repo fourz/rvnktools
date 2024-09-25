@@ -4,7 +4,6 @@ import java.util.logging.Level;
 import org.bukkit.plugin.java.JavaPlugin;
 // import org.bukkit.plugin.PluginManager;
 
-
 public class Main extends JavaPlugin {
 
     @Override
@@ -12,8 +11,7 @@ public class Main extends JavaPlugin {
 		
         // Code that runs when the plugin is enabled
 		getServer().getPluginManager().registerEvents(new JoinListener(), this);
-		getLogger().info("Listening for Join Events");
-        getLogger().info("RVNK Toolkit  has been enabled!");
+        getLogger().info("RVNK Toolkit has been enabled.");
 		// Register commands
 		this.getCommand("ping").setExecutor(new PingCommand());
     }
@@ -21,7 +19,7 @@ public class Main extends JavaPlugin {
     @Override
     public void onDisable() {
         // Code that runs when the plugin is disabled
-        getLogger().info("RVNK Toolkit  has been disabled!");
+        getLogger().info("RVNK Toolkit has been disabled.");
     }
 }
 
