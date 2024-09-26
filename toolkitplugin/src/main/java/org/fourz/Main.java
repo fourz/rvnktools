@@ -12,6 +12,7 @@ public class Main extends JavaPlugin {
         // Code that runs when the plugin is enabled
 		getServer().getPluginManager().registerEvents(new JoinListener(), this);
         getLogger().info("RVNK Toolkit has been enabled.");
+        getLogger().info("Brian is a neeeeeeeerd")
 		// Register commands
 		this.getCommand("ping").setExecutor(new PingCommand());
     }
