@@ -1,7 +1,7 @@
 name: RVNKToolKit 
 version: 1.0-SNAPSHOT
 author: wizard
-main: org.fourz.Main
+main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
 api-version: 1.21
 
@@ -12,3 +12,10 @@ commands:
   tps:
     description: Shows the server's current TPS.
     usage: /tps
+  events:
+    description: Provides information about scheduled events.
+    usage: /events
+  discord:
+    description: Provides information about the server's discord.
+    usage: /discord
+
