@@ -9,6 +9,7 @@ import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
+import org.fourz.rvnktools.command.ToggleCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 
@@ -33,7 +34,7 @@ public class RVNKTools extends JavaPlugin {
         this.getCommand("events").setExecutor(new EventsCommand());
         this.getCommand("discord").setExecutor(new DiscordCommand());
 
-        registerToggleCommands();
+        //registerToggleCommands();
 
         getLogger().info("RVNK Toolkit has been enabled.");
     }
