@@ -3,7 +3,9 @@ package org.fourz.rvnktools;
 import java.util.logging.Level;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.checkerframework.checker.units.qual.A;
-import org.fourz.rvnktools.DiscordCommand;
+import org.fourz.rvnktools.commands.AnnouncementCommand;
+import org.fourz.rvnktools.commands.DiscordCommand;
+import org.fourz.rvnktools.commands.EventsCommand;
 import org.fourz.rvnktools.AnnouncementManager;
 
 public class RVNKTools extends JavaPlugin {

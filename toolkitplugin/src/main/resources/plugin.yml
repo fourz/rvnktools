@@ -10,12 +10,12 @@ commands:
     description: Shows your current ping.
     usage: /ping
   tps:
-    description: Shows the server's current TPS.
+    description: Shows the server's TPS.
     usage: /tps
   events:
-    description: Provides information about scheduled events.
+    description: Manages events.
     usage: /events
   discord:
-    description: Provides information about the server's discord.
+    description: Provides a link to the Discord server.
     usage: /discord
 

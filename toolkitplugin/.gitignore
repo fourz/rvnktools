@@ -1,11 +1,12 @@
 # Maven
 target/
 .mvn/
+dependency-reduced-pom.xml
 
 # Ignore log files
 *.log
 
-# Ignore build directories
+# Ignore build files directories
 dist/
 build/
 
