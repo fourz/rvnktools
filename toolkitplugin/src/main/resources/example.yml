@@ -1,0 +1,20 @@
+announcements:
+  - name: "welcome"
+    type: "server"
+    recurrence: "10m"
+    owner: "wizardofire"
+    cost: 0
+
+  - name: "buy my shit"
+    type: "classified"
+    recurrence: "20"
+    owner: "antnatchos"
+    cost: 20
+
+  - name: "cheese toastie day"
+    type: "scheduled"
+    date: "2028-09-24"
+    time: "7:00 PM"
+    recurrence: "Yearly"
+    owner: "system"
+    cost: 0
