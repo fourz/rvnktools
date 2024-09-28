@@ -48,11 +48,11 @@ public class AnnouncementManager {
         try {
             configFile.createNewFile();
             YamlConfiguration defaultConfig = new YamlConfiguration();
-            defaultConfig.set("announcements", Arrays.asList("Welcome to the server!", "Remember to follow the rules!"));
-            defaultConfig.set("interval", 300);
-            defaultConfig.set("random-interval", false);
-            defaultConfig.set("min-interval", 180);
-            defaultConfig.set("max-interval", 600);
+            defaultConfig.set("announcements", Arrays.asList("Welcome to Ravenkraft!", "Remember to follow the rules!"));
+            defaultConfig.set("interval", 3000);
+            defaultConfig.set("random-interval", true);
+            defaultConfig.set("min-interval", 2400);
+            defaultConfig.set("max-interval", 6000);
             defaultConfig.save(configFile);
         } catch (IOException e) {
             e.printStackTrace();

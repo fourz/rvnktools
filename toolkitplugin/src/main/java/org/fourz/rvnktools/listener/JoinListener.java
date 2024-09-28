@@ -1,4 +1,4 @@
-package org.fourz.rvnktools;
+package org.fourz.rvnktools.listener;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
