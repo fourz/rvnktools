@@ -1,4 +1,4 @@
-package org.fourz.rvnktools;
+package org.fourz.rvnktools.announcementManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -6,6 +6,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.fourz.rvnktools.RVNKTools;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +32,7 @@ public class AnnouncementManager {
         startAnnouncementTask();
     }
 
-    public void loadConfig() {        
+    public void loadConfig() {
         if (!configFile.exists()) {
             createDefaultConfig();
         }
@@ -48,16 +49,18 @@ public class AnnouncementManager {
         try {
             configFile.createNewFile();
             YamlConfiguration defaultConfig = new YamlConfiguration();
-            defaultConfig.set("announcements", Arrays.asList("Welcome to Ravenkraft!", "Remember to follow the rules!"));
-            defaultConfig.set("interval", 3000);
-            defaultConfig.set("random-interval", true);
-            defaultConfig.set("min-interval", 2400);
-            defaultConfig.set("max-interval", 6000);
+            defaultConfig.set("announcements",
+                    Arrays.asList("Welcome to the server!", "Remember to follow the rules!"));
+            defaultConfig.set("interval", 300);
+            defaultConfig.set("random-interval", false);
+            defaultConfig.set("min-interval", 180);
+            defaultConfig.set("max-interval", 600);
             defaultConfig.save(configFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
     private void startAnnouncementTask() {
         if (announcementTask != null) {
             announcementTask.cancel();
@@ -85,7 +88,8 @@ public class AnnouncementManager {
     }
 
     private void broadcastAnnouncement() {
-        if (announcements.isEmpty()) return;
+        if (announcements.isEmpty())
+            return;
         String announcement = announcements.get(new Random().nextInt(announcements.size()));
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!disabledPlayers.contains(player.getUniqueId())) {

@@ -15,7 +15,7 @@ public class MickyHatPlaceListener implements Listener {
         // Ensure it's a block placement action
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
             ItemStack item = event.getItem();
-            
+
             if (item != null && item.getType() == Material.CARVED_PUMPKIN) {
                 ItemMeta meta = item.getItemMeta();
                 if (meta != null && meta.hasCustomModelData()) {
