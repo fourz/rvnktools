@@ -1,4 +1,4 @@
-package org.fourz.rvnktools;
+package org.fourz.rvnktools.command;
 
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -14,17 +14,18 @@ public class DiscordCommand implements CommandExecutor {
         if (cmd.getName().equalsIgnoreCase("discord")) {
             if (sender instanceof Player) {
                 Player player = (Player) sender;
-                
+
                 // Create the main message component
                 TextComponent message = new TextComponent("Click here");
-                message.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://discord.com/channels/452900386794111006/698630242801156106"));
-                
+                message.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,
+                        "https://discord.com/channels/452900386794111006/698630242801156106"));
+
                 // Add additional text
                 TextComponent additionalText = new TextComponent(" to join our Discord!");
-                
+
                 // Combine the components
                 message.addExtra(additionalText);
-                
+
                 // Send the combined message
                 player.spigot().sendMessage(message);
             } else {

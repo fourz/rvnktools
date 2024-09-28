@@ -1,4 +1,4 @@
-package org.fourz.rvnktools;
+package org.fourz.rvnktools.command;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -29,16 +29,16 @@ public class TPSCommand implements CommandExecutor {
 
             StringBuilder message = new StringBuilder("§a---- §6Server Information §a----\n");
             message.append("§eTPS (1m, 5m, 15m): §f").append(formatTPS(tps[0])).append(", ")
-                   .append(formatTPS(tps[1])).append(", ").append(formatTPS(tps[2])).append("\n");
+                    .append(formatTPS(tps[1])).append(", ").append(formatTPS(tps[2])).append("\n");
             message.append("§eOnline Players: §f").append(Bukkit.getOnlinePlayers().size()).append("/")
-                   .append(Bukkit.getMaxPlayers()).append("\n");
+                    .append(Bukkit.getMaxPlayers()).append("\n");
             message.append("§eMemory Usage: §f").append(formatMemory(runtime.totalMemory() - runtime.freeMemory()))
-                   .append("/").append(formatMemory(runtime.maxMemory())).append("\n");
+                    .append("/").append(formatMemory(runtime.maxMemory())).append("\n");
             message.append("§eCPU Usage: §f").append(df.format(osBean.getSystemLoadAverage())).append("%\n");
             message.append("§eServer Version: §f").append(Bukkit.getVersion()).append("\n");
             message.append("§eJava Version: §f").append(System.getProperty("java.version")).append("\n");
             message.append("§eOperating System: §f").append(System.getProperty("os.name")).append(" ")
-                   .append(System.getProperty("os.version"));
+                    .append(System.getProperty("os.version"));
 
             if (sender instanceof Player) {
                 Player player = (Player) sender;
