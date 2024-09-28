@@ -1,12 +1,8 @@
 package org.fourz.rvnktools;
 
-import java.util.logging.Level;
-
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.checkerframework.checker.units.qual.A;
 import org.fourz.rvnktools.DiscordCommand;
-import org.fourz.rvnktools.listeners.MickyHatPlaceListener;
+import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.AnnouncementManager;
 
 public class RVNKTools extends JavaPlugin {
