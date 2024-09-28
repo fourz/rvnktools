@@ -18,4 +18,6 @@ commands:
   discord:
     description: Provides a link to the Discord server.
     usage: /discord
-
+  announcement:
+    description: Manages announcements.
+    usage: /announcement -add <message> or /announcement -remove
