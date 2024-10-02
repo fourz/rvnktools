@@ -6,25 +6,25 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
+import org.fourz.rvnktools.RVNKTools;
 
 public class DiscordCommand implements CommandExecutor {
+    private LinkMaker linkMaker;
+
+    public DiscordCommand(RVNKTools plugin) {
+        linkMaker = new LinkMaker(plugin);
+    }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+
         if (cmd.getName().equalsIgnoreCase("discord")) {
             if (sender instanceof Player) {
                 Player player = (Player) sender;
 
-                // Create the main message component
-                TextComponent message = new TextComponent("Click here");
-                message.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,
-                        "https://discord.com/channels/452900386794111006/698630242801156106"));
-
-                // Add additional text
-                TextComponent additionalText = new TextComponent(" to join our Discord!");
-
-                // Combine the components
-                message.addExtra(additionalText);
+                TextComponent message = new TextComponent(
+                        linkMaker.replacePlaceholders("Click here to join our {discord-link}!"));
 
                 // Send the combined message
                 player.spigot().sendMessage(message);
