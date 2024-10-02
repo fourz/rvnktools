@@ -1,10 +1,6 @@
 package org.fourz.rvnktools;
 
-import java.util.logging.Level;
-
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.checkerframework.checker.units.qual.A;
 import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
@@ -18,7 +14,6 @@ public class RVNKTools extends JavaPlugin {
 
     @Override
     public void onEnable() {
-
         // Initialize AnnouncementManager
         announcementManager = new AnnouncementManager(this);
 
@@ -31,7 +26,7 @@ public class RVNKTools extends JavaPlugin {
         this.getCommand("ping").setExecutor(new PingCommand());
         this.getCommand("tps").setExecutor(this);
         this.getCommand("events").setExecutor(new EventsCommand());
-        this.getCommand("discord").setExecutor(new DiscordCommand());
+        this.getCommand("discord").setExecutor(new DiscordCommand(this));
 
         getLogger().info("RVNK Toolkit has been enabled.");
     }
