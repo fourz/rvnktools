@@ -1,6 +1,9 @@
 package org.fourz.rvnktools;
 
+<<<<<<< HEAD
 import org.bukkit.configuration.file.FileConfiguration;
+=======
+>>>>>>> dev
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.DiscordCommand;
@@ -16,10 +19,13 @@ public class RVNKTools extends JavaPlugin {
 
     @Override
     public void onEnable() {
+<<<<<<< HEAD
 
         // Save default config if not present
         saveDefaultConfig();
         
+=======
+>>>>>>> dev
         // Initialize AnnouncementManager
         // announcementManager = new AnnouncementManager(this);
 
@@ -32,7 +38,7 @@ public class RVNKTools extends JavaPlugin {
         this.getCommand("ping").setExecutor(new PingCommand());
         this.getCommand("tps").setExecutor(this);
         this.getCommand("events").setExecutor(new EventsCommand());
-        this.getCommand("discord").setExecutor(new DiscordCommand());
+        this.getCommand("discord").setExecutor(new DiscordCommand(this));
 
         // registerToggleCommands();
 

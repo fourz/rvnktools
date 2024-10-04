@@ -1,0 +1,17 @@
+links:
+  discord:
+    url: "https://discord.gg/5PvjD44Ba5"
+    text: "Discord"
+    placeholder: "{discord-link}"
+  facebook:
+    url: "https://www.facebook.com/ravenkraftserver"
+    text: "Facebook"
+    placeholder: "{facebook-link}"
+  patreon:
+    url: "https://www.patreon.com/ravenkraftmc"
+    text: "Patreon"
+    placeholder: "{patreon-link}"
+  information:
+    url: "https://discord.com/channels/452900386794111006/1091794540744159233"
+    text: "Information"
+    placeholder: "{information-link}"
