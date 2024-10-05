@@ -36,13 +36,11 @@ public class RVNKTools extends JavaPlugin {
 
         // registerToggleCommands();
 
-        FileConfiguration config = getConfig();
-         
+        FileConfiguration config = getConfig();         
         // Initialize CycleCommand
-        CycleCommand cycleCommand = new CycleCommand(config);
-                 
+        CycleCommand cycleCommand = new CycleCommand(config);                 
         // Register command executor
-        this.getCommand("commandcycle").setExecutor(cycleCommand);
+        //this.getCommand("commandcycle").setExecutor(cycleCommand);
 
         // 
 
