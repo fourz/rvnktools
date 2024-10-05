@@ -71,6 +71,8 @@ import java.util.HashMap;
             if (commandCycleSection != null) {
                 // Iterate over each subcommand defined under 'commandcycle'
                 for (String subcommand : commandCycleSection.getKeys(false)) {
+                    String subcommand_debug = subcommand.toLowerCase();
+
                     // Get the configuration section for the current subcommand
                     ConfigurationSection subcommandSection = commandCycleSection.getConfigurationSection(subcommand);
                     if (subcommandSection != null) {
@@ -113,6 +115,11 @@ import java.util.HashMap;
                     }
                 }
             }
+        }
+
+    private Object getLogger() {
+            // TODO Auto-generated method stub
+            throw new UnsupportedOperationException("Unimplemented method 'getLogger'");
         }
 
     /**
