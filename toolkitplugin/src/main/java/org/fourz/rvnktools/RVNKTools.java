@@ -12,7 +12,7 @@ import org.fourz.rvnktools.command.CycleCommand;
 
 public class RVNKTools extends JavaPlugin {
 
-    private AnnouncementManager announcementManager;
+    // private AnnouncementManager announcementManager;
 
     @Override
     public void onEnable() {
@@ -36,9 +36,9 @@ public class RVNKTools extends JavaPlugin {
 
         // registerToggleCommands();
 
-        FileConfiguration config = getConfig();         
+        // FileConfiguration config = getConfig();         
         // Initialize CycleCommand
-        CycleCommand cycleCommand = new CycleCommand(config);                 
+        // CycleCommand cycleCommand = new CycleCommand(config);                 
         // Register command executor
         //this.getCommand("commandcycle").setExecutor(cycleCommand);
 
