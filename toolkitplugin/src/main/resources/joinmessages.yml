@@ -1,0 +1,13 @@
+messages:
+  - "Welcome to the server, {player}!"
+  - "Glad to see you, {player}. Let's get started!"
+  - "Hey {player}, good to have you here!"
+  - "Welcome, {player}. Enjoy your stay!"
+  - "{player}, we're happy you joined us!"
+new_player_messages:
+  - "Welcome to Ravenkraft, {player}!"
+  - "Hey {player}, welcome to the adventure! We're happy to have you!"
+  - "Welcome aboard, {player}! Your adventure begins now!"
+  - "{player}, welcome to the community! We're excited to see what you'll do!"
+  - "Hello {player}, welcome to Ravenkraft! Have a great time!"
+chance: 40

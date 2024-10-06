@@ -8,11 +8,12 @@ import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.command.CycleCommand;
 
 public class RVNKTools extends JavaPlugin {
 
-    // private AnnouncementManager announcementManager;
+    private AnnouncementManager announcementManager;
 
     @Override
     public void onEnable() {
@@ -21,10 +22,10 @@ public class RVNKTools extends JavaPlugin {
         // saveDefaultConfig();
         
         // Initialize AnnouncementManager
-        // announcementManager = new AnnouncementManager(this);
+        announcementManager = new AnnouncementManager(this);
 
         // Code that runs when the plugin is enabled
-        getServer().getPluginManager().registerEvents(new JoinListener(), this);
+        getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
         getLogger().info("yoo");
 
@@ -32,7 +33,8 @@ public class RVNKTools extends JavaPlugin {
         this.getCommand("ping").setExecutor(new PingCommand());
         this.getCommand("tps").setExecutor(this);
         this.getCommand("events").setExecutor(new EventsCommand());
-        this.getCommand("discord").setExecutor(new DiscordCommand(this));
+        this.getCommand("discord").setExecutor(new DiscordCommand(this));        
+        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
 
         // registerToggleCommands();
 

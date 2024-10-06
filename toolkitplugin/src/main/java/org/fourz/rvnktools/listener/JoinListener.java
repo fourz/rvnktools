@@ -1,68 +1,56 @@
 package org.fourz.rvnktools.listener;
 
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Arrays;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 
 public class JoinListener implements Listener {
-    private List<String> messages = Arrays.asList(
-                "Welcome to the server, where the code is made up and the bugs don't matter!",
-                "Welcome, we've been expecting you!",
-                "Welcome, enjoy your stay. Beware of the bugs!",
-                "Welcome to our humble server, {player}!",
-                "Glad to have you here, {player}!",
-                "Look who's here! Welcome, {player}!",
-                "The fun just doubled now that you're here, {player}!",
-                "{player}, brace yourself for an awesome time!",
-                "We've rolled out the red carpet for you, {player}!",
-                "All hail {player}! Welcome to the server!",
-                "Hey {player}, ready for some epic adventures?",
-                "Welcome, {player}! Hope you've brought snacks!",
-                "The party starts now that {player} is here!",
-                "Ahoy, {player}! Welcome aboard!",
-                "It's a bird! It's a plane! No, it's {player}! Welcome!",
-                "{player}, you just made this server 100% better!",
-                "Hey {player}, welcome! Mind the creepers!",
-                "{player}, we hope you're ready for some serious fun!",
-                "Welcome, {player}! Let the games begin!",
-                "{player}, the server just got more awesome!",
-                "{player}, ready to make some memories? Welcome!",
-                "Welcome, {player}! We've got room for one more adventurer!",
-                "{player}, welcome to the land of opportunities... and mobs!",
-                "We were just waiting for you, {player}! Let's go!",
-                "{player}, welcome! Remember, every hero starts somewhere!",
-                "{player}, you are now officially part of the legend!",
-                "The fun level just skyrocketed! Welcome, {player}!",
-                "{player}, grab your sword and let's dive in!",
-                "Welcome, {player}! Don't forget to craft some armor!"
-            );
+    private JavaPlugin plugin;
+    private List<String> messages;
+    private List<String> newPlayerMessages;
+    private int interval;
+    
+    public JoinListener(JavaPlugin plugin) {
+        this.plugin = plugin;
+        loadMessages();
+    }
 
-            private List<String> newPlayerMessages = Arrays.asList(
-                "Welcome to Ravenkraft, {player}!",
-                "Hey {player}, welcome to the adventure! We're happy to have you!",
-                "A warm welcome to you, {player}! Let's start this journey together!",
-                "Welcome aboard, {player}! Your adventure begins now!"
-                // ... add more messages here
-            );
+    private void loadMessages() {
+        File file = new File(plugin.getDataFolder(), "joinmessages.yml");
+        if (!file.exists()) {
+            plugin.saveResource("joinmessages.yml", false);
+        }
+        FileConfiguration config = YamlConfiguration.loadConfiguration(file);
 
-        @EventHandler
-        public void onPlayerJoin(PlayerJoinEvent event) {
-            Random random = new Random();
-            Player player = event.getPlayer();
+        messages = config.getStringList("messages");
+        newPlayerMessages = config.getStringList("new_player_messages");
+        interval = config.getInt("chance", 40); // Default chance is 40%
+    }
 
-            if (player.hasPlayedBefore()) {
-                if (random.nextInt(100) < 40) {
-                    String message = messages.get(random.nextInt(messages.size()));
-                    player.sendMessage(message.replace("{player}", player.getName()));
-                }
-            } else {
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Random random = new Random();
+        Player player = event.getPlayer();
+
+        if (player.hasPlayedBefore()) {
+            if (random.nextInt(100) < interval && player.hasPermission("rvnktools.welcome")) {
+                String message = messages.get(random.nextInt(messages.size()));
+                player.sendMessage(message.replace("{player}", player.getName()));
+            }
+        } else {
+            if (player.hasPermission("rvnktools.welcome.newplayer")) {
                 String message = newPlayerMessages.get(random.nextInt(newPlayerMessages.size()));
                 player.sendMessage(message.replace("{player}", player.getName()));
             }
         }
     }
+}

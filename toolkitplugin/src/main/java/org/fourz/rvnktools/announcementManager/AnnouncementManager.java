@@ -50,11 +50,11 @@ public class AnnouncementManager {
             configFile.createNewFile();
             YamlConfiguration defaultConfig = new YamlConfiguration();
             defaultConfig.set("announcements",
-                    Arrays.asList("Welcome to the server!", "Remember to follow the rules!"));
-            defaultConfig.set("interval", 300);
+                    Arrays.asList("HOwdy PaRTnEr!", "Beware of Shadowmelt..","Welcome to Ravenkraft!"));
+            defaultConfig.set("interval", 1200);
             defaultConfig.set("random-interval", false);
-            defaultConfig.set("min-interval", 180);
-            defaultConfig.set("max-interval", 600);
+            defaultConfig.set("min-interval", 480);
+            defaultConfig.set("max-interval", 6000);
             defaultConfig.save(configFile);
         } catch (IOException e) {
             e.printStackTrace();
@@ -92,7 +92,7 @@ public class AnnouncementManager {
             return;
         String announcement = announcements.get(new Random().nextInt(announcements.size()));
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!disabledPlayers.contains(player.getUniqueId())) {
+            if (!disabledPlayers.contains(player.getUniqueId()) && player.hasPermission("announcement.receive")) {
                 player.sendMessage(announcement);
             }
         }
@@ -100,12 +100,16 @@ public class AnnouncementManager {
 
     public void toggleAnnouncements(Player player) {
         UUID playerId = player.getUniqueId();
-        if (disabledPlayers.contains(playerId)) {
-            disabledPlayers.remove(playerId);
-            player.sendMessage("Announcements enabled.");
+        if (player.hasPermission("rvnktools.command.announcement.toggle")) {
+            if (disabledPlayers.contains(playerId)) {
+                disabledPlayers.remove(playerId);
+                player.sendMessage("Announcements enabled.");
+            } else {
+                disabledPlayers.add(playerId);
+                player.sendMessage("Announcements disabled.");
+            }
         } else {
-            disabledPlayers.add(playerId);
-            player.sendMessage("Announcements disabled.");
+            player.sendMessage("You do not have permission to toggle announcements.");
         }
     }
 

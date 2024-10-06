@@ -18,3 +18,18 @@ commands:
   discord:
     description: Provides information about the server's discord.
     usage: /discord
+  broadcast:
+    description: Broadcasts a message to all players
+    usage: /broadcast <message>
+
+permissions:
+  rvnktools.command.broadcast:
+    description: Allows the player to use the broadcast command
+    default: op
+  rvnktools.welcome:
+    description: Allows the player to get welcome messages
+    default: true
+  rvnktools.welcome.newplayer:
+    description: Allows the player to get welcome messages
+    default: true
+        

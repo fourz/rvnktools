@@ -67,7 +67,7 @@ import java.util.HashMap;
             subcommandInstructions = new HashMap<>();
             
             // Retrieve the 'commandcycle' section from the config
-            ConfigurationSection commandCycleSection = config.getConfigurationSection("commands.commandcycle");
+            ConfigurationSection commandCycleSection = config.getConfigurationSection("rvnktools.command.commandcycle");
             if (commandCycleSection != null) {
                 // Iterate over each subcommand defined under 'commandcycle'
                 for (String subcommand : commandCycleSection.getKeys(false)) {
