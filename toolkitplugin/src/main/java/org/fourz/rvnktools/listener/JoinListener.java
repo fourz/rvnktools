@@ -16,7 +16,6 @@ public class JoinListener implements Listener {
                 "Welcome, enjoy your stay. Beware of the bugs!",
                 "Welcome to our humble server, {player}!",
                 "Glad to have you here, {player}!",
-                "Greetings, {player}! The adventure awaits!",
                 "Look who's here! Welcome, {player}!",
                 "The fun just doubled now that you're here, {player}!",
                 "{player}, brace yourself for an awesome time!",
