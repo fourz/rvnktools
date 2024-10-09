@@ -29,6 +29,9 @@ public class MickyHatPlaceListener implements Listener {
                     // Force a resync of the player's position
                     event.getPlayer().teleport(event.getPlayer().getLocation());
 
+                    // send message to player
+                    event.getPlayer().sendMessage("Mickyhats cannot be placed at this time.");
+
                 }
             }
         }
