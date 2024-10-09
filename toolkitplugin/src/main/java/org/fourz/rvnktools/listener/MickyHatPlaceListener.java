@@ -19,21 +19,20 @@ public class MickyHatPlaceListener implements Listener {
             if (item != null && item.getType() == Material.CARVED_PUMPKIN) {
                 ItemMeta meta = item.getItemMeta();
                 if (meta != null && meta.hasCustomModelData()) {
-                    int customModelData = meta.getCustomModelData();
 
-                    // Cancel block placement if custom model data is greater than 0
-                    if (customModelData > 0) {
-                        // Cancel the interaction before the block is placed
-                        event.setCancelled(true);
+                    // Cancel the interaction before the block is placed
+                    event.setCancelled(true);
 
-                        // Optionally log or notify the player
-                        event.getPlayer().sendMessage("no");
+                    // Sync the player's inventory to correct the client-side state
+                    event.getPlayer().updateInventory();
 
-                        // Sync the player's inventory to correct the client-side state
-                        event.getPlayer().updateInventory();
-                    }
+                    // Force a resync of the player's position
+                    event.getPlayer().teleport(event.getPlayer().getLocation());
+
                 }
             }
         }
     }
 }
+
+

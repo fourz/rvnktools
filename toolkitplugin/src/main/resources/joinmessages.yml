@@ -1,0 +1,23 @@
+messages:
+  - "Welcome to the server, {player}!"
+  - "Glad to see you, {player}. Let's get started!"
+  - "Hey {player}, good to have you here!"
+  - "Welcome, {player}. Enjoy your stay!"
+  - "{player}, we're happy you joined us!"
+  - "ShadowMelt sees you, {player}.  Beware the toasties."
+  - "Come check out the Nether Express. Station is at spawn, {player}!"
+  - "{player}, ShadowMelt permits your arrival, though its reasons remain shrouded."
+  - "Tread carefully, {player}, for magic here is fickle, and its price unknown."
+  - "Enter, {player}. The shadows are eager to meet you."
+  - "Welcome, {player}. Ask about Wiz-Alert//TM//."
+  - "Welcome to Ravenkraft, where everyone is a little bit mad. Especially the staff."  
+  - "Welcome, {player}. try /discord to get the link to our discord server!"
+
+new_player_messages:
+  - "Welcome to Ravenkraft, {player}!"
+  - "Hey {player}, welcome to the adventure! We're happy to have you!"
+  - "Welcome aboard, {player}! Your adventure begins now!"
+  - "Hello {player}, welcome to Ravenkraft! Have a great time!"
+  - "Welcome, {player}. ShadowMelt has decided to allow your presence... for now."
+  - "Welcome to Ravenkraft, {player}! The haunted tour begins now."  
+chance: 40
