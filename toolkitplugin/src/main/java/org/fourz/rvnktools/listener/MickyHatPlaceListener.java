@@ -26,6 +26,9 @@ public class MickyHatPlaceListener implements Listener {
                     // Sync the player's inventory to correct the client-side state
                     event.getPlayer().updateInventory();
 
+                    // Force a resync of the player's position
+                    event.getPlayer().teleport(event.getPlayer().getLocation());
+
                 }
             }
         }

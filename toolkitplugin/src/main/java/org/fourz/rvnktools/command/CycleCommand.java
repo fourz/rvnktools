@@ -72,6 +72,7 @@ import java.util.HashMap;
                 // Iterate over each subcommand defined under 'commandcycle'
                 for (String subcommand : commandCycleSection.getKeys(false)) {
                     String subcommand_debug = subcommand.toLowerCase();
+                    //output to console                    
 
                     // Get the configuration section for the current subcommand
                     ConfigurationSection subcommandSection = commandCycleSection.getConfigurationSection(subcommand);

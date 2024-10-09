@@ -3,17 +3,18 @@ package org.fourz.rvnktools;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announcementManager.AnnouncementManager;
+import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.command.BroadcastCommand;
-import org.fourz.rvnktools.command.CycleCommand;
 
 public class RVNKTools extends JavaPlugin {
 
     private AnnouncementManager announcementManager;
+    private CycleCommands cycleCommands;
 
     @Override
     public void onEnable() {
@@ -22,7 +23,7 @@ public class RVNKTools extends JavaPlugin {
         // saveDefaultConfig();
         
         // Initialize AnnouncementManager
-        announcementManager = new AnnouncementManager(this);
+        // announcementManager = new AnnouncementManager(this);
 
         // Code that runs when the plugin is enabled
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
@@ -36,15 +37,8 @@ public class RVNKTools extends JavaPlugin {
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
         this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
 
-        // registerToggleCommands();
-
-        // FileConfiguration config = getConfig();         
-        // Initialize CycleCommand
-        // CycleCommand cycleCommand = new CycleCommand(config);                 
-        // Register command executor
-        //this.getCommand("commandcycle").setExecutor(cycleCommand);
-
-        // 
+        // Initialize and register CycleCommands
+        // cycleCommands = new CycleCommands(this);
 
         getLogger().info("RVNK Toolkit has been enabled.");
     }
