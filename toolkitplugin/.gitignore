@@ -16,7 +16,6 @@ build/
 
 # Ignore IDE specific files 
 .vscode/
-.vscode/*
 .idea/
 
 # Ignore OS generated files
