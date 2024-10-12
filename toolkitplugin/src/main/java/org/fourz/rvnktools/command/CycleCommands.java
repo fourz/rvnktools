@@ -1,156 +1,130 @@
 package org.fourz.rvnktools.command;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 
 public class CycleCommands {
     private final JavaPlugin plugin;
-    private FileConfiguration cycleCommandsConfig;
-    private final Map<String, CommandDefinition> commandDefinitions = new HashMap<>();
-    private final Map<String, AtomicInteger> playerCycleIndices = new HashMap<>();
+    private FileConfiguration config;
+    private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
     public CycleCommands(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.config = plugin.getConfig();
+        this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
     }
 
-    // Loads the configuration file from the plugin's data folder
-    private void loadConfig() {
-        File configFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
-        if (!configFile.exists()) {
-            // Save the default configuration file if it does not exist
-            plugin.saveResource("cyclecommands.yml", false);
-        }
-        cycleCommandsConfig = YamlConfiguration.loadConfiguration(configFile);
-        parseCommands();
+    public void loadConfig() {
+        plugin.saveResource("cyclecommands.yml", false);
+        this.config = plugin.getConfig();
     }
 
-    // Parses the commands from the configuration file and stores them in memory
-    private void parseCommands() {
-        if (cycleCommandsConfig == null) return;
-
-        // Iterate through each command defined in the configuration
-        for (String commandName : cycleCommandsConfig.getConfigurationSection("commands").getKeys(false)) {
-            String description = cycleCommandsConfig.getString("commands." + commandName + ".description");
-            String usage = cycleCommandsConfig.getString("commands." + commandName + ".usage");
-            String alias = cycleCommandsConfig.getString("commands." + commandName + ".alias");
-            CommandDefinition commandDefinition = new CommandDefinition(commandName, description, usage, alias);
-
-            // Iterate through each set for the command and store its actions
-            for (String setName : cycleCommandsConfig.getConfigurationSection("commands." + commandName + ".sets").getKeys(false)) {
-                List<Map<?, ?>> actions = cycleCommandsConfig.getMapList("commands." + commandName + ".sets." + setName);
-                commandDefinition.getSets().put(setName, actions);
+    public void registerCommands() {
+        ConfigurationSection commandsSection = config.getConfigurationSection("commands");
+        if (commandsSection != null) {
+            for (String commandKey : commandsSection.getKeys(false)) {
+                ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
+                if (commandConfig != null) {
+                    PluginCommand pluginCommand = plugin.getCommand(commandKey);
+                    if (pluginCommand != null) {
+                        pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig));
+                        plugin.getLogger().info("Registered command: " + commandKey);
+                    }
+                }
             }
-            commandDefinitions.put(commandName, commandDefinition);
         }
     }
 
-    // Registers all the parsed commands with the server
-    private void registerCommands() {
-        for (String commandName : commandDefinitions.keySet()) {
-            plugin.getCommand(commandName).setExecutor(new CommandCycleExecutor(commandDefinitions.get(commandName)));
-            plugin.getLogger().info("Registered command: " + commandName);
-        }
-    }
+    private class CycleCommandExecutor implements CommandExecutor {
+        private final String commandKey;
+        private final ConfigurationSection commandConfig;
 
-    // Inner class to handle the execution of cycle commands
-    public class CommandCycleExecutor implements CommandExecutor {
-        private final CommandDefinition commandDefinition;
-
-        public CommandCycleExecutor(CommandDefinition commandDefinition) {
-            this.commandDefinition = commandDefinition;
+        public CycleCommandExecutor(String commandKey, ConfigurationSection commandConfig) {
+            this.commandKey = commandKey;
+            this.commandConfig = commandConfig;
         }
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            // Ensure the command sender is a player
             if (!(sender instanceof Player)) {
-                sender.sendMessage("This command can only be run by a player.");
+                sender.sendMessage("This command can only be used by players.");
                 return true;
             }
+
             Player player = (Player) sender;
+            UUID playerId = player.getUniqueId();
+            String instructionKey = getNextInstructionKey(playerId);
+            ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions." + instructionKey);
 
-            // Create a unique key for the player and command to track their cycle progress
-            String playerKey = player.getUniqueId().toString() + "-" + commandDefinition.name;
-            AtomicInteger cycleIndex = playerCycleIndices.computeIfAbsent(playerKey, k -> new AtomicInteger(0));
-
-            // Get the list of sets for the command
-            List<String> setNames = commandDefinition.getSets().keySet().stream().toList();
-            if (setNames.isEmpty()) {
-                player.sendMessage("No sets available for this command.");
-                return true;
+            if (instructions != null) {
+                for (String key : instructions.getKeys(false)) {
+                    switch (key) {
+                        case "run_command_as_player":
+                            String playerCommand = instructions.getString(key);
+                            if (playerCommand != null) {
+                                player.performCommand(playerCommand);
+                            }
+                            break;
+                        case "run_command_as_server":
+                            String serverCommand = instructions.getString(key).replace("$player", player.getName());
+                            if (serverCommand != null) {
+                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
+                            }
+                            break;
+                        case "send_message_to_player":
+                            String message = instructions.getString(key);
+                            if (message != null) {
+                                player.sendMessage(message);
+                            }
+                            break;
+                        case "send_message_to_all_players":
+                            String broadcastMessage = instructions.getString(key);
+                            if (broadcastMessage != null) {
+                                Bukkit.broadcastMessage(broadcastMessage);
+                            }
+                            break;
+                        case "wait":
+                            // Handle wait logic if required, might need async scheduling
+                            break;
+                    }
+                }
+            } else {
+                player.sendMessage("No instruction set found for key: " + instructionKey);
             }
 
-            // Get the current set based on the cycle index and increment the index
-            int currentIndex = cycleIndex.getAndUpdate(i -> (i + 1) % setNames.size());
-            String setName = setNames.get(currentIndex);
-            List<Map<?, ?>> actions = commandDefinition.getSets().get(setName);
-
-            // Execute each action defined in the set
-            for (Map<?, ?> actionMap : actions) {
-                String action = (String) actionMap.get("action");
-                String detail = (String) actionMap.get("detail");
-                executeAction(player, action, detail);
-            }
             return true;
         }
 
-        // Executes a specific action for the player
-        private void executeAction(Player player, String action, String detail) {
-            switch (action) {
-                case "run_command_as_player":
-                    // Player executes a command
-                    player.performCommand(detail);
-                    break;
-                case "run_command_as_server":
-                    // Server executes a command, replacing $player with the player's name
-                    plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), detail.replace("$player", player.getName()));
-                    break;
-                case "send_message_to_player":
-                    // Send a message to the player
-                    player.sendMessage(detail);
-                    break;
-                default:
-                    // Handle unknown actions
-                    player.sendMessage("Unknown action: " + action);
+        private String getNextInstructionKey(UUID playerId) {
+            Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
+            int position = commandPositions.getOrDefault(playerId, 0);
+
+            ConfigurationSection instructionsSection = commandConfig.getConfigurationSection("instructions");
+            if (instructionsSection == null) {
+                return null;
             }
-        }
-    }
 
-    // Class to define the structure of a command
-    private static class CommandDefinition {
-        private final String name;
-        private final String description;
-        private final String usage;
-        private final String alias;
-        private final Map<String, List<Map<?, ?>>> sets = new HashMap<>();
+            int totalInstructions = instructionsSection.getKeys(false).size();
+            String nextInstructionKey = (String) instructionsSection.getKeys(false).toArray()[position];
 
-        public CommandDefinition(String name, String description, String usage, String alias) {
-            this.name = name;
-            this.description = description;
-            this.usage = usage;
-            this.alias = alias;
-        }
+            // Update position for next time
+            position = (position + 1) % totalInstructions;
+            commandPositions.put(playerId, position);
 
-        public String getUsage() {
-            return usage;
-        }
-
-        public Map<String, List<Map<?, ?>>> getSets() {
-            return sets;
+            return nextInstructionKey;
         }
     }
 }

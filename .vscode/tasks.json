@@ -1,15 +1,55 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-            "label": "Build and Copy Jar",
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Plugin",
             "type": "shell",
-            "command": "mvn package",
+            "command": "mvn clean package",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
             "group": {
                 "kind": "build",
-                "isDefault": true
+                "isDefault": true                
             },
-            "detail": "Build the project and copy the jar to multiple locations."
-		}
-	]
+            "detail": "Compiles and packages the Spigot plugin using Maven."
+        },
+        {
+            "label": "Copy to Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\copyto-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": "build",
+            "dependsOn": "Build Plugin",
+            "detail": "Copies the built plugin JAR to the server plugins folder."
+        },
+        {
+            "label": "Restart Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\restart-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build",
+            },
+            "dependsOn": "Copy to Server",
+            "detail": "RESTARTS after copying fresh build to DEV server."
+        },
+        {
+            "label": "Reload Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\reload-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build",
+            },
+            "dependsOn": "Copy to Server",
+            "detail": "Reloads plugins after copying fresh build to DEV server."
+        }
+    ]
 }

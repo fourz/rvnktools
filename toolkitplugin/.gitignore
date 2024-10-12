@@ -16,7 +16,7 @@ build/
 
 # Ignore IDE specific files 
 .vscode/
-.vscode/settings.json
+.vscode/*
 .idea/
 
 # Ignore OS generated files

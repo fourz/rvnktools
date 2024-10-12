@@ -4,31 +4,38 @@ commands:
       description: Cycle through gamemodes.
       usage: /cyclegamemode
       alias: gmc
-      sets:
+      instructions:
         creative:
-          - action: run_command_as_player
-            detail: /gamemode creative
+          - run_command_as_player: "/gamemode creative"
         survival:
-          - action: run_command_as_player
-            detail: /gamemode survival
+          - run_command_as_player: "/gamemode survival"
         spectator:
-          - action: run_command_as_player
-            detail: /gamemode spectator
+          - run_command_as_player: "/gamemode spectator"
     cycletrainmode:
       description: Cycle through instruction sets.
       alias: railroad
       usage: /railroad
-      sets:
+      instructions:
         trainmodeon:
-          - action: run_command_as_server
-            detail: lp user $player permission unset group.rail-trains
-          - action: send_message_to_player
-            detail: "Newly placed minecarts will now be train minecarts."
+          - run_command_as_server: lp user $player permission unset group.rail-trains
+          - send_message_to_player: "Newly placed minecarts will now be train minecarts."
         trainmodeoff:
-          - action: run_command_as_server
-            detail: lp user $player permission set group.rail-trains
-          - action: send_message_to_player
-            detail: "Newly placed minecarts will now be vanilla minecarts."
+          - run_command_as_server: lp user $player permission set group.rail-trains
+          - send_message_to_player: "Newly placed minecarts will now be vanilla minecarts."
+    countdown:
+      description: Countdown for restarting the server.
+      usage: /countdown
+      instructions:
+        5minute:
+          - send_command_as_server: "broadcast &cServer restart in 5 minutes."
+          - wait: 3m
+        2minute:
+          - send_command_as_server: "broadcast &cServer restart in 2 minutes."
+          - wait: 1m
+        1minute:
+          - send_command_as_server: "broadcast &cServer restart in 1 minute."
+          - wait: 1m
+          - send_message_to_all_players: "server restarting..."
 permissions:
   rvnktools.command.cyclegamemode:
     description: Allows the player to use the gmc command
