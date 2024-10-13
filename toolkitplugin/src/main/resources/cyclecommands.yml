@@ -36,6 +36,7 @@ commands:
           - send_command_as_server: "broadcast &cServer restart in 1 minute."
           - wait: 1m
           - send_message_to_all_players: "server restarting..."
+          
 permissions:
   rvnktools.command.cyclegamemode:
     description: Allows the player to use the gmc command
