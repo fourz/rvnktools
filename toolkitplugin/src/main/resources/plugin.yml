@@ -21,6 +21,25 @@ commands:
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>
+    permissions: 
+      - rvnktools.command.broadcast    
+  cyclegamemode:
+    description: Cycle through gamemodes.
+    usage: /cyclegamemode
+    permissions: 
+      - rvnktools.command.cyclegamemode
+    alias: gmc
+  cycletrainmode:
+    description: Cycle through instruction sets.
+    alias: railroad
+    usage: /railroad
+    permissions: 
+      - rvnktools.command.cycletrainmode    
+  countdown:  
+    description: Countdown for restarting the server.
+    usage: /countdown 
+    permissions: 
+      - rvnktools.command.countdown    
 
 permissions:
   rvnktools.command.broadcast:
@@ -32,4 +51,10 @@ permissions:
   rvnktools.welcome.newplayer:
     description: Allows the player to get welcome messages
     default: true
+  rvnktools.command.cyclegamemode:
+    description: Allows the player to use the gmc command
+    default: false
+  rvnktools.command.cycletrainmode:
+    description: Allows the player to use cycle railroad modes
+    default: false        
         

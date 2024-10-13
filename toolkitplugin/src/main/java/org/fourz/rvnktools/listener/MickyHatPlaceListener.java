@@ -23,13 +23,15 @@ public class MickyHatPlaceListener implements Listener {
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
             ItemStack item = event.getItem();
 
+            // Check if the item is a carved pumpkin
             if (item != null && item.getType() == Material.CARVED_PUMPKIN) {
                 ItemMeta meta = item.getItemMeta();
+
+                // Check if the item has custom model data
                 if (meta != null && meta.hasCustomModelData()) {
 
                     UUID playerId = event.getPlayer().getUniqueId();
-                    long currentTime = System.currentTimeMillis();
-                    
+                    long currentTime = System.currentTimeMillis();                    
 
                     // Check if the player is on cooldown
                     if (lastInteraction.containsKey(playerId) &&

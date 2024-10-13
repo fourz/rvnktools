@@ -9,7 +9,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -25,26 +27,49 @@ public class CycleCommands {
         this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
+        plugin.getLogger().info("CycleCommands initialized.");
     }
 
     public void loadConfig() {
-        plugin.saveResource("cyclecommands.yml", false);
-        this.config = plugin.getConfig();
+        File cycleCommandsFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
+        if (!cycleCommandsFile.exists()) {
+            plugin.saveResource("cyclecommands.yml", false);
+        }
+        this.config = YamlConfiguration.loadConfiguration(cycleCommandsFile);
     }
 
     public void registerCommands() {
         ConfigurationSection commandsSection = config.getConfigurationSection("commands");
+        // output the commands section to the console
+        plugin.getLogger().info("Commands section: " + commandsSection);
+
         if (commandsSection != null) {
             for (String commandKey : commandsSection.getKeys(false)) {
+                plugin.getLogger().info("Processing command key: " + commandKey);
+
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
+                    plugin.getLogger().info("Command config for " + commandKey + ": " + commandConfig);
+
                     PluginCommand pluginCommand = plugin.getCommand(commandKey);
                     if (pluginCommand != null) {
+                        plugin.getLogger().info("Plugin command for " + commandKey + ": " + pluginCommand);
+
                         pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig));
                         plugin.getLogger().info("Registered command: " + commandKey);
+
+                    } else {
+
+                        plugin.getLogger().info("Plugin command for " + commandKey + " is null");
                     }
+                } else {
+
+                    plugin.getLogger().info("Command config for " + commandKey + " is null");
                 }
             }
+        } else {
+
+            plugin.getLogger().info("Commands section is null");
         }
     }
 
@@ -71,6 +96,7 @@ public class CycleCommands {
 
             if (instructions != null) {
                 for (String key : instructions.getKeys(false)) {
+                    
                     switch (key) {
                         case "run_command_as_player":
                             String playerCommand = instructions.getString(key);
