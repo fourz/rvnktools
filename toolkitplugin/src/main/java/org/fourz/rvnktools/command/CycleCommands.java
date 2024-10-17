@@ -9,12 +9,16 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+
 import org.bukkit.configuration.file.YamlConfiguration;
+//import 
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Iterator;
 
 public class CycleCommands {
     private final JavaPlugin plugin;
@@ -95,38 +99,8 @@ public class CycleCommands {
             ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions." + instructionKey);
 
             if (instructions != null) {
-                for (String key : instructions.getKeys(false)) {
-                    
-                    switch (key) {
-                        case "run_command_as_player":
-                            String playerCommand = instructions.getString(key);
-                            if (playerCommand != null) {
-                                player.performCommand(playerCommand);
-                            }
-                            break;
-                        case "run_command_as_server":
-                            String serverCommand = instructions.getString(key).replace("$player", player.getName());
-                            if (serverCommand != null) {
-                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
-                            }
-                            break;
-                        case "send_message_to_player":
-                            String message = instructions.getString(key);
-                            if (message != null) {
-                                player.sendMessage(message);
-                            }
-                            break;
-                        case "send_message_to_all_players":
-                            String broadcastMessage = instructions.getString(key);
-                            if (broadcastMessage != null) {
-                                Bukkit.broadcastMessage(broadcastMessage);
-                            }
-                            break;
-                        case "wait":
-                            // Handle wait logic if required, might need async scheduling
-                            break;
-                    }
-                }
+                List<Map<?, ?>> instructionList = instructions.getMapList("steps"); // Adjusted to handle lists
+                executeInstructions(player, instructionList.iterator());
             } else {
                 player.sendMessage("No instruction set found for key: " + instructionKey);
             }
@@ -134,6 +108,45 @@ public class CycleCommands {
             return true;
         }
 
+        private void executeInstructions(Player player, Iterator<Map<?, ?>> iterator) {
+            if (!iterator.hasNext()) return;
+
+            Map<?, ?> instruction = iterator.next();
+            
+            String key = instruction.keySet().iterator().next().toString();
+            plugin.getLogger().info("Instruction key: " + key);
+
+            String value = instruction.get(key).toString();
+            plugin.getLogger().info("Instruction value: " + value);
+
+            switch (key) {
+                case "run_command_as_player":
+                    player.performCommand(value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "run_command_as_server":
+                    String serverCommand = value.replace("$player", player.getName());
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
+                    executeInstructions(player, iterator);
+                    break;
+                case "send_message_to_player":
+                    player.sendMessage(value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "send_message_to_all_players":
+                    Bukkit.broadcastMessage(value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "wait":
+                    long delay = parseTime(value);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> executeInstructions(player, iterator), delay);
+                    break;
+                default:
+                    plugin.getLogger().warning("Unknown instruction: " + key);
+                    executeInstructions(player, iterator);
+                    break;
+            }
+        }
         private String getNextInstructionKey(UUID playerId) {
             Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
             int position = commandPositions.getOrDefault(playerId, 0);
@@ -151,6 +164,22 @@ public class CycleCommands {
             commandPositions.put(playerId, position);
 
             return nextInstructionKey;
+        }
+        private long parseTime(String timeStr) {
+            // Implement parsing of time strings like "1m", "30s"
+            // For simplicity, let's assume 'm' for minutes and 's' for seconds
+            try {
+                if (timeStr.endsWith("m")) {
+                    return Long.parseLong(timeStr.replace("m", "")) * 20 * 60;
+                } else if (timeStr.endsWith("s")) {
+                    return Long.parseLong(timeStr.replace("s", "")) * 20;
+                } else {
+                    return Long.parseLong(timeStr) * 20; // Assuming ticks
+                }
+            } catch (NumberFormatException e) {
+                plugin.getLogger().warning("Invalid time format: " + timeStr);
+                return 0;
+            }
         }
     }
 }

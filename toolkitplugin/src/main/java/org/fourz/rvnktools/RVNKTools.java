@@ -7,6 +7,7 @@ import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
+import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.command.BroadcastCommand;
@@ -23,7 +24,7 @@ public class RVNKTools extends JavaPlugin {
         // saveDefaultConfig();
         
         // Initialize AnnouncementManager
-        // announcementManager = new AnnouncementManager(this);
+        announcementManager = new AnnouncementManager(this);
 
         // Code that runs when the plugin is enabled
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
@@ -31,7 +32,7 @@ public class RVNKTools extends JavaPlugin {
 
         // Register commands
         this.getCommand("ping").setExecutor(new PingCommand());
-        this.getCommand("tps").setExecutor(this);
+        this.getCommand("tps").setExecutor(new TPSCommand());
         this.getCommand("events").setExecutor(new EventsCommand());
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
         this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));        

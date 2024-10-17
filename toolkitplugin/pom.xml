@@ -60,7 +60,7 @@
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-util</artifactId>
             <version>9.4.44.v20210927</version>
-        </dependency>        
+        </dependency>
     </dependencies>
     <build>
         <plugins>
