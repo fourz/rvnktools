@@ -5,11 +5,11 @@ commands:
     alias: gmc
     instructions:
       creative:
-        - run_command_as_player: "/gamemode creative"
+        - run_command_as_player: "gamemode creative"
       survival:
-        - run_command_as_player: "/gamemode survival"
+        - run_command_as_player: "gamemode survival"
       spectator:
-        - run_command_as_player: "/gamemode spectator"
+        - run_command_as_player: "gamemode spectator"
   cycletrainmode:
     description: Cycle through instruction sets.
     alias: railroad
@@ -24,15 +24,18 @@ commands:
   countdown:
     description: Countdown for restarting the server.
     usage: /countdown
+    permission: 
+      - rvnktools.command.countdown
     instructions:
       5minute:
         - run_command_as_server: "broadcast &cServer restart in 5 minutes."
         - wait: 3m
-      2minute:
         - run_command_as_server: "broadcast &cServer restart in 2 minutes."
-        - wait: 1m
-      1minute:
+        - wait: 1m        
         - send_command_as_server: "broadcast &cServer restart in 1 minute."
         - wait: 1m
         - send_message_to_all_players: "server restarting..."
+      cancel:
+        - run_command_as_server: "broadcast &cServer restart cancelled."  
         
+

@@ -49,31 +49,38 @@ public class CycleCommands {
 
         if (commandsSection != null) {
             for (String commandKey : commandsSection.getKeys(false)) {
-                plugin.getLogger().info("Processing command key: " + commandKey);
 
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
-                    plugin.getLogger().info("Command config for " + commandKey + ": " + commandConfig);
 
                     PluginCommand pluginCommand = plugin.getCommand(commandKey);
                     if (pluginCommand != null) {
-                        plugin.getLogger().info("Plugin command for " + commandKey + ": " + pluginCommand);
 
+                        // register command
                         pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig));
-                        plugin.getLogger().info("Registered command: " + commandKey);
+                        plugin.getLogger().info("CycleCommands registered command: " + commandKey);
 
+                        // register aliases
+                        List<String> aliases = commandConfig.getStringList("aliases");
+                        for (String alias : aliases) {
+                            pluginCommand.getAliases().add(alias);
+                        }
+
+                        // set command description
+                        String description = commandConfig.getString("description");
+                        if (description != null) {
+                            pluginCommand.setDescription(description);
+                        }
                     } else {
 
-                        plugin.getLogger().info("Plugin command for " + commandKey + " is null");
+                        plugin.getLogger().info("CycleCommands: Plugin command for " + commandKey + " is null");
                     }
                 } else {
-
-                    plugin.getLogger().info("Command config for " + commandKey + " is null");
+                    plugin.getLogger().info("CycleCommands: Command config for " + commandKey + " is null");
                 }
             }
         } else {
-
-            plugin.getLogger().info("Commands section is null");
+            plugin.getLogger().info("CycleCommands: Commands section is null");
         }
     }
 
@@ -92,15 +99,30 @@ public class CycleCommands {
                 sender.sendMessage("This command can only be used by players.");
                 return true;
             }
-
+            
             Player player = (Player) sender;
             UUID playerId = player.getUniqueId();
             String instructionKey = getNextInstructionKey(playerId);
-            ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions." + instructionKey);
+            ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions");
+
+            if (commandConfig.contains("permission")) {                
+                // retrieve the permission node for the command
+                String permissionsString = commandConfig.getString("permission").toLowerCase();     
+
+                // check permissions for the command
+                if (!player.hasPermission(permissionsString)) {
+                    player.sendMessage("You do not have permission to use this command.");
+                    return true;
+                }
+            }
+
 
             if (instructions != null) {
-                List<Map<?, ?>> instructionList = instructions.getMapList("steps"); // Adjusted to handle lists
+                List<Map<?, ?>> instructionList = instructions.getMapList(instructionKey);
+
+                plugin.getLogger().info("instructionList: " + instructionList);
                 executeInstructions(player, instructionList.iterator());
+            
             } else {
                 player.sendMessage("No instruction set found for key: " + instructionKey);
             }

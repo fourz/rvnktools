@@ -8,6 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.ChatFormat;
 
 public class DiscordCommand implements CommandExecutor {
     private LinkMaker linkMaker;
@@ -24,7 +25,8 @@ public class DiscordCommand implements CommandExecutor {
                 Player player = (Player) sender;
 
                 TextComponent message = new TextComponent(
-                        linkMaker.replacePlaceholders("Click here to join our {discord-link}!"));
+                        linkMaker.replacePlaceholders("Click here to join our {discord-link}!")
+                );
 
                 // Send the combined message
                 player.spigot().sendMessage(message);

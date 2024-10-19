@@ -28,10 +28,10 @@ commands:
     usage: /cyclegamemode
     permissions: 
       - rvnktools.command.cyclegamemode
-    alias: gmc
+    aliases: [gmc]
   cycletrainmode:
     description: Cycle through instruction sets.
-    alias: railroad
+    aliases: [railroad]
     usage: /railroad
     permissions: 
       - rvnktools.command.cycletrainmode    
@@ -39,8 +39,7 @@ commands:
     description: Countdown for restarting the server.
     usage: /countdown 
     permissions: 
-      - rvnktools.command.countdown    
-
+      - rvnktools.command.countdown
 permissions:
   rvnktools.command.broadcast:
     description: Allows the player to use the broadcast command
