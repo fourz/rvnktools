@@ -20,7 +20,11 @@
         <repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
-        </repository>        
+        </repository>
+        <repository>
+            <id>placeholderapi</id>
+            <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -61,6 +65,12 @@
             <artifactId>jetty-util</artifactId>
             <version>9.4.44.v20210927</version>
         </dependency>
+        <dependency>
+            <groupId>me.clip</groupId>
+            <artifactId>placeholderapi</artifactId>
+            <version>2.11.6</version>
+            <scope>provided</scope>
+        </dependency>        
     </dependencies>
     <build>
         <plugins>

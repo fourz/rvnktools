@@ -1,0 +1,87 @@
+announcements:
+  - id: 'event'
+    text: "event next week"
+    type: "news"
+    recurrence: "1h"
+    owner: "wizardofire"
+    permission: "rvnktools.news"
+
+  - id: 'trains'
+    text: "Use &d/trains &afor train help pages."
+    type: "help"
+    recurrence: "2h"
+    permission: "rvnktools.announce.help"
+
+  - id: 'patreon'
+    text: '&aCheck out our &c{patreon-link}!'
+    type: "help"
+    recurrence: "2h"
+    permission: "rvnktools.announce.help"
+
+  - id: 'welcome'
+    text: "welcome to da server"
+    type: "server" # cant turn this type off
+    recurrence: "1h"
+
+  - id: 'event'
+    text: "event next week: stuff here"
+    type: "news"
+    recurrence: "2h"
+    permission: "wizardofire"
+
+  - id: 'ant_shop1'
+    text: "buy my shit, yo"
+    type: "advert"
+    recurrence: "20m"
+    owner: "antnatchos"
+    permission: "rvnktools.announce.advert"
+    cost: 1
+
+  - id: 'toasty'
+    text: "its cheese toastie day!"
+    type: "scheduled"
+    date: "2028-09-24"
+    time: "1900"
+    recurrence: "annual"
+    owner: "system" # cant turn this off
+    permission: "rvnktools.announce.scheduled"
+
+  - id: 'ads'
+    text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
+    type: "server"
+    recurrence: "1h"
+    permission: 'rvnktools.announce.ads'
+
+  - id: 'railroad'
+    text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
+    type: "guide"
+
+  - id: 'ignoreclaims'
+    text: "&aUse &d/ignoreclaims &a or &d/ic &aif you need to bypass claims."
+    type: "server"
+    recurrence: "1h"
+    permission: 'group.trusted'
+
+  - id: 'facebook'
+    text: '&aCheck out our &9{facebook-link}'
+    type: "guide"
+
+  - id: 'information_channel'
+    text: '&aCheck out &e{information-link} &achannel on {discord-link}'
+    type: "guide"
+    recurrence: "1h"    
+
+  - id: 'trains_help'
+    text: '&aUse &d/trains &afor train help pages.'
+    type: "guide"
+    recurrence: "1h"    
+
+  - id: 'help_guide'
+    text: '&aTry &d/help &afor a command guide'
+    type: "guide"
+    recurrence: "1h"    
+
+  - id: 'patreon_check'
+    text: '&aCheck out our &c{patreon-link}!'
+    type: "guide"
+    recurrence: "2h"

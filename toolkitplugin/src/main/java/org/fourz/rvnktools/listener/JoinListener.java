@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 
+import org.fourz.rvnktools.util.ChatFormat;
+
 public class JoinListener implements Listener {
     private JavaPlugin plugin;
     private List<String> messages;
@@ -44,12 +46,12 @@ public class JoinListener implements Listener {
         if (player.hasPlayedBefore()) {
             if (random.nextInt(100) < interval && player.hasPermission("rvnktools.welcome")) {
                 String message = messages.get(random.nextInt(messages.size()));
-                player.sendMessage(message.replace("{player}", player.getName()));
+                player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
             }
         } else {
             if (player.hasPermission("rvnktools.welcome.newplayer")) {
                 String message = newPlayerMessages.get(random.nextInt(newPlayerMessages.size()));
-                player.sendMessage(message.replace("{player}", player.getName()));
+                player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
             }
         }
     }

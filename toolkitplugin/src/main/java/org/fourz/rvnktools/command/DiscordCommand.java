@@ -1,14 +1,13 @@
 package org.fourz.rvnktools.command;
 
-import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.RVNKTools;
 
 public class DiscordCommand implements CommandExecutor {
     private LinkMaker linkMaker;
@@ -25,7 +24,7 @@ public class DiscordCommand implements CommandExecutor {
                 Player player = (Player) sender;
 
                 TextComponent message = new TextComponent(
-                        linkMaker.replacePlaceholders("Click here to join our {discord-link}!")
+                        ChatFormat.colorize(linkMaker.replacePlaceholders("&oJoin the {discord-link}!"))
                 );
 
                 // Send the combined message
