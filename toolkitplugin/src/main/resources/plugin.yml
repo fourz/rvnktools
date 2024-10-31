@@ -1,9 +1,10 @@
 name: RVNKToolKit 
 version: 1.0-SNAPSHOT
-author: wizard
+author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
 api-version: 1.21
+depend: [PlaceholderAPI]
 
 commands:
   ping:

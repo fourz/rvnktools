@@ -138,9 +138,8 @@ public class AnnouncementManager {
         plugin.getLogger().info("Ticks value: " + ticks);
 
         if (ticks > 0) {
-            //generate random long ranging from half of ticks to 1.5 times ticks
-            long randomTicks = (long) (rand.nextLong(ticks * 2) - ticks);        
-            ticks += randomTicks;
+            //generate random long ranging from 90% to 110% of ticks
+            ticks = (long) (rand.nextLong(ticks / 5) + ticks * 0.9); 
         } 
 
         if (announcement.getType().equalsIgnoreCase("scheduled") && announcement.getDate() != null && announcement.getTime() != null) {
@@ -182,9 +181,11 @@ public class AnnouncementManager {
                 public void run() {                    
                     plugin.getLogger().info("Broadcasting announcement: " + announcement.getId());
                     broadcastAnnouncement(announcement);
+                    
                 }
             }.runTaskTimer(plugin, ticks, ticks);
 
+            //
             scheduledTasks.put(announcement, task);
 
             // output the scheduled announcement to the console with the delay in ticks

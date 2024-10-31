@@ -1,5 +1,6 @@
 package org.fourz.rvnktools.listener;
 
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.EventHandler;
@@ -14,6 +15,10 @@ import java.util.List;
 import java.util.Random;
 
 import org.fourz.rvnktools.util.ChatFormat;
+
+import me.clip.placeholderapi.PlaceholderAPI;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 
 public class JoinListener implements Listener {
     private JavaPlugin plugin;
@@ -46,13 +51,31 @@ public class JoinListener implements Listener {
         if (player.hasPlayedBefore()) {
             if (random.nextInt(100) < interval && player.hasPermission("rvnktools.welcome")) {
                 String message = messages.get(random.nextInt(messages.size()));
-                player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
+                //player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
+
+                messagePlayer(player, message);
+
+                // PlaceholderAPI support
+
             }
         } else {
             if (player.hasPermission("rvnktools.welcome.newplayer")) {
                 String message = newPlayerMessages.get(random.nextInt(newPlayerMessages.size()));
-                player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
+                //player.sendMessage(ChatFormat.colorize(message.replace("{player}", player.getName())));
+
+                messagePlayer(player, message);
             }
+        }
+    }
+
+    public void messagePlayer (Player player, String message) {
+        //if placeholderAPI is enabled
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            //send to player using placeholderAPI
+            message = PlaceholderAPI.setPlaceholders(player, message);            
+        } else {
+            //send to player without placeholderAPI
+            message = ChatFormat.colorize(message.replace("{player}", player.getName())); 
         }
     }
 }
