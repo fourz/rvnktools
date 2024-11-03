@@ -19,20 +19,19 @@ announcements:
     permission: "rvnktools.announce.help"
 
   - id: 'welcome'
-    text: "welcome to da server"
-    type: "server" # cant turn this type off
-    recurrence: "1h"
+    text: "welcome to Ravenkraft!"
+    type: 'newbie'
 
-  - id: 'event'
+  - id: 'vote for MickeyHats'
     text: "event next week: stuff here"
     type: "news"
     recurrence: "2h"
-    permission: "wizardofire"
+    permission: "group.default"
 
   - id: 'ant_shop1'
-    text: "buy my shit, yo"
+    text: "its %localtime_time%! buy my shit, &ayo!"
     type: "advert"
-    recurrence: "20m"
+    recurrence: "1m"
     owner: "antnatchos"
     permission: "rvnktools.announce.advert"
     cost: 1

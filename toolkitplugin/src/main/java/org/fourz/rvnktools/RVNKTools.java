@@ -1,10 +1,7 @@
 package org.fourz.rvnktools;
 
 import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.CycleCommands;
@@ -14,9 +11,6 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
-
-import me.clip.placeholderapi.PlaceholderAPI;
-import me.clip.placeholderapi.libs.kyori.adventure.bossbar.BossBar.Listener;
 
 import org.fourz.rvnktools.command.BroadcastCommand;
 
@@ -28,18 +22,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
 
-        
         // Save default config if not present
         // saveDefaultConfig();
         
         // Initialize AnnouncementManager
         announcementManager = new AnnouncementManager(this);
 
-        // Register PlaceholderAPI integration or disable the plugin
+        // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
-            getLogger().warning("Could not find PlaceholderAPI! This plugin is required.");
-            Bukkit.getPluginManager().disablePlugin(this);
-        }
+            getLogger().warning("PlaceholderAPI not found, PlaceholderAPI integration will be unavailable.");
+        } else {
+            getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
+        } 
 
         // Register Events
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
@@ -61,10 +55,17 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+
+        announcementManager.savePlayerDisabledTypes();
+
+        //garbage collection        
+        announcementManager = null;
+        cycleCommands = null;
+
+        
         // Code that runs when the plugin is disabled
         getLogger().info("RVNK Toolkit has been disabled.");
     }
-
 }
 
 

@@ -4,7 +4,7 @@ author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
 api-version: 1.21
-depend: [PlaceholderAPI]
+softdepend: [PlaceholderAPI]
 
 commands:
   ping:

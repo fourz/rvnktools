@@ -2,7 +2,6 @@ package org.fourz.rvnktools.announcementManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -10,12 +9,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
 import java.io.File;
 import java.io.IOException;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import me.clip.placeholderapi.PlaceholderAPI;
 
 public class AnnouncementManager {
     private final JavaPlugin plugin;
@@ -24,13 +27,17 @@ public class AnnouncementManager {
     private List<Announcement> announcements;
     private Map<Announcement, BukkitTask> scheduledTasks;
     private Map<UUID, Set<String>> playerDisabledTypes;
+    boolean usingPlaceholderAPI;
 
     public AnnouncementManager(RVNKTools plugin) {
         plugin.getLogger().info("Enabling AnnouncementManager.");
         this.plugin = plugin;
+        this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
         this.playerDisabledTypes = new HashMap<>();
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml"); // Initialize configFile
+        
         loadConfig();
+        loadPlayerDisabledTypes(); 
 
         plugin.getLogger().info("Scheduling announcements...");
         scheduleAnnouncements();
@@ -41,7 +48,7 @@ public class AnnouncementManager {
         File configFile = new File(plugin.getDataFolder(), "announcements.yml");
 
         // Check if the announcements.yml file exists
-        if (!configFile.exists()) {
+        if (!this.configFile.exists()) {
             // If the file does not exist, save the default resource from the plugin's jar
             plugin.saveResource("announcements.yml", false);
             // createDefaultConfig();
@@ -83,6 +90,12 @@ public class AnnouncementManager {
         if (map.containsKey("cost")) {
             cost = (Integer) map.get("cost");
         }
+        
+        //if text contains a placeholder and placeholderAPI is not found, return null
+        if (text.contains("%") && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
+            plugin.getLogger().warning("PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
+            return null;
+        }
 
         LocalDate date = null;
         LocalTime time = null;
@@ -113,6 +126,53 @@ public class AnnouncementManager {
         return announcement;
     }
 
+    private boolean loadPlayerDisabledTypes() {
+        File dataFolder = plugin.getDataFolder();
+        if (!dataFolder.exists()) {
+            dataFolder.mkdirs();
+        }
+
+        File configFile = new File(dataFolder, "playerDisabledTypes.yml");
+        if (!configFile.exists()) {
+            return false;
+        }
+
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+
+        for (String key : config.getKeys(false)) {
+            UUID playerId = UUID.fromString(key);
+            boolean value = config.getBoolean(key);
+            if (value) {
+                playerDisabledTypes.put(playerId, new HashSet<>());
+            }
+        }
+
+        return true;
+    }
+
+    public void savePlayerDisabledTypes() {
+        File dataFolder = plugin.getDataFolder();
+        if (!dataFolder.exists()) {
+            dataFolder.mkdirs();
+        }
+
+        File configFile = new File(dataFolder, "playerDisabledTypes.yml");
+        YamlConfiguration config = new YamlConfiguration();
+
+        // build the config file from the playerDisabledTypes map
+        for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
+            String key = entry.getKey().toString();
+            boolean value = !entry.getValue().isEmpty();
+            config.set(key, value);
+        }
+
+        try {
+            config.save(configFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save playerDisabledTypes to file: " + e.getMessage());
+        }
+    }
+
     private void scheduleAnnouncements() {
         if (scheduledTasks != null) {
             // Cancel existing tasks
@@ -139,7 +199,9 @@ public class AnnouncementManager {
 
         if (ticks > 0) {
             //generate random long ranging from 90% to 110% of ticks
-            ticks = (long) (rand.nextLong(ticks / 5) + ticks * 0.9); 
+            //ticks = (long) (rand.nextLong(ticks / 5) + ticks * 0.9); 
+            ticks = (long) (ticks * (0.9 + rand.nextDouble() * 0.2)); // between 90% and 110%
+
         } 
 
         if (announcement.getType().equalsIgnoreCase("scheduled") && announcement.getDate() != null && announcement.getTime() != null) {
@@ -221,10 +283,19 @@ public class AnnouncementManager {
 
     private void broadcastAnnouncement(Announcement announcement) {
         String message = announcement.getText();
-        message = replacePlaceholders(message);
+        //message = replacePlaceholders(message);
+
+        //add integration for LinkMaker here      
+
+
+        //if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {        
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (shouldReceiveAnnouncement(player, announcement)) {
+                message = ChatFormat.colorize(message); 
+                if (this.usingPlaceholderAPI) {
+                    message = PlaceholderAPI.setPlaceholders(player, message);
+                }
                 player.sendMessage(message);
             }
         }
@@ -236,7 +307,7 @@ public class AnnouncementManager {
         }
 
         // Types that can't be turned off
-        if (announcement.getType().equalsIgnoreCase("server") || announcement.getType().equalsIgnoreCase("scheduled")) {
+        if (announcement.getType().matches("(?i)^(server|scheduled)$")) {
             return true;
         }
 
@@ -249,21 +320,9 @@ public class AnnouncementManager {
         return true;
     }
 
-    private String replacePlaceholders(String message) {
-        message = message.replace("{patreon-link}", "https://patreon.com/yourserver");
-        message = message.replace("{facebook-link}", "https://facebook.com/yourserver");
-        message = message.replace("{information-link}", "https://discord.com/yourserver/information");
-        message = message.replace("{discord-link}", "Discord");
-
-        // Handle color codes
-        message = ChatColor.translateAlternateColorCodes('&', message);
-
-        return message;
-    }
-
     public void toggleAnnouncementType(Player player, String type) {
         UUID playerId = player.getUniqueId();
-        if (player.hasPermission("rvnktools.command.announcement.toggle")) {
+        if (player.hasPermission("rvnktools.command.announcement.toggle." + type)) {
             type = type.toLowerCase();
             Set<String> disabledTypes = playerDisabledTypes.getOrDefault(playerId, new HashSet<>());
 

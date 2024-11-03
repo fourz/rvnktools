@@ -44,8 +44,6 @@ public class CycleCommands {
 
     public void registerCommands() {
         ConfigurationSection commandsSection = config.getConfigurationSection("commands");
-        // output the commands section to the console
-        plugin.getLogger().info("Commands section: " + commandsSection);
 
         if (commandsSection != null) {
             for (String commandKey : commandsSection.getKeys(false)) {
