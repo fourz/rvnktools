@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class AnnounceTabCompleter implements TabCompleter {
     private final AnnounceManager announceManager;
-    private final List<String> subcommands = Arrays.asList("toggle", "list", "add", "remove");
+    private final List<String> subcommands = Arrays.asList("toggle", "types", "list", "add", "remove", "now");
 
     public AnnounceTabCompleter(AnnounceManager announceManager) {
         this.announceManager = announceManager;
@@ -32,6 +32,13 @@ public class AnnounceTabCompleter implements TabCompleter {
                 case "remove":
                     // Assuming announceManager has a method to get existing announcement IDs
                     return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
+                case "now":
+                    return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
+                case "list":
+                    List<String> listOptions = new ArrayList<>();
+                    listOptions.add("all");
+                    listOptions.addAll(announceManager.getAnnounceTypes());
+                    return filterCompletions(listOptions, args[1]);
             }
         }
 

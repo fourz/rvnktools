@@ -3,32 +3,32 @@ announce_types:
     color: "&a"
     prefix: "&a[News]"
     suffix: "&7"
-    permission: rvnktools.announce.news
+    permission: rvnktools.announce.type.news
   - id: help
     color: "&b"
     prefix: "&b[Help]"
     suffix: "&7"
-    permission: rvnktools.announce.help
+    permission: rvnktools.announce.type.help
   - id: advert
     color: "&d"
     prefix: "&d[Advert]"
     suffix: "&7"
-    permission: rvnktools.announce.advert
+    permission: rvnktools.announce.type.advert
   - id: scheduled
     color: "&a"
     prefix: "&a[Scheduled]"
     suffix: "&6"
-    permission: rvnktools.announce.scheduled
+    permission: rvnktools.announce.type.scheduled
   - id: server
     color: "&c"
     prefix: "&c[Server]"
     suffix: "&7"
-    permission: rvnktools.announce.server    
+    permission: rvnktools.announce.type.server    
   - id: guide
     color: "&e"
     prefix: "&e[Guide]"
     suffix: "&7"
-    permission: rvnktools.announce.guide
+    permission: rvnktools.announce.type.guide
 
 announcements:
   - id: event
@@ -37,19 +37,16 @@ announcements:
     recurrence: 90m
     expiration: 2028-11-9
     owner: wizardofire
-    permission: rvnktools.news
 
   - id: trains
     text: "Use &d/trains &afor train help pages."
     type: help
     recurrence: 2h
-    permission: rvnktools.announce.help
 
   - id: patreon
     text: '&aCheck out our &c{patreon-link}!'
     type: help
     recurrence: 2h
-    permission: rvnktools.announce.help
 
   - id: welcome
     text: "welcome to Ravenkraft!"
@@ -60,7 +57,6 @@ announcements:
     type: help
     recurrence: 2h
     expiration: '2028-11-24'
-    permission: rvnktools.announce.help
 
   - id: ant_shop1
     text: "BarterSigns coming Soon!"
@@ -80,24 +76,26 @@ announcements:
     text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
     type: server
     recurrence: 100m
-    permission: rvnktools.announce.server
 
   - id: railroad
     text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
     type: help
     recurrence: 2h
-    permission: rvnktools.command.railroad
 
   - id: announcements
     text: "&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off."
     type: server
     recurrence: 80m
-    permission: rvnktools.announce.server
+
+  - id: announcements_disabled
+    text: "&aUse &d/announce disabled &ato see which announcement types you have disabled."
+    type: help
+    recurrence: 80m
 
   - id: ignoreclaims
     text: "&aUse &d/ignoreclaims &a or &d/ic &aif you need to bypass claims."
     type: server
-    recurrence: 1h
+    recurrence: 90m
     permission: griefprevention.ignoreclaims
 
   - id: facebook
