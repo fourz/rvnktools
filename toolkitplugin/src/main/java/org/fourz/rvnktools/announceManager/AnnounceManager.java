@@ -1,36 +1,34 @@
-package org.fourz.rvnktools.announcementManager;
+package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.util.ChatFormat;
-import org.fourz.rvnktools.linkMaker.LinkMaker;
-
 import java.io.File;
 import java.io.IOException;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-
 import me.clip.placeholderapi.PlaceholderAPI;
+import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
-public class AnnouncementManager {
+public class AnnounceManager {
     private final JavaPlugin plugin;
     private final File configFile;
     private FileConfiguration config;
     private List<Announcement> announcements;
     private Map<Announcement, BukkitTask> scheduledTasks;
     private Map<UUID, Set<String>> playerDisabledTypes;
+    private Map<String, AnnounceType> announceTypes;
     boolean usingPlaceholderAPI;
 
-    public AnnouncementManager(RVNKTools plugin) {
-        plugin.getLogger().info("Enabling AnnouncementManager.");
+    public AnnounceManager(RVNKTools plugin) {
+        plugin.getLogger().info("Enabling AnnounceManager.");
         this.plugin = plugin;
         this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
         this.playerDisabledTypes = new HashMap<>();
@@ -38,6 +36,10 @@ public class AnnouncementManager {
         
         loadConfig();
         loadPlayerDisabledTypes(); 
+
+        //register commands
+        plugin.getCommand("announce").setExecutor(new AnnounceCommand(this));
+        plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
 
         plugin.getLogger().info("Scheduling announcements...");
         scheduleAnnouncements();
@@ -73,6 +75,23 @@ public class AnnouncementManager {
             // If the announcement is successfully parsed, add it to the list
             if (announcement != null) {
                 announcements.add(announcement);
+            }
+        }
+
+        // Initialize the map to hold AnnounceType objects
+        announceTypes = new HashMap<>();
+
+        // Retrieve the list of maps from the "announce_types" section of the config
+        List<Map<?, ?>> announceTypeMaps = config.getMapList("announce_types");
+
+        // Iterate through each map in the list
+        for (Map<?, ?> map : announceTypeMaps) {
+            // Parse the map into an AnnounceType object
+            AnnounceType announceType = parseAnnounceType(map);
+
+            // If the announceType is successfully parsed, add it to the map
+            if (announceType != null) {
+                announceTypes.put(announceType.getId(), announceType);
             }
         }
     }
@@ -115,7 +134,7 @@ public class AnnouncementManager {
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setText(text);
-        announcement.setType(type);
+        announcement.setType(type); 
         announcement.setRecurrence(recurrence);
         announcement.setOwner(owner);
         announcement.setPermission(permission);
@@ -124,6 +143,23 @@ public class AnnouncementManager {
         announcement.setCost(cost);
 
         return announcement;
+    }
+
+    private AnnounceType parseAnnounceType(Map<?, ?> map) {
+        String id = (String) map.get("id");
+        String color = (String) map.get("color");
+        String prefix = (String) map.get("prefix");
+        String suffix = (String) map.get("suffix");
+        String permission = (String) map.get("permission");
+
+        AnnounceType announceType = new AnnounceType();
+        announceType.setId(id);
+        announceType.setColor(color);
+        announceType.setPrefix(prefix);
+        announceType.setSuffix(suffix);
+        announceType.setPermission(permission);
+
+        return announceType;
     }
 
     private boolean loadPlayerDisabledTypes() {
@@ -283,7 +319,8 @@ public class AnnouncementManager {
 
     private void broadcastAnnouncement(Announcement announcement) {
         String message = announcement.getText();
-        //message = replacePlaceholders(message);
+        
+        message = "&5" + announcement.getType() + "&6: &f" + message; // Add type to message and colorize
 
         //add integration for LinkMaker here      
 
@@ -322,8 +359,8 @@ public class AnnouncementManager {
 
     public void toggleAnnouncementType(Player player, String type) {
         UUID playerId = player.getUniqueId();
-        if (player.hasPermission("rvnktools.command.announcement.toggle." + type)) {
-            type = type.toLowerCase();
+        type = type.toLowerCase();
+        if (player.hasPermission("rvnktools.command.announce.toggle." + type)) {            
             Set<String> disabledTypes = playerDisabledTypes.getOrDefault(playerId, new HashSet<>());
 
             if (disabledTypes.contains(type)) {
@@ -350,6 +387,31 @@ public class AnnouncementManager {
                 task.cancel();
             }
         }
+    }
+
+    public boolean validateAnnounceType(String type) {
+        this.plugin.getLogger().info("Announce type: " + type);
+        this.plugin.getLogger().info("Returning: " + announceTypes.containsKey(type));
+        this.plugin.getLogger().info("Announce types: " + announceTypes);
+
+        return announceTypes.containsKey(type);
+    }
+
+    public boolean getPlayerDisabledTypes(Player player, String type) {
+        Set<String> disabledTypes = playerDisabledTypes.get(player.getUniqueId());
+        return disabledTypes != null && disabledTypes.contains(type);
+    }
+
+    public Set<String> getAnnounceTypes() {
+        return announceTypes.keySet();
+    }
+
+    public Set<String> getAnnouncementIds() {
+        Set<String> ids = new HashSet<>();
+        for (Announcement announcement : announcements) {
+            ids.add(announcement.getId());
+        }
+        return ids;
     }
 
     private void createDefaultConfig() {

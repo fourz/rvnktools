@@ -1,86 +1,125 @@
+announce_types:
+  - id: news
+    color: "&a"
+    prefix: "&a[News]"
+    suffix: "&7"
+    permission: rvnktools.announce.news
+  - id: help
+    color: "&b"
+    prefix: "&b[Help]"
+    suffix: "&7"
+    permission: rvnktools.announce.help
+  - id: advert
+    color: "&d"
+    prefix: "&d[Advert]"
+    suffix: "&7"
+    permission: rvnktools.announce.advert
+  - id: scheduled
+    color: "&a"
+    prefix: "&a[Scheduled]"
+    suffix: "&6"
+    permission: rvnktools.announce.scheduled
+  - id: server
+    color: "&c"
+    prefix: "&c[Server]"
+    suffix: "&7"
+    permission: rvnktools.announce.server    
+  - id: guide
+    color: "&e"
+    prefix: "&e[Guide]"
+    suffix: "&7"
+    permission: rvnktools.announce.guide
+
 announcements:
-  - id: 'event'
-    text: "event next week"
-    type: "news"
-    recurrence: "1h"
-    owner: "wizardofire"
-    permission: "rvnktools.news"
+  - id: event
+    text: "Get a head start on the Christmas event now. Dates coming soon!"
+    type: news
+    recurrence: 90m
+    expiration: 2028-11-9
+    owner: wizardofire
+    permission: rvnktools.news
 
-  - id: 'trains'
+  - id: trains
     text: "Use &d/trains &afor train help pages."
-    type: "help"
-    recurrence: "2h"
-    permission: "rvnktools.announce.help"
+    type: help
+    recurrence: 2h
+    permission: rvnktools.announce.help
 
-  - id: 'patreon'
+  - id: patreon
     text: '&aCheck out our &c{patreon-link}!'
-    type: "help"
-    recurrence: "2h"
-    permission: "rvnktools.announce.help"
+    type: help
+    recurrence: 2h
+    permission: rvnktools.announce.help
 
-  - id: 'welcome'
+  - id: welcome
     text: "welcome to Ravenkraft!"
-    type: 'newbie'
+    permission: rvnktools.announce.welcome
 
-  - id: 'vote for MickeyHats'
-    text: "event next week: stuff here"
-    type: "news"
-    recurrence: "2h"
-    permission: "group.default"
+  - id: mickyhats
+    text: "vote daily for MickyHats! do /vote"
+    type: help
+    recurrence: 2h
+    expiration: '2028-11-24'
+    permission: rvnktools.announce.help
 
-  - id: 'ant_shop1'
-    text: "its %localtime_time%! buy my shit, &ayo!"
-    type: "advert"
-    recurrence: "1m"
-    owner: "antnatchos"
-    permission: "rvnktools.announce.advert"
+  - id: ant_shop1
+    text: "BarterSigns coming Soon!"
+    type: advert
+    recurrence: 40m
+    owner: wizardofire
     cost: 1
 
-  - id: 'toasty'
+  - id: toastyday
     text: "its cheese toastie day!"
-    type: "scheduled"
+    type: scheduled
     date: "2028-09-24"
-    time: "1900"
-    recurrence: "annual"
-    owner: "system" # cant turn this off
-    permission: "rvnktools.announce.scheduled"
+    time: '1900'
+    recurrence: annual
 
-  - id: 'ads'
+  - id: ads
     text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
-    type: "server"
-    recurrence: "1h"
-    permission: 'rvnktools.announce.ads'
+    type: server
+    recurrence: 100m
+    permission: rvnktools.announce.server
 
-  - id: 'railroad'
+  - id: railroad
     text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
-    type: "guide"
+    type: help
+    recurrence: 2h
+    permission: rvnktools.command.railroad
 
-  - id: 'ignoreclaims'
+  - id: announcements
+    text: "&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off."
+    type: server
+    recurrence: 80m
+    permission: rvnktools.announce.server
+
+  - id: ignoreclaims
     text: "&aUse &d/ignoreclaims &a or &d/ic &aif you need to bypass claims."
-    type: "server"
-    recurrence: "1h"
-    permission: 'group.trusted'
+    type: server
+    recurrence: 1h
+    permission: griefprevention.ignoreclaims
 
-  - id: 'facebook'
+  - id: facebook
     text: '&aCheck out our &9{facebook-link}'
-    type: "guide"
+    type: help
 
-  - id: 'information_channel'
+  - id: information_channel
     text: '&aCheck out &e{information-link} &achannel on {discord-link}'
-    type: "guide"
-    recurrence: "1h"    
+    type: help
+    recurrence: 120m
 
-  - id: 'trains_help'
+  - id: trains_help
     text: '&aUse &d/trains &afor train help pages.'
-    type: "guide"
+    type: guide
     recurrence: "1h"    
 
-  - id: 'help_guide'
+  - id: help_guide
     text: '&aTry &d/help &afor a command guide'
-    type: "guide"
-    recurrence: "1h"    
+    type: guide
+    recurrence: 2h
 
-  - id: 'patreon_check'
+  - id: patreon_check
     text: '&aCheck out our &c{patreon-link}!'
-    type: "guide"
-    recurrence: "2h"
+    type: guide
+    recurrence: 2h

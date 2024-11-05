@@ -3,7 +3,6 @@ package org.fourz.rvnktools;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
@@ -11,12 +10,12 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
-
+import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
-    private AnnouncementManager announcementManager;
+    private AnnounceManager announcementManager;
     private CycleCommands cycleCommands;
 
     @Override
@@ -26,7 +25,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // saveDefaultConfig();
         
         // Initialize AnnouncementManager
-        announcementManager = new AnnouncementManager(this);
+        announcementManager = new AnnounceManager(this);
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {

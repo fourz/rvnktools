@@ -1,6 +1,7 @@
-package org.fourz.rvnktools.announcementManager;
+package org.fourz.rvnktools.announceManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 public class Announcement {
@@ -13,6 +14,11 @@ public class Announcement {
     private LocalDate date;
     private LocalTime time;
     private Integer cost;
+    private LocalDateTime expiration;
+
+    public Announcement() { 
+        this.type = "system";   
+    }
 
     // Getters and Setters
     public String getId() {
@@ -31,7 +37,12 @@ public class Announcement {
         return type;
     }
     public void setType(String type) {
-        this.type = type;
+        if (type != null) {
+            this.type = type;            
+        } else {
+            this.type = "system";
+        }
+        return;
     }
     public String getRecurrence() {
         return recurrence;
@@ -68,5 +79,11 @@ public class Announcement {
     }
     public void setCost(Integer cost) {
         this.cost = cost;
+    }
+    public LocalDateTime getExpiration() {
+        return expiration;
+    }
+    public void setExpiration(LocalDateTime expiration) {
+        this.expiration = expiration;
     }
 }

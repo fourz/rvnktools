@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.announcementManager;
+package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;

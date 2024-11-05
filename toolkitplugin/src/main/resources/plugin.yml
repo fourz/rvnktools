@@ -19,6 +19,12 @@ commands:
   discord:
     description: Provides information about the server's discord.
     usage: /discord
+  announce:
+    description: Manages announcements.
+    usage: /announce <toggle|list|add|remove> [args]
+    aliases: [announcement]
+    permissions: 
+      - rvnktools.command.announce
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>
@@ -49,7 +55,7 @@ permissions:
     description: Allows the player to get welcome messages
     default: true
   rvnktools.welcome.newplayer:
-    description: Allows the player to get welcome messages
+    description: Sends a welcome message to new players
     default: true
   rvnktools.command.cyclegamemode:
     description: Allows the player to use the gmc command
@@ -57,4 +63,16 @@ permissions:
   rvnktools.command.cycletrainmode:
     description: Allows the player to use cycle railroad modes
     default: false        
-        
+  rvnktools.command.countdown:
+    description: Allows the player to use the countdown command
+    default: false
+  rvnktools.command.announce:
+    description: Allows the player to use the announce command
+    default: false
+  rvnktools.command.railroad:
+    description: Allows the player to use the railroad command
+    default: false
+  rvnktools.announce.help:
+    description: Allows the player to get help messages 
+    default: true
+              
