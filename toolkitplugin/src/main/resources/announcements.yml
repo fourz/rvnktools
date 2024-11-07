@@ -110,7 +110,7 @@ announcements:
   - id: trains_help
     text: '&aUse &d/trains &afor train help pages.'
     type: guide
-    recurrence: "1h"    
+    recurrence: 1h    
 
   - id: help_guide
     text: '&aTry &d/help &afor a command guide'

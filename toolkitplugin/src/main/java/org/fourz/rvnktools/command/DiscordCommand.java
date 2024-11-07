@@ -13,7 +13,7 @@ public class DiscordCommand implements CommandExecutor {
     private LinkMaker linkMaker;
 
     public DiscordCommand(RVNKTools plugin) {
-        linkMaker = new LinkMaker(plugin);
+        linkMaker = plugin.linkMaker;
     }
 
     @Override
@@ -23,12 +23,11 @@ public class DiscordCommand implements CommandExecutor {
             if (sender instanceof Player) {
                 Player player = (Player) sender;
 
-                TextComponent message = new TextComponent(
-                        ChatFormat.colorize(linkMaker.replacePlaceholders("&oJoin the {discord-link}!"))
-                );
+                TextComponent constructedMessage = 
+                    ChatFormat.parse("&oJoin our {discord-link}!", linkMaker);
 
                 // Send the combined message
-                player.spigot().sendMessage(message);
+                player.spigot().sendMessage(constructedMessage);
             } else {
                 sender.sendMessage("This command can only be used by players.");
             }

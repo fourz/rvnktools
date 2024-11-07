@@ -12,11 +12,13 @@ import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
     private AnnounceManager announcementManager;
     private CycleCommands cycleCommands;
+    public LinkMaker linkMaker;
 
     @Override
     public void onEnable() {
@@ -33,6 +35,9 @@ public class RVNKTools extends JavaPlugin implements Listener {
         } else {
             getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
         } 
+
+        // Initialize LinkMakerPAPI
+        linkMaker = new LinkMaker(this);
 
         // Register Events
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
@@ -56,11 +61,13 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public void onDisable() {
 
         announcementManager.savePlayerDisabledTypes();
+        announcementManager.shutdown();
 
         //garbage collection        
         announcementManager = null;
         cycleCommands = null;
-
+        linkMaker = null;
+        
         
         // Code that runs when the plugin is disabled
         getLogger().info("RVNK Toolkit has been disabled.");

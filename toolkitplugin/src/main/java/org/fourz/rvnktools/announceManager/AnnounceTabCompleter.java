@@ -27,11 +27,8 @@ public class AnnounceTabCompleter implements TabCompleter {
         if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "toggle":
-                    // Assuming announceManager has a method to get available types
                     return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[1]);
                 case "remove":
-                    // Assuming announceManager has a method to get existing announcement IDs
-                    return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
                 case "now":
                     return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
                 case "list":
@@ -41,13 +38,12 @@ public class AnnounceTabCompleter implements TabCompleter {
                     return filterCompletions(listOptions, args[1]);
             }
         }
-
         return completions;
     }
 
     private List<String> filterCompletions(List<String> options, String partial) {
         return options.stream()
-                     .filter(opt -> opt.toLowerCase().startsWith(partial.toLowerCase()))
-                     .collect(Collectors.toList());
+            .filter(opt -> opt.toLowerCase().startsWith(partial.toLowerCase()))
+            .collect(Collectors.toList());
     }
 }

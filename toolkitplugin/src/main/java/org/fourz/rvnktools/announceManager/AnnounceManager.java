@@ -9,6 +9,7 @@ public class AnnounceManager {
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
     boolean usingPlaceholderAPI;
+    
 
     public AnnounceManager(RVNKTools plugin) {
         plugin.getLogger().info("Enabling AnnounceManager.");
@@ -18,7 +19,7 @@ public class AnnounceManager {
         this.announceScheduler = new AnnounceScheduler(plugin, this);
 
         // Register commands
-        plugin.getCommand("announce").setExecutor(new AnnounceCommand(this));
+        plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
         plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
 
         // Schedule announcements

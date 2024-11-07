@@ -7,16 +7,23 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.entity.Player;
+
+
 import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
 import me.clip.placeholderapi.PlaceholderAPI;
+import net.md_5.bungee.api.chat.TextComponent;
 
 public class AnnounceCommand implements CommandExecutor {
 
     private final AnnounceManager announcementManager;
+    private final RVNKTools plugin;
 
-    public AnnounceCommand(AnnounceManager announcementManager) {
+    public AnnounceCommand(AnnounceManager announcementManager, RVNKTools plugin) {
         this.announcementManager = announcementManager;
+        this.plugin = plugin;
     }
 
     @Override
@@ -121,30 +128,24 @@ public class AnnounceCommand implements CommandExecutor {
             message = PlaceholderAPI.setPlaceholders(player, message);
         } 
         
-        //use ChatFormat to colorize the message and replace {player} with the player name
-        message = ChatFormat.colorize(message); 
+        //use ChatFormat to colorize the message and replace linkMaker placeholders
+        TextComponent constructedMessage = ChatFormat.parse(message, plugin.linkMaker);
 
         //send the message to the player
-        player.sendMessage(message);        
+        player.spigot().sendMessage(constructedMessage);        
     }
 
     public boolean listAnnouncements(Player player, String[] args) {
 
         if (args.length > 1) {
             if (args[1].equalsIgnoreCase("all")) {
-                listAllAnnouncements(player);
+                listAnnouncements(player);
                 return true;
             } else {
                 //
                 String type = args[1];
                 if (announcementManager.validateAnnounceType(type)) {
-                    // Implementation for listing announcements by type
-                    messagePlayer(player, "&6Announcements for type &a" + type + "&6:");
-                    for (Announcement announcement : announcementManager.getAnnouncements()) {
-                        if (announcement.getType().equalsIgnoreCase(type)) {
-                            messagePlayer(player, " &7- &a" + announcement.getId() + " &7- " + announcement.getText());
-                        }
-                    }
+                    listAnnouncements(player, type);
                     return true;
                 } else {
                     player.sendMessage("Invalid announcement type: " + type);
@@ -152,14 +153,24 @@ public class AnnounceCommand implements CommandExecutor {
                 }
             } 
         }
-        listAllAnnouncements(player);
+        listAnnouncements(player);
         return true;
 
     }
-    private void listAllAnnouncements(Player player) {
+    private void listAnnouncements(Player player, String type) {
+        messagePlayer(player, "&6Announcements for type &a" + type + "&6:");
+        for (Announcement announcement : announcementManager.getAnnouncements()) {
+            if (announcement.getType().equalsIgnoreCase(type)) {
+                messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getText());
+
+            }
+        }
+    }
+
+    private void listAnnouncements(Player player) {
         messagePlayer(player, "&6All announcements:");
         for (Announcement announcement : announcementManager.getAnnouncements()) {
-            messagePlayer(player, " &7- &a" + announcement.getId() + " &7- " + announcement.getText());
+            messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getText());
         }
     }
 }
