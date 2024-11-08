@@ -1,32 +1,26 @@
 announce_types:
   - id: news
-    color: "&a"
-    prefix: "&a[News]"
+    prefix: "&a[News] &7"
     suffix: "&7"
     permission: rvnktools.announce.type.news
   - id: help
-    color: "&b"
-    prefix: "&b[Help]"
+    prefix: "&b[Help] &7"
     suffix: "&7"
     permission: rvnktools.announce.type.help
   - id: advert
-    color: "&d"
-    prefix: "&d[Advert]"
+    prefix: "&d[Advert] &f"
     suffix: "&7"
     permission: rvnktools.announce.type.advert
   - id: scheduled
-    color: "&a"
-    prefix: "&a[Scheduled]"
-    suffix: "&6"
+    prefix: "&a[!!] &7"
+    suffix: " &a[!!]"
     permission: rvnktools.announce.type.scheduled
   - id: server
-    color: "&c"
-    prefix: "&c[Server]"
+    prefix: "&c[Server] &f"
     suffix: "&7"
     permission: rvnktools.announce.type.server    
   - id: guide
-    color: "&e"
-    prefix: "&e[Guide]"
+    prefix: "&e[Guide] &7"
     suffix: "&7"
     permission: rvnktools.announce.type.guide
 
@@ -66,11 +60,11 @@ announcements:
     cost: 1
 
   - id: toastyday
-    text: "its cheese toastie day!"
+    text: "Happy Cheese Toasty Day!"
     type: scheduled
     date: "2028-09-24"
     time: '1900'
-    recurrence: annual
+    recurrence: 120m
 
   - id: ads
     text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
@@ -102,7 +96,7 @@ announcements:
     text: '&aCheck out our &9{facebook-link}'
     type: help
 
-  - id: information_channel
+  - id: information
     text: '&aCheck out &e{information-link} &achannel on {discord-link}'
     type: help
     recurrence: 120m
@@ -117,7 +111,18 @@ announcements:
     type: guide
     recurrence: 2h
 
-  - id: patreon_check
+  - id: patreon
     text: '&aCheck out our &c{patreon-link}!'
     type: guide
     recurrence: 2h
+
+  - id: discord
+    text: '&aJoin us on &9{discord-link}!'
+    type: guide
+    recurrence: 2h
+
+  - id: xmas
+    text: "Merry Christmas!"
+    type: scheduled
+    date: "2028-12-25"
+    recurrence: 4h

@@ -20,6 +20,7 @@ public class AnnounceConfig {
     private Map<String, AnnounceType> announceTypes;
     boolean usingPlaceholderAPI;
 
+    // initialize the AnnounceConfig object
     public AnnounceConfig(JavaPlugin plugin) {
         this.plugin = plugin;
         this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
@@ -30,6 +31,7 @@ public class AnnounceConfig {
         loadPlayerDisabledTypes();
     }
 
+    // load the configuration from the YAML file
     public void loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
@@ -56,6 +58,7 @@ public class AnnounceConfig {
         }
     }
 
+    // parse an announcement from a map
     private Announcement parseAnnouncement(Map<?, ?> map) {
         String id = (String) map.get("id");
         String text = (String) map.get("text");
@@ -70,6 +73,7 @@ public class AnnounceConfig {
             cost = (Integer) map.get("cost");
         }
 
+        // Check if PlaceholderAPI is used and available
         if (text.contains("%") && !usingPlaceholderAPI) {
             plugin.getLogger().warning("PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
             return null;
@@ -104,16 +108,15 @@ public class AnnounceConfig {
         return announcement;
     }
 
+    // parse an announce type from a map
     private AnnounceType parseAnnounceType(Map<?, ?> map) {
         String id = (String) map.get("id");
-        String color = (String) map.get("color");
         String prefix = (String) map.get("prefix");
         String suffix = (String) map.get("suffix");
         String permission = (String) map.get("permission");
 
         AnnounceType announceType = new AnnounceType();
         announceType.setId(id);
-        announceType.setColor(color);
         announceType.setPrefix(prefix);
         announceType.setSuffix(suffix);
         announceType.setPermission(permission);
@@ -121,6 +124,7 @@ public class AnnounceConfig {
         return announceType;
     }
 
+    // load player disabled types from a YAML file
     public boolean loadPlayerDisabledTypes() {
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists()) {
@@ -144,6 +148,7 @@ public class AnnounceConfig {
         return true;
     }
 
+    // save player disabled types to a YAML file
     public void savePlayerDisabledTypes() {
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists()) {
@@ -169,19 +174,23 @@ public class AnnounceConfig {
         }
     }
 
+    // reload the configuration and player disabled types
     public void reloadConfig() {
         loadConfig();
         loadPlayerDisabledTypes();
     }
 
+    // Getter for announcements
     public List<Announcement> getAnnouncements() {
         return announcements;
     }
 
+    // Getter for player disabled types
     public Map<UUID, Set<String>> getPlayerDisabledTypes() {
         return playerDisabledTypes;
     }
 
+    // Getter for announce types
     public Map<String, AnnounceType> getAnnounceTypes() {
         return announceTypes;
     }

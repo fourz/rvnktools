@@ -2,7 +2,6 @@ package org.fourz.rvnktools.announceManager;
 
 public class AnnounceType {
     private String id;
-    private String color;
     private String prefix;
     private String suffix;
     private String permission;
@@ -14,14 +13,6 @@ public class AnnounceType {
 
     public void setId(String id) {
         this.id = id;
-    }
-
-    public String getColor() {
-        return color;
-    }
-
-    public void setColor(String color) {
-        this.color = color;
     }
 
     public String getPrefix() {

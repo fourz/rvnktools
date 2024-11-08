@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class AnnounceTabCompleter implements TabCompleter {
     private final AnnounceManager announceManager;
-    private final List<String> subcommands = Arrays.asList("toggle", "types", "list", "add", "remove", "now");
+    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "remove", "now");
 
     public AnnounceTabCompleter(AnnounceManager announceManager) {
         this.announceManager = announceManager;

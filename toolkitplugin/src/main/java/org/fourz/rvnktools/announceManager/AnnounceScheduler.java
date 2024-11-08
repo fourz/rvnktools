@@ -51,7 +51,7 @@ public class AnnounceScheduler {
 
     // schedule a single announcement based on its type and recurrence
     private void scheduleAnnouncement(Announcement announcement) {
-        long ticks = parseRecurrenceToTicks(announcement.getRecurrence());
+        long ticks = convertRecurrenceToTicks(announcement.getRecurrence());
 
         logInfo("Announcement id: " + announcement.getId());
         logInfo("Ticks value: " + ticks);
@@ -127,7 +127,7 @@ public class AnnounceScheduler {
     }
 
     // parse the recurrence string to ticks
-    private long parseRecurrenceToTicks(String recurrence) {
+    private long convertRecurrenceToTicks(String recurrence) {
         if (recurrence == null) {
             return -1;
         }
@@ -155,18 +155,8 @@ public class AnnounceScheduler {
 
     // broadcast the announcement to all players
     public void broadcastAnnouncement(Announcement announcement) {
-        String message = announcement.getText();
-        message = "&5" + announcement.getType() + "&6: &f" + message;
+        this.announceManager.broadcastAnnouncement(announcement);
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (announceManager.shouldReceiveAnnouncement(player, announcement)) {
-                String formattedMessage = ChatFormat.colorize(message);
-                if (usingPlaceholderAPI) {
-                    formattedMessage = PlaceholderAPI.setPlaceholders(player, formattedMessage);
-                }
-                player.sendMessage(formattedMessage);
-            }
-        }
     }
 
     // shut down the scheduler and cancels all tasks

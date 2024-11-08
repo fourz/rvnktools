@@ -42,7 +42,7 @@ public class AnnounceCommand implements CommandExecutor {
 
         switch (args[0].toLowerCase()) {
             case "toggle":
-                return toggleAnnouncementType(player, args[1]);
+                return toggleAnnouncementType(player, args.length > 1 ? args[1] : null);
             case "list":
                 return listAnnouncements(player, args);
             case "add":
@@ -52,8 +52,8 @@ public class AnnounceCommand implements CommandExecutor {
                 //return removeAnnouncement(player, args);
                 break;
             case "now":
-                return sendAnnouncementNow(player, args[1]);
-            case "types":
+                return sendAnnouncementNow(player, args.length > 1 ? args[1] : null);
+            case "status":
                 return showPlayerAnnouncementTypes(player);
             default:
                 sendUsage(player);
@@ -85,7 +85,7 @@ public class AnnounceCommand implements CommandExecutor {
         } 
     }
 
-    private boolean sendAnnouncementNow(Player player, String id) {
+    private boolean sendAnnouncementNow(Player player, String id) {        
         if (id == null) {
             player.sendMessage("Announcement ID cannot be empty");
             return false;
@@ -96,7 +96,6 @@ public class AnnounceCommand implements CommandExecutor {
             player.sendMessage("Invalid announcement ID: " + id);
             return false;
         }
-
     }    
     
     private boolean showDisabledAnnouncementTypes(Player player, String[] args) {

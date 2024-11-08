@@ -2,7 +2,6 @@ package org.fourz.rvnktools.util;
 
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.bukkit.ChatColor;
-
 import net.md_5.bungee.api.chat.TextComponent;
 
 public class ChatFormat {  

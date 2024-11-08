@@ -1,8 +1,12 @@
 package org.fourz.rvnktools.announceManager;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import java.util.*;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.ChatFormat;
+
+import me.clip.placeholderapi.PlaceholderAPI;
 
 public class AnnounceManager {
     private final RVNKTools plugin;
@@ -25,6 +29,26 @@ public class AnnounceManager {
         // Schedule announcements
         plugin.getLogger().info("Scheduling announcements...");
         announceScheduler.scheduleAnnouncements();
+    }
+
+    public void broadcastAnnouncement(Announcement announcement) {      
+                
+        AnnounceType type = announceConfig.getAnnounceTypes().get(announcement.getType());        
+        String prefix = type.getPrefix();
+        String suffix = type.getSuffix();                
+        String message = announcement.getText();
+
+        message = prefix + message + suffix;
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (this.shouldReceiveAnnouncement(player, announcement)) {
+                String formattedMessage = ChatFormat.colorize(message);
+                if (usingPlaceholderAPI) {
+                    formattedMessage = PlaceholderAPI.setPlaceholders(player, formattedMessage);
+                }
+                player.sendMessage(formattedMessage);
+            }
+        }
     }
 
     public void toggleAnnouncementType(Player player, String type) {
@@ -117,7 +141,7 @@ public class AnnounceManager {
     public boolean sendAnnouncementNow(Player player, String id) {
         for (Announcement announcement : announceConfig.getAnnouncements()) {
             if (announcement.getId().equalsIgnoreCase(id)) {
-                announceScheduler.broadcastAnnouncement(announcement);
+                broadcastAnnouncement(announcement);
                 return true;
             }
         }
