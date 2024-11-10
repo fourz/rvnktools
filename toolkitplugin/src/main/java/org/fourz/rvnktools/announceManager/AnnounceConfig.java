@@ -50,15 +50,33 @@ public class AnnounceConfig {
 
         announceTypes = new HashMap<>();
         List<Map<?, ?>> announceTypeMaps = config.getMapList("announce_types");
-        for (Map<?, ?> map : announceTypeMaps) {
+        for (Map<?, ?> map : announceTypeMaps) {//a
             AnnounceType announceType = parseAnnounceType(map);
             if (announceType != null) {
                 announceTypes.put(announceType.getId(), announceType);
             }
         }
     }
+    public Announcement parseAnnouncement(String id, String type, String text, String playerName) {
+        Announcement announcement = new Announcement();
+        announcement.setId(id);
+        announcement.setType(type);
+        announcement.setText(text);
+        announcement.setOwner(playerName);
+        announcements.add(announcement);
+        return announcement;
+    }
 
-    // parse an announcement from a map
+    public Announcement parseAnnouncement(String id, String type, String text) {
+        Announcement announcement = new Announcement();
+        announcement.setId(id);
+        announcement.setType(type);
+        announcement.setText(text);
+        announcements.add(announcement);        
+        return announcement;
+    }
+
+    // parse an announcement from a map in the YAML config file
     private Announcement parseAnnouncement(Map<?, ?> map) {
         String id = (String) map.get("id");
         String text = (String) map.get("text");

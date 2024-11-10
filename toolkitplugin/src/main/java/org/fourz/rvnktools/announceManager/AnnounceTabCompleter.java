@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class AnnounceTabCompleter implements TabCompleter {
     private final AnnounceManager announceManager;
-    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "remove", "now");
+    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "remove", "now", "help", "types");
 
     public AnnounceTabCompleter(AnnounceManager announceManager) {
         this.announceManager = announceManager;
@@ -21,11 +21,48 @@ public class AnnounceTabCompleter implements TabCompleter {
         List<String> completions = new ArrayList<>();
         
         if (args.length == 1) {
-            return filterCompletions(subcommands, args[0]);
+            List<String> availableCommands = new ArrayList<>();
+            for (String cmd : subcommands) {
+                String permission = switch (cmd) {
+                    case "add" -> "rvnktools.command.announce.add";
+                    case "remove" -> "rvnktools.command.announce.remove";
+                    case "now" -> "rvnktools.command.announce.now";
+                    default -> "rvnktools.command.announce";
+                };
+                if (sender.hasPermission(permission)) {
+                    availableCommands.add(cmd);
+                }
+            }
+            return filterCompletions(availableCommands, args[0]);
         }
 
         if (args.length == 2) {
+            String permission = switch (args[0].toLowerCase()) {
+                case "add" -> "rvnktools.command.announce.add";
+                case "remove" -> "rvnktools.command.announce.remove";
+                case "now" -> "rvnktools.command.announce.now";
+                default -> "rvnktools.command.announce";
+            };
+            
+            if (!sender.hasPermission(permission)) {
+                return completions;
+            }
+
             switch (args[0].toLowerCase()) {
+                case "help":
+                    List<String> availableHelpTopics = new ArrayList<>();
+                    for (String cmd : subcommands) {
+                        permission = switch (cmd) {
+                            case "add" -> "rvnktools.command.announce.add";
+                            case "remove" -> "rvnktools.command.announce.remove";
+                            case "now" -> "rvnktools.command.announce.now";
+                            default -> "rvnktools.command.announce";
+                        };
+                        if (sender.hasPermission(permission)) {
+                            availableHelpTopics.add(cmd);
+                        }
+                    }
+                    return filterCompletions(availableHelpTopics, args[1]);
                 case "toggle":
                     return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[1]);
                 case "remove":
@@ -33,9 +70,18 @@ public class AnnounceTabCompleter implements TabCompleter {
                     return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
                 case "list":
                     List<String> listOptions = new ArrayList<>();
-                    listOptions.add("all");
-                    listOptions.addAll(announceManager.getAnnounceTypes());
+                    if (sender.hasPermission("rvnktools.announce.type.*")) {
+                        listOptions.add("all");
+                    }
+                    for (String type : announceManager.getAnnounceTypes()) {
+                        if (sender.hasPermission("rvnktools.announce.type." + type.toLowerCase())) {
+                            listOptions.add(type);
+                        }
+                    }
                     return filterCompletions(listOptions, args[1]);
+                case "add":                    
+                    return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[1]);
+                    
             }
         }
         return completions;

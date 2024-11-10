@@ -2,6 +2,8 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.checkerframework.checker.units.qual.A;
+
 import java.util.*;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.ChatFormat;
@@ -29,6 +31,45 @@ public class AnnounceManager {
         // Schedule announcements
         plugin.getLogger().info("Scheduling announcements...");
         announceScheduler.scheduleAnnouncements();
+    }
+
+    public boolean addAnnouncement(Player player, String input) {
+
+        // extract id, type, and text from input
+        String[] args = input.split(" ", 3);
+        
+        if (args.length < 3) {
+            if (player != null) {
+                player.sendMessage("Invalid announcement format. Usage: <type> <id> <message>");
+            } else {
+                plugin.getLogger().warning("Invalid announcement format. Usage: <type> <id> <message>");
+            }
+            return false;
+        }
+        
+        String type = args[0];
+        String id = args[1];
+        String text = args[2];
+
+        if (!validateAnnounceType(type)) {
+            plugin.getLogger().warning("Invalid announcement type: " + type);
+            return false;
+        }
+
+        if (player != null) {
+            if (!player.hasPermission("rvnktools.command.announce.add." + type)) {
+                player.sendMessage("You do not have permission to add announcements.");
+                return false;
+            } else {
+                //parse announcement as player.  set owner to player
+                announceConfig.parseAnnouncement(id, type, text, player.getName());
+                return true;
+            }
+        }
+        
+        //parse announcement as console
+        announceConfig.parseAnnouncement(id, type, text);
+        return true;
     }
 
     public void broadcastAnnouncement(Announcement announcement) {      
@@ -66,7 +107,7 @@ public class AnnounceManager {
             }
             announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
         } else {
-            player.sendMessage("You do not have permission to toggle announcements.");
+            player.sendMessage("You do not have permission to toggle announcements of this type.");
         }
     }
 
@@ -105,11 +146,13 @@ public class AnnounceManager {
         return true;
     }
 
+    // get disabled types for a player
     public boolean getPlayerDisabledTypes(Player player, String type) {
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
         return disabledTypes != null && disabledTypes.contains(type);
     }
 
+    // get disabled types for a player
     public String[] getPlayerDisabledAnnouncementTypes(Player player)  {
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
         if (disabledTypes == null) {
