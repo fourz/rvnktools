@@ -8,10 +8,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.entity.Player;
 
-
 import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.linkMaker.LinkMaker;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -182,6 +180,7 @@ public class AnnounceCommand implements CommandExecutor {
                 if (!player.hasPermission("rvnktools.announce.type.*")) {
                     messagePlayer(player, "&cYou don't have permission to list all announcements");
                     return false;
+                    
                 }
                 listAnnouncements(player);
                 return true;
@@ -241,11 +240,10 @@ public class AnnounceCommand implements CommandExecutor {
     }
 
     private boolean showAnnouncementTypes(Player player) {
-        messagePlayer(player, "&6=== Announcement Types ===");
+        messagePlayer(player, "&6=== Announcement Type Access ===");
         messagePlayer(player, "");
-        
         for (String type : announcementManager.getAnnounceTypes()) {
-            String permission = "rvnktools.announce.types." + type.toLowerCase();
+            String permission = "rvnktools.announce.type." + type.toLowerCase();
             if (player.hasPermission(permission)) {
                 messagePlayer(player, " &a✔ &f" + type);
             } else {
@@ -256,6 +254,7 @@ public class AnnounceCommand implements CommandExecutor {
         messagePlayer(player, "");
         messagePlayer(player, "&7✔ = You have access to this type");
         messagePlayer(player, "&7✘ = You don't have access to this type");
+        messagePlayer(player, "&7Use &5/announce list [type]&7 to see all of a given type.");
         return true;
     }
 }

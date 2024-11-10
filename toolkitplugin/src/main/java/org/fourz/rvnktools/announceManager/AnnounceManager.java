@@ -190,4 +190,21 @@ public class AnnounceManager {
         }
         return false;
     }
+
+    public void cleanup() {
+        // Clear any cached data or temporary collections
+        announceScheduler.cleanup();
+        
+        // Suggest garbage collection for this manager        
+        Runtime.getRuntime().gc();
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            cleanup();
+        } finally {
+            super.finalize();
+        }
+    }
 }

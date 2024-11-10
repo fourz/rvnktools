@@ -9,6 +9,14 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
+import org.fourz.rvnktools.Permission.PermissionService;
+
+import me.clip.placeholderapi.PlaceholderAPI;
+import net.md_5.bungee.api.chat.TextComponent;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 //import 
@@ -21,11 +29,11 @@ import java.util.UUID;
 import java.util.Iterator;
 
 public class CycleCommands {
-    private final JavaPlugin plugin;
+    private final RVNKTools plugin;
     private FileConfiguration config;
     private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
-    public CycleCommands(JavaPlugin plugin) {
+    public CycleCommands(RVNKTools plugin) {
         this.plugin = plugin;
         this.config = plugin.getConfig();
         this.playerCommandPositions = new HashMap<>();
@@ -118,7 +126,7 @@ public class CycleCommands {
             if (instructions != null) {
                 List<Map<?, ?>> instructionList = instructions.getMapList(instructionKey);
 
-                plugin.getLogger().info("instructionList: " + instructionList);
+                //plugin.getLogger().info("instructionList: " + instructionList);
                 executeInstructions(player, instructionList.iterator());
             
             } else {
@@ -131,13 +139,9 @@ public class CycleCommands {
         private void executeInstructions(Player player, Iterator<Map<?, ?>> iterator) {
             if (!iterator.hasNext()) return;
 
-            Map<?, ?> instruction = iterator.next();
-            
+            Map<?, ?> instruction = iterator.next();            
             String key = instruction.keySet().iterator().next().toString();
-            plugin.getLogger().info("Instruction key: " + key);
-
             String value = instruction.get(key).toString();
-            plugin.getLogger().info("Instruction value: " + value);
 
             switch (key) {
                 case "run_command_as_player":
@@ -146,15 +150,24 @@ public class CycleCommands {
                     break;
                 case "run_command_as_server":
                     String serverCommand = value.replace("$player", player.getName());
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
+                    //Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
+                    executeCommandAsync(serverCommand);
                     executeInstructions(player, iterator);
                     break;
                 case "send_message_to_player":
-                    player.sendMessage(value);
+                    messagePlayer(player, value);
                     executeInstructions(player, iterator);
                     break;
                 case "send_message_to_all_players":
                     Bukkit.broadcastMessage(value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "set_permission":
+                    plugin.permissionService.addPermission(player.getUniqueId(), value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "unset_permission":
+                    plugin.permissionService.removePermission(player.getUniqueId(), value);
                     executeInstructions(player, iterator);
                     break;
                 case "wait":
@@ -202,4 +215,43 @@ public class CycleCommands {
             }
         }
     }
+
+    private void messagePlayer (Player player, String message) {
+
+        //if message is null, return a vertical space to avoid using unnecessary parsing methods
+        if (message == null) {
+            player.sendMessage("");
+            return;
+        }   
+
+        //if placeholderAPI is enabled
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+
+            //set any placeholders in the message
+            message = PlaceholderAPI.setPlaceholders(player, message);
+        } 
+        
+        //use ChatFormat to colorize the message and replace linkMaker placeholders
+        TextComponent constructedMessage = ChatFormat.parse(message, plugin.linkMaker);
+
+        //send the message to the player
+        player.spigot().sendMessage(constructedMessage);        
+    }
+
+    // This method demonstrates how to run a command asynchronously but safely
+    public void executeCommandAsync(String command) {
+        // Start an asynchronous task
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // Perform any async operations here (e.g., data retrieval or heavy computation)
+            // Then queue the command execution on the main thread
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    // Execute the command safely on the main thread
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                }
+            }.runTask(plugin); // Switch back to the main thread here
+        });
+    }
+
 }

@@ -21,6 +21,29 @@ commands:
       trainmodeoff:
         - run_command_as_server: lp user $player permission set group.rail-trains
         - send_message_to_player: "Newly placed minecarts will now be vanilla minecarts."
+  announcer:
+    description: Enable or disable announcements feature.
+    usage: /announcer
+    instructions:
+      enabled_base:
+        - unset_permission: group.announce-all
+        #- run_command_as_server: lp user $player permission unset group.announce-all              
+        - set_permission: group.announce-base
+        #- run_command_as_server: lp user $player permission set group.announce-base        
+        - send_message_to_player: "&6Essential announcements only are enabled."
+        - send_message_to_player: "&aUse &d/announcer &aagain to enable all announcement types."  
+      enabled_all:
+        #- run_command_as_server: lp user $player permission unset group.announce-base
+        - unset_permission: group.announce-base
+        #- run_command_as_server: lp user $player permission set group.announce-all
+        - set_permission: group.announce-all
+        - send_message_to_player: "&6All announcements are available."
+        - send_message_to_player: "&aUse &d/announcer &aagain to disable the announcements feature."
+      disabled:
+        #- run_command_as_server: lp user $player permission unset group.announce-all
+        - unset_permission: group.announce-all  
+        - send_message_to_player: "&6Announcements feature is disabled."
+        - send_message_to_player: "&aUse &d/announcer &aagain to renable the announcements feature."
   countdown:
     description: Countdown for restarting the server.
     usage: /countdown

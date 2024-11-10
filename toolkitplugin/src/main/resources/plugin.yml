@@ -47,6 +47,9 @@ commands:
     usage: /countdown 
     permissions: 
       - rvnktools.command.countdown
+  announcer:
+    description: Enable or disable announcements feature.
+    usage: /announcer
 permissions:
   rvnktools.command.broadcast:
     description: Allows the player to use the broadcast command

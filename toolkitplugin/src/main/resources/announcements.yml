@@ -18,7 +18,7 @@ announce_types:
   - id: server
     prefix: "&c[Server] &f"
     suffix: "&7"
-    permission: rvnktools.announce.type.server    
+    permission: rvnktools.announce.type.server
   - id: guide
     prefix: "&e[Guide] &7"
     suffix: "&7"
@@ -126,3 +126,8 @@ announcements:
     type: scheduled
     date: "2028-12-25"
     recurrence: 4h
+
+  - id: announcer
+    text: "Use &d/announcer &ato toggle &eannouncer &aon and off."
+    type: server
+    recurrence: 2h

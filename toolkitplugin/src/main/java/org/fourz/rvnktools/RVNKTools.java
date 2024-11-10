@@ -10,6 +10,8 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.Permission.LuckPermsManager;
+import org.fourz.rvnktools.Permission.PermissionService;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
@@ -19,12 +21,17 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private AnnounceManager announcementManager;
     private CycleCommands cycleCommands;
     public LinkMaker linkMaker;
+    public PermissionService permissionService;
+    private int gcTaskId = -1;
 
     @Override
     public void onEnable() {
 
         // Save default config if not present
         // saveDefaultConfig();
+
+        LuckPermsManager.init();
+        permissionService = new PermissionService();
         
         // Initialize AnnouncementManager
         announcementManager = new AnnounceManager(this);
@@ -36,7 +43,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
             getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
         } 
 
-        // Initialize LinkMakerPAPI
+        // Initialize LinkMaker
         linkMaker = new LinkMaker(this);
 
         // Register Events
@@ -53,12 +60,21 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
 
+        // Schedule periodic garbage collection
+        scheduleGarbageCollection();
+
         getLogger().info("RVNK Toolkit has been enabled.");
                 
     }
 
     @Override
     public void onDisable() {
+
+        // Cancel GC task if running
+        if (gcTaskId != -1) {
+            Bukkit.getScheduler().cancelTask(gcTaskId);
+            gcTaskId = -1;
+        }
 
         announcementManager.savePlayerDisabledTypes();
         announcementManager.shutdown();
@@ -72,6 +88,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Code that runs when the plugin is disabled
         getLogger().info("RVNK Toolkit has been disabled.");
     }
+
+    private void scheduleGarbageCollection() {
+        gcTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+            // Run cleanup on components
+            if (announcementManager != null) {
+                announcementManager.cleanup();
+            }
+            
+            // Request garbage collection
+            System.gc();
+            
+            getLogger().fine("Performed scheduled garbage collection");
+        }, 6000L, 6000L); // Run every 5 minutes (6000 ticks)
+    }
 }
-
-

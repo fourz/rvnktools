@@ -113,7 +113,7 @@ public class AnnounceScheduler {
         }.runTaskTimer(plugin, ticks, ticks);
 
         scheduledTasks.put(announcement, task);
-        logInfo("Scheduled announcement '" + announcement.getId() + "' with delay " + ticks + " ticks.");
+        //logInfo("Scheduled announcement '" + announcement.getId() + "' with delay " + ticks + " ticks.");
     }
 
     // applies a random multiplier to the ticks value
@@ -166,5 +166,10 @@ public class AnnounceScheduler {
                 task.cancel();
             }
         }
+    }
+
+    public void cleanup() {
+        // perform garbage collection
+        System.gc();       
     }
 }
