@@ -36,12 +36,12 @@ commands:
     permissions: 
       - rvnktools.command.cyclegamemode
     aliases: [gmc]
-  cycletrainmode:
+  railroad:
     description: Cycle through instruction sets.
-    aliases: [railroad]
+    aliases: [cycletrainmode]
     usage: /railroad
     permissions: 
-      - rvnktools.command.cycletrainmode    
+      - rvnktools.command.railroad    
   countdown:  
     description: Countdown for restarting the server.
     usage: /countdown 

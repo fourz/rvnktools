@@ -10,9 +10,9 @@ commands:
         - run_command_as_player: "gamemode survival"
       spectator:
         - run_command_as_player: "gamemode spectator"
-  cycletrainmode:
-    description: Cycle through instruction sets.
-    alias: railroad
+  railroad:
+    description: Cycle through minecart placement modes.
+    alias: cycletrainmode
     usage: /railroad
     instructions:
       trainmodeon:
@@ -27,20 +27,15 @@ commands:
     instructions:
       enabled_base:
         - unset_permission: group.announce-all
-        #- run_command_as_server: lp user $player permission unset group.announce-all              
         - set_permission: group.announce-base
-        #- run_command_as_server: lp user $player permission set group.announce-base        
         - send_message_to_player: "&6Essential announcements only are enabled."
         - send_message_to_player: "&aUse &d/announcer &aagain to enable all announcement types."  
       enabled_all:
-        #- run_command_as_server: lp user $player permission unset group.announce-base
         - unset_permission: group.announce-base
-        #- run_command_as_server: lp user $player permission set group.announce-all
         - set_permission: group.announce-all
         - send_message_to_player: "&6All announcements are available."
         - send_message_to_player: "&aUse &d/announcer &aagain to disable the announcements feature."
       disabled:
-        #- run_command_as_server: lp user $player permission unset group.announce-all
         - unset_permission: group.announce-all  
         - send_message_to_player: "&6Announcements feature is disabled."
         - send_message_to_player: "&aUse &d/announcer &aagain to renable the announcements feature."
@@ -58,7 +53,8 @@ commands:
         - send_command_as_server: "broadcast &cServer restart in 1 minute."
         - wait: 1m
         - send_message_to_all_players: "server restarting..."
+        - wait: 5s        
+        #- run_command_as_server: restart
       cancel:
-        - run_command_as_server: "broadcast &cServer restart cancelled."  
-        
-
+        - run_command_as_server: "broadcast &cServer restart cancelled."
+        - cancel_all_tasks: countdown

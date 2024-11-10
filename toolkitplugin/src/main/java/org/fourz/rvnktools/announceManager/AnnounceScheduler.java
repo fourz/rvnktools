@@ -53,8 +53,8 @@ public class AnnounceScheduler {
     private void scheduleAnnouncement(Announcement announcement) {
         long ticks = convertRecurrenceToTicks(announcement.getRecurrence());
 
-        logInfo("Announcement id: " + announcement.getId());
-        logInfo("Ticks value: " + ticks);
+        // logInfo("Announcement id: " + announcement.getId());
+        // logInfo("Ticks value: " + ticks);
 
         if (ticks > 0) {
             ticks = applyRandomTicks(ticks);

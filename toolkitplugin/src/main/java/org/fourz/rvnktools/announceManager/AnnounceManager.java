@@ -73,10 +73,26 @@ public class AnnounceManager {
     }
 
     public void broadcastAnnouncement(Announcement announcement) {      
+        if (announcement == null) {
+            plugin.getLogger().warning("Cannot broadcast null announcement");
+            return;
+        }
+
+        String announcementType = announcement.getType();
+        if (announcementType == null || announcementType.isEmpty()) {
+            plugin.getLogger().warning("Announcement has null or empty type");
+            return;
+        }
                 
-        AnnounceType type = announceConfig.getAnnounceTypes().get(announcement.getType());        
-        String prefix = type.getPrefix();
-        String suffix = type.getSuffix();                
+        AnnounceType type = announceConfig.getAnnounceTypes().get(announcementType);        
+        if (type == null) {
+            plugin.getLogger().warning("Could not find announcement type '" + announcementType + "' in config. Available types: " + 
+                String.join(", ", announceConfig.getAnnounceTypes().keySet()));
+            return;
+        }
+
+        String prefix = type.getPrefix() != null ? type.getPrefix() : "";
+        String suffix = type.getSuffix() != null ? type.getSuffix() : "";
         String message = announcement.getText();
 
         message = prefix + message + suffix;
