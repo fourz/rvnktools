@@ -1,0 +1,133 @@
+announce_types:
+  - id: news
+    prefix: "&a[News] &7"
+    suffix: "&7"
+    permission: rvnktools.announce.type.news
+  - id: help
+    prefix: "&b[Help] &7"
+    suffix: "&7"
+    permission: rvnktools.announce.type.help
+  - id: advert
+    prefix: "&d[Advert] &f"
+    suffix: "&7"
+    permission: rvnktools.announce.type.advert
+  - id: scheduled
+    prefix: "&a[!!] &7"
+    suffix: " &a[!!]"
+    permission: rvnktools.announce.type.scheduled
+  - id: server
+    prefix: "&c[Server] &f"
+    suffix: "&7"
+    permission: rvnktools.announce.type.server
+  - id: guide
+    prefix: "&e[Guide] &7"
+    suffix: "&7"
+    permission: rvnktools.announce.type.guide
+
+announcements:
+  - id: event
+    text: "Get a head start on the Christmas event now. Dates coming soon!"
+    type: news
+    recurrence: 90m
+    expiration: 2028-11-9
+    owner: wizardofire
+
+  - id: trains
+    text: "Use &d/trains &afor train help pages."
+    type: help
+    recurrence: 2h
+
+  - id: patreon
+    text: '&aCheck out our &c{patreon-link}!'
+    type: help
+    recurrence: 2h
+
+  - id: welcome
+    text: "welcome to Ravenkraft!"
+    permission: rvnktools.announce.welcome
+
+  - id: mickyhats
+    text: "vote daily for MickyHats! do /vote"
+    type: help
+    recurrence: 2h
+    expiration: '2028-11-24'
+
+  - id: ant_shop1
+    text: "BarterSigns coming Soon!"
+    type: advert
+    recurrence: 40m
+    owner: wizardofire
+    cost: 1
+
+  - id: toastyday
+    text: "Happy Cheese Toasty Day!"
+    type: scheduled
+    date: "2028-09-24"
+    time: '1900'
+    recurrence: 120m
+
+  - id: ads
+    text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
+    type: server
+    recurrence: 100m
+
+  - id: railroad
+    text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
+    type: help
+    recurrence: 2h
+
+  - id: announcements
+    text: "&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off."
+    type: server
+    recurrence: 80m
+
+  - id: announcements_disabled
+    text: "&aUse &d/announce disabled &ato see which announcement types you have disabled."
+    type: help
+    recurrence: 80m
+
+  - id: ignoreclaims
+    text: "&aUse &d/ignoreclaims &a or &d/ic &aif you need to bypass claims."
+    type: server
+    recurrence: 90m
+    permission: griefprevention.ignoreclaims
+
+  - id: facebook
+    text: '&aCheck out our &9{facebook-link}'
+    type: help
+
+  - id: information
+    text: '&aCheck out &e{information-link} &achannel on {discord-link}'
+    type: help
+    recurrence: 120m
+
+  - id: trains_help
+    text: '&aUse &d/trains &afor train help pages.'
+    type: guide
+    recurrence: 1h    
+
+  - id: help_guide
+    text: '&aTry &d/help &afor a command guide'
+    type: guide
+    recurrence: 2h
+
+  - id: patreon
+    text: '&aCheck out our &c{patreon-link}!'
+    type: guide
+    recurrence: 2h
+
+  - id: discord
+    text: '&aJoin us on &9{discord-link}!'
+    type: guide
+    recurrence: 2h
+
+  - id: xmas
+    text: "Merry Christmas!"
+    type: scheduled
+    date: "2028-12-25"
+    recurrence: 4h
+
+  - id: announcer
+    text: "Use &d/announcer &ato toggle &eannouncer &aon and off."
+    type: server
+    recurrence: 2h

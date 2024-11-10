@@ -1,67 +1,105 @@
 package org.fourz.rvnktools;
 
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.Bukkit;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.announcementManager.AnnouncementManager;
 import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
+import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.Permission.LuckPermsManager;
+import org.fourz.rvnktools.Permission.PermissionService;
+import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
-public class RVNKTools extends JavaPlugin {
+public class RVNKTools extends JavaPlugin implements Listener {
 
-    private AnnouncementManager announcementManager;
+    private AnnounceManager announcementManager;
     private CycleCommands cycleCommands;
+    public LinkMaker linkMaker;
+    public PermissionService permissionService;
+    private int gcTaskId = -1;
 
     @Override
     public void onEnable() {
 
         // Save default config if not present
         // saveDefaultConfig();
+
+        LuckPermsManager.init();
+        permissionService = new PermissionService();
         
         // Initialize AnnouncementManager
-        // announcementManager = new AnnouncementManager(this);
+        announcementManager = new AnnounceManager(this);
 
-        // Code that runs when the plugin is enabled
+        // Register PlaceholderAPI integration or flag as unavailable
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
+            getLogger().warning("PlaceholderAPI not found, PlaceholderAPI integration will be unavailable.");
+        } else {
+            getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
+        } 
+
+        // Initialize LinkMaker
+        linkMaker = new LinkMaker(this);
+
+        // Register Events
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
-        getLogger().info("yoo");
 
-        // Register commands
+        // Register Commands
         this.getCommand("ping").setExecutor(new PingCommand());
-        this.getCommand("tps").setExecutor(this);
+        this.getCommand("tps").setExecutor(new TPSCommand());
         this.getCommand("events").setExecutor(new EventsCommand());
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
-        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
+        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));        
 
         // Initialize and register CycleCommands
-        // cycleCommands = new CycleCommands(this);
+        cycleCommands = new CycleCommands(this);
+
+        // Schedule periodic garbage collection
+        scheduleGarbageCollection();
 
         getLogger().info("RVNK Toolkit has been enabled.");
+                
     }
 
     @Override
     public void onDisable() {
+
+        // Cancel GC task if running
+        if (gcTaskId != -1) {
+            Bukkit.getScheduler().cancelTask(gcTaskId);
+            gcTaskId = -1;
+        }
+
+        announcementManager.savePlayerDisabledTypes();
+        announcementManager.shutdown();
+
+        //garbage collection        
+        announcementManager = null;
+        cycleCommands = null;
+        linkMaker = null;
+        
+        
         // Code that runs when the plugin is disabled
         getLogger().info("RVNK Toolkit has been disabled.");
     }
 
-    // private void registerToggleCommands() {
-    //     FileConfiguration config = getConfig();
-
-    //     config.getConfigurationSection("togglecommands").getKeys(false).forEach(commandName -> {
-    //         List<String> toggleOnCommands = config.getStringList("togglecommands." + commandName + ".toggleoncommands");
-    //         List<String> toggleOffCommands = config.getStringList("togglecommands." + commandName + ".toggleoffcommands");
-    //         String toggleOnMessage = config.getString("togglecommands." + commandName + ".toggleonmessage");
-    //         String toggleOffMessage = config.getString("togglecommands." + commandName + ".toggleoffmessage");
-    //         String permissionNode = config.getString("togglecommands." + commandName + ".permissionnode");
-
-    //         getCommand(commandName).setExecutor(new ToggleCommand(this, commandName, toggleOnCommands, toggleOffCommands, toggleOnMessage, toggleOffMessage, permissionNode));
-    //     });
-    // }
+    private void scheduleGarbageCollection() {
+        gcTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+            // Run cleanup on components
+            if (announcementManager != null) {
+                announcementManager.cleanup();
+            }
+            
+            // Request garbage collection
+            System.gc();
+            
+            getLogger().fine("Performed scheduled garbage collection");
+        }, 6000L, 6000L); // Run every 5 minutes (6000 ticks)
+    }
 }
-
-

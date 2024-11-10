@@ -1,156 +1,257 @@
 package org.fourz.rvnktools.command;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
+import org.fourz.rvnktools.Permission.PermissionService;
+
+import me.clip.placeholderapi.PlaceholderAPI;
+import net.md_5.bungee.api.chat.TextComponent;
+
+import org.bukkit.configuration.file.YamlConfiguration;
+//import 
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
+import java.util.Iterator;
 
 public class CycleCommands {
-    private final JavaPlugin plugin;
-    private FileConfiguration cycleCommandsConfig;
-    private final Map<String, CommandDefinition> commandDefinitions = new HashMap<>();
-    private final Map<String, AtomicInteger> playerCycleIndices = new HashMap<>();
+    private final RVNKTools plugin;
+    private FileConfiguration config;
+    private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
-    public CycleCommands(JavaPlugin plugin) {
+    public CycleCommands(RVNKTools plugin) {
         this.plugin = plugin;
+        this.config = plugin.getConfig();
+        this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
+        plugin.getLogger().info("CycleCommands initialized.");
     }
 
-    // Loads the configuration file from the plugin's data folder
-    private void loadConfig() {
-        File configFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
-        if (!configFile.exists()) {
-            // Save the default configuration file if it does not exist
+    public void loadConfig() {
+        File cycleCommandsFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
+        if (!cycleCommandsFile.exists()) {
             plugin.saveResource("cyclecommands.yml", false);
         }
-        cycleCommandsConfig = YamlConfiguration.loadConfiguration(configFile);
-        parseCommands();
+        this.config = YamlConfiguration.loadConfiguration(cycleCommandsFile);
     }
 
-    // Parses the commands from the configuration file and stores them in memory
-    private void parseCommands() {
-        if (cycleCommandsConfig == null) return;
+    public void registerCommands() {
+        ConfigurationSection commandsSection = config.getConfigurationSection("commands");
 
-        // Iterate through each command defined in the configuration
-        for (String commandName : cycleCommandsConfig.getConfigurationSection("commands").getKeys(false)) {
-            String description = cycleCommandsConfig.getString("commands." + commandName + ".description");
-            String usage = cycleCommandsConfig.getString("commands." + commandName + ".usage");
-            String alias = cycleCommandsConfig.getString("commands." + commandName + ".alias");
-            CommandDefinition commandDefinition = new CommandDefinition(commandName, description, usage, alias);
+        if (commandsSection != null) {
+            for (String commandKey : commandsSection.getKeys(false)) {
 
-            // Iterate through each set for the command and store its actions
-            for (String setName : cycleCommandsConfig.getConfigurationSection("commands." + commandName + ".sets").getKeys(false)) {
-                List<Map<?, ?>> actions = cycleCommandsConfig.getMapList("commands." + commandName + ".sets." + setName);
-                commandDefinition.getSets().put(setName, actions);
+                ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
+                if (commandConfig != null) {
+
+                    PluginCommand pluginCommand = plugin.getCommand(commandKey);
+                    if (pluginCommand != null) {
+
+                        // register command
+                        pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig));
+                        plugin.getLogger().info("CycleCommands registered command: " + commandKey);
+
+                        // register aliases
+                        List<String> aliases = commandConfig.getStringList("aliases");
+                        for (String alias : aliases) {
+                            pluginCommand.getAliases().add(alias);
+                        }
+
+                        // set command description
+                        String description = commandConfig.getString("description");
+                        if (description != null) {
+                            pluginCommand.setDescription(description);
+                        }
+                    } else {
+
+                        plugin.getLogger().info("CycleCommands: Plugin command for " + commandKey + " is null");
+                    }
+                } else {
+                    plugin.getLogger().info("CycleCommands: Command config for " + commandKey + " is null");
+                }
             }
-            commandDefinitions.put(commandName, commandDefinition);
+        } else {
+            plugin.getLogger().info("CycleCommands: Commands section is null");
         }
     }
 
-    // Registers all the parsed commands with the server
-    private void registerCommands() {
-        for (String commandName : commandDefinitions.keySet()) {
-            plugin.getCommand(commandName).setExecutor(new CommandCycleExecutor(commandDefinitions.get(commandName)));
-            plugin.getLogger().info("Registered command: " + commandName);
-        }
-    }
+    private class CycleCommandExecutor implements CommandExecutor {
+        private final String commandKey;
+        private final ConfigurationSection commandConfig;
 
-    // Inner class to handle the execution of cycle commands
-    public class CommandCycleExecutor implements CommandExecutor {
-        private final CommandDefinition commandDefinition;
-
-        public CommandCycleExecutor(CommandDefinition commandDefinition) {
-            this.commandDefinition = commandDefinition;
+        public CycleCommandExecutor(String commandKey, ConfigurationSection commandConfig) {
+            this.commandKey = commandKey;
+            this.commandConfig = commandConfig;
         }
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            // Ensure the command sender is a player
             if (!(sender instanceof Player)) {
-                sender.sendMessage("This command can only be run by a player.");
+                sender.sendMessage("This command can only be used by players.");
                 return true;
             }
+            
             Player player = (Player) sender;
+            UUID playerId = player.getUniqueId();
+            String instructionKey = getNextInstructionKey(playerId);
+            ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions");
 
-            // Create a unique key for the player and command to track their cycle progress
-            String playerKey = player.getUniqueId().toString() + "-" + commandDefinition.name;
-            AtomicInteger cycleIndex = playerCycleIndices.computeIfAbsent(playerKey, k -> new AtomicInteger(0));
+            if (commandConfig.contains("permission")) {                
+                // retrieve the permission node for the command
+                String permissionsString = commandConfig.getString("permission").toLowerCase();     
 
-            // Get the list of sets for the command
-            List<String> setNames = commandDefinition.getSets().keySet().stream().toList();
-            if (setNames.isEmpty()) {
-                player.sendMessage("No sets available for this command.");
-                return true;
+                // check permissions for the command
+                if (!player.hasPermission(permissionsString)) {
+                    player.sendMessage("You do not have permission to use this command.");
+                    return true;
+                }
             }
 
-            // Get the current set based on the cycle index and increment the index
-            int currentIndex = cycleIndex.getAndUpdate(i -> (i + 1) % setNames.size());
-            String setName = setNames.get(currentIndex);
-            List<Map<?, ?>> actions = commandDefinition.getSets().get(setName);
 
-            // Execute each action defined in the set
-            for (Map<?, ?> actionMap : actions) {
-                String action = (String) actionMap.get("action");
-                String detail = (String) actionMap.get("detail");
-                executeAction(player, action, detail);
+            if (instructions != null) {
+                List<Map<?, ?>> instructionList = instructions.getMapList(instructionKey);
+
+                //plugin.getLogger().info("instructionList: " + instructionList);
+                executeInstructions(player, instructionList.iterator());
+            
+            } else {
+                player.sendMessage("No instruction set found for key: " + instructionKey);
             }
+
             return true;
         }
 
-        // Executes a specific action for the player
-        private void executeAction(Player player, String action, String detail) {
-            switch (action) {
+        private void executeInstructions(Player player, Iterator<Map<?, ?>> iterator) {
+            if (!iterator.hasNext()) return;
+
+            Map<?, ?> instruction = iterator.next();            
+            String key = instruction.keySet().iterator().next().toString();
+            String value = instruction.get(key).toString();
+
+            switch (key) {
                 case "run_command_as_player":
-                    // Player executes a command
-                    player.performCommand(detail);
+                    player.performCommand(value);
+                    executeInstructions(player, iterator);
                     break;
                 case "run_command_as_server":
-                    // Server executes a command, replacing $player with the player's name
-                    plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), detail.replace("$player", player.getName()));
+                    String serverCommand = value.replace("$player", player.getName());
+                    //Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
+                    executeCommandAsync(serverCommand);
+                    executeInstructions(player, iterator);
                     break;
                 case "send_message_to_player":
-                    // Send a message to the player
-                    player.sendMessage(detail);
+                    messagePlayer(player, value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "send_message_to_all_players":
+                    Bukkit.broadcastMessage(value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "set_permission":
+                    plugin.permissionService.addPermission(player.getUniqueId(), value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "unset_permission":
+                    plugin.permissionService.removePermission(player.getUniqueId(), value);
+                    executeInstructions(player, iterator);
+                    break;
+                case "wait":
+                    long delay = parseTime(value);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> executeInstructions(player, iterator), delay);
                     break;
                 default:
-                    // Handle unknown actions
-                    player.sendMessage("Unknown action: " + action);
+                    plugin.getLogger().warning("Unknown instruction: " + key);
+                    executeInstructions(player, iterator);
+                    break;
+            }
+        }
+        private String getNextInstructionKey(UUID playerId) {
+            Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
+            int position = commandPositions.getOrDefault(playerId, 0);
+
+            ConfigurationSection instructionsSection = commandConfig.getConfigurationSection("instructions");
+            if (instructionsSection == null) {
+                return null;
+            }
+
+            int totalInstructions = instructionsSection.getKeys(false).size();
+            String nextInstructionKey = (String) instructionsSection.getKeys(false).toArray()[position];
+
+            // Update position for next time
+            position = (position + 1) % totalInstructions;
+            commandPositions.put(playerId, position);
+
+            return nextInstructionKey;
+        }
+        private long parseTime(String timeStr) {
+            // Implement parsing of time strings like "1m", "30s"
+            // For simplicity, let's assume 'm' for minutes and 's' for seconds
+            try {
+                if (timeStr.endsWith("m")) {
+                    return Long.parseLong(timeStr.replace("m", "")) * 20 * 60;
+                } else if (timeStr.endsWith("s")) {
+                    return Long.parseLong(timeStr.replace("s", "")) * 20;
+                } else {
+                    return Long.parseLong(timeStr) * 20; // Assuming ticks
+                }
+            } catch (NumberFormatException e) {
+                plugin.getLogger().warning("Invalid time format: " + timeStr);
+                return 0;
             }
         }
     }
 
-    // Class to define the structure of a command
-    private static class CommandDefinition {
-        private final String name;
-        private final String description;
-        private final String usage;
-        private final String alias;
-        private final Map<String, List<Map<?, ?>>> sets = new HashMap<>();
+    private void messagePlayer (Player player, String message) {
 
-        public CommandDefinition(String name, String description, String usage, String alias) {
-            this.name = name;
-            this.description = description;
-            this.usage = usage;
-            this.alias = alias;
-        }
+        //if message is null, return a vertical space to avoid using unnecessary parsing methods
+        if (message == null) {
+            player.sendMessage("");
+            return;
+        }   
 
-        public String getUsage() {
-            return usage;
-        }
+        //if placeholderAPI is enabled
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
 
-        public Map<String, List<Map<?, ?>>> getSets() {
-            return sets;
-        }
+            //set any placeholders in the message
+            message = PlaceholderAPI.setPlaceholders(player, message);
+        } 
+        
+        //use ChatFormat to colorize the message and replace linkMaker placeholders
+        TextComponent constructedMessage = ChatFormat.parse(message, plugin.linkMaker);
+
+        //send the message to the player
+        player.spigot().sendMessage(constructedMessage);        
     }
+
+    // This method demonstrates how to run a command asynchronously but safely
+    public void executeCommandAsync(String command) {
+        // Start an asynchronous task
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            // Perform any async operations here (e.g., data retrieval or heavy computation)
+            // Then queue the command execution on the main thread
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    // Execute the command safely on the main thread
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                }
+            }.runTask(plugin); // Switch back to the main thread here
+        });
+    }
+
 }

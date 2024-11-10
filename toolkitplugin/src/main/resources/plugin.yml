@@ -1,9 +1,10 @@
 name: RVNKToolKit 
 version: 1.0-SNAPSHOT
-author: wizard
+author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
 api-version: 1.21
+softdepend: [PlaceholderAPI]
 
 commands:
   ping:
@@ -18,10 +19,37 @@ commands:
   discord:
     description: Provides information about the server's discord.
     usage: /discord
+  announce:
+    description: Manages announcements.
+    usage: /announce <toggle|list|add|remove> [args]
+    aliases: [announcement]
+    permissions: 
+      - rvnktools.command.announce
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>
-
+    permissions: 
+      - rvnktools.command.broadcast    
+  cyclegamemode:
+    description: Cycle through gamemodes.
+    usage: /cyclegamemode
+    permissions: 
+      - rvnktools.command.cyclegamemode
+    aliases: [gmc]
+  railroad:
+    description: Cycle through instruction sets.
+    aliases: [cycletrainmode]
+    usage: /railroad
+    permissions: 
+      - rvnktools.command.railroad    
+  countdown:  
+    description: Countdown for restarting the server.
+    usage: /countdown 
+    permissions: 
+      - rvnktools.command.countdown
+  announcer:
+    description: Enable or disable announcements feature.
+    usage: /announcer
 permissions:
   rvnktools.command.broadcast:
     description: Allows the player to use the broadcast command
@@ -30,6 +58,24 @@ permissions:
     description: Allows the player to get welcome messages
     default: true
   rvnktools.welcome.newplayer:
-    description: Allows the player to get welcome messages
+    description: Sends a welcome message to new players
     default: true
-        
+  rvnktools.command.cyclegamemode:
+    description: Allows the player to use the gmc command
+    default: false
+  rvnktools.command.cycletrainmode:
+    description: Allows the player to use cycle railroad modes
+    default: false        
+  rvnktools.command.countdown:
+    description: Allows the player to use the countdown command
+    default: false
+  rvnktools.command.announce:
+    description: Allows the player to use the announce command
+    default: false
+  rvnktools.command.railroad:
+    description: Allows the player to use the railroad command
+    default: false
+  rvnktools.announce.help:
+    description: Allows the player to get help messages 
+    default: true
+              
