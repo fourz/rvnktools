@@ -25,15 +25,15 @@ announce_types:
     permission: rvnktools.announce.type.guide
 
 announcements:
-  - id: event
-    text: "Get a head start on the Christmas event now. Dates coming soon!"
+  - id: events
+    text: "&e&lEvents &7are held every &eSaturday &7at &e7pm CST."
     type: news
     recurrence: 90m
     expiration: 2028-11-9
     owner: wizardofire
 
   - id: trains
-    text: "Use &d/trains &afor train help pages."
+    text: "&7Use &d/trains &7for train help pages."
     type: help
     recurrence: 2h
 
@@ -43,24 +43,25 @@ announcements:
     recurrence: 2h
 
   - id: welcome
-    text: "welcome to Ravenkraft!"
+    text: "&e&lWelcome &7to &aRavenkraft&7!"
     permission: rvnktools.announce.welcome
+    type: help    
 
   - id: mickyhats
-    text: "vote daily for MickyHats! do /vote"
+    text: "&6Vote daily &7for &eMickyHats&7! Do &6/vote"
     type: help
     recurrence: 2h
     expiration: '2028-11-24'
 
   - id: ant_shop1
-    text: "BarterSigns coming Soon!"
+    text: "&e&lBarterSigns &acoming Soon!"
     type: advert
     recurrence: 40m
     owner: wizardofire
     cost: 1
 
   - id: toastyday
-    text: "Happy Cheese Toasty Day!"
+    text: "&e&lHappy &6Cheese Toasty &e&lDay!"
     type: scheduled
     date: "2028-09-24"
     time: '1900'
@@ -87,7 +88,7 @@ announcements:
     recurrence: 80m
 
   - id: ignoreclaims
-    text: "&aUse &d/ignoreclaims &a or &d/ic &aif you need to bypass claims."
+    text: "&7Use &d/ignoreclaims &7or &d/ic &7if you need to bypass claims."
     type: server
     recurrence: 90m
     permission: griefprevention.ignoreclaims
@@ -102,12 +103,12 @@ announcements:
     recurrence: 120m
 
   - id: trains_help
-    text: '&aUse &d/trains &afor train help pages.'
+    text: "&7Use &d/trains &7for train help pages."
     type: guide
     recurrence: 1h    
 
   - id: help_guide
-    text: '&aTry &d/help &afor a command guide'
+    text: "&7Try &d/help &7for a command guide"
     type: guide
     recurrence: 2h
 
@@ -121,13 +122,13 @@ announcements:
     type: guide
     recurrence: 2h
 
-  - id: xmas
-    text: "Merry Christmas!"
+  - id: xmasevent
+    text: "&2Get started on your &c&lHOLIDAY VILLAGE &2build. &aDates and times are coming soon!"
     type: scheduled
     date: "2028-12-25"
     recurrence: 4h
 
   - id: announcer
-    text: "Use &d/announcer &ato toggle &eannouncer &aon and off."
+    text: "&7Use &d/announcer &7to cycle &eannouncer &7modes."
     type: server
     recurrence: 2h
