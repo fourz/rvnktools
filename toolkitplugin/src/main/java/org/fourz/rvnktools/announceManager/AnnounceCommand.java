@@ -83,7 +83,7 @@ public class AnnounceCommand implements CommandExecutor {
             return false;
         }
         String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        
+                
         return announcementManager.addAnnouncement(player, message);
     }
 
@@ -184,6 +184,9 @@ public class AnnounceCommand implements CommandExecutor {
                 }
                 listAnnouncements(player);
                 return true;
+            } else if (args[1].equalsIgnoreCase("types")) {
+                showAnnouncementTypes(player);
+                return true;                  
             } else {
                 String type = args[1];
                 if (!player.hasPermission("rvnktools.announce.type." + type.toLowerCase())) {

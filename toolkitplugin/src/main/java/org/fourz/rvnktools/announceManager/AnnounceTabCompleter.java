@@ -70,9 +70,16 @@ public class AnnounceTabCompleter implements TabCompleter {
                     return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
                 case "list":
                     List<String> listOptions = new ArrayList<>();
+                    
+                    // add types option
+                    listOptions.add("types");
+
+                    // add all types if the player has permission
                     if (sender.hasPermission("rvnktools.announce.type.*")) {
                         listOptions.add("all");
                     }
+
+                    // add all types that the player has permission to
                     for (String type : announceManager.getAnnounceTypes()) {
                         if (sender.hasPermission("rvnktools.announce.type." + type.toLowerCase())) {
                             listOptions.add(type);

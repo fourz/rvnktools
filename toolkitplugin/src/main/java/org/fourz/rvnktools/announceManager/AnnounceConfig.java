@@ -3,6 +3,7 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
@@ -15,14 +16,15 @@ public class AnnounceConfig {
     private final JavaPlugin plugin;
     private final File configFile;
     private FileConfiguration config;
-    private List<Announcement> announcements;
     private Map<UUID, Set<String>> playerDisabledTypes;
     private Map<String, AnnounceType> announceTypes;
     boolean usingPlaceholderAPI;
+    private final AnnounceManager announceManager;
 
     // initialize the AnnounceConfig object
-    public AnnounceConfig(JavaPlugin plugin) {
+    public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
+        this.announceManager = announceManager;
         this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
         this.playerDisabledTypes = new HashMap<>();
@@ -38,13 +40,17 @@ public class AnnounceConfig {
             plugin.getLogger().info("Created default announcements.yml");
         }
 
-        this.config = YamlConfiguration.loadConfiguration(configFile);
-        announcements = new ArrayList<>();
+        config = YamlConfiguration.loadConfiguration(configFile);
+
+        //announceManager.announcements = new ArrayList<>();
         List<Map<?, ?>> announcementMaps = config.getMapList("announcements");
+        // log to console
+        plugin.getLogger().info("Loaded " + announcementMaps.size() + " announcements from file");
+
         for (Map<?, ?> map : announcementMaps) {
             Announcement announcement = parseAnnouncement(map);
             if (announcement != null) {
-                announcements.add(announcement);
+                announceManager.addAnnouncement(announcement);
             }
         }
 
@@ -57,23 +63,24 @@ public class AnnounceConfig {
             }
         }
     }
-    public Announcement parseAnnouncement(String id, String type, String text, String playerName) {
+
+    // parse an announcement input by a player
+    public boolean parseAnnouncement(String id, String type, String text, String playerName) {
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setType(type);
         announcement.setText(text);
-        announcement.setOwner(playerName);
-        announcements.add(announcement);
-        return announcement;
+        announcement.setOwner(playerName);        
+        return announceManager.addAnnouncement(announcement);
     }
 
-    public Announcement parseAnnouncement(String id, String type, String text) {
+    // parse an announcement from console input
+    public boolean parseAnnouncement(String id, String type, String text) {
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setType(type);
-        announcement.setText(text);
-        announcements.add(announcement);        
-        return announcement;
+        announcement.setText(text);        
+        return announceManager.addAnnouncement(announcement);
     }
 
     // parse an announcement from a map in the YAML config file
@@ -198,9 +205,54 @@ public class AnnounceConfig {
         loadPlayerDisabledTypes();
     }
 
-    // Getter for announcements
-    public List<Announcement> getAnnouncements() {
-        return announcements;
+    // save the configuration to the YAML file
+    public void saveConfig() {
+        // Create a list to hold the announcements data
+        List<Map<String, Object>> announcementMaps = new ArrayList<>();
+
+        for (Announcement announcement : announceManager.getAnnouncements()) {
+            // Ensure required fields are not null
+            if (announcement.getId() == null || announcement.getType() == null || announcement.getText() == null) {
+                plugin.getLogger().warning("Skipping announcement due to missing required fields: " + announcement.getId());
+                continue;
+            }
+
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", announcement.getId());
+            map.put("text", announcement.getText());
+            map.put("type", announcement.getType());
+
+            // Add optional fields only if they are not null
+            if (announcement.getRecurrence() != null) {
+                map.put("recurrence", announcement.getRecurrence());
+            }
+            if (announcement.getOwner() != null) {
+                map.put("owner", announcement.getOwner());
+            }
+            if (announcement.getPermission() != null) {
+                map.put("permission", announcement.getPermission());
+            }
+            if (announcement.getDate() != null) {
+                map.put("date", announcement.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+            }
+            if (announcement.getTime() != null) {
+                map.put("time", announcement.getTime().format(DateTimeFormatter.ofPattern("HHmm")));
+            }
+            if (announcement.getCost() != null) {
+                map.put("cost", announcement.getCost());
+            }
+
+            announcementMaps.add(map);
+            // log to console
+            plugin.getLogger().info("Added to announcementMaps: " + announcement.getId());
+        }
+        // Set the 'announcements' section in the config
+        config.set("announcements", announcementMaps);
+        try {
+            config.save(configFile);            
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save announcements to file: " + e.getMessage());
+        }
     }
 
     // Getter for player disabled types

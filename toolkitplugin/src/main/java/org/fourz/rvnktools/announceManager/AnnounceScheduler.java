@@ -31,6 +31,17 @@ public class AnnounceScheduler {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
+        scheduleSaveConfig();
+    }
+
+    private void scheduleSaveConfig() {
+        // Schedule saveConfig to run every 20 minutes (24000 ticks)
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                saveConfig();
+            }
+        }.runTaskTimer(plugin, 24000L, 24000L);
     }
 
     // schedules all announcements
@@ -171,5 +182,10 @@ public class AnnounceScheduler {
     public void cleanup() {
         // perform garbage collection
         System.gc();       
+    }
+
+    // Add saveConfig method
+    public void saveConfig() {
+        announceManager.saveConfig();
     }
 }

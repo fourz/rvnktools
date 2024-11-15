@@ -2,26 +2,27 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.checkerframework.checker.units.qual.A;
 
 import java.util.*;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.util.ChatFormat;
-
-import me.clip.placeholderapi.PlaceholderAPI;
+import org.fourz.rvnktools.util.ChatServiceInterface;
+import org.fourz.rvnktools.util.ChatService;
 
 public class AnnounceManager {
     private final RVNKTools plugin;
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
-    boolean usingPlaceholderAPI;
-    
+    private final ChatServiceInterface chatService;    
+    boolean usingPlaceholderAPI;    
+    private List<Announcement> announcements;
 
     public AnnounceManager(RVNKTools plugin) {
         plugin.getLogger().info("Enabling AnnounceManager.");
         this.plugin = plugin;
+        this.chatService = new ChatService();
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
-        this.announceConfig = new AnnounceConfig(plugin);
+        this.announcements = new ArrayList<>();
+        this.announceConfig = new AnnounceConfig(plugin, this);
         this.announceScheduler = new AnnounceScheduler(plugin, this);
 
         // Register commands
@@ -33,6 +34,20 @@ public class AnnounceManager {
         announceScheduler.scheduleAnnouncements();
     }
 
+    // Add an announcement to the announcements list, used by AnnounceConfig
+    public boolean addAnnouncement(Announcement announcement) {        
+        if (announcement == null) {
+            plugin.getLogger().warning("Cannot add null announcement");
+            return false;
+        }
+        announcements.add(announcement);
+
+        // Log the announcement
+        plugin.getLogger().info("Added announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
+        return true;
+    }
+
+    // Add an announcement to the announcements list, used by AnnounceCommand
     public boolean addAnnouncement(Player player, String input) {
 
         // extract id, type, and text from input
@@ -40,7 +55,7 @@ public class AnnounceManager {
         
         if (args.length < 3) {
             if (player != null) {
-                player.sendMessage("Invalid announcement format. Usage: <type> <id> <message>");
+                chatService.sendMessage(player, "Invalid announcement format. Usage: <type> <id> <message>");
             } else {
                 plugin.getLogger().warning("Invalid announcement format. Usage: <type> <id> <message>");
             }
@@ -61,15 +76,12 @@ public class AnnounceManager {
                 player.sendMessage("You do not have permission to add announcements.");
                 return false;
             } else {
-                //parse announcement as player.  set owner to player
-                announceConfig.parseAnnouncement(id, type, text, player.getName());
-                return true;
+                // Parse announcement as player. Set owner to player
+                return announceConfig.parseAnnouncement(id, type, text, player.getName());
             }
-        }
-        
-        //parse announcement as console
-        announceConfig.parseAnnouncement(id, type, text);
-        return true;
+        }        
+        // Parse announcement as console        
+        return announceConfig.parseAnnouncement(id, type, text);
     }
 
     public void broadcastAnnouncement(Announcement announcement) {      
@@ -91,19 +103,15 @@ public class AnnounceManager {
             return;
         }
 
+        // Only construct message after all null checks have passed
         String prefix = type.getPrefix() != null ? type.getPrefix() : "";
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
-        String message = announcement.getText();
-
-        message = prefix + message + suffix;
+        String message = prefix + announcement.getText() + suffix;
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                String formattedMessage = ChatFormat.colorize(message);
-                if (usingPlaceholderAPI) {
-                    formattedMessage = PlaceholderAPI.setPlaceholders(player, formattedMessage);
-                }
-                player.sendMessage(formattedMessage);
+                chatService.sendMessage(player, message);
+                plugin.getLogger().info("Broadcasting announcement to " + player.getName() + ": " + message);
             }
         }
     }
@@ -116,14 +124,14 @@ public class AnnounceManager {
 
             if (disabledTypes.contains(type)) {
                 disabledTypes.remove(type);
-                player.sendMessage("Announcements of type '" + type + "' enabled.");
+                chatService.sendMessage(player, "Announcements of type '" + type + "' enabled.");
             } else {
                 disabledTypes.add(type);
-                player.sendMessage("Announcements of type '" + type + "' disabled.");
+                chatService.sendMessage(player, "Announcements of type '" + type + "' disabled.");
             }
             announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
         } else {
-            player.sendMessage("You do not have permission to toggle announcements of this type.");
+            chatService.sendMessage(player, "You do not have permission to toggle announcements of this type.");
         }
     }
 
@@ -132,7 +140,14 @@ public class AnnounceManager {
         announceScheduler.scheduleAnnouncements();
     }
 
-    public void shutdown() {
+    public void saveConfig() {
+        announceConfig.saveConfig();
+        //log to console
+        plugin.getLogger().info("Saved AnnounceManager configuration.");
+    }    
+
+    public void shutdown() {    
+        saveConfig();    
         announceScheduler.shutdown();
     }
 
@@ -183,14 +198,18 @@ public class AnnounceManager {
 
     public Set<String> getAnnouncementIds() {
         Set<String> ids = new HashSet<>();
-        for (Announcement announcement : announceConfig.getAnnouncements()) {
+        for (Announcement announcement : this.announcements) {
             ids.add(announcement.getId());
         }
         return ids;
     }
 
     public List<Announcement> getAnnouncements() {
-        return announceConfig.getAnnouncements();
+        return announcements;
+    }
+
+    public void setAnnouncements(List<Announcement> announcements) {
+        this.announcements = announcements;
     }
 
     public void savePlayerDisabledTypes() {
@@ -198,7 +217,7 @@ public class AnnounceManager {
     }
 
     public boolean sendAnnouncementNow(Player player, String id) {
-        for (Announcement announcement : announceConfig.getAnnouncements()) {
+        for (Announcement announcement : this.announcements) {
             if (announcement.getId().equalsIgnoreCase(id)) {
                 broadcastAnnouncement(announcement);
                 return true;
