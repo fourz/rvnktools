@@ -29,5 +29,11 @@ public class ChatFormat {
     // Parses the text and returns a clickable link with colorized text
     public static TextComponent parse (String text, LinkMaker linkMaker) {
         return makeLink(colorize(text), linkMaker);            
-    }        
+    }
+
+    // Parses the text and returns a clickable link with colorized text
+    public static TextComponent parse (TextComponent text, LinkMaker linkMaker) {
+        return makeLink(colorize(text), linkMaker);            
+    }
+    
 }

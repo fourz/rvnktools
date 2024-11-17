@@ -77,6 +77,7 @@ public class AnnounceManager {
                 return false;
             } else {
                 // Parse announcement as player. Set owner to player
+                player.sendMessage("Announcement added: " + id + " (" + type + ")");
                 return announceConfig.parseAnnouncement(id, type, text, player.getName());
             }
         }        
@@ -110,7 +111,7 @@ public class AnnounceManager {
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                chatService.sendMessage(player, message);
+                chatService.sendMessage(player, message, plugin.linkMaker);
                 plugin.getLogger().info("Broadcasting announcement to " + player.getName() + ": " + message);
             }
         }

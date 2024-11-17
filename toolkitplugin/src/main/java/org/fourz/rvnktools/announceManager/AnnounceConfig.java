@@ -243,8 +243,6 @@ public class AnnounceConfig {
             }
 
             announcementMaps.add(map);
-            // log to console
-            plugin.getLogger().info("Added to announcementMaps: " + announcement.getId());
         }
         // Set the 'announcements' section in the config
         config.set("announcements", announcementMaps);
