@@ -5,6 +5,7 @@ public class AnnounceType {
     private String prefix;
     private String suffix;
     private String permission;
+    private Double listingFee;
 
     // Getters and setters
     public String getId() {
@@ -37,5 +38,13 @@ public class AnnounceType {
 
     public void setPermission(String permission) {
         this.permission = permission;
+    }
+
+    public Double getListingFee() {
+        return listingFee;
+    }
+
+    public void setListingFee(Double listingFee) {
+        this.listingFee = listingFee;
     }
 }

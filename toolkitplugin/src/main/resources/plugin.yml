@@ -7,6 +7,10 @@ api-version: 1.21
 softdepend: [PlaceholderAPI]
 
 commands:
+  puthat:
+    description: Applies a custom Jack-o-Lantern to the nearest mob.
+    usage: /puthat <customModelData>
+    permission: rvnktools.command.puthat
   ping:
     description: Shows your current ping.
     usage: /ping
@@ -25,28 +29,32 @@ commands:
     aliases: [announcement]
     permissions: 
       - rvnktools.command.announce
+    default: op      
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>
     permissions: 
       - rvnktools.command.broadcast    
+    default: op      
   cyclegamemode:
     description: Cycle through gamemodes.
     usage: /cyclegamemode
     permissions: 
       - rvnktools.command.cyclegamemode
     aliases: [gmc]
+    default: op    
   railroad:
     description: Cycle through instruction sets.
     aliases: [cycletrainmode]
     usage: /railroad
     permissions: 
-      - rvnktools.command.railroad    
+      - rvnktools.command.railroad          
   countdown:  
     description: Countdown for restarting the server.
     usage: /countdown 
     permissions: 
       - rvnktools.command.countdown
+    default: op      
   announcer:
     description: Enable or disable announcements feature.
     usage: /announcer
@@ -78,4 +86,6 @@ permissions:
   rvnktools.announce.help:
     description: Allows the player to get help messages 
     default: true
-              
+  rvnktools.command.puthat:
+    description: Allows the player to use the puthat command
+    default: true

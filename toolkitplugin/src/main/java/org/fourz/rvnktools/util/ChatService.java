@@ -4,7 +4,10 @@ package org.fourz.rvnktools.util;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.announceManager.PlayerMessageService;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
+
 import me.clip.placeholderapi.PlaceholderAPI;
+import net.md_5.bungee.api.chat.TextComponent;
 
 public class ChatService implements ChatServiceInterface {
     private final boolean usingPlaceholderAPI;
@@ -13,9 +16,13 @@ public class ChatService implements ChatServiceInterface {
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
 
-    @Override
     public void sendMessage(Player player, String message) {
         player.sendMessage(formatMessage(player, message));
+    }
+
+    public void sendMessage(Player player, String message, LinkMaker linkMaker) {
+        TextComponent textComponent = ChatFormat.parse(message, linkMaker);
+        player.spigot().sendMessage(textComponent);
     }
 
     @Override

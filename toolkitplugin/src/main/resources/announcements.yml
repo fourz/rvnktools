@@ -10,6 +10,8 @@ announce_types:
   - id: advert
     prefix: "&d[Advert] &f"
     suffix: "&7"
+    list_fee: 4
+    weekly_fee: 10
     permission: rvnktools.announce.type.advert
   - id: scheduled
     prefix: "&a[!!] &7"
@@ -127,6 +129,23 @@ announcements:
     type: scheduled
     date: "2028-12-25"
     recurrence: 4h
+
+  - id: xmasevent_week1
+    text: "Winter Village Build Event starts tonite at 8PM EST! RVSP on the {discord-link} if you can."
+    type: news
+    expiration: "2024-11-16"
+    recurrence: 4h
+
+  - id: xmasevent_reminder
+    text: "The last day for Winter Village Build event will be January 18th."
+    type: news
+    expiration: "2025-01-17"
+    recurrence: 3h
+
+  - id: todayexample
+    text: "&e&lToday &7is &a day."
+    type: scheduled
+    date: "2024-11-16"    
 
   - id: announcer
     text: "&7Use &d/announcer &7to cycle &eannouncer &7modes."

@@ -1,16 +1,14 @@
 package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import me.clip.placeholderapi.PlaceholderAPI;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.util.ChatFormat;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AnnounceScheduler {
 
@@ -22,11 +20,18 @@ public class AnnounceScheduler {
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
-    private Map<Announcement, BukkitTask> scheduledTasks;
+    private Map<Announcement, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();
     private boolean usingPlaceholderAPI;
     private final Random rand = new Random();
 
-    // initialize the scheduler with the plugin and announce manager
+    // constants for improved readability in conditional statements
+    private static final int RECURRENCE_UNSET = -1;
+    private static final int TIME_SET__BEFORE_TIME = 0;
+    private static final int TIME_SET__TICKS_POSITIVE = 1;
+    private static final int TIME_SET__DATE_EQUAL = 3;
+    private static final int TIME_NULL__DATE_EQUAL = 4;    
+
+    // initialize the scheduler 
     public AnnounceScheduler(RVNKTools plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
@@ -52,7 +57,7 @@ public class AnnounceScheduler {
                 task.cancel();
             }
         }
-        scheduledTasks = new HashMap<>();
+        scheduledTasks = new ConcurrentHashMap<>();
 
         // Schedule each announcement
         for (Announcement announcement : announceManager.getAnnouncements()) {
@@ -60,18 +65,26 @@ public class AnnounceScheduler {
         }
     }
 
-    // schedule a single announcement based on its type and recurrence
+    // schedule a single announcement given an announcement object
     private void scheduleAnnouncement(Announcement announcement) {
+
+        // Check if the announcement has an expiration date and if it has past, skip it
+        if (announcement.getExpiration() != null) {
+            if (LocalDateTime.now().isAfter(announcement.getExpiration())) {
+                return;
+            }
+        }
+
+        //calculate the ticks based on the recurrence
         long ticks = convertRecurrenceToTicks(announcement.getRecurrence());
 
-        // logInfo("Announcement id: " + announcement.getId());
-        // logInfo("Ticks value: " + ticks);
 
         if (ticks > 0) {
             ticks = applyRandomTicks(ticks);
         }
 
-        if ("scheduled".equalsIgnoreCase(announcement.getType()) && announcement.getDate() != null && announcement.getTime() != null) {
+        // if the type is 'scheduled' and the date is set, handle it as a scheduled announcement
+        if ("scheduled".equalsIgnoreCase(announcement.getType()) && announcement.getDate() != null) {
             handleScheduledAnnouncement(announcement, ticks);
             return;
         }
@@ -82,39 +95,91 @@ public class AnnounceScheduler {
     // handle scheduling of announcements with a specific date and time
     private void handleScheduledAnnouncement(Announcement announcement, long ticks) {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime announcementDateTime = LocalDateTime.of(announcement.getDate(), announcement.getTime());
+        Integer condition = TIME_SET__TICKS_POSITIVE;
 
-        // adjust the date if the announcement time has passed
-        if (now.isAfter(announcementDateTime)) {
-            if ("annual".equalsIgnoreCase(announcement.getRecurrence())) {
-                announcementDateTime = announcementDateTime.plusYears(1);
-            } else {
-                return;
+        // announcement has time set
+        if (announcement.getTime() != null) {
+            // Check if the announcement is set to run before the current time
+            if (now.toLocalDate().isEqual(announcement.getDate()) && now.toLocalTime().isBefore(announcement.getTime())) {
+                condition = TIME_SET__BEFORE_TIME;
+            // Check if the announcement is set to run after the current time
+            } else if (now.toLocalDate().isEqual(announcement.getDate()) && ticks > 0) {
+                condition = TIME_SET__TICKS_POSITIVE;
+            // Check if the announcement is set to run on the same date as the current date
+            } else if (now.toLocalDate().isEqual(announcement.getDate())) {
+                condition = TIME_SET__DATE_EQUAL;
+            }
+        // announcement has no time set
+        } else {
+            // Check if the announcement is set to run on the same date as the current date
+            if (now.toLocalDate().isEqual(announcement.getDate())) {
+                condition = TIME_NULL__DATE_EQUAL;
             }
         }
 
-        long delay = Duration.between(now, announcementDateTime).toMillis() / 50L;
+        switch (condition) {            
+            case TIME_SET__BEFORE_TIME:
+                // Schedule to run later at a specific time
+                long delay = Duration.between(now, LocalDateTime.of(announcement.getDate(), announcement.getTime())).toMillis() / 50L;
+                BukkitTask task = new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        broadcastAnnouncement(announcement);
+                    }
+                }.runTaskLater(plugin, delay);
+                scheduledTasks.put(announcement, task);
+                return;
+            case TIME_SET__TICKS_POSITIVE:
+                // Schedule to run later with a positive ticks value
+                handlePeriodicAnnouncement(announcement, ticks);
+                return;
 
-        // schedule the announcement
-        BukkitTask task = new BukkitRunnable() {
-            @Override
-            public void run() {
-                broadcastAnnouncement(announcement);
-                if ("annual".equalsIgnoreCase(announcement.getRecurrence())) {
-                    announcement.setDate(announcement.getDate().plusYears(1));
-                    scheduleAnnouncement(announcement);
-                }
-            }
-        }.runTaskLater(plugin, delay);
+            case TIME_SET__DATE_EQUAL:
+                // Schedule to run later without specific time
+                long delayDateEqual = Duration.between(now, LocalDateTime.of(announcement.getDate(), now.toLocalTime())).toMillis() / 50L;
+                BukkitTask taskDateEqual = new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        broadcastAnnouncement(announcement);
+                    }
+                }.runTaskLater(plugin, delayDateEqual);
+                scheduledTasks.put(announcement, taskDateEqual);
+                return;
 
-        scheduledTasks.put(announcement, task);
+            case TIME_NULL__DATE_EQUAL:
+                // Schedule to run every 4 hours
+                int nextHour = ((now.getHour() / 4) + 1) * 4 % 24;
+                LocalDateTime nextTime = now.withHour(nextHour).withMinute(0).withSecond(0).withNano(0);
+                long delayNullTime = Duration.between(now, nextTime).toMillis() / 50L;
+                long period = 4 * 60L * 60L * 20L; // 4 hours in ticks
+
+                BukkitTask taskNullTime = new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        broadcastAnnouncement(announcement);
+                    }
+                }.runTaskTimer(plugin, delayNullTime, period);
+                scheduledTasks.put(announcement, taskNullTime);
+                return;
+            default:
+                // No action needed
+                break;
+        }
     }
 
     // handle scheduling of periodic announcements
     private void handlePeriodicAnnouncement(Announcement announcement, long ticks) {
-        if (ticks == -1) {
-            ticks = rand.nextLong(DEFAULT_RANDOM_RANGE) + DEFAULT_DELAY;
+
+        // if ticks is set to RECURRENCE_UNSET (-1), the recurrence was not set, calculate an interval that will only run once before midnight
+        // using factor of 0.7, if the server starts at midnight, the announcement will run at 4:48 PM
+        // using factor of 0.7, if the server starts at 5am, the announcement will run at 6:18 PM
+        if (ticks == RECURRENCE_UNSET) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime midnight = now.toLocalDate().atStartOfDay().plusDays(1);
+            long ticks_until_midnight = Duration.between(now, midnight).toMillis() / 50L;
+            ticks = (long) (ticks_until_midnight * 0.7);
         }
+
         BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
@@ -140,12 +205,9 @@ public class AnnounceScheduler {
     // parse the recurrence string to ticks
     private long convertRecurrenceToTicks(String recurrence) {
         if (recurrence == null) {
-            return -1;
+            return RECURRENCE_UNSET;
         }
         recurrence = recurrence.toLowerCase();
-        if (recurrence.equals("annual")) {
-            return -1;
-        }
         long ticks = 0;
         try {
             if (recurrence.endsWith("h")) {
@@ -180,8 +242,7 @@ public class AnnounceScheduler {
     }
 
     public void cleanup() {
-        // perform garbage collection
-        System.gc();       
+
     }
 
     // Add saveConfig method

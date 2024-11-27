@@ -10,15 +10,19 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+
+import net.milkbowl.vault.economy.Economy;
+
 import org.fourz.rvnktools.Permission.LuckPermsManager;
 import org.fourz.rvnktools.Permission.PermissionService;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-
+import org.fourz.rvnktools.hatManager.PutHatCommand;
 public class RVNKTools extends JavaPlugin implements Listener {
 
-    private AnnounceManager announcementManager;
+    private AnnounceManager announceManager;
+    private Economy economy;    
     private CycleCommands cycleCommands;
     public LinkMaker linkMaker;
     public PermissionService permissionService;
@@ -33,8 +37,11 @@ public class RVNKTools extends JavaPlugin implements Listener {
         LuckPermsManager.init();
         permissionService = new PermissionService();
         
+        // Initialize Economy
+        this.economy = getServer().getServicesManager().getRegistration(Economy.class).getProvider();
+        
         // Initialize AnnouncementManager
-        announcementManager = new AnnounceManager(this);
+        announceManager = new AnnounceManager(this);
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
@@ -55,13 +62,14 @@ public class RVNKTools extends JavaPlugin implements Listener {
         this.getCommand("tps").setExecutor(new TPSCommand());
         this.getCommand("events").setExecutor(new EventsCommand());
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
-        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));        
+        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
+        this.getCommand("puthat").setExecutor(new PutHatCommand(this));
 
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
 
         // Schedule periodic garbage collection
-        scheduleGarbageCollection();
+        // scheduleGarbageCollection();
 
         getLogger().info("RVNK Toolkit has been enabled.");
                 
@@ -70,17 +78,11 @@ public class RVNKTools extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
 
-        // Cancel GC task if running
-        if (gcTaskId != -1) {
-            Bukkit.getScheduler().cancelTask(gcTaskId);
-            gcTaskId = -1;
-        }
-
-        announcementManager.savePlayerDisabledTypes();
-        announcementManager.shutdown();
+        announceManager.savePlayerDisabledTypes();
+        announceManager.shutdown();
 
         //garbage collection        
-        announcementManager = null;
+        announceManager = null;
         cycleCommands = null;
         linkMaker = null;
         
@@ -89,17 +91,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
         getLogger().info("RVNK Toolkit has been disabled.");
     }
 
-    private void scheduleGarbageCollection() {
-        gcTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
-            // Run cleanup on components
-            if (announcementManager != null) {
-                announcementManager.cleanup();
-            }
-            
-            // Request garbage collection
-            System.gc();
-            
-            getLogger().fine("Performed scheduled garbage collection");
-        }, 6000L, 6000L); // Run every 5 minutes (6000 ticks)
+    public Economy getEconomy() {
+
+        return economy;
+
     }
+
 }
