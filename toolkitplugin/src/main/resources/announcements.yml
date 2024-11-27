@@ -10,6 +10,8 @@ announce_types:
   - id: advert
     prefix: "&d[Advert] &f"
     suffix: "&7"
+    list_fee: 4
+    weekly_fee: 10
     permission: rvnktools.announce.type.advert
   - id: scheduled
     prefix: "&a[!!] &7"
@@ -140,7 +142,7 @@ announcements:
     expiration: "2025-01-17"
     recurrence: 3h
 
-    - id: todayexample
+  - id: todayexample
     text: "&e&lToday &7is &a day."
     type: scheduled
     date: "2024-11-16"    

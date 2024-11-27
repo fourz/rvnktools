@@ -85,6 +85,23 @@ public class AnnounceManager {
         return announceConfig.parseAnnouncement(id, type, text);
     }
 
+    public boolean deleteAnnouncement(String id) {
+        if (id == null || id.isEmpty()) {
+            plugin.getLogger().warning("Cannot delete announcement with null or empty id");
+            return false;
+        }
+
+        boolean removed = announcements.removeIf(announcement -> announcement.getId().equalsIgnoreCase(id));
+        if (removed) {
+            plugin.getLogger().info("Deleted announcement: " + id);
+            announceConfig.saveConfig();
+            return true;
+        }
+
+        plugin.getLogger().warning("Could not find announcement with id: " + id);
+        return false;
+    }
+
     public void broadcastAnnouncement(Announcement announcement) {      
         if (announcement == null) {
             plugin.getLogger().warning("Cannot broadcast null announcement");
@@ -242,5 +259,9 @@ public class AnnounceManager {
         } finally {
             super.finalize();
         }
+    }
+
+    public AnnounceType getAnnounceType(String type) {
+        return announceConfig.getAnnounceTypes().get(type);
     }
 }

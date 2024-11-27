@@ -3,7 +3,6 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
@@ -70,7 +69,7 @@ public class AnnounceConfig {
         announcement.setId(id);
         announcement.setType(type);
         announcement.setText(text);
-        announcement.setOwner(playerName);        
+        announcement.setOwner(playerName);
         return announceManager.addAnnouncement(announcement);
     }
 
@@ -138,12 +137,16 @@ public class AnnounceConfig {
         String id = (String) map.get("id");
         String prefix = (String) map.get("prefix");
         String suffix = (String) map.get("suffix");
+        Double listingFee = (Double) map.get("list_fee");
         String permission = (String) map.get("permission");
 
         AnnounceType announceType = new AnnounceType();
         announceType.setId(id);
         announceType.setPrefix(prefix);
         announceType.setSuffix(suffix);
+        if (listingFee != null) {
+            announceType.setListingFee(listingFee);
+        }
         announceType.setPermission(permission);
 
         return announceType;
