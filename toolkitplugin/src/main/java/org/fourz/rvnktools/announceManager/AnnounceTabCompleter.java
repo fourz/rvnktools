@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class AnnounceTabCompleter implements TabCompleter {
     private final AnnounceManager announceManager;
-    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "remove", "now", "help", "types");
+    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "delete", "now", "help", "types");
 
     public AnnounceTabCompleter(AnnounceManager announceManager) {
         this.announceManager = announceManager;
@@ -25,7 +25,7 @@ public class AnnounceTabCompleter implements TabCompleter {
             for (String cmd : subcommands) {
                 String permission = switch (cmd) {
                     case "add" -> "rvnktools.command.announce.add";
-                    case "remove" -> "rvnktools.command.announce.remove";
+                    case "delete" -> "rvnktools.command.announce.delete";
                     case "now" -> "rvnktools.command.announce.now";
                     default -> "rvnktools.command.announce";
                 };
@@ -39,7 +39,7 @@ public class AnnounceTabCompleter implements TabCompleter {
         if (args.length == 2) {
             String permission = switch (args[0].toLowerCase()) {
                 case "add" -> "rvnktools.command.announce.add";
-                case "remove" -> "rvnktools.command.announce.remove";
+                case "delete" -> "rvnktools.command.announce.delete";
                 case "now" -> "rvnktools.command.announce.now";
                 default -> "rvnktools.command.announce";
             };
@@ -54,7 +54,7 @@ public class AnnounceTabCompleter implements TabCompleter {
                     for (String cmd : subcommands) {
                         permission = switch (cmd) {
                             case "add" -> "rvnktools.command.announce.add";
-                            case "remove" -> "rvnktools.command.announce.remove";
+                            case "delete" -> "rvnktools.command.announce.delete";
                             case "now" -> "rvnktools.command.announce.now";
                             default -> "rvnktools.command.announce";
                         };
@@ -65,7 +65,7 @@ public class AnnounceTabCompleter implements TabCompleter {
                     return filterCompletions(availableHelpTopics, args[1]);
                 case "toggle":
                     return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[1]);
-                case "remove":
+                case "delete":
                 case "now":
                     return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
                 case "list":

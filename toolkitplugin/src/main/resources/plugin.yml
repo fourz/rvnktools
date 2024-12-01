@@ -25,7 +25,7 @@ commands:
     usage: /discord
   announce:
     description: Manages announcements.
-    usage: /announce <toggle|list|add|remove> [args]
+    usage: /announce <toggle|list|add|delete> [args]
     aliases: [announcement]
     permissions: 
       - rvnktools.command.announce
