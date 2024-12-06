@@ -28,6 +28,12 @@ public class AnnounceSubCommandAdd extends AnnounceSubCommand {
 
         String type = args[1];
         String id = args[2];
+
+        // Check if announcement already exists
+        if (announceManager.announcementExists(id)) {
+            messagePlayer(player, "&cAn announcement with ID '" + id + "' already exists");
+            return false;
+        }
         
         // Get announcement type config
         AnnounceType announceType = announceManager.getAnnounceType(type);

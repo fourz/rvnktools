@@ -6,6 +6,7 @@ public class AnnounceType {
     private String suffix;
     private String permission;
     private Double listingFee;
+    private boolean imported = false;
 
     // Getters and setters
     public String getId() {
@@ -47,4 +48,5 @@ public class AnnounceType {
     public void setListingFee(Double listingFee) {
         this.listingFee = listingFee;
     }
+
 }

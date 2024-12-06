@@ -1,153 +1,139 @@
 announce_types:
-  - id: news
-    prefix: "&a[News] &7"
-    suffix: "&7"
-    permission: rvnktools.announce.type.news
-  - id: help
-    prefix: "&b[Help] &7"
-    suffix: "&7"
-    permission: rvnktools.announce.type.help
-  - id: advert
-    prefix: "&d[Advert] &f"
-    suffix: "&7"
-    list_fee: 4
-    weekly_fee: 10
-    permission: rvnktools.announce.type.advert
-  - id: scheduled
-    prefix: "&a[!!] &7"
-    suffix: " &a[!!]"
-    permission: rvnktools.announce.type.scheduled
-  - id: server
-    prefix: "&c[Server] &f"
-    suffix: "&7"
-    permission: rvnktools.announce.type.server
-  - id: guide
-    prefix: "&e[Guide] &7"
-    suffix: "&7"
-    permission: rvnktools.announce.type.guide
+- id: news
+  prefix: '&a[News] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.news
+- id: help
+  prefix: '&b[Help] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.help
+- id: advert
+  prefix: '&d[Advert] &f'
+  suffix: '&7'
+  list_fee: 4
+  weekly_fee: 10
+  permission: rvnktools.announce.type.advert
+- id: scheduled
+  prefix: '&a[!!] &7'
+  suffix: ' &a[!!]'
+  permission: rvnktools.announce.type.scheduled
+- id: server
+  prefix: '&c[Server] &f'
+  suffix: '&7'
+  permission: rvnktools.announce.type.server
+- id: guide
+  prefix: '&e[Guide] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.guide
 
 announcements:
-  - id: events
-    text: "&e&lEvents &7are held every &eSaturday &7at &e7pm CST."
-    type: news
-    recurrence: 90m
-    expiration: 2028-11-9
-    owner: wizardofire
+- id: events
+  text: '&e&lEvents &7are held every &eSaturday &7at &e7pm CST.'
+  type: news
+  recurrence: 90m
+  owner: wizardofire
+- id: trains
+  text: '&7Use &d/trains &7for train help pages.'
+  type: help
+  recurrence: 2h
+- id: welcome
+  text: '&e&lWelcome &7to &aRavenkraft&7!'
+  type: help
+  permission: rvnktools.announce.welcome
+- id: mickyhats
+  text: '&6Vote daily &7for &eMickyHats&7! Do &6/vote'
+  type: help
+  recurrence: 2h
+- id: ant_shop1
+  text: '&e&lBarterSigns &acoming Soon!'
+  type: advert
+  recurrence: 40m
+  owner: wizardofire
+  cost: 1
+- id: toastyday
+  text: '&e&lHappy &6Cheese Toasty &e&lDay!'
+  type: scheduled
+  recurrence: 120m
+  date: '2028-09-24'
+  time: '1900'
+- id: ads
+  text: '&aUse &d/ads &ato toggle &eplayer adverts &aon and off.'
+  type: server
+  recurrence: 100m
+- id: railroad
+  text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
+  type: help
+  recurrence: 2h
+- id: announcements
+  text: '&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off.'
+  type: server
+  recurrence: 80m
+- id: announcements_disabled
+  text: '&aUse &d/announce disabled &ato see which announcement types you have disabled.'
+  type: help
+  recurrence: 80m
+- id: ignoreclaims
+  text: '&7Use &d/ignoreclaims &7or &d/ic &7if you need to bypass claims.'
+  type: server
+  recurrence: 90m
+  permission: griefprevention.ignoreclaims
+- id: facebook
+  text: '&aCheck out our &9{facebook-link}'
+  type: help
+- id: information
+  text: '&aCheck out &e{information-link} &achannel on {discord-link}'
+  type: help
+  recurrence: 120m
+- id: trains_help
+  text: '&7Use &d/trains &7for train help pages.'
+  type: guide
+  recurrence: 1h
+- id: help_guide
+  text: '&7Try &d/help &7for a command guide'
+  type: guide
+  recurrence: 2h
+- id: patreon
+  text: '&aCheck out our &c{patreon-link}!'
+  type: guide
+  recurrence: 2h
+- id: discord
+  text: '&aJoin us on &9{discord-link}!'
+  type: guide
+  recurrence: 2h
+- id: xmasevent
+  text: '&2Get started on your &c&lHOLIDAY VILLAGE &2build. &aDates and times are
+    coming soon!'
+  type: scheduled
+  recurrence: 4h
+  date: '2028-12-25'
+- id: xmasevent_week1
+  text: Winter Village Build Event starts tonite at 8PM EST! RVSP on the {discord-link}
+    if you can.
+  type: news
+  recurrence: 4h
+- id: xmasevent_reminder
+  text: The last day for Winter Village Build event will be January 18th.
+  type: news
+  recurrence: 3h
+- id: todayexample
+  text: '&e&lToday &7is &a day.'
+  type: scheduled
+  date: '2024-11-16'
+- id: announcer
+  text: '&7Use &d/announcer &7to cycle &eannouncer &7modes.'
+  type: server
+  recurrence: 2h
 
-  - id: trains
-    text: "&7Use &d/trains &7for train help pages."
-    type: help
-    recurrence: 2h
-
-  - id: patreon
-    text: '&aCheck out our &c{patreon-link}!'
-    type: help
-    recurrence: 2h
-
-  - id: welcome
-    text: "&e&lWelcome &7to &aRavenkraft&7!"
-    permission: rvnktools.announce.welcome
-    type: help    
-
-  - id: mickyhats
-    text: "&6Vote daily &7for &eMickyHats&7! Do &6/vote"
-    type: help
-    recurrence: 2h
-    expiration: '2028-11-24'
-
-  - id: ant_shop1
-    text: "&e&lBarterSigns &acoming Soon!"
-    type: advert
-    recurrence: 40m
-    owner: wizardofire
-    cost: 1
-
-  - id: toastyday
-    text: "&e&lHappy &6Cheese Toasty &e&lDay!"
-    type: scheduled
-    date: "2028-09-24"
-    time: '1900'
-    recurrence: 120m
-
-  - id: ads
-    text: "&aUse &d/ads &ato toggle &eplayer adverts &aon and off."
-    type: server
-    recurrence: 100m
-
-  - id: railroad
-    text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
-    type: help
-    recurrence: 2h
-
-  - id: announcements
-    text: "&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off."
-    type: server
-    recurrence: 80m
-
-  - id: announcements_disabled
-    text: "&aUse &d/announce disabled &ato see which announcement types you have disabled."
-    type: help
-    recurrence: 80m
-
-  - id: ignoreclaims
-    text: "&7Use &d/ignoreclaims &7or &d/ic &7if you need to bypass claims."
-    type: server
-    recurrence: 90m
-    permission: griefprevention.ignoreclaims
-
-  - id: facebook
-    text: '&aCheck out our &9{facebook-link}'
-    type: help
-
-  - id: information
-    text: '&aCheck out &e{information-link} &achannel on {discord-link}'
-    type: help
-    recurrence: 120m
-
-  - id: trains_help
-    text: "&7Use &d/trains &7for train help pages."
-    type: guide
-    recurrence: 1h    
-
-  - id: help_guide
-    text: "&7Try &d/help &7for a command guide"
-    type: guide
-    recurrence: 2h
-
-  - id: patreon
-    text: '&aCheck out our &c{patreon-link}!'
-    type: guide
-    recurrence: 2h
-
-  - id: discord
-    text: '&aJoin us on &9{discord-link}!'
-    type: guide
-    recurrence: 2h
-
-  - id: xmasevent
-    text: "&2Get started on your &c&lHOLIDAY VILLAGE &2build. &aDates and times are coming soon!"
-    type: scheduled
-    date: "2028-12-25"
-    recurrence: 4h
-
-  - id: xmasevent_week1
-    text: "Winter Village Build Event starts tonite at 8PM EST! RVSP on the {discord-link} if you can."
-    type: news
-    expiration: "2024-11-16"
-    recurrence: 4h
-
-  - id: xmasevent_reminder
-    text: "The last day for Winter Village Build event will be January 18th."
-    type: news
-    expiration: "2025-01-17"
-    recurrence: 3h
-
-  - id: todayexample
-    text: "&e&lToday &7is &a day."
-    type: scheduled
-    date: "2024-11-16"    
-
-  - id: announcer
-    text: "&7Use &d/announcer &7to cycle &eannouncer &7modes."
-    type: server
-    recurrence: 2h
+storage:
+# types: mysql, sqlite, flatfile
+  type: flatfile 
+  mysql:
+    host: localhost
+    port: 3306
+    username: root
+    password: ''
+    useSSL: false
+    database: rvnktools
+    tablePrefix: announce_
+  sqlite:
+    database: announcements.db

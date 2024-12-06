@@ -13,11 +13,12 @@ public class Announcement {
     private String permission;
     private LocalDate date;
     private LocalTime time;
-    private Integer cost;
     private LocalDateTime expiration;
+    private boolean imported;
 
     public Announcement() { 
         this.type = "system";   
+        this.imported = false;  // Initialize as not imported
     }
 
     // Getters and Setters
@@ -74,16 +75,19 @@ public class Announcement {
     public void setTime(LocalTime time) {
         this.time = time;
     }
-    public Integer getCost() {
-        return cost;
-    }
-    public void setCost(Integer cost) {
-        this.cost = cost;
-    }
+
     public LocalDateTime getExpiration() {
         return expiration;
     }
     public void setExpiration(LocalDateTime expiration) {
         this.expiration = expiration;
+    }
+    
+    public boolean isImported() {
+        return imported;
+    }
+    
+    public void setImported() {
+        this.imported = true;
     }
 }

@@ -20,7 +20,7 @@ public class AnnounceScheduler {
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
-    private Map<Announcement, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();
+    private Map<Announcement, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();    
     private boolean usingPlaceholderAPI;
     private final Random rand = new Random();
 
@@ -36,17 +36,16 @@ public class AnnounceScheduler {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
-        scheduleSaveConfig();
-    }
-
-    private void scheduleSaveConfig() {
-        // Schedule saveConfig to run every 20 minutes (24000 ticks)
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                saveConfig();
-            }
-        }.runTaskTimer(plugin, 24000L, 24000L);
+        // Comment out the scheduleSaveConfig() method to prevent periodic saving
+        // private void scheduleSaveConfig() {
+        //     // Schedule saveConfig to run every 20 minutes (24000 ticks)
+        //     // new BukkitRunnable() {
+        //     //     @Override
+        //     //     public void run() {
+        //     //         saveConfig();
+        //     //     }
+        //     // }.runTaskTimer(plugin, 24000L, 24000L);
+        // }
     }
 
     // schedules all announcements
@@ -63,6 +62,7 @@ public class AnnounceScheduler {
         for (Announcement announcement : announceManager.getAnnouncements()) {
             scheduleAnnouncement(announcement);
         }
+        logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
     }
 
     // schedule a single announcement given an announcement object
@@ -245,8 +245,8 @@ public class AnnounceScheduler {
 
     }
 
-    // Add saveConfig method
-    public void saveConfig() {
-        announceManager.saveConfig();
-    }
+    // Remove or comment out the saveConfig() method if it's no longer needed
+    // public void saveConfig() {
+    //     announceManager.saveConfig();
+    // }
 }
