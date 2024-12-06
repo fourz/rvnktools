@@ -22,6 +22,7 @@ public class SQLiteDataConnector implements DataStore {
     private final String databasePath;
     private Connection connection;
     private final JavaPlugin plugin;
+    private boolean empty = false;
 
     public SQLiteDataConnector(JavaPlugin plugin, String databasePath) {
         this.plugin = plugin;
@@ -232,6 +233,7 @@ public class SQLiteDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
+                empty = true;
             }
             
             // Check if announce_types table exists
@@ -269,5 +271,10 @@ public class SQLiteDataConnector implements DataStore {
             e.printStackTrace();
         }
         return false;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return empty;
     }
 }

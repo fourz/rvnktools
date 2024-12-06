@@ -14,8 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public class AnnounceConfig {
     private final JavaPlugin plugin;
@@ -28,7 +26,7 @@ public class AnnounceConfig {
     private DataStore dataStore;
     private String storageType;
 
-    // initialize the AnnounceConfig object
+    // Constructor to initialize the announcement configuration and load data
     public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
@@ -36,40 +34,171 @@ public class AnnounceConfig {
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
         this.playerDisabledTypes = new HashMap<>();
 
-        loadConfig();
-        initializeDataStore();
+        loadConfig();        
         loadPlayerDisabledTypes();
     }
 
-    private void initializeDataStore() {
+    // Sets up data storage and handles initial data migration from YAML to database if needed
+    public void initializeDataStore() {
         plugin.getLogger().info("Using " + storageType + " storage");
-        
-        // Load data from YAML first
-        List<Announcement> ymlAnnouncements = new ArrayList<>();
-        Map<String, AnnounceType> ymlTypes = new HashMap<>();
-        
-        if (configFile.exists()) {
-            List<Map<?, ?>> announcementMaps = config.getMapList("announcements");
-            List<Map<?, ?>> typesMaps = config.getMapList("announce_types");
-            
-            // Parse announcements from YAML
-            for (Map<?, ?> map : announcementMaps) {
-                Announcement announcement = parseAnnouncement(map);
-                if (announcement != null) {
-                    ymlAnnouncements.add(announcement);
+
+        // Load data from YAML files
+        List<Announcement> ymlAnnouncements = loadDataFromYAML();
+        Map<String, AnnounceType> ymlTypes = loadTypesFromYAML();
+        announceTypes = new HashMap<>();
+
+        // Initialize DataStore based on storage type
+        initializeDataStoreConnection();
+
+        boolean isChanged = false;
+
+        if (dataStore != null) {
+            dataStore.connect();
+            try {
+                if (dataStore.isEmpty()) {
+                    // if database is empty, populate it with YAML data
+                    plugin.getLogger().info("Database is empty");                    
+                    announceManager.setAnnouncements(ymlAnnouncements);
+                    plugin.getLogger().info("Loading " + ymlAnnouncements.size() + " announcements from file");
+                    announceTypes = ymlTypes;
+                    isChanged = importYML(ymlAnnouncements, ymlTypes);
+                } else {
+                    plugin.getLogger().info("Database is not empty");
+
+                    //if YAML data is empty, load data from the database into memory first
+                    if (ymlAnnouncements.isEmpty() || ymlTypes.isEmpty()) {                        
+                        
+                        plugin.getLogger().warning("YAML data is empty. Skipping import");
+                        // Load data from the database into memory first                        
+                        List<Announcement> announcements = loadDataFromDatabase();
+                        announceManager.setAnnouncements(announcements);
+                        isChanged = true;
+
+                    //if YML data is not empty, perform import
+                    } else {                        
+                        List<Announcement> announcements = loadDataFromDatabase();                    
+                        // Load data from the database into memory first
+                        announceManager.setAnnouncements(announcements);
+                        announceManager.setAnnouncementsImported();
+
+                        // Perform YML imports after database data is loaded
+                        isChanged = importYML(ymlAnnouncements, ymlTypes);
+                    }                    
+
                 }
+                if (isChanged) {
+                    saveConfig();
+                    plugin.getLogger().info("Saved announcements after import changes");
+                }
+            } catch (Exception e) {
+                plugin.getLogger().severe("Failed to initialize database: " + e.getMessage());
+                e.printStackTrace();
+
+                // Fallback to YAML data if database fails
+                announceManager.setAnnouncements(ymlAnnouncements);
+                announceTypes = ymlTypes;
+            } finally {
+                dataStore.disconnect();
             }
-            
-            // Parse types from YAML
-            for (Map<?, ?> map : typesMaps) {
-                AnnounceType announceType = parseAnnounceType(map);
-                if (announceType != null) {
-                    ymlTypes.put(announceType.getId(), announceType);
+        } else {
+            // If using YAML storage, set the data directly
+            announceManager.setAnnouncements(ymlAnnouncements);
+            announceTypes = ymlTypes;
+        }
+    }
+
+    private boolean importYML(List<Announcement> ymlAnnouncements, Map<String, AnnounceType> ymlTypes) {
+        boolean needsSaving = false;
+        
+        // Load existing data for comparison
+        List<Announcement> existingAnnouncements = dataStore.loadAnnouncements();
+        List<AnnounceType> existingTypes = dataStore.loadAnnounceTypes();
+
+        // Create lookup sets
+        Set<String> existingAnnouncementIds = new HashSet<>();
+        for (Announcement announcement : existingAnnouncements) {
+            existingAnnouncementIds.add(announcement.getId().toLowerCase());
+        }
+
+        Set<String> existingTypeIds = new HashSet<>();
+        for (AnnounceType type : existingTypes) {
+            existingTypeIds.add(type.getId().toLowerCase());
+        }
+
+        // Import announce types
+        for (AnnounceType type : ymlTypes.values()) {
+            if (!existingTypeIds.contains(type.getId().toLowerCase())) {
+                try {                    
+                    dataStore.saveAnnounceType(type);
+                    plugin.getLogger().info("Imported announce type: " + type.getId());                    
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error saving announce type: " + type.getId());
+                    e.printStackTrace();
                 }
             }
         }
 
-        // Initialize appropriate data store
+        // Import announcements
+        for (Announcement ymlAnnouncement : ymlAnnouncements) {
+            boolean exists = existingAnnouncementIds.contains(ymlAnnouncement.getId().toLowerCase());
+            
+            // Only try to import if not already imported
+            if (!exists && !ymlAnnouncement.isImported()) {                
+                // output message to console
+                try {
+                    //dataStore.saveAnnouncement(ymlAnnouncement);    
+                    announceManager.addAnnouncement(ymlAnnouncement);            
+                    announceManager.setAnnouncementImported(ymlAnnouncement.getId());
+                    needsSaving = true;                    
+                    plugin.getLogger().info("Imported announcement: " + ymlAnnouncement.getId() + announceManager.isAnnouncementImported(ymlAnnouncement.getId()));
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error importing announcement " + ymlAnnouncement.getId() + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
+            } 
+            // Mark as imported if exists but not already marked
+            else if (exists && !ymlAnnouncement.isImported()) {
+                announceManager.setAnnouncementImported(ymlAnnouncement.getId());
+                needsSaving = true;
+                plugin.getLogger().info("Marked existing announcement as imported: " + ymlAnnouncement.getId());
+            }
+        }
+
+        return needsSaving;
+    }
+
+    // Reads and parses announcement data from YAML configuration
+    private List<Announcement> loadDataFromYAML() {
+        List<Announcement> announcements = new ArrayList<>();
+        if (configFile.exists()) {
+            List<Map<?, ?>> announcementMaps = config.getMapList("announcements");
+            for (Map<?, ?> map : announcementMaps) {
+                Announcement announcement = parseAnnouncement(map);
+                if (announcement != null) {
+                    announcements.add(announcement);
+                }
+            }
+        }
+        return announcements;
+    }
+
+    // Reads and parses announcement types from YAML configuration
+    private Map<String, AnnounceType> loadTypesFromYAML() {
+        Map<String, AnnounceType> types = new HashMap<>();
+        if (configFile.exists()) {
+            List<Map<?, ?>> typesMaps = config.getMapList("announce_types");
+            for (Map<?, ?> map : typesMaps) {
+                AnnounceType announceType = parseAnnounceType(map);
+                if (announceType != null) {
+                    types.put(announceType.getId(), announceType);
+                }
+            }
+        }
+        return types;
+    }
+
+    // Creates appropriate DataStore instance based on configuration settings
+    private void initializeDataStoreConnection() {
         if (storageType.equalsIgnoreCase("mysql")) {
             String host = config.getString("storage.mysql.host");
             int port = config.getInt("storage.mysql.port");
@@ -83,142 +212,24 @@ public class AnnounceConfig {
             dataStore = new SQLiteDataConnector(plugin, databasePath);
         } else {
             dataStore = null;
-            // If using yml, set the loaded data directly
-            announceManager.setAnnouncements(ymlAnnouncements);
-            announceTypes = ymlTypes;
-            return;
-        }
-
-        // Initialize database and populate if needed
-        if (dataStore != null) {
-            dataStore.connect();
-            
-            try {
-                // pull existing data from database
-                List<Announcement> existingAnnouncements = dataStore.loadAnnouncements();
-                List<AnnounceType> existingTypes = dataStore.loadAnnounceTypes();
-
-                // if types are empty, populate from yml
-                if (existingTypes.isEmpty()) {
-                    plugin.getLogger().info("No announce types found in database - populating from yml...");
-                    
-                    // Use the yml data for the local lookup map
-                    announceTypes = ymlTypes;
-
-                    // Populate database with data from the yml
-                    for (AnnounceType type : ymlTypes.values()) {
-                        try {
-                            if (!type.isImported()) {
-                                dataStore.saveAnnounceType(type);
-                                setImportedType(type.getId());
-                            }
-                        } catch (Exception e) {
-                            plugin.getLogger().warning("Error saving announce type: " + type.getId());
-                            e.printStackTrace();
-                        }
-                    }
-
-                    plugin.getLogger().info("Database populated with " + ymlTypes.size() + " announce types");
-                } else {
-
-                    // Create the local map for lookup from existing types
-                    announceTypes = existingTypes.stream().collect(Collectors.toMap(AnnounceType::getId, Function.identity()));
-
-                    // Check for types that are not imported
-                    List<AnnounceType> unimportedTypes = new ArrayList<>();
-                    for (AnnounceType type : ymlTypes.values()) {
-                        if (existingTypes.contains(type)) {
-                            unimportedTypes.add(type);
-                        } else {
-                            //this fails because announceTypes is not initialized
-                            setImportedType(type.getId());
-                        }
-                    }
-
-                    if (!unimportedTypes.isEmpty()) {
-                        plugin.getLogger().info("Found " + unimportedTypes.size() + " unimported announce types in database - importing from yml...");
-                        // Import unimported types from yml
-                        for (AnnounceType type : unimportedTypes) {
-                            try {                                
-                                dataStore.saveAnnounceType(type);                                
-                                // Update the local lookup map
-                                announceTypes.put(type.getId(), type);
-                                setImportedType(type.getId());
-
-                            } catch (Exception e) {
-                                plugin.getLogger().warning("Error saving announce type: " + type.getId());
-                                e.printStackTrace();
-                            }
-                        }
-
-                        plugin.getLogger().info("Imported " + unimportedTypes.size() + " announce types to database");
-                    } else {
-                        plugin.getLogger().info("All announce types are imported to database");
-                    }
-                }
-
-
-                if (existingAnnouncements.isEmpty()) {
-                    // Use the yml data for the local lookup map
-                    plugin.getLogger().info("No announcements found in database - populating from yml...");                    
-                    for (Announcement announcement : ymlAnnouncements) {
-                        dataStore.saveAnnouncement(announcement);
-                        announcement.setImported(true);                        
-                    }
-                    plugin.getLogger().info("Database populated with " + ymlAnnouncements.size() + " announcements");
-
-                } else {
-                    // Check for announcements that are not imported
-                    List<Announcement> unimportedAnnouncements = new ArrayList<>();
-                    for (Announcement announcement : existingAnnouncements) {
-                        if (!announcement.isImported()) {
-                            unimportedAnnouncements.add(announcement);
-                        } else {
-                            announceManager.setImportedAnnouncement(announcement.getId());
-                        }
-                    }
-
-                    if (!unimportedAnnouncements.isEmpty()) {
-                        plugin.getLogger().info("Found " + unimportedAnnouncements.size() + " unimported announcements in database - importing from yml...");
-                        
-                        for (Announcement announcement : unimportedAnnouncements) {
-                            if (!announcement.isImported()) {
-                                dataStore.saveAnnouncement(announcement);
-                                announceManager.setImportedAnnouncement(announcement.getId());
-                            }
-                        }
-                        
-                        plugin.getLogger().info("Imported " + unimportedAnnouncements.size() + " announcements to database");
-
-                    } else {
-                        plugin.getLogger().info("All announcements are imported to database");
-                    }
-                }
-
-                // Load the data from database
-                announceManager.setAnnouncements(dataStore.loadAnnouncements());
-                announceTypes = new HashMap<>();
-                for (AnnounceType type : dataStore.loadAnnounceTypes()) {
-                    announceTypes.put(type.getId(), type);
-                }
-
-                // Save the updated imported flags back to config
-                saveConfig();
-
-            } catch (Exception e) {
-                plugin.getLogger().severe("Failed to initialize database: " + e.getMessage());
-                e.printStackTrace();
-                
-                // Fallback to yml data if database fails
-                announceManager.setAnnouncements(ymlAnnouncements);
-                announceTypes = ymlTypes;
-            } finally {
-                dataStore.disconnect();
-            }
         }
     }
 
-    // load the configuration from the YAML file
+    // Retrieves announcement data from database and stores it in memory
+    private List<Announcement> loadDataFromDatabase() {
+        // Load announce types from database
+        List<AnnounceType> dbTypes = dataStore.loadAnnounceTypes();
+        announceTypes = new HashMap<>();
+        for (AnnounceType type : dbTypes) {
+            announceTypes.put(type.getId(), type);
+        }
+
+        // Load announcements from database
+        return dataStore.loadAnnouncements();
+        //announceManager.setAnnouncements(dbAnnouncements);
+    }
+
+    // Loads or creates the YAML configuration file
     public void loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
@@ -229,7 +240,12 @@ public class AnnounceConfig {
         storageType = config.getString("storage.type", "yml");
     }
 
-    // parse an announcement input by a player
+    // Parses an announcement object, adding to local memory and data store
+    public boolean parseAnnouncement(Announcement announcement) {        
+        return announceManager.addAnnouncement(announcement);
+    }
+
+    // Creates a new announcement from player input with owner information
     public boolean parseAnnouncement(String id, String type, String text, String playerName) {
         Announcement announcement = new Announcement();
         announcement.setId(id);
@@ -239,7 +255,7 @@ public class AnnounceConfig {
         return announceManager.addAnnouncement(announcement);
     }
 
-    // parse an announcement from console input
+    // Creates a new announcement from console input without owner information
     public boolean parseAnnouncement(String id, String type, String text) {
         Announcement announcement = new Announcement();
         announcement.setId(id);
@@ -248,7 +264,7 @@ public class AnnounceConfig {
         return announceManager.addAnnouncement(announcement);
     }
 
-    // parse an announcement from a map in the YAML config file
+    // Converts a YAML map into an Announcement object
     private Announcement parseAnnouncement(Map<?, ?> map) {
         String id = (String) map.get("id");
         String text = (String) map.get("text");
@@ -290,12 +306,12 @@ public class AnnounceConfig {
         announcement.setPermission(permission);
         announcement.setDate(date);
         announcement.setTime(time);
-        announcement.setImported(imported);
+        if (imported) announcement.setImported();
 
         return announcement;
     }
 
-    // parse an announce type from a map
+    // Converts a YAML map into an AnnounceType object
     private AnnounceType parseAnnounceType(Map<?, ?> map) {
         String id = (String) map.get("id");
         String prefix = (String) map.get("prefix");
@@ -312,12 +328,10 @@ public class AnnounceConfig {
             announceType.setListingFee(listingFee);
         }
         announceType.setPermission(permission);
-        announceType.setImported(imported);
-
         return announceType;
     }
 
-    // load player disabled types from a YAML file
+    // Loads player preferences for disabled announcement types
     public boolean loadPlayerDisabledTypes() {
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists()) {
@@ -341,7 +355,7 @@ public class AnnounceConfig {
         return true;
     }
 
-    // save player disabled types to a YAML file
+    // Persists player preferences for disabled announcement types
     public void savePlayerDisabledTypes() {
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists()) {
@@ -367,16 +381,18 @@ public class AnnounceConfig {
         }
     }
 
-    // reload the configuration and player disabled types
+    // Refreshes configuration and player preferences from disk
     public void reloadConfig() {
         loadConfig();
         loadPlayerDisabledTypes();
     }
 
-    // save the configuration to the YAML file
+    // Persists announcements and announcement types to YAML configuration
     public void saveConfig() {
         // Create a list to hold the announcements data
         List<Map<String, Object>> announcementMaps = new ArrayList<>();
+
+        plugin.getLogger().info("Saving " + announceManager.getAnnouncements().size() + " announcements to file");
 
         for (Announcement announcement : announceManager.getAnnouncements()) {
             // Ensure required fields are not null
@@ -433,9 +449,7 @@ public class AnnounceConfig {
             if (type.getListingFee() != null) {
                 map.put("list_fee", type.getListingFee());
             }
-            map.put("permission", type.getPermission());
-            map.put("imported", type.isImported());
-            
+            map.put("permission", type.getPermission());            
             announceTypeMaps.add(map);
         }
 
@@ -448,34 +462,18 @@ public class AnnounceConfig {
         }
     }
 
-    // Getter for player disabled types
+    // Returns the map of player-disabled announcement types
     public Map<UUID, Set<String>> getPlayerDisabledTypes() {
         return playerDisabledTypes;
     }
 
-    // Getter for announce types
+    // Returns the map of available announcement types
     public Map<String, AnnounceType> getAnnounceTypes() {
         return announceTypes;
     }
     
-    /**
-     * Gets the current DataStore instance being used for database operations.
-     * Returns null if using yml storage.
-     * 
-     * @return The DataStore instance, or null if using yml storage
-     */
+    // Returns the current data storage implementation
     public DataStore getDataStore() {
         return dataStore;
-    }
-
-    private void setImportedType(String typeId) {
-        AnnounceType type = announceTypes.get(typeId);
-        if (type != null) {
-            type.setImported(true);
-            announceTypes.put(typeId, type);
-        }
-    }
-    private boolean isImportedType(String typeId) {
-        return announceTypes.get(typeId).isImported();        
     }
 }

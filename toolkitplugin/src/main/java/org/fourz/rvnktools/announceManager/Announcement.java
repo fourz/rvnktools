@@ -87,7 +87,7 @@ public class Announcement {
         return imported;
     }
     
-    public void setImported(boolean imported) {
-        this.imported = imported;
+    public void setImported() {
+        this.imported = true;
     }
 }

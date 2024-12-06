@@ -49,11 +49,4 @@ public class AnnounceType {
         this.listingFee = listingFee;
     }
 
-    public boolean isImported() {
-        return imported;
-    }
-
-    public void setImported(boolean imported) {
-        this.imported = imported;
-    }
 }

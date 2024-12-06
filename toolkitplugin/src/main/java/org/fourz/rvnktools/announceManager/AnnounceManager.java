@@ -23,6 +23,7 @@ public class AnnounceManager {
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
         this.announcements = new ArrayList<>();
         this.announceConfig = new AnnounceConfig(plugin, this);
+        this.announceConfig.initializeDataStore();
         this.announceScheduler = new AnnounceScheduler(plugin, this);
 
         // Register commands
@@ -36,26 +37,29 @@ public class AnnounceManager {
 
     // Add an announcement to the announcements list, used by AnnounceConfig
     public boolean addAnnouncement(Announcement announcement) {        
+
         if (announcement == null) {
             plugin.getLogger().warning("Cannot add null announcement");
             return false;
         }
 
+        //log to console        
+        plugin.getLogger().info("Adding announcement: " + announcement.getId() + " (" + announcement.getType() + ")");        
+
         if (announceConfig.getDataStore() != null && !announcement.isImported()) {
-            announceConfig.getDataStore().connect();
+            ////announceConfig.getDataStore().connect();
             if (announceConfig.getDataStore().announcementExists(announcement.getId())) {
                 plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
-                announceConfig.getDataStore().disconnect();
+                ////announceConfig.getDataStore().disconnect();
                 return false;
             }
             announceConfig.getDataStore().saveAnnouncement(announcement);
-            plugin.getLogger().info("Saved announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
-            
+                        
             //set as imported in the announcements list
             setImported(announcement.getId());
             plugin.getLogger().info("Marked announcement as imported: " + announcement.getId());
 
-            announceConfig.getDataStore().disconnect();
+            ////announceConfig.getDataStore().disconnect();
         }
 
         announcements.add(announcement);
@@ -63,11 +67,12 @@ public class AnnounceManager {
         return true;
     }
 
+
     // private setImported method
     private void setImported(String id) {
         for (Announcement a : announcements) {
             if (a.getId().equalsIgnoreCase(id)) {
-                a.setImported(true);
+                a.setImported();
                 break;
             }
         }
@@ -126,34 +131,6 @@ public class AnnounceManager {
         return announceConfig.parseAnnouncement(id, type, text);
     }
 
-    public boolean deleteAnnouncement(String id) {
-        if (id == null || id.isEmpty()) {
-            plugin.getLogger().warning("Cannot delete announcement with null or empty id");
-            return false;
-        }
-
-        if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();
-            if (!announceConfig.getDataStore().announcementExists(id)) {
-                plugin.getLogger().warning("Announcement with ID '" + id + "' does not exist");
-                announceConfig.getDataStore().disconnect();
-                return false;
-            }
-            announceConfig.getDataStore().deleteAnnouncement(id);
-            announceConfig.getDataStore().disconnect();
-        }
-
-        boolean removed = announcements.removeIf(announcement -> announcement.getId().equalsIgnoreCase(id));
-        if (removed) {
-            plugin.getLogger().info("Deleted announcement: " + id);
-            announceConfig.saveConfig();
-            return true;
-        }
-
-        plugin.getLogger().warning("Could not find announcement with id: " + id);
-        return false;
-    }
-
     public void broadcastAnnouncement(Announcement announcement) {      
         if (announcement == null) {
             plugin.getLogger().warning("Cannot broadcast null announcement");
@@ -184,6 +161,42 @@ public class AnnounceManager {
                 plugin.getLogger().info("Broadcasting announcement to " + player.getName() + ": " + message);
             }
         }
+    }
+
+    public void cleanup() {
+        // Clear any cached data or temporary collections
+        announceScheduler.cleanup();
+        
+        // Suggest garbage collection for this manager        
+        Runtime.getRuntime().gc();
+    }
+
+    public boolean deleteAnnouncement(String id) {
+        if (id == null || id.isEmpty()) {
+            plugin.getLogger().warning("Cannot delete announcement with null or empty id");
+            return false;
+        }
+
+        if (announceConfig.getDataStore() != null) {
+            announceConfig.getDataStore().connect();
+            if (!announceConfig.getDataStore().announcementExists(id)) {
+                plugin.getLogger().warning("Announcement with ID '" + id + "' does not exist");
+                announceConfig.getDataStore().disconnect();
+                return false;
+            }
+            announceConfig.getDataStore().deleteAnnouncement(id);
+            announceConfig.getDataStore().disconnect();
+        }
+
+        boolean removed = announcements.removeIf(announcement -> announcement.getId().equalsIgnoreCase(id));
+        if (removed) {
+            plugin.getLogger().info("Deleted announcement: " + id);
+            announceConfig.saveConfig();
+            return true;
+        }
+
+        plugin.getLogger().warning("Could not find announcement with id: " + id);
+        return false;
     }
 
     public void toggleAnnouncementType(Player player, String type) {
@@ -296,22 +309,7 @@ public class AnnounceManager {
         return false;
     }
 
-    public void cleanup() {
-        // Clear any cached data or temporary collections
-        announceScheduler.cleanup();
-        
-        // Suggest garbage collection for this manager        
-        Runtime.getRuntime().gc();
-    }
 
-    @Override
-    protected void finalize() throws Throwable {
-        try {
-            cleanup();
-        } finally {
-            super.finalize();
-        }
-    }
 
     public AnnounceType getAnnounceType(String type) {
         return announceConfig.getAnnounceTypes().get(type);
@@ -338,16 +336,22 @@ public class AnnounceManager {
         return false;
     }
 
-    public void setImportedAnnouncement(String id) {
+    public void setAnnouncementImported(String id) {
         for (Announcement announcement : announcements) {
             if (announcement.getId().equalsIgnoreCase(id)) {
-                announcement.setImported(true);
+                announcement.setImported();         
                 break;
             }
         }
     }
 
-    public boolean isImportedAnnouncement(String id) {
+    public void setAnnouncementsImported() {
+        for (Announcement announcement : announcements) {
+            announcement.setImported();
+        }
+    }
+
+    public boolean isAnnouncementImported(String id) {
         for (Announcement announcement : announcements) {
             if (announcement.getId().equalsIgnoreCase(id)) {
                 return announcement.isImported();

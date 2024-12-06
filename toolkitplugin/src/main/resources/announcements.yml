@@ -36,10 +36,6 @@ announcements:
   text: '&7Use &d/trains &7for train help pages.'
   type: help
   recurrence: 2h
-- id: patreon
-  text: '&aCheck out our &c{patreon-link}!'
-  type: help
-  recurrence: 2h
 - id: welcome
   text: '&e&lWelcome &7to &aRavenkraft&7!'
   type: help

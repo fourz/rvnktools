@@ -19,4 +19,7 @@ public interface DataStore {
 
     // Add new method
     boolean announcementExists(String id);
+    
+    // Add new method
+    boolean isEmpty();
 }

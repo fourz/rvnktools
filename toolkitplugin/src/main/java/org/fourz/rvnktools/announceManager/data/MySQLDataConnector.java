@@ -13,6 +13,7 @@ public class MySQLDataConnector implements DataStore {
     private final String password;
     private final String database; // Add database field
     private Connection connection;
+    private boolean empty = false;
 
     public MySQLDataConnector(String host, int port, String database, String username, String password, boolean useSSL) {
         this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
@@ -156,6 +157,7 @@ public class MySQLDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
+                empty = true;
             }
             
             // Check if announce_types table exists
@@ -190,5 +192,10 @@ public class MySQLDataConnector implements DataStore {
             e.printStackTrace();
         }
         return false;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return empty;
     }
 }
