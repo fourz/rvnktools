@@ -8,18 +8,15 @@ import org.fourz.rvnktools.announceManager.Announcement;
 public interface DataStore {
     void connect();
     void disconnect();
+    void initializeTables();
+    
+    boolean isEmpty();
+    boolean announcementExists(String id);
+    
     void saveAnnouncement(Announcement announcement);
     void deleteAnnouncement(String id);
     List<Announcement> loadAnnouncements();
+    
     void saveAnnounceType(AnnounceType announceType);
     List<AnnounceType> loadAnnounceTypes();
-    
-    // Add new method
-    void initializeTables();
-
-    // Add new method
-    boolean announcementExists(String id);
-    
-    // Add new method
-    boolean isEmpty();
 }

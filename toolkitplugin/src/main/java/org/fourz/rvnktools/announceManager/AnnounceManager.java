@@ -36,37 +36,59 @@ public class AnnounceManager {
     }
 
     // Add an announcement to the announcements list, used by AnnounceConfig
-    public boolean addAnnouncement(Announcement announcement) {        
+    public boolean addAnnouncement(Announcement announcement) {
+        // Determine the condition code based on the announcement state
+        String conditionCode;
 
         if (announcement == null) {
-            plugin.getLogger().warning("Cannot add null announcement");
-            return false;
-        }
-
-        //log to console        
-        plugin.getLogger().info("Adding announcement: " + announcement.getId() + " (" + announcement.getType() + ")");        
-
-        if (announceConfig.getDataStore() != null && !announcement.isImported()) {
-            ////announceConfig.getDataStore().connect();
+            // Condition when the announcement is null
+            conditionCode = "NULL_ANNOUNCEMENT";
+        } else if (announceConfig.getDataStore() != null && !announcement.isImported()) {
+            // Condition when there's a data store and the announcement is not imported
             if (announceConfig.getDataStore().announcementExists(announcement.getId())) {
-                plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
-                ////announceConfig.getDataStore().disconnect();
-                return false;
+                // Condition when the announcement already exists in the data store
+                conditionCode = "ANNOUNCEMENT_EXISTS";
+            } else {
+                // Condition when the announcement needs to be saved to the data store
+                conditionCode = "SAVE_ANNOUNCEMENT";
             }
-            announceConfig.getDataStore().saveAnnouncement(announcement);
-                        
-            //set as imported in the announcements list
-            setImported(announcement.getId());
-            plugin.getLogger().info("Marked announcement as imported: " + announcement.getId());
-
-            ////announceConfig.getDataStore().disconnect();
+        } else {
+            // Default condition to add the announcement
+            conditionCode = "ADD_ANNOUNCEMENT";
         }
 
-        announcements.add(announcement);
-        plugin.getLogger().info("Added announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
-        return true;
-    }
+        // Handle each condition using a switch statement
+        switch (conditionCode) {
+            case "NULL_ANNOUNCEMENT":
+                // Cannot add a null announcement
+                plugin.getLogger().warning("Cannot add null announcement");
+                return false;
 
+            case "ANNOUNCEMENT_EXISTS":
+                // Announcement with this ID already exists in the data store
+                plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
+                return false;
+
+            case "SAVE_ANNOUNCEMENT":
+                // Save the announcement to the data store and mark as imported
+                announceConfig.getDataStore().saveAnnouncement(announcement);
+                setImported(announcement.getId());
+                plugin.getLogger().info("Marked announcement as imported: " + announcement.getId());
+                // Proceed to add the announcement
+                // (No break to continue to ADD_ANNOUNCEMENT case)
+
+            case "ADD_ANNOUNCEMENT":
+                // Add the announcement to the list and log the addition
+                announcements.add(announcement);
+                plugin.getLogger().info("Added announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
+                return true;
+
+            default:
+                // Unexpected condition
+                plugin.getLogger().warning("Unexpected condition in addAnnouncement");
+                return false;
+        }
+    }
 
     // private setImported method
     private void setImported(String id) {
