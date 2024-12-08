@@ -20,7 +20,8 @@ public class AnnounceConfig {
         IMPORT_YML_TO_NEW_DB,
         UPDATE_MISSING_YML_FROM_DB,
         MERGE_YML_INTO_DB,
-        FALLBACK_TO_YML
+        FALLBACK_TO_YML,
+        NO_UPDATE
     }
 
     private final JavaPlugin plugin;
@@ -49,7 +50,7 @@ public class AnnounceConfig {
             : ConfigOperation.FALLBACK_TO_YML;
 
             //log the config operation
-            plugin.getLogger().info("Config Operation: " + configOperation);
+            plugin.getLogger().info("AnnounceConfig Operation: " + configOperation);
         
         loadPlayerDisabledTypes();
     }
@@ -65,7 +66,11 @@ public class AnnounceConfig {
         }
 
         dataStore.connect();
+
         boolean dbEmpty = dataStore.isEmpty();
+        
+        if (!dbEmpty && dbMatchesYml()) return ConfigOperation.NO_UPDATE;
+        
         dataStore.disconnect();
 
         // if db is empty, mark for import
@@ -85,6 +90,53 @@ public class AnnounceConfig {
         }
 
         return ConfigOperation.FALLBACK_TO_YML;
+    }
+    
+    private boolean dbMatchesYml() {
+            Integer ymlHash = generateConfigHash(ymlAnnouncements, ymlTypes);
+            Integer dbHash = generateConfigHash(dataStore.loadAnnouncements(), dataStore.loadAnnounceTypes());
+            
+            if (ymlHash.equals(dbHash)) {
+                plugin.getLogger().info("Database and YAML configurations match (Hash: " + ymlHash + ")");
+                dataStore.disconnect();
+                return true;
+            }
+            return false;
+    }
+
+    // Generates a hash of the configuration data for comparison
+    private Integer generateConfigHash(List<Announcement> announcements, Collection<AnnounceType> types) {
+        List<String> elements = new ArrayList<>();
+        
+        // Add sorted announcement entries
+        for (Announcement a : announcements) {
+            elements.add(String.format("%s:%s:%s:%s",
+                a.getId().toLowerCase(),
+                a.getType().toLowerCase(),
+                a.getText(),
+                a.getPermission() != null ? a.getPermission() : ""));
+        }
+        
+        // Add sorted type entries
+        for (AnnounceType t : types) {
+            elements.add(String.format("%s:%s:%s:%s:%s",
+                t.getId().toLowerCase(),
+                t.getPrefix() != null ? t.getPrefix() : "",
+                t.getSuffix() != null ? t.getSuffix() : "",
+                t.getPermission() != null ? t.getPermission() : "",
+                t.getListingFee() != null ? t.getListingFee().toString() : ""));
+        }
+        
+        // Sort elements for consistent ordering
+        Collections.sort(elements);
+
+        //generate hash of concatenated elements into a string
+        return String.join("|", elements).hashCode();
+    }
+
+    // Overloaded method to generate hash of configuration data
+    private Integer generateConfigHash(List<Announcement> announcements, Map<String, AnnounceType> types) {
+        return generateConfigHash(announcements, types.values());
     }
 
     // Loads or creates the YAML configuration file
@@ -126,13 +178,16 @@ public class AnnounceConfig {
 
         try {
             switch (configOperation) {
+
+                case NO_UPDATE:
+                case FALLBACK_TO_YML:
+                    announceManager.setAnnouncements(ymlAnnouncements);
+                    announceTypes = ymlTypes;
+                    break;
+
                 case IMPORT_YML_TO_NEW_DB:
                     announceTypes = ymlTypes;
                     isChanged = importYML(ymlAnnouncements, ymlTypes);
-                    
-                    //log to console
-                    plugin.getLogger().info("isChanged: " + isChanged);
-
                     if (isChanged) {
                         announceManager.setAnnouncements(dataStore.loadAnnouncements());
                         announceManager.setAnnouncementsImported();
@@ -150,11 +205,6 @@ public class AnnounceConfig {
                     announceManager.setAnnouncements(announcements_);
                     announceManager.setAnnouncementsImported();
                     isChanged = importYML(ymlAnnouncements, ymlTypes);
-                    break;
-
-                case FALLBACK_TO_YML:
-                    announceManager.setAnnouncements(ymlAnnouncements);
-                    announceTypes = ymlTypes;
                     break;
             }
 
@@ -175,9 +225,6 @@ public class AnnounceConfig {
 
     private boolean importYML(List<Announcement> ymlAnnouncements, Map<String, AnnounceType> ymlTypes) {
         boolean needsSaving = false;
-        
-        //plugin.getLogger().info("YAML Announcements: " + ymlAnnouncements.size());
-        //plugin.getLogger().info("YAML Types: " + ymlTypes.size());
 
         List<Announcement> existingAnnouncements = dataStore.loadAnnouncements();
         List<AnnounceType> existingTypes = dataStore.loadAnnounceTypes();
@@ -373,8 +420,7 @@ public class AnnounceConfig {
         String prefix = (String) map.get("prefix");
         String suffix = (String) map.get("suffix");
         Double listingFee = map.get("list_fee") == null ? null : (map.get("list_fee") instanceof Integer ? ((Integer) map.get("list_fee")).doubleValue() : (Double) map.get("list_fee"));
-        String permission = (String) map.get("permission");
-        boolean imported = map.containsKey("imported") ? (Boolean) map.get("imported") : false;
+        String permission = (String) map.get("permission");        
 
         AnnounceType announceType = new AnnounceType();
         announceType.setId(id);
