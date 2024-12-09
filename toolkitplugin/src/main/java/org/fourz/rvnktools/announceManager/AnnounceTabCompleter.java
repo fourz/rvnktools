@@ -10,7 +10,8 @@ import java.util.stream.Collectors;
 
 public class AnnounceTabCompleter implements TabCompleter {
     private final AnnounceManager announceManager;
-    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "delete", "now", "help", "types");
+    private final List<String> subcommands = Arrays.asList("toggle", "status", "list", "add", "delete", "now", "help", "types", "set");
+    private final List<String> setProperties = Arrays.asList("recurrence", "date", "type", "permission");
 
     public AnnounceTabCompleter(AnnounceManager announceManager) {
         this.announceManager = announceManager;
@@ -27,6 +28,7 @@ public class AnnounceTabCompleter implements TabCompleter {
                     case "add" -> "rvnktools.command.announce.add";
                     case "delete" -> "rvnktools.command.announce.delete";
                     case "now" -> "rvnktools.command.announce.now";
+                    case "set" -> "rvnktools.command.announce.set";
                     default -> "rvnktools.command.announce";
                 };
                 if (sender.hasPermission(permission)) {
@@ -41,6 +43,7 @@ public class AnnounceTabCompleter implements TabCompleter {
                 case "add" -> "rvnktools.command.announce.add";
                 case "delete" -> "rvnktools.command.announce.delete";
                 case "now" -> "rvnktools.command.announce.now";
+                case "set" -> "rvnktools.command.announce.set";
                 default -> "rvnktools.command.announce";
             };
             
@@ -88,9 +91,36 @@ public class AnnounceTabCompleter implements TabCompleter {
                     return filterCompletions(listOptions, args[1]);
                 case "add":                    
                     return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[1]);
-                    
+                case "set":
+                    return filterCompletions(new ArrayList<>(announceManager.getAnnouncementIds()), args[1]);
             }
         }
+
+        if (args.length == 3 && args[0].toLowerCase().equals("set")) {
+            if (!sender.hasPermission("rvnktools.command.announce.set")) {
+                return completions;
+            }
+            return filterCompletions(setProperties, args[2]);
+        }
+
+        if (args.length == 4 && args[0].toLowerCase().equals("set")) {
+            if (!sender.hasPermission("rvnktools.command.announce.set")) {
+                return completions;
+            }
+            
+            switch (args[2].toLowerCase()) {
+                case "recurrence":
+                    return filterCompletions(Arrays.asList("none", "daily", "1h", "2h", "4h", "30m", "60m", "90m"), args[3]);
+                case "type":
+                    return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[3]);
+                case "permission":
+                    return filterCompletions(Arrays.asList("none"), args[3]);
+                case "date":
+                    // No specific completions for date as it requires a specific format
+                    break;
+            }
+        }
+        
         return completions;
     }
 

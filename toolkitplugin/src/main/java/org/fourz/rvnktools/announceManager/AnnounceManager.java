@@ -9,6 +9,13 @@ import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.ChatService;
 
 public class AnnounceManager {
+    private enum CheckCondition {
+        NULL_ANNOUNCEMENT,
+        ANNOUNCEMENT_EXISTS,
+        SAVE_ANNOUNCEMENT,
+        ADD_ANNOUNCEMENT
+    }
+
     private final RVNKTools plugin;
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
@@ -37,55 +44,37 @@ public class AnnounceManager {
 
     // Add an announcement to the announcements list, used by AnnounceConfig
     public boolean addAnnouncement(Announcement announcement) {
-        // Determine the condition code based on the announcement state
-        String conditionCode;
+        CheckCondition condition;
 
         if (announcement == null) {
-            // Condition when the announcement is null
-            conditionCode = "NULL_ANNOUNCEMENT";
+            condition = CheckCondition.NULL_ANNOUNCEMENT;
+            return false;
         } else if (announceConfig.getDataStore() != null && !announcement.isImported()) {
-            // Condition when there's a data store and the announcement is not imported
-            if (announceConfig.getDataStore().announcementExists(announcement.getId())) {
-                // Condition when the announcement already exists in the data store
-                conditionCode = "ANNOUNCEMENT_EXISTS";
-            } else {
-                // Condition when the announcement needs to be saved to the data store
-                conditionCode = "SAVE_ANNOUNCEMENT";
-            }
+            condition = checkAnnounceExist(announcement.getId()) ? 
+            CheckCondition.ANNOUNCEMENT_EXISTS : 
+            CheckCondition.SAVE_ANNOUNCEMENT;
         } else {
-            // Default condition to add the announcement
-            conditionCode = "ADD_ANNOUNCEMENT";
+            condition = CheckCondition.ADD_ANNOUNCEMENT;
         }
 
-        // Handle each condition using a switch statement
-        switch (conditionCode) {
-            case "NULL_ANNOUNCEMENT":
-                // Cannot add a null announcement
+        switch (condition) {
+            case NULL_ANNOUNCEMENT:
                 plugin.getLogger().warning("Cannot add null announcement");
                 return false;
-
-            case "ANNOUNCEMENT_EXISTS":
-                // Announcement with this ID already exists in the data store
+            case ANNOUNCEMENT_EXISTS:
                 plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
                 return false;
-
-            case "SAVE_ANNOUNCEMENT":
-                // Save the announcement to the data store and mark as imported
+            case SAVE_ANNOUNCEMENT:
+                announceConfig.getDataStore().connect();
                 announceConfig.getDataStore().saveAnnouncement(announcement);
+                    announceConfig.getDataStore().disconnect();
                 setImported(announcement.getId());
-                plugin.getLogger().info("Marked announcement as imported: " + announcement.getId());
-                // Proceed to add the announcement
-                // (No break to continue to ADD_ANNOUNCEMENT case)
-
-            case "ADD_ANNOUNCEMENT":
-                // Add the announcement to the list and log the addition
+                // Fall through to ADD_ANNOUNCEMENT
+            case ADD_ANNOUNCEMENT:
                 announcements.add(announcement);
                 plugin.getLogger().info("Added announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
                 return true;
-
             default:
-                // Unexpected condition
-                plugin.getLogger().warning("Unexpected condition in addAnnouncement");
                 return false;
         }
     }
@@ -121,17 +110,14 @@ public class AnnounceManager {
 
         // Check if announcement already exists
         if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();
-            if (announceConfig.getDataStore().announcementExists(id)) {
+            if (checkAnnounceExist(id)) {
                 if (player != null) {
                     chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
                 } else {
                     plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
                 }
-                announceConfig.getDataStore().disconnect();
                 return false;
             }
-            announceConfig.getDataStore().disconnect();
         }
 
         if (!validateAnnounceType(type)) {
@@ -150,7 +136,21 @@ public class AnnounceManager {
             }
         }        
         // Parse announcement as console        
-        return announceConfig.parseAnnouncement(id, type, text);
+
+        if (announceConfig.getDataStore() != null) {
+            announceConfig.getDataStore().connect();            
+            Boolean result = announceConfig.parseAnnouncement(id, type, text);
+            announceConfig.getDataStore().disconnect();
+            return result;
+        } 
+        return announceConfig.parseAnnouncement(id, type, text);       
+    }
+
+    private boolean checkAnnounceExist(String id) {
+        announceConfig.getDataStore().connect();
+        boolean exists = announceConfig.getDataStore().announcementExists(id);
+        announceConfig.getDataStore().disconnect();
+        return exists;
     }
 
     public void broadcastAnnouncement(Announcement announcement) {      
@@ -229,9 +229,11 @@ public class AnnounceManager {
 
             if (disabledTypes.contains(type)) {
                 disabledTypes.remove(type);
+                announceConfig.removePlayerDisabledType(playerId, type);
                 chatService.sendMessage(player, "Announcements of type '" + type + "' enabled.");
             } else {
                 disabledTypes.add(type);
+                announceConfig.addPlayerDisabledType(playerId, type);
                 chatService.sendMessage(player, "Announcements of type '" + type + "' disabled.");
             }
             announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
@@ -330,8 +332,6 @@ public class AnnounceManager {
         }
         return false;
     }
-
-
 
     public AnnounceType getAnnounceType(String type) {
         return announceConfig.getAnnounceTypes().get(type);

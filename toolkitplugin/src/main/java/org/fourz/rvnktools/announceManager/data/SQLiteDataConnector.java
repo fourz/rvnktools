@@ -15,6 +15,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.UUID;
 import java.io.File;
 import java.io.IOException;
 
@@ -249,6 +254,18 @@ public class SQLiteDataConnector implements DataStore {
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
             }
+            
+            // Check if announce_disabledtypes table exists
+            tables = metaData.getTables(null, null, "announce_disabledtypes", null);
+            if (!tables.next()) {
+                Statement stmt = connection.createStatement();
+                String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
+                    "player_id VARCHAR(36)," +
+                    "type VARCHAR(64)," +
+                    "PRIMARY KEY (player_id, type)" +
+                    ")";
+                stmt.executeUpdate(createAnnounceDisabledTypesTable);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -276,5 +293,75 @@ public class SQLiteDataConnector implements DataStore {
     @Override
     public boolean isEmpty() {
         return empty;
+    }
+
+    @Override
+    public void savePlayerDisabledType(UUID playerId, String type) {
+        try {
+            ensureConnected();
+            String sql = "INSERT OR IGNORE INTO announce_disabledtypes (player_id, type) VALUES (?, ?)";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, type);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void removePlayerDisabledType(UUID playerId, String type) {
+        try {
+            ensureConnected();
+            String sql = "DELETE FROM announce_disabledtypes WHERE player_id = ? AND type = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, type);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public Set<String> getPlayerDisabledTypes(UUID playerId) {
+        Set<String> types = new HashSet<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT type FROM announce_disabledtypes WHERE player_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        types.add(rs.getString("type"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return types;
+    }
+
+    @Override
+    public Map<UUID, Set<String>> getAllPlayerDisabledTypes() {
+        Map<UUID, Set<String>> allTypes = new HashMap<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT player_id, type FROM announce_disabledtypes";
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    UUID playerId = UUID.fromString(rs.getString("player_id"));
+                    String type = rs.getString("type");
+                    allTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return allTypes;
     }
 }

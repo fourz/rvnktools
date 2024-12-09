@@ -3,6 +3,11 @@ package org.fourz.rvnktools.announceManager.data;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
@@ -11,7 +16,7 @@ public class MySQLDataConnector implements DataStore {
     private final String url;
     private final String username;
     private final String password;
-    private final String database; // Add database field
+    private final String database;
     private Connection connection;
     private boolean empty = false;
 
@@ -19,7 +24,7 @@ public class MySQLDataConnector implements DataStore {
         this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
         this.username = username;
         this.password = password;
-        this.database = database; // Store database name
+        this.database = database;
     }
 
     @Override
@@ -173,6 +178,18 @@ public class MySQLDataConnector implements DataStore {
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
             }
+
+            // Check if announce_disabledtypes table exists
+            tables = metaData.getTables(database, null, "announce_disabledtypes", null);
+            if (!tables.next()) {
+                Statement stmt = connection.createStatement();
+                String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
+                    "player_id VARCHAR(36)," +
+                    "type VARCHAR(64)," +
+                    "PRIMARY KEY (player_id, type)" +
+                    ")";
+                stmt.executeUpdate(createAnnounceDisabledTypesTable);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -197,5 +214,63 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public boolean isEmpty() {
         return empty;
+    }
+
+    @Override
+    public void savePlayerDisabledType(UUID playerId, String type) {
+        String query = "INSERT IGNORE INTO announce_disabledtypes (player_id, type) VALUES (?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, type);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void removePlayerDisabledType(UUID playerId, String type) {
+        String query = "DELETE FROM announce_disabledtypes WHERE player_id = ? AND type = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, type);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public Set<String> getPlayerDisabledTypes(UUID playerId) {
+        Set<String> types = new HashSet<>();
+        String query = "SELECT type FROM announce_disabledtypes WHERE player_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, playerId.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    types.add(resultSet.getString("type"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return types;
+    }
+
+    @Override
+    public Map<UUID, Set<String>> getAllPlayerDisabledTypes() {
+        Map<UUID, Set<String>> allTypes = new HashMap<>();
+        String query = "SELECT player_id, type FROM announce_disabledtypes";
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(query)) {
+            while (resultSet.next()) {
+                UUID playerId = UUID.fromString(resultSet.getString("player_id"));
+                String type = resultSet.getString("type");
+                allTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return allTypes;
     }
 }
