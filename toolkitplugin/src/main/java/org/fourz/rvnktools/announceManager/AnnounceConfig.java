@@ -253,7 +253,8 @@ public class AnnounceConfig {
         // Process announcements that need importing
         for (Announcement announcement : ymlAnnouncements) {
             boolean exists = existingAnnouncementIds.contains(announcement.getId().toLowerCase());
-            if (!exists && !announcement.isImported()) {
+            // Remove isImported() check since we want to import all announcements from YML
+            if (!exists) {
                 try {
                     announceManager.addAnnouncement(announcement);
                     successfulImports.add(announcement.getId().toLowerCase());              
@@ -372,7 +373,8 @@ public class AnnounceConfig {
         String permission = (String) map.get("permission");
         String dateStr = (String) map.get("date");
         String timeStr = (String) map.get("time");
-        boolean imported = map.containsKey("imported") ? (Boolean) map.get("imported") : false;
+        // Default imported to false if not present in YAML
+        boolean imported = map.containsKey("imported") && (Boolean) map.get("imported");
 
         // Check if PlaceholderAPI is used and available
         if (text.contains("%") && !usingPlaceholderAPI) {
