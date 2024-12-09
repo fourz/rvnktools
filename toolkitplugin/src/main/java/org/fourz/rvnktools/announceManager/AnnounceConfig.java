@@ -27,7 +27,6 @@ public class AnnounceConfig {
     private final JavaPlugin plugin;
     private final File configFile;
     private FileConfiguration config;
-    private Map<UUID, Set<String>> playerDisabledTypes;
     private Map<String, AnnounceType> announceTypes;
     boolean usingPlaceholderAPI;
     private final AnnounceManager announceManager;
@@ -36,6 +35,7 @@ public class AnnounceConfig {
     private ConfigOperation configOperation;
     private List<Announcement> ymlAnnouncements;
     private Map<String, AnnounceType> ymlTypes;
+    private AnnouncePreferences preferences;
 
     // initializes the configuration and data storage settings
     public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
@@ -43,7 +43,6 @@ public class AnnounceConfig {
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
-        this.playerDisabledTypes = new HashMap<>();
 
         this.configOperation = loadConfig() 
             ? detectConfigState()
@@ -51,8 +50,6 @@ public class AnnounceConfig {
 
             //log the config operation
             plugin.getLogger().info("AnnounceConfig Operation: " + configOperation);
-        
-
     }
 
     private ConfigOperation detectConfigState() {
@@ -60,17 +57,15 @@ public class AnnounceConfig {
         initializeDataStoreConnection();
         
         if (dataStore == null) {
-            //log to console
-            plugin.getLogger().info("DataStore is null, falling back to YAML");
             return ConfigOperation.FALLBACK_TO_YML;
         }
 
+        // Connect to database and check if it is empty
         dataStore.connect();
-
         boolean dbEmpty = dataStore.isEmpty();
         
-        if (!dbEmpty && dbMatchesYml()) return ConfigOperation.NO_UPDATE;
-        
+        // Check if database and YAML configurations match
+        if (!dbEmpty && dbMatchesYml()) return ConfigOperation.NO_UPDATE;        
         dataStore.disconnect();
 
         if (dbEmpty) {
@@ -153,24 +148,30 @@ public class AnnounceConfig {
 
     // Sets up data storage and handles initial data migration from YAML to database if needed
     public void initializeDataStore() {
-        plugin.getLogger().info("Using " + storageType + " storage");
+        plugin.getLogger().info("AnnounceConfig using " + storageType + " storage");
 
         // Initialize DataStore if not already done
         if (dataStore == null) {
             initializeDataStoreConnection();
         }
 
+        // Connect to the database once during initialization
+        if (dataStore != null) {
+            dataStore.connect();
+        }
+
+        // Initialize preferences after dataStore is initialized
+        this.preferences = new AnnouncePreferences(plugin, dataStore);
+        preferences.loadPreferences();
+
         // If not using database storage, use YAML data directly
         if (dataStore == null) {
             announceManager.setAnnouncements(ymlAnnouncements);
             announceTypes = ymlTypes;
-            loadPlayerDisabledTypes();
             return;
         }
 
         boolean isChanged = false;
-        dataStore.connect();
-        loadPlayerDisabledTypes();
 
         try {
             switch (configOperation) {
@@ -214,8 +215,6 @@ public class AnnounceConfig {
             // Fallback to YAML data on database error
             announceManager.setAnnouncements(ymlAnnouncements);
             announceTypes = ymlTypes;
-        } finally {
-            dataStore.disconnect();
         }
     }
 
@@ -239,7 +238,7 @@ public class AnnounceConfig {
         for (AnnounceType type : ymlTypes.values()) {
             if (!existingTypeIds.contains(type.getId().toLowerCase())) {
                 try {                    
-                    dataStore.saveAnnounceType(type);
+                    dataStore.saveAnnounceType(type);                    
                     plugin.getLogger().info("Imported announce type: " + type.getId());                    
                 } catch (Exception e) {
                     plugin.getLogger().warning("Error saving announce type: " + type.getId());
@@ -263,7 +262,7 @@ public class AnnounceConfig {
                     plugin.getLogger().warning("Error importing announcement " + announcement.getId() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
-            }
+            }            
         }
 
         // Only mark announcements that were successfully imported
@@ -332,6 +331,7 @@ public class AnnounceConfig {
     // Retrieves announcement data from database and stores it in memory
     private List<Announcement> loadDataFromDatabase() {
         // Load announce types from database
+
         List<AnnounceType> dbTypes = dataStore.loadAnnounceTypes();
         announceTypes = new HashMap<>();
         for (AnnounceType type : dbTypes) {
@@ -428,70 +428,9 @@ public class AnnounceConfig {
         return announceType;
     }
 
-    // Loads player preferences for disabled announcement types
-    public boolean loadPlayerDisabledTypes() {
-        if (dataStore != null) {
-            playerDisabledTypes = dataStore.getAllPlayerDisabledTypes();
-            return true;
-        }
-        
-        // Fallback to YML if no datastore
-        File dataFolder = plugin.getDataFolder();
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-
-        File configFile = new File(dataFolder, "announceDisabledTypes.yml");
-        if (!configFile.exists()) {
-            return false;
-        }
-
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-
-        for (String key : config.getKeys(false)) {
-            UUID playerId = UUID.fromString(key);
-            List<String> disabledTypesList = config.getStringList(key);
-            Set<String> disabledTypesSet = new HashSet<>(disabledTypesList);
-            playerDisabledTypes.put(playerId, disabledTypesSet);
-        }
-
-        return true;
-    }
-
     // Persists player preferences for disabled announcement types
     public void savePlayerDisabledTypes() {
-        if (dataStore != null) {
-            for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
-                for (String type : entry.getValue()) {
-                    dataStore.savePlayerDisabledType(entry.getKey(), type);
-                }
-            }
-            return;
-        }
-        
-        // Fallback to YML if no datastore
-        File dataFolder = plugin.getDataFolder();
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-
-        File configFile = new File(dataFolder, "playerDisabledTypes.yml");
-        YamlConfiguration config = new YamlConfiguration();
-
-        for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
-            String key = entry.getKey().toString();
-            List<String> disabledTypesList = new ArrayList<>(entry.getValue());
-            config.set(key, disabledTypesList);
-        }
-
-        try {
-            // Save the config to file
-            config.save(configFile);
-            plugin.getLogger().info("Saved announceDisabledTypes to file");
-
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save announceDisabledTypes to file: " + e.getMessage());
-        }
+        preferences.savePreferences();
     }
 
     // Refreshes configuration and player preferences from disk
@@ -577,7 +516,7 @@ public class AnnounceConfig {
 
     // Returns the map of player-disabled announcement types
     public Map<UUID, Set<String>> getPlayerDisabledTypes() {
-        return playerDisabledTypes;
+        return preferences.getAllDisabledTypes();
     }
 
     // Returns the map of available announcement types
@@ -591,17 +530,16 @@ public class AnnounceConfig {
     }
 
     public void addPlayerDisabledType(UUID playerId, String type) {
-        if (dataStore != null) {
-            dataStore.connect();
-            dataStore.savePlayerDisabledType(playerId, type);
-            dataStore.disconnect();
-        }
+        preferences.addDisabledType(playerId, type);
     }
 
     public void removePlayerDisabledType(UUID playerId, String type) {
+        preferences.removeDisabledType(playerId, type);
+    }
+
+    // Add a shutdown method to disconnect the DataStore
+    public void shutdown() {
         if (dataStore != null) {
-            dataStore.connect();
-            dataStore.removePlayerDisabledType(playerId, type);
             dataStore.disconnect();
         }
     }

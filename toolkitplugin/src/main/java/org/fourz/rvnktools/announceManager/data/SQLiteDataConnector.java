@@ -37,26 +37,27 @@ public class SQLiteDataConnector implements DataStore {
     @Override
     public void connect() {
         try {
-            File dbFile = new File(this.databasePath);
-            File parentDir = dbFile.getParentFile();
-            
-            if (!parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-            
-            if (!dbFile.exists()) {
-                dbFile.createNewFile();
-                plugin.getLogger().info("SQLite database file created at: " + dbFile.getAbsolutePath());
-            }
+            if (connection == null || connection.isClosed()) {
+                File dbFile = new File(this.databasePath);
+                File parentDir = dbFile.getParentFile();
+                
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs();
+                }
+                
+                if (!dbFile.exists()) {
+                    dbFile.createNewFile();
+                    plugin.getLogger().info("SQLite database file created at: " + dbFile.getAbsolutePath());
+                }
 
-            Class.forName("org.sqlite.JDBC");
-            this.connection = DriverManager.getConnection("jdbc:sqlite:" + this.databasePath);
-            this.connection.setAutoCommit(true);
-            
-            // Initialize tables immediately after connection
-            initializeTables();
-            plugin.getLogger().info("Successfully connected to SQLite database");
-            
+                Class.forName("org.sqlite.JDBC");
+                this.connection = DriverManager.getConnection("jdbc:sqlite:" + this.databasePath);
+                this.connection.setAutoCommit(true);
+                
+                // Initialize tables immediately after connection
+                initializeTables();
+                plugin.getLogger().info("Successfully connected to SQLite database");
+            }
         } catch (ClassNotFoundException | SQLException | IOException e) {
             plugin.getLogger().severe("Failed to connect to SQLite database: " + e.getMessage());
             e.printStackTrace();
@@ -97,24 +98,21 @@ public class SQLiteDataConnector implements DataStore {
 
     @Override
     public void saveAnnouncement(Announcement announcement) {
+        String sql = "INSERT INTO announcements (id, text, type, recurrence, owner, permission, date, time, expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
             ensureConnected();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return;
-        }
-        String sql = "INSERT INTO announcements (id, text, type, recurrence, owner, permission, date, time, expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
-            pstmt.setString(1, announcement.getId());
-            pstmt.setString(2, announcement.getText());
-            pstmt.setString(3, announcement.getType());
-            pstmt.setString(4, announcement.getRecurrence());
-            pstmt.setString(5, announcement.getOwner());
-            pstmt.setString(6, announcement.getPermission());
-            pstmt.setString(7, announcement.getDate() != null ? announcement.getDate().toString() : null);
-            pstmt.setString(8, announcement.getTime() != null ? announcement.getTime().toString() : null);
-            pstmt.setString(9, announcement.getExpiration() != null ? announcement.getExpiration().toString() : null);
-            pstmt.executeUpdate();
+            try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
+                pstmt.setString(1, announcement.getId());
+                pstmt.setString(2, announcement.getText());
+                pstmt.setString(3, announcement.getType());
+                pstmt.setString(4, announcement.getRecurrence());
+                pstmt.setString(5, announcement.getOwner());
+                pstmt.setString(6, announcement.getPermission());
+                pstmt.setString(7, announcement.getDate() != null ? announcement.getDate().toString() : null);
+                pstmt.setString(8, announcement.getTime() != null ? announcement.getTime().toString() : null);
+                pstmt.setString(9, announcement.getExpiration() != null ? announcement.getExpiration().toString() : null);
+                pstmt.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }

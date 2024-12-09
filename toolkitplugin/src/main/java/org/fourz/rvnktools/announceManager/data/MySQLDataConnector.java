@@ -30,9 +30,10 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void connect() {
         try {
-            connection = DriverManager.getConnection(url, username, password);
-            // Initialize tables immediately after connection
-            initializeTables();
+            if (connection == null || connection.isClosed()) {
+                connection = DriverManager.getConnection(url, username, password);
+                initializeTables();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -49,20 +50,29 @@ public class MySQLDataConnector implements DataStore {
         }
     }
 
+    private void ensureConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            connect();
+        }
+    }
+
     @Override
     public void saveAnnouncement(Announcement announcement) {
         String query = "INSERT INTO announcements (id, text, type, recurrence, owner, permission, date, time, expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, announcement.getId());
-            statement.setString(2, announcement.getText());
-            statement.setString(3, announcement.getType());
-            statement.setString(4, announcement.getRecurrence());
-            statement.setString(5, announcement.getOwner());
-            statement.setString(6, announcement.getPermission());
-            statement.setDate(7, announcement.getDate() != null ? Date.valueOf(announcement.getDate()) : null);
-            statement.setTime(8, announcement.getTime() != null ? Time.valueOf(announcement.getTime()) : null);
-            statement.setTimestamp(9, announcement.getExpiration() != null ? Timestamp.valueOf(announcement.getExpiration()) : null);
-            statement.executeUpdate();
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, announcement.getId());
+                statement.setString(2, announcement.getText());
+                statement.setString(3, announcement.getType());
+                statement.setString(4, announcement.getRecurrence());
+                statement.setString(5, announcement.getOwner());
+                statement.setString(6, announcement.getPermission());
+                statement.setDate(7, announcement.getDate() != null ? Date.valueOf(announcement.getDate()) : null);
+                statement.setTime(8, announcement.getTime() != null ? Time.valueOf(announcement.getTime()) : null);
+                statement.setTimestamp(9, announcement.getExpiration() != null ? Timestamp.valueOf(announcement.getExpiration()) : null);
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -71,9 +81,12 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void deleteAnnouncement(String id) {
         String query = "DELETE FROM announcements WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, id);
-            statement.executeUpdate();
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, id);
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -83,20 +96,23 @@ public class MySQLDataConnector implements DataStore {
     public List<Announcement> loadAnnouncements() {
         List<Announcement> announcements = new ArrayList<>();
         String query = "SELECT * FROM announcements";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(query)) {
-            while (resultSet.next()) {
-                Announcement announcement = new Announcement();
-                announcement.setId(resultSet.getString("id"));
-                announcement.setText(resultSet.getString("text"));
-                announcement.setType(resultSet.getString("type"));
-                announcement.setRecurrence(resultSet.getString("recurrence"));
-                announcement.setOwner(resultSet.getString("owner"));
-                announcement.setPermission(resultSet.getString("permission"));
-                announcement.setDate(resultSet.getDate("date") != null ? resultSet.getDate("date").toLocalDate() : null);
-                announcement.setTime(resultSet.getTime("time") != null ? resultSet.getTime("time").toLocalTime() : null);
-                announcement.setExpiration(resultSet.getTimestamp("expiration") != null ? resultSet.getTimestamp("expiration").toLocalDateTime() : null);
-                announcements.add(announcement);
+        try {
+            ensureConnection();
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(query)) {
+                while (resultSet.next()) {
+                    Announcement announcement = new Announcement();
+                    announcement.setId(resultSet.getString("id"));
+                    announcement.setText(resultSet.getString("text"));
+                    announcement.setType(resultSet.getString("type"));
+                    announcement.setRecurrence(resultSet.getString("recurrence"));
+                    announcement.setOwner(resultSet.getString("owner"));
+                    announcement.setPermission(resultSet.getString("permission"));
+                    announcement.setDate(resultSet.getDate("date") != null ? resultSet.getDate("date").toLocalDate() : null);
+                    announcement.setTime(resultSet.getTime("time") != null ? resultSet.getTime("time").toLocalTime() : null);
+                    announcement.setExpiration(resultSet.getTimestamp("expiration") != null ? resultSet.getTimestamp("expiration").toLocalDateTime() : null);
+                    announcements.add(announcement);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -107,13 +123,16 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void saveAnnounceType(AnnounceType announceType) {
         String query = "INSERT INTO announce_types (id, prefix, suffix, permission, listing_fee) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, announceType.getId());
-            statement.setString(2, announceType.getPrefix());
-            statement.setString(3, announceType.getSuffix());
-            statement.setString(4, announceType.getPermission());
-            statement.setDouble(5, announceType.getListingFee() != null ? announceType.getListingFee() : 0.0);
-            statement.executeUpdate();
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, announceType.getId());
+                statement.setString(2, announceType.getPrefix());
+                statement.setString(3, announceType.getSuffix());
+                statement.setString(4, announceType.getPermission());
+                statement.setDouble(5, announceType.getListingFee() != null ? announceType.getListingFee() : 0.0);
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -123,16 +142,19 @@ public class MySQLDataConnector implements DataStore {
     public List<AnnounceType> loadAnnounceTypes() {
         List<AnnounceType> announceTypes = new ArrayList<>();
         String query = "SELECT * FROM announce_types";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(query)) {
-            while (resultSet.next()) {
-                AnnounceType announceType = new AnnounceType();
-                announceType.setId(resultSet.getString("id"));
-                announceType.setPrefix(resultSet.getString("prefix"));
-                announceType.setSuffix(resultSet.getString("suffix"));
-                announceType.setPermission(resultSet.getString("permission"));
-                announceType.setListingFee(resultSet.getDouble("listing_fee"));
-                announceTypes.add(announceType);
+        try {
+            ensureConnection();
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(query)) {
+                while (resultSet.next()) {
+                    AnnounceType announceType = new AnnounceType();
+                    announceType.setId(resultSet.getString("id"));
+                    announceType.setPrefix(resultSet.getString("prefix"));
+                    announceType.setSuffix(resultSet.getString("suffix"));
+                    announceType.setPermission(resultSet.getString("permission"));
+                    announceType.setListingFee(resultSet.getDouble("listing_fee"));
+                    announceTypes.add(announceType);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -143,6 +165,7 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void initializeTables() {
         try {
+            ensureConnection();
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
@@ -197,12 +220,15 @@ public class MySQLDataConnector implements DataStore {
 
     public boolean announcementExists(String id) {
         String query = "SELECT COUNT(*) FROM announcements WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, id);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    int count = resultSet.getInt(1);
-                    return count > 0;
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, id);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (resultSet.next()) {
+                        int count = resultSet.getInt(1);
+                        return count > 0;
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -219,10 +245,13 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void savePlayerDisabledType(UUID playerId, String type) {
         String query = "INSERT IGNORE INTO announce_disabledtypes (player_id, type) VALUES (?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, playerId.toString());
-            statement.setString(2, type);
-            statement.executeUpdate();
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, playerId.toString());
+                statement.setString(2, type);
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -231,10 +260,13 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void removePlayerDisabledType(UUID playerId, String type) {
         String query = "DELETE FROM announce_disabledtypes WHERE player_id = ? AND type = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, playerId.toString());
-            statement.setString(2, type);
-            statement.executeUpdate();
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, playerId.toString());
+                statement.setString(2, type);
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -244,11 +276,14 @@ public class MySQLDataConnector implements DataStore {
     public Set<String> getPlayerDisabledTypes(UUID playerId) {
         Set<String> types = new HashSet<>();
         String query = "SELECT type FROM announce_disabledtypes WHERE player_id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setString(1, playerId.toString());
-            try (ResultSet resultSet = statement.executeQuery()) {
-                while (resultSet.next()) {
-                    types.add(resultSet.getString("type"));
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    while (resultSet.next()) {
+                        types.add(resultSet.getString("type"));
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -261,12 +296,15 @@ public class MySQLDataConnector implements DataStore {
     public Map<UUID, Set<String>> getAllPlayerDisabledTypes() {
         Map<UUID, Set<String>> allTypes = new HashMap<>();
         String query = "SELECT player_id, type FROM announce_disabledtypes";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(query)) {
-            while (resultSet.next()) {
-                UUID playerId = UUID.fromString(resultSet.getString("player_id"));
-                String type = resultSet.getString("type");
-                allTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+        try {
+            ensureConnection();
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(query)) {
+                while (resultSet.next()) {
+                    UUID playerId = UUID.fromString(resultSet.getString("player_id"));
+                    String type = resultSet.getString("type");
+                    allTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();

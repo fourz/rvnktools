@@ -65,14 +65,11 @@ public class AnnounceManager {
                 plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
                 return false;
             case SAVE_ANNOUNCEMENT:
-                announceConfig.getDataStore().connect();
                 announceConfig.getDataStore().saveAnnouncement(announcement);
-                    announceConfig.getDataStore().disconnect();
                 setImported(announcement.getId());
                 // Fall through to ADD_ANNOUNCEMENT
             case ADD_ANNOUNCEMENT:
                 announcements.add(announcement);
-                plugin.getLogger().info("Added announcement: " + announcement.getId() + " (" + announcement.getType() + ")");
                 return true;
             default:
                 return false;
@@ -147,10 +144,7 @@ public class AnnounceManager {
     }
 
     private boolean checkAnnounceExist(String id) {
-        announceConfig.getDataStore().connect();
-        boolean exists = announceConfig.getDataStore().announcementExists(id);
-        announceConfig.getDataStore().disconnect();
-        return exists;
+        return announceConfig.getDataStore().announcementExists(id);
     }
 
     public void broadcastAnnouncement(Announcement announcement) {      
@@ -200,14 +194,11 @@ public class AnnounceManager {
         }
 
         if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();
             if (!announceConfig.getDataStore().announcementExists(id)) {
                 plugin.getLogger().warning("Announcement with ID '" + id + "' does not exist");
-                announceConfig.getDataStore().disconnect();
                 return false;
             }
             announceConfig.getDataStore().deleteAnnouncement(id);
-            announceConfig.getDataStore().disconnect();
         }
 
         boolean removed = announcements.removeIf(announcement -> announcement.getId().equalsIgnoreCase(id));
@@ -256,6 +247,8 @@ public class AnnounceManager {
     public void shutdown() {    
         saveConfig();    
         announceScheduler.shutdown();
+        savePlayerDisabledTypes();
+        announceConfig.shutdown(); // Disconnect the DataStore during shutdown
     }
 
     public boolean validateAnnounceType(String type) {
