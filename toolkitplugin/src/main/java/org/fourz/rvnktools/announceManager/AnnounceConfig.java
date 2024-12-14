@@ -39,46 +39,71 @@ public class AnnounceConfig {
 
     // initializes the configuration and data storage settings
     public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
+        // Store dependencies
         this.plugin = plugin;
         this.announceManager = announceManager;
-        this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
+        
+        // Initialize core components
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
-
-        this.configOperation = loadConfig() 
-            ? detectConfigState()
-            : ConfigOperation.FALLBACK_TO_YML;
-
-            //log the config operation
-            plugin.getLogger().info("AnnounceConfig Operation: " + configOperation);
+        this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
+        
+        // Load configuration and determine operation mode
+        boolean configLoaded = loadConfig();
+        this.configOperation = configLoaded ? detectConfigState() : ConfigOperation.FALLBACK_TO_YML;
+        
+        // Log the determined configuration operation
+        plugin.getLogger().info("AnnounceConfig Operation: " + configOperation);
     }
 
     private ConfigOperation detectConfigState() {
-
+        plugin.getLogger().info("Detecting config state...");
+        
         initializeDataStoreConnection();
         
         if (dataStore == null) {
+            plugin.getLogger().warning("Database connection failed - dataStore is null");
             return ConfigOperation.FALLBACK_TO_YML;
         }
 
         // Connect to database and check if it is empty
-        dataStore.connect();
-        boolean dbEmpty = dataStore.isEmpty();
-        
-        // Check if database and YAML configurations match
-        if (!dbEmpty && dbMatchesYml()) return ConfigOperation.NO_UPDATE;        
-        dataStore.disconnect();
+        try {
+            plugin.getLogger().info("Attempting database connection...");
+            dataStore.connect();
+            plugin.getLogger().info("Database connection successful");
+            
+            boolean dbEmpty = dataStore.isEmpty();
+            plugin.getLogger().info("Database empty check result: " + dbEmpty);
+            
+            // Check if database and YAML configurations match
+            if (!dbEmpty && dbMatchesYml()) {
+                plugin.getLogger().info("Database matches YAML content");
+                return ConfigOperation.NO_UPDATE;
+            }
+            
+            dataStore.disconnect();
 
-        if (dbEmpty) {
-            return ConfigOperation.IMPORT_YML_TO_NEW_DB;
+            if (dbEmpty) {
+                plugin.getLogger().info("Empty database detected - will import YAML");
+                return ConfigOperation.IMPORT_YML_TO_NEW_DB;
 
-        } else if (!dbEmpty && (ymlAnnouncements.isEmpty() || ymlTypes.isEmpty())) {
-            return ConfigOperation.UPDATE_MISSING_YML_FROM_DB;
+            } else if (!dbEmpty && (ymlAnnouncements.isEmpty() || ymlTypes.isEmpty())) {
+                return ConfigOperation.UPDATE_MISSING_YML_FROM_DB;
 
-        } else if (!dbEmpty && !ymlAnnouncements.isEmpty() && !ymlTypes.isEmpty()) {
-            return ConfigOperation.MERGE_YML_INTO_DB;
+            } else if (!dbEmpty && !ymlAnnouncements.isEmpty() && !ymlTypes.isEmpty()) {
+                //output a warning message
+                plugin.getLogger().warning("Database and YAML configurations do not match. Merging YAML data into database.");
+
+                return ConfigOperation.MERGE_YML_INTO_DB;
+            }
+
+            //output a warning message
+            plugin.getLogger().warning("Unable to determine configuration state. Using YAML configurations.");
+            return ConfigOperation.FALLBACK_TO_YML;
+        } catch (Exception e) {
+            plugin.getLogger().severe("Database connection/check failed: " + e.getMessage());
+            e.printStackTrace();
+            return ConfigOperation.FALLBACK_TO_YML;
         }
-
-        return ConfigOperation.FALLBACK_TO_YML;
     }
     
     private boolean dbMatchesYml() {
@@ -313,19 +338,37 @@ public class AnnounceConfig {
 
     // Creates appropriate DataStore instance based on configuration settings
     private void initializeDataStoreConnection() {
+        plugin.getLogger().info("Initializing data store connection with type: " + storageType);
+        
         if (storageType.equalsIgnoreCase("mysql")) {
-            String host = config.getString("storage.mysql.host");
-            int port = config.getInt("storage.mysql.port");
-            String database = config.getString("storage.mysql.database");
-            String username = config.getString("storage.mysql.username");
-            String password = config.getString("storage.mysql.password");
+            String host = config.getString("storage.mysql.host", "");
+            int port = config.getInt("storage.mysql.port", 3306);
+            String database = config.getString("storage.mysql.database", "");
+            String username = config.getString("storage.mysql.username", "");
+            String password = config.getString("storage.mysql.password", "");
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
+            
+            plugin.getLogger().info("MySQL configuration - Host: " + host + ", Port: " + port + 
+                ", Database: " + database + ", Username: " + username + 
+                ", SSL: " + useSSL);
+            
+            if (host.isEmpty() || database.isEmpty() || username.isEmpty()) {
+                plugin.getLogger().severe("Invalid MySQL configuration - missing required fields");
+                dataStore = null;
+                return;
+            }
+            
             dataStore = new MySQLDataConnector(host, port, database, username, password, useSSL);
+            plugin.getLogger().info("MySQL connector created successfully");
         } else if (storageType.equalsIgnoreCase("sqlite")) {
             String databasePath = config.getString("storage.sqlite.database", "announcements.db");
             dataStore = new SQLiteDataConnector(plugin, databasePath);
         } else {
             dataStore = null;
+        }
+        
+        if (dataStore == null) {
+            plugin.getLogger().warning("Failed to initialize data store - unknown or invalid storage type");
         }
     }
 
@@ -368,7 +411,33 @@ public class AnnounceConfig {
         String id = (String) map.get("id");
         String text = (String) map.get("text");
         String type = (String) map.get("type");
-        String recurrence = (String) map.get("recurrence");
+        Object recurrence = map.get("recurrence");
+        Long recurrenceSeconds = null;
+        
+        if (recurrence != null) {
+            if (recurrence instanceof Long) {
+                recurrenceSeconds = (Long) recurrence;
+            } else if (recurrence instanceof String) {
+                // Convert string format to seconds
+                String recStr = (String) recurrence;
+                try {
+                    if (recStr.endsWith("s")) {
+                        recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1));
+                    } else if (recStr.endsWith("m")) {
+                        recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1)) * 60;
+                    } else if (recStr.endsWith("h")) {
+                        recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1)) * 3600;
+                    } else if (recStr.endsWith("d")) {
+                        recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1)) * 86400;
+                    } else {
+                        recurrenceSeconds = Long.parseLong(recStr);
+                    }
+                } catch (NumberFormatException e) {
+                    plugin.getLogger().warning("Invalid recurrence format for announcement " + id + ": " + recStr);
+                }
+            }
+        }
+        
         String owner = (String) map.get("owner");
         String permission = (String) map.get("permission");
         String dateStr = (String) map.get("date");
@@ -401,7 +470,7 @@ public class AnnounceConfig {
         announcement.setId(id);
         announcement.setText(text);
         announcement.setType(type);
-        announcement.setRecurrence(recurrence);
+        announcement.setRecurrence(recurrenceSeconds);
         announcement.setOwner(owner);
         announcement.setPermission(permission);
         announcement.setDate(date);

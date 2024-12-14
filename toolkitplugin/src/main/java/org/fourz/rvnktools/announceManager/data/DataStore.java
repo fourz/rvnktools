@@ -27,4 +27,7 @@ public interface DataStore {
     void removePlayerDisabledType(UUID playerId, String type);
     Set<String> getPlayerDisabledTypes(UUID playerId);
     Map<UUID, Set<String>> getAllPlayerDisabledTypes();
+    
+    void savePlayerPreferences(UUID playerId, String preferences);
+    String getPlayerPreferences(UUID playerId);
 }

@@ -105,7 +105,7 @@ public class SQLiteDataConnector implements DataStore {
                 pstmt.setString(1, announcement.getId());
                 pstmt.setString(2, announcement.getText());
                 pstmt.setString(3, announcement.getType());
-                pstmt.setString(4, announcement.getRecurrence());
+                pstmt.setObject(4, announcement.getRecurrence()); // Changed to handle Long
                 pstmt.setString(5, announcement.getOwner());
                 pstmt.setString(6, announcement.getPermission());
                 pstmt.setString(7, announcement.getDate() != null ? announcement.getDate().toString() : null);
@@ -152,7 +152,7 @@ public class SQLiteDataConnector implements DataStore {
                 announcement.setId(rs.getString("id"));
                 announcement.setText(rs.getString("text"));
                 announcement.setType(rs.getString("type"));
-                announcement.setRecurrence(rs.getString("recurrence"));
+                announcement.setRecurrence(rs.getObject("recurrence") != null ? rs.getLong("recurrence") : null);
                 announcement.setOwner(rs.getString("owner"));
                 announcement.setPermission(rs.getString("permission"));
                 announcement.setDate(rs.getString("date") != null ? LocalDate.parse(rs.getString("date")) : null);
@@ -228,7 +228,7 @@ public class SQLiteDataConnector implements DataStore {
                     "id VARCHAR(64) PRIMARY KEY," +
                     "text TEXT NOT NULL," +
                     "type VARCHAR(32) NOT NULL," +
-                    "recurrence VARCHAR(32)," +
+                    "recurrence BIGINT," + // Changed from VARCHAR to BIGINT
                     "owner VARCHAR(64)," +
                     "permission VARCHAR(128)," +
                     "date DATE," +
@@ -263,6 +263,17 @@ public class SQLiteDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
+            }
+            
+            // Check if announce_prefs table exists
+            tables = metaData.getTables(null, null, "announce_prefs", null);
+            if (!tables.next()) {
+                Statement stmt = connection.createStatement();
+                String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
+                    "player_id VARCHAR(36) PRIMARY KEY," +
+                    "text VARCHAR(512)" +
+                    ")";
+                stmt.executeUpdate(createAnnouncePrefsTable);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -361,5 +372,40 @@ public class SQLiteDataConnector implements DataStore {
             e.printStackTrace();
         }
         return allTypes;
+    }
+
+    @Override
+    public void savePlayerPreferences(UUID playerId, String preferences) {
+        try {
+            ensureConnected();
+            String sql = "INSERT OR REPLACE INTO announce_prefs (player_id, text) VALUES (?, ?)";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, preferences);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String getPlayerPreferences(UUID playerId) {
+        String preferences = null;
+        try {
+            ensureConnected();
+            String sql = "SELECT text FROM announce_prefs WHERE player_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        preferences = rs.getString("text");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return preferences;
     }
 }

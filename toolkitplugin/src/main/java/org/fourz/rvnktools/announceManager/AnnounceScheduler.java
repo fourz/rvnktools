@@ -62,7 +62,11 @@ public class AnnounceScheduler {
         for (Announcement announcement : announceManager.getAnnouncements()) {
             scheduleAnnouncement(announcement);
         }
-        logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
+        
+        // Only log the final count
+        if (scheduledTasks.size() > 0) {
+            logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
+        }
     }
 
     // schedule a single announcement given an announcement object
@@ -76,7 +80,7 @@ public class AnnounceScheduler {
         }
 
         //calculate the ticks based on the recurrence
-        long ticks = convertRecurrenceToTicks(announcement.getRecurrence());
+        long ticks = announcement.getRecurrence() * 20L;
 
 
         if (ticks > 0) {
@@ -85,7 +89,7 @@ public class AnnounceScheduler {
 
         // if the type is 'scheduled' and the date is set, handle it as a scheduled announcement
         if ("scheduled".equalsIgnoreCase(announcement.getType()) && announcement.getDate() != null) {
-            handleScheduledAnnouncement(announcement, ticks);
+            handleScheduledAnnouncement(announcement);
             return;
         }
 
@@ -93,34 +97,37 @@ public class AnnounceScheduler {
     }
 
     // handle scheduling of announcements with a specific date and time
-    private void handleScheduledAnnouncement(Announcement announcement, long ticks) {
+    private void handleScheduledAnnouncement(Announcement announcement) {
         LocalDateTime now = LocalDateTime.now();
-        Integer condition = TIME_SET__TICKS_POSITIVE;
 
-        // announcement has time set
-        if (announcement.getTime() != null) {
-            // Check if the announcement is set to run before the current time
-            if (now.toLocalDate().isEqual(announcement.getDate()) && now.toLocalTime().isBefore(announcement.getTime())) {
-                condition = TIME_SET__BEFORE_TIME;
-            // Check if the announcement is set to run after the current time
-            } else if (now.toLocalDate().isEqual(announcement.getDate()) && ticks > 0) {
-                condition = TIME_SET__TICKS_POSITIVE;
-            // Check if the announcement is set to run on the same date as the current date
-            } else if (now.toLocalDate().isEqual(announcement.getDate())) {
-                condition = TIME_SET__DATE_EQUAL;
-            }
-        // announcement has no time set
-        } else {
-            // Check if the announcement is set to run on the same date as the current date
-            if (now.toLocalDate().isEqual(announcement.getDate())) {
-                condition = TIME_NULL__DATE_EQUAL;
-            }
-        }
+        // Check if the announcement date is today
+        if (now.toLocalDate().isEqual(announcement.getDate())) {
+            long delay = 0L;
 
-        switch (condition) {            
-            case TIME_SET__BEFORE_TIME:
-                // Schedule to run later at a specific time
-                long delay = Duration.between(now, LocalDateTime.of(announcement.getDate(), announcement.getTime())).toMillis() / 50L;
+            // If time is specified
+            if (announcement.getTime() != null) {
+                if (now.toLocalTime().isBefore(announcement.getTime())) {
+                    // Calculate delay until the specified time
+                    delay = Duration.between(now.toLocalTime(), announcement.getTime()).toMillis() / 50L;
+                } else {
+                    // Time has already passed today, do not schedule
+                    return;
+                }
+            }
+
+            // If recurrence is set, schedule periodically on the scheduled day
+            long ticks = announcement.getRecurrence() * 20L;
+            if (ticks > 0) {
+                ticks = applyRandomTicks(ticks);
+                BukkitTask task = new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        broadcastAnnouncement(announcement);
+                    }
+                }.runTaskTimer(plugin, delay, ticks);
+                scheduledTasks.put(announcement, task);
+            } else {
+                // Schedule the announcement to run once after the calculated delay
                 BukkitTask task = new BukkitRunnable() {
                     @Override
                     public void run() {
@@ -128,42 +135,7 @@ public class AnnounceScheduler {
                     }
                 }.runTaskLater(plugin, delay);
                 scheduledTasks.put(announcement, task);
-                return;
-            case TIME_SET__TICKS_POSITIVE:
-                // Schedule to run later with a positive ticks value
-                handlePeriodicAnnouncement(announcement, ticks);
-                return;
-
-            case TIME_SET__DATE_EQUAL:
-                // Schedule to run later without specific time
-                long delayDateEqual = Duration.between(now, LocalDateTime.of(announcement.getDate(), now.toLocalTime())).toMillis() / 50L;
-                BukkitTask taskDateEqual = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskLater(plugin, delayDateEqual);
-                scheduledTasks.put(announcement, taskDateEqual);
-                return;
-
-            case TIME_NULL__DATE_EQUAL:
-                // Schedule to run every 4 hours
-                int nextHour = ((now.getHour() / 4) + 1) * 4 % 24;
-                LocalDateTime nextTime = now.withHour(nextHour).withMinute(0).withSecond(0).withNano(0);
-                long delayNullTime = Duration.between(now, nextTime).toMillis() / 50L;
-                long period = 4 * 60L * 60L * 20L; // 4 hours in ticks
-
-                BukkitTask taskNullTime = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskTimer(plugin, delayNullTime, period);
-                scheduledTasks.put(announcement, taskNullTime);
-                return;
-            default:
-                // No action needed
-                break;
+            }
         }
     }
 
@@ -242,11 +214,9 @@ public class AnnounceScheduler {
     }
 
     public void cleanup() {
-
+        // Cancel all tasks and clear the map
+        shutdown();
+        scheduledTasks.clear();
     }
 
-    // Remove or comment out the saveConfig() method if it's no longer needed
-    // public void saveConfig() {
-    //     announceManager.saveConfig();
-    // }
 }

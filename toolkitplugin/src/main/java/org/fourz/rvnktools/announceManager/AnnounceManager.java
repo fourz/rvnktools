@@ -10,7 +10,6 @@ import org.fourz.rvnktools.util.ChatService;
 
 public class AnnounceManager {
     private enum CheckCondition {
-        NULL_ANNOUNCEMENT,
         ANNOUNCEMENT_EXISTS,
         SAVE_ANNOUNCEMENT,
         ADD_ANNOUNCEMENT
@@ -37,17 +36,15 @@ public class AnnounceManager {
         plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
         plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
 
-        // Schedule announcements
-        //plugin.getLogger().info("Scheduling announcements...");
         announceScheduler.scheduleAnnouncements();
     }
 
-    // Add an announcement to the announcements list, used by AnnounceConfig
+    // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
     public boolean addAnnouncement(Announcement announcement) {
         CheckCondition condition;
 
         if (announcement == null) {
-            condition = CheckCondition.NULL_ANNOUNCEMENT;
+            plugin.getLogger().warning("Cannot add null announcement");
             return false;
         } else if (announceConfig.getDataStore() != null && !announcement.isImported()) {
             condition = checkAnnounceExist(announcement.getId()) ? 
@@ -58,16 +55,13 @@ public class AnnounceManager {
         }
 
         switch (condition) {
-            case NULL_ANNOUNCEMENT:
-                plugin.getLogger().warning("Cannot add null announcement");
-                return false;
             case ANNOUNCEMENT_EXISTS:
                 plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
                 return false;
             case SAVE_ANNOUNCEMENT:
                 announceConfig.getDataStore().saveAnnouncement(announcement);
                 setImported(announcement.getId());
-                // Fall through to ADD_ANNOUNCEMENT
+                // fall through
             case ADD_ANNOUNCEMENT:
                 announcements.add(announcement);
                 return true;

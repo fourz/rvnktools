@@ -49,10 +49,11 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
                 // Allow owners to modify recurrence without permission check
                 boolean isOwner = announcement.getOwner() != null && 
                                 announcement.getOwner().equalsIgnoreCase(player.getName());
-                if (!isOwner || !checkPermission(player, "rvnktools.command.announce.set")) return false;
-                
+                if (!isOwner || !checkPermission(player, "rvnktools.command.announce.set")) {
+                    return false;
+                }                
                 if (isValidRecurrence(value)) {
-                    announcement.setRecurrence(value);
+                    announcement.setRecurrence(convertRecurrenceToSecondsLong(value));                    
                     messagePlayer(player, "&aSet recurrence to: " + value);
                 } else {
                     messagePlayer(player, "&cInvalid recurrence value. Use: daily or none, or time values like 90m, 2h");
@@ -135,5 +136,24 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
             }
         }        
         return false;
+    }
+
+    private Long convertRecurrenceToSecondsLong (String recurrence) {
+        if (recurrence.equalsIgnoreCase("none")) {
+            return null;
+        }
+        if (recurrence.equalsIgnoreCase("daily")) {
+            return 86400L;
+        }
+        String number = recurrence.substring(0, recurrence.length() - 1);
+        char unit = recurrence.charAt(recurrence.length() - 1);
+        int value = Integer.parseInt(number);
+        if (unit == 'm') {
+            return (long) value * 60;
+        }
+        if (unit == 'h') {
+            return (long) value * 3600;
+        }
+        return null;
     }
 }

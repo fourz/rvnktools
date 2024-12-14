@@ -65,7 +65,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.setString(1, announcement.getId());
                 statement.setString(2, announcement.getText());
                 statement.setString(3, announcement.getType());
-                statement.setString(4, announcement.getRecurrence());
+                statement.setObject(4, announcement.getRecurrence()); // Changed to handle Long
                 statement.setString(5, announcement.getOwner());
                 statement.setString(6, announcement.getPermission());
                 statement.setDate(7, announcement.getDate() != null ? Date.valueOf(announcement.getDate()) : null);
@@ -105,7 +105,7 @@ public class MySQLDataConnector implements DataStore {
                     announcement.setId(resultSet.getString("id"));
                     announcement.setText(resultSet.getString("text"));
                     announcement.setType(resultSet.getString("type"));
-                    announcement.setRecurrence(resultSet.getString("recurrence"));
+                    announcement.setRecurrence(resultSet.getObject("recurrence") != null ? resultSet.getLong("recurrence") : null);
                     announcement.setOwner(resultSet.getString("owner"));
                     announcement.setPermission(resultSet.getString("permission"));
                     announcement.setDate(resultSet.getDate("date") != null ? resultSet.getDate("date").toLocalDate() : null);
@@ -177,7 +177,7 @@ public class MySQLDataConnector implements DataStore {
                     "id VARCHAR(64) PRIMARY KEY," +
                     "text TEXT NOT NULL," +
                     "type VARCHAR(32) NOT NULL," +
-                    "recurrence VARCHAR(32)," +
+                    "recurrence BIGINT," + // Changed from VARCHAR to BIGINT
                     "owner VARCHAR(64)," +
                     "permission VARCHAR(128)," +
                     "date DATE," +
@@ -212,6 +212,17 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
+            }
+
+            // Check if announce_prefs table exists
+            tables = metaData.getTables(database, null, "announce_prefs", null);
+            if (!tables.next()) {
+                Statement stmt = connection.createStatement();
+                String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
+                    "player_id VARCHAR(36) PRIMARY KEY," +
+                    "text VARCHAR(512)" +
+                    ")";
+                stmt.executeUpdate(createAnnouncePrefsTable);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -310,5 +321,40 @@ public class MySQLDataConnector implements DataStore {
             e.printStackTrace();
         }
         return allTypes;
+    }
+
+    @Override
+    public void savePlayerPreferences(UUID playerId, String preferences) {
+        String query = "INSERT INTO announce_prefs (player_id, text) VALUES (?, ?) ON DUPLICATE KEY UPDATE text = ?";
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, playerId.toString());
+                statement.setString(2, preferences);
+                statement.setString(3, preferences);
+                statement.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String getPlayerPreferences(UUID playerId) {
+        String query = "SELECT text FROM announce_prefs WHERE player_id = ?";
+        try {
+            ensureConnection();
+            try (PreparedStatement statement = connection.prepareStatement(query)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (resultSet.next()) {
+                        return resultSet.getString("text");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

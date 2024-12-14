@@ -110,7 +110,7 @@ public class AnnounceTabCompleter implements TabCompleter {
             
             switch (args[2].toLowerCase()) {
                 case "recurrence":
-                    return filterCompletions(Arrays.asList("none", "daily", "1h", "2h", "4h", "30m", "60m", "90m"), args[3]);
+                    return filterCompletions(Arrays.asList("none", "daily", "60m", "90m", "120m"), args[3]);
                 case "type":
                     return filterCompletions(new ArrayList<>(announceManager.getAnnounceTypes()), args[3]);
                 case "permission":
