@@ -9,37 +9,49 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
+import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnktools.util.Debug.LogLevel;
 
 public class MySQLDataConnector implements DataStore {
+    private static final String CLASS_NAME = "MySQLDataConnector";
     private final String url;
     private final String username;
     private final String password;
     private final String database;
     private Connection connection;
     private boolean empty = false;
+    private final Debug debug;
 
-    public MySQLDataConnector(String host, int port, String database, String username, String password, boolean useSSL) {
+    public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL) {
         this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
         this.username = username;
         this.password = password;
         this.database = database;
+        this.debug = new Debug(plugin, CLASS_NAME, LogLevel.INFO) {};
+    }
+    public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, LogLevel level) {
+        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
+        this.username = username;
+        this.password = password;
+        this.database = database;
+        this.debug = new Debug(plugin, CLASS_NAME, level) {};
     }
 
     @Override
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
-                Bukkit.getLogger().info("[RVNKToolKit] Attempting to establish MySQL connection to " + url);
+                debug.log(LogLevel.INFO, "Attempting to establish MySQL connection to " + url);
                 connection = DriverManager.getConnection(url, username, password);
-                Bukkit.getLogger().info("[RVNKToolKit] MySQL connection established successfully");
+                debug.log(LogLevel.INFO, "MySQL connection established successfully");
                 initializeTables();
             }
         } catch (SQLException e) {
-            Bukkit.getLogger().severe("[RVNKToolKit] Failed to connect to MySQL: " + e.getMessage());
-            e.printStackTrace();
+            debug.error("Failed to connect to MySQL: " + e.getMessage(), e);
         }
     }
 
@@ -50,13 +62,13 @@ public class MySQLDataConnector implements DataStore {
                 connection.close();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error disconnecting from database", e);
         }
     }
 
     private void ensureConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            Bukkit.getLogger().info("[RVNKToolKit] Re-establishing lost MySQL connection");
+            debug.log(LogLevel.INFO, "Re-establishing lost MySQL connection");
             connect();
         }
     }
@@ -79,7 +91,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving announcement: " + announcement.getId(), e);
         }
     }
 
@@ -93,7 +105,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error deleting announcement: " + id, e);
         }
     }
 
@@ -120,7 +132,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error loading announcements", e);
         }
         return new ArrayList<>(announcements.values());
     }
@@ -139,7 +151,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving announce type: " + announceType.getId(), e);
         }
     }
 
@@ -162,7 +174,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error loading announce types", e);
         }
         return announceTypes;
     }
@@ -174,12 +186,12 @@ public class MySQLDataConnector implements DataStore {
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
-            Bukkit.getLogger().info("[RVNKToolKit] Checking and creating necessary MySQL tables");
+            debug.log(LogLevel.INFO, "Checking and creating necessary MySQL tables");
             
             // Check if announcements table exists
             tables = metaData.getTables(database, null, "announcements", null);
             if (!tables.next()) {
-                Bukkit.getLogger().info("[RVNKToolKit] Creating announcements table");
+                debug.log(LogLevel.INFO, "Creating announcements table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -193,16 +205,16 @@ public class MySQLDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
-                Bukkit.getLogger().info("[RVNKToolKit] announcements table created successfully");
+                debug.log(LogLevel.INFO, "announcements table created successfully");
                 empty = true;
             } else {
-                Bukkit.getLogger().info("[RVNKToolKit] announcements table already exists");
+                debug.log(LogLevel.INFO, "announcements table already exists");
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(database, null, "announce_types", null);
             if (!tables.next()) {
-                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_types table");
+                debug.log(LogLevel.INFO, "Creating announce_types table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -212,15 +224,15 @@ public class MySQLDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
-                Bukkit.getLogger().info("[RVNKToolKit] announce_types table created successfully");
+                debug.log(LogLevel.INFO, "announce_types table created successfully");
             } else {
-                Bukkit.getLogger().info("[RVNKToolKit] announce_types table already exists");
+                debug.log(LogLevel.FINE, "announce_types table already exists");
             }
 
             // Check if announce_disabledtypes table exists
             tables = metaData.getTables(database, null, "announce_disabledtypes", null);
             if (!tables.next()) {
-                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_disabledtypes table");
+                debug.log(LogLevel.INFO, "Creating announce_disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -228,31 +240,30 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
-                Bukkit.getLogger().info("[RVNKToolKit] announce_disabledtypes table created successfully");
+                debug.log(LogLevel.INFO, "announce_disabledtypes table created successfully");
             } else {
-                Bukkit.getLogger().info("[RVNKToolKit] announce_disabledtypes table already exists");
+                debug.log(LogLevel.INFO, "announce_disabledtypes table already exists");
             }
 
             // Check if announce_prefs table exists
             tables = metaData.getTables(database, null, "announce_prefs", null);
             if (!tables.next()) {
-                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_prefs table");
+                debug.log(LogLevel.INFO, "Creating announce_prefs table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
                     "text VARCHAR(512)" +
                     ")";
                 stmt.executeUpdate(createAnnouncePrefsTable);
-                Bukkit.getLogger().info("[RVNKToolKit] announce_prefs table created successfully");
+                debug.log(LogLevel.INFO, "announce_prefs table created successfully");
             } else {
-                Bukkit.getLogger().info("[RVNKToolKit] announce_prefs table already exists");
+                debug.log(LogLevel.INFO, "announce_prefs table already exists");
             }
             
-            Bukkit.getLogger().info("[RVNKToolKit] All database tables verified/created successfully");
+            debug.log(LogLevel.INFO, "All database tables verified/created successfully");
             
         } catch (SQLException e) {
-            Bukkit.getLogger().severe("[RVNKToolKit] Failed to initialize database tables: " + e.getMessage());
-            e.printStackTrace();
+            debug.error("Failed to initialize database tables: " + e.getMessage(), e);
         }
     }
 
@@ -270,7 +281,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error checking if announcement exists: " + id, e);
         }
         return false;
     }
@@ -293,7 +304,7 @@ public class MySQLDataConnector implements DataStore {
                 return announceCount == 0 && typeCount == 0;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error checking if database is empty", e);
             return true; // Assume empty on error
         }
     }
@@ -309,7 +320,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving player disabled type for playerId: " + playerId, e);
         }
     }
 
@@ -324,7 +335,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error removing player disabled type for playerId: " + playerId, e);
         }
     }
 
@@ -343,7 +354,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error retrieving disabled types for playerId: " + playerId, e);
         }
         return types;
     }
@@ -363,7 +374,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error retrieving all player disabled types", e);
         }
         return allTypes;
     }
@@ -380,7 +391,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving player preferences for playerId: " + playerId, e);
         }
     }
 
@@ -398,7 +409,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error retrieving player preferences for playerId: " + playerId, e);
         }
         return null;
     }

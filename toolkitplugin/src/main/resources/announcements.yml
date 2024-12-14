@@ -158,3 +158,11 @@ storage:
     tablePrefix: announce_
   sqlite:
     database: announcements.db
+
+debug:
+  # Available levels: OFF, SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL
+  level: INFO
+  # Enable timing logs
+  timing: false
+  # Log file name (optional)
+  file: announcements.log
