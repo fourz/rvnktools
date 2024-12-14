@@ -94,7 +94,7 @@ public class MySQLDataConnector implements DataStore {
 
     @Override
     public List<Announcement> loadAnnouncements() {
-        List<Announcement> announcements = new ArrayList<>();
+        Map<String, Announcement> announcements = new HashMap<>();
         String query = "SELECT * FROM announcements";
         try {
             ensureConnection();
@@ -111,13 +111,13 @@ public class MySQLDataConnector implements DataStore {
                     announcement.setDate(resultSet.getDate("date") != null ? resultSet.getDate("date").toLocalDate() : null);
                     announcement.setTime(resultSet.getTime("time") != null ? resultSet.getTime("time").toLocalTime() : null);
                     announcement.setExpiration(resultSet.getTimestamp("expiration") != null ? resultSet.getTimestamp("expiration").toLocalDateTime() : null);
-                    announcements.add(announcement);
+                    announcements.put(announcement.getId(), announcement);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return announcements;
+        return new ArrayList<>(announcements.values());
     }
 
     @Override

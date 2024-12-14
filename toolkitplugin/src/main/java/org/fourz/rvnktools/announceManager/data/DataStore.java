@@ -18,6 +18,9 @@ public interface DataStore {
     boolean announcementExists(String id);
     void saveAnnouncement(Announcement announcement);
     void deleteAnnouncement(String id);
+    
+    // This method now returns List for backward compatibility
+    // but internally uses Map for better performance
     List<Announcement> loadAnnouncements();
     
     void saveAnnounceType(AnnounceType announceType);

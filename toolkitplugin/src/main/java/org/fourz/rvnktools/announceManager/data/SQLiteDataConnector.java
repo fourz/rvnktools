@@ -137,33 +137,30 @@ public class SQLiteDataConnector implements DataStore {
 
     @Override
     public List<Announcement> loadAnnouncements() {
+        Map<String, Announcement> announcements = new HashMap<>();
+        String sql = "SELECT * FROM announcements";
         try {
             ensureConnected();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-        List<Announcement> announcements = new ArrayList<>();
-        String sql = "SELECT * FROM announcements";
-        try (Statement stmt = this.connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                Announcement announcement = new Announcement();
-                announcement.setId(rs.getString("id"));
-                announcement.setText(rs.getString("text"));
-                announcement.setType(rs.getString("type"));
-                announcement.setRecurrence(rs.getObject("recurrence") != null ? rs.getLong("recurrence") : null);
-                announcement.setOwner(rs.getString("owner"));
-                announcement.setPermission(rs.getString("permission"));
-                announcement.setDate(rs.getString("date") != null ? LocalDate.parse(rs.getString("date")) : null);
-                announcement.setTime(rs.getString("time") != null ? LocalTime.parse(rs.getString("time")) : null);
-                announcement.setExpiration(rs.getString("expiration") != null ? LocalDateTime.parse(rs.getString("expiration")) : null);
-                announcements.add(announcement);
+            try (Statement stmt = this.connection.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    Announcement announcement = new Announcement();
+                    announcement.setId(rs.getString("id"));
+                    announcement.setText(rs.getString("text"));
+                    announcement.setType(rs.getString("type"));
+                    announcement.setRecurrence(rs.getObject("recurrence") != null ? rs.getLong("recurrence") : null);
+                    announcement.setOwner(rs.getString("owner"));
+                    announcement.setPermission(rs.getString("permission"));
+                    announcement.setDate(rs.getString("date") != null ? LocalDate.parse(rs.getString("date")) : null);
+                    announcement.setTime(rs.getString("time") != null ? LocalTime.parse(rs.getString("time")) : null);
+                    announcement.setExpiration(rs.getString("expiration") != null ? LocalDateTime.parse(rs.getString("expiration")) : null);
+                    announcements.put(announcement.getId(), announcement);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return announcements;
+        return new ArrayList<>(announcements.values());
     }
 
     @Override

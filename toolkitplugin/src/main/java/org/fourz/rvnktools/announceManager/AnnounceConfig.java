@@ -382,9 +382,13 @@ public class AnnounceConfig {
             announceTypes.put(type.getId(), type);
         }
 
-        // Load announcements from database
-        return dataStore.loadAnnouncements();
-        //announceManager.setAnnouncements(dbAnnouncements);
+        // Convert list to map
+        List<Announcement> announcementList = new ArrayList<>();
+        List<Announcement> dbAnnouncements = dataStore.loadAnnouncements();
+        for (Announcement announcement : dbAnnouncements) {
+            announcementList.add(announcement);
+        }
+        return announcementList;
     }
 
     // Creates a new announcement from player input with owner information

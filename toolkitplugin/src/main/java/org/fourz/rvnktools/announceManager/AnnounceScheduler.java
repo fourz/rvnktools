@@ -51,12 +51,7 @@ public class AnnounceScheduler {
     // schedules all announcements
     public void scheduleAnnouncements() {
         // Cancel existing tasks if any
-        if (scheduledTasks != null) {
-            for (BukkitTask task : scheduledTasks.values()) {
-                task.cancel();
-            }
-        }
-        scheduledTasks = new ConcurrentHashMap<>();
+        cleanup();
 
         // Schedule each announcement
         for (Announcement announcement : announceManager.getAnnouncements()) {
