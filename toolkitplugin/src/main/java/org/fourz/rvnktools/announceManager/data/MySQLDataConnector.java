@@ -45,9 +45,9 @@ public class MySQLDataConnector implements DataStore {
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
-                debug.log(LogLevel.INFO, "Attempting to establish MySQL connection to " + url);
+                debug.log(LogLevel.CONFIG, "Attempting to establish MySQL connection to " + url);
                 connection = DriverManager.getConnection(url, username, password);
-                debug.log(LogLevel.INFO, "MySQL connection established successfully");
+                debug.log(LogLevel.FINE, "MySQL connection established successfully");
                 initializeTables();
             }
         } catch (SQLException e) {
@@ -68,7 +68,7 @@ public class MySQLDataConnector implements DataStore {
 
     private void ensureConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            debug.log(LogLevel.INFO, "Re-establishing lost MySQL connection");
+            debug.log(LogLevel.FINE, "Re-establishing lost MySQL connection");
             connect();
         }
     }
@@ -186,12 +186,12 @@ public class MySQLDataConnector implements DataStore {
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
-            debug.log(LogLevel.INFO, "Checking and creating necessary MySQL tables");
+            debug.log(LogLevel.CONFIG, "Checking and creating necessary MySQL tables");
             
             // Check if announcements table exists
             tables = metaData.getTables(database, null, "announcements", null);
             if (!tables.next()) {
-                debug.log(LogLevel.INFO, "Creating announcements table");
+                debug.log(LogLevel.CONFIG, "Creating announcements table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -208,13 +208,13 @@ public class MySQLDataConnector implements DataStore {
                 debug.log(LogLevel.INFO, "announcements table created successfully");
                 empty = true;
             } else {
-                debug.log(LogLevel.INFO, "announcements table already exists");
+                debug.log(LogLevel.FINE, "announcements table already exists");
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(database, null, "announce_types", null);
             if (!tables.next()) {
-                debug.log(LogLevel.INFO, "Creating announce_types table");
+                debug.log(LogLevel.CONFIG, "Creating announce_types table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -232,7 +232,7 @@ public class MySQLDataConnector implements DataStore {
             // Check if announce_disabledtypes table exists
             tables = metaData.getTables(database, null, "announce_disabledtypes", null);
             if (!tables.next()) {
-                debug.log(LogLevel.INFO, "Creating announce_disabledtypes table");
+                debug.log(LogLevel.CONFIG, "Creating announce_disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -242,13 +242,13 @@ public class MySQLDataConnector implements DataStore {
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
                 debug.log(LogLevel.INFO, "announce_disabledtypes table created successfully");
             } else {
-                debug.log(LogLevel.INFO, "announce_disabledtypes table already exists");
+                debug.log(LogLevel.FINE, "announce_disabledtypes table already exists");
             }
 
             // Check if announce_prefs table exists
             tables = metaData.getTables(database, null, "announce_prefs", null);
             if (!tables.next()) {
-                debug.log(LogLevel.INFO, "Creating announce_prefs table");
+                debug.log(LogLevel.CONFIG, "Creating announce_prefs table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
@@ -257,10 +257,10 @@ public class MySQLDataConnector implements DataStore {
                 stmt.executeUpdate(createAnnouncePrefsTable);
                 debug.log(LogLevel.INFO, "announce_prefs table created successfully");
             } else {
-                debug.log(LogLevel.INFO, "announce_prefs table already exists");
+                debug.log(LogLevel.FINE, "announce_prefs table already exists");
             }
             
-            debug.log(LogLevel.INFO, "All database tables verified/created successfully");
+            debug.log(LogLevel.CONFIG, "All database tables verified/created successfully");
             
         } catch (SQLException e) {
             debug.error("Failed to initialize database tables: " + e.getMessage(), e);

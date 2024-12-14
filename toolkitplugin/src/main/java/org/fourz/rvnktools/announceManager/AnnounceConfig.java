@@ -131,7 +131,7 @@ public class AnnounceConfig {
     }
 
     public void initializeDataStore() {
-        debug.log(LogLevel.INFO, "AnnounceConfig using " + storageType + " storage");
+        debug.log("AnnounceConfig using " + storageType + " storage");
 
         // Initialize DataStore if not already done
         if (dataStore == null) {
@@ -190,7 +190,7 @@ public class AnnounceConfig {
 
             if (isChanged) {
                 saveConfig();
-                debug.log(LogLevel.INFO, "Saved announcements after import changes");
+                debug.log("Saved announcements after import changes");
             }
         } catch (Exception e) {
             debug.error("Failed to initialize database: " + e.getMessage(), e);
@@ -206,7 +206,7 @@ public class AnnounceConfig {
             Integer dbHash = generateConfigHash(dataStore.loadAnnouncements(), dataStore.loadAnnounceTypes());
             
             if (ymlHash.equals(dbHash)) {
-                debug.log(LogLevel.INFO, "Database and YAML configurations match (Hash: " + ymlHash + ")");
+                debug.log("Database and YAML configurations match (Hash: " + ymlHash + ")");
                 dataStore.disconnect();
                 return true;
             }
@@ -261,7 +261,7 @@ public class AnnounceConfig {
     public boolean loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
-            debug.log(LogLevel.INFO, "Created default announcements.yml");
+            debug.log("Created default announcements.yml");
         }
 
         config = YamlConfiguration.loadConfiguration(configFile);        
@@ -269,7 +269,10 @@ public class AnnounceConfig {
 
         // Load data from YAML
         this.ymlAnnouncements = loadDataFromYAML();
+        debug.log(LogLevel.CONFIG, "Loaded " + ymlAnnouncements.size() + " announcements from file");
+
         this.ymlTypes = loadTypesFromYAML();
+        debug.log(LogLevel.CONFIG, "Loaded " + ymlTypes.size() + " announce types from file");
 
         // return success if data is loaded
         return !ymlAnnouncements.isEmpty() && !ymlTypes.isEmpty();
@@ -296,7 +299,7 @@ public class AnnounceConfig {
             if (!existingTypeIds.contains(type.getId().toLowerCase())) {
                 try {                    
                     dataStore.saveAnnounceType(type);                    
-                    debug.log(LogLevel.INFO, "Imported announce type: " + type.getId());                    
+                    debug.log("Imported announce type: " + type.getId());                    
                 } catch (Exception e) {
                     debug.log(LogLevel.WARNING, "Error saving announce type: " + type.getId());
                     e.printStackTrace();
@@ -315,7 +318,7 @@ public class AnnounceConfig {
                 try {
                     announceManager.addAnnouncement(announcement);
                     successfulImports.add(announcement.getId().toLowerCase());              
-                    debug.log(LogLevel.INFO, "Imported announcement: " + announcement.getId());
+                    debug.log("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
                     debug.log(LogLevel.WARNING, "Error importing announcement " + announcement.getId() + ": " + e.getMessage());
                     e.printStackTrace();
@@ -352,7 +355,7 @@ public class AnnounceConfig {
                 if (!dataStore.loadAnnounceTypes().stream()
                         .anyMatch(t -> t.getId().equalsIgnoreCase(type.getId()))) {
                     dataStore.saveAnnounceType(type);
-                    debug.log(LogLevel.INFO, "Imported announce type: " + type.getId());
+                    debug.log("Imported announce type: " + type.getId());
                 }
             } catch (Exception e) {
                 debug.log(LogLevel.WARNING, "Failed to import announce type " + type.getId() + ": " + e.getMessage());
@@ -432,7 +435,7 @@ public class AnnounceConfig {
 
     // Creates appropriate DataStore instance based on configuration settings
     private void initializeDataStoreConnection() {
-        debug.log(LogLevel.INFO, "Initializing data store connection with type: " + storageType);
+        debug.log("Initializing data store connection with type: " + storageType);
         
         if (storageType.equalsIgnoreCase("mysql")) {
             String host = config.getString("storage.mysql.host", "");
@@ -442,7 +445,7 @@ public class AnnounceConfig {
             String password = config.getString("storage.mysql.password", "");
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
             
-            debug.log(LogLevel.INFO, "MySQL configuration - Host: " + host + ", Port: " + port + 
+            debug.log("MySQL configuration - Host: " + host + ", Port: " + port + 
                 ", Database: " + database + ", Username: " + username + 
                 ", SSL: " + useSSL);
             
@@ -453,7 +456,7 @@ public class AnnounceConfig {
             }
             
             dataStore = new MySQLDataConnector(plugin, host, port, database, username, password, useSSL);
-            debug.log(LogLevel.INFO, "MySQL connector created successfully");
+            debug.log("MySQL connector created successfully");
         } else if (storageType.equalsIgnoreCase("sqlite")) {
             String databasePath = config.getString("storage.sqlite.database", "announcements.db");
             dataStore = new SQLiteDataConnector(plugin, databasePath);
@@ -639,7 +642,7 @@ public class AnnounceConfig {
 
         // Get a snapshot of announcements to avoid concurrent modification
         Collection<Announcement> currentAnnouncements = new ArrayList<>(announceManager.getAnnouncements());
-        debug.log(LogLevel.INFO, "Saving " + currentAnnouncements.size() + " announcements to file");
+        debug.log("Saving " + currentAnnouncements.size() + " announcements to file");
 
         for (Announcement announcement : currentAnnouncements) {
             try {
