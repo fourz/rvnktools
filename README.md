@@ -2,20 +2,6 @@
 
 RVNKTools is a comprehensive Minecraft server plugin that provides a wide array of features to enhance server administration. It includes tools for managing announcements, permissions, events, and much more, tailored for ease of use and scalability.
 
-## Features
-
-- **Announcements Management**: 
-  - Schedule, edit, and remove announcements using YAML or database integration.
-  - Flexible recurrence and type categorization for announcements.
-- **Permissions Handling**: 
-  - Advanced tools to manage player permissions.
-- **Integration Support**: 
-  - PlaceholderAPI integration for dynamic message handling.
-- **Extensible Commands**: 
-  - Rich subcommand system for plugin interaction.
-- **Custom Features**: 
-  - Includes features such as a hat manager, link maker, and more.
-
 ## Installation
 
 1. Download the latest version of `rvnktools.jar` from the [Releases](#).
@@ -23,59 +9,60 @@ RVNKTools is a comprehensive Minecraft server plugin that provides a wide array 
 3. Restart your server.
 4. Configure the plugin using the `config.yml` and `announcements.yml` files generated in the `plugins/RVNKTools` directory.
 
-## Configuration
+# RVNKTools Minecraft Plugin
 
-### announcements.yml
-The `announcements.yml` file allows you to define and customize announcements in YAML format:
+RVNKTools is a versatile Minecraft server plugin designed to streamline server administration and enhance player experience. This plugin offers a range of features, making it a valuable tool for server owners and administrators.
 
-```yaml
-announcements:
-  - id: "event_reminder"
-    text: "Don't forget to join the upcoming event!"
-    type: "news"
-    recurrence: "3h"
-    imported: false
-```
-Commands
+## Key Features
 
-    /announce
-        /announce list - List all announcements.
-        /announce add <id> - Add a new announcement.
-        /announce delete <id> - Delete an announcement by ID.
-        /announce reload - Reload the announcements configuration.
+- **Announcements Management**:
+  - Schedule, manage, and remove announcements with YAML or database integration.
+  - Support for recurring announcements and categorized types.
 
-Permissions
+- **Permissions Handling**:
+  - Tools to efficiently manage player permissions and access control.
 
-    rvnktools.announce.manage - Allows managing announcements.
-    rvnktools.announce.view - Allows viewing announcements.
+- **Integration Support**:
+  - Seamless integration with PlaceholderAPI for dynamic messages and content.
 
-Development
-Building from Source
+- **Custom Commands and Tools**:
+  - Extendable command system for managing announcements, preferences, and other features.
+  - Includes additional tools such as a hat manager and link maker.
 
-    Clone the repository:
+- **Database Compatibility**:
+  - Supports SQLite and MySQL for flexible data storage options.
 
-    git clone https://github.com/fourz/rvnktools.git
+## Suggested Use Cases
 
-Navigate to the project directory:
+- **Server Administration**:
+  - Simplify server management by automating announcements and schedules.
+  - Manage player permissions efficiently through built-in tools.
 
-cd rvnktools
+- **Event Management**:
+  - Use the announcement system to keep players informed about server events, updates, and important information.
 
-Build the plugin using Maven:
+- **Custom Player Experience**:
+  - Enhance interactivity by leveraging PlaceholderAPI integration for dynamic and personalized messages.
 
-mvn clean package
+- **Plugin Development**:
+  - Developers can extend RVNKTools to add custom features or integrate with other plugins.
 
-    The JAR file will be available in the target directory.
+## Getting Started
 
-Contributions
+1. Install the plugin by placing the `rvnktools.jar` file in your server's `plugins` directory.
+2. Restart the server to generate configuration files.
+3. Configure announcements and settings using the `announcements.yml` and `config.yml` files.
+4. Use the `/announce` commands to manage announcements directly in-game.
 
-Contributions are welcome! Please follow these steps:
+## Support and Contributions
 
-    Fork the repository.
-    Create a new branch for your feature/bugfix.
-    Commit your changes.
-    Submit a pull request with a clear description of the changes.
+- **Support**:
+  - For help and troubleshooting, join our [Discord](#) or open an issue on GitHub.
 
-Known Issues
+- **Contribute**:
+  - Contributions are welcome! Fork the repository, implement your changes, and submit a pull request.
 
-    YAML and database sync might result in discrepancies if not properly configured.
-    Ensure unique id values for announcements to avoid conflicts.
+## License
+
+RVNKTools is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
+
