@@ -74,9 +74,9 @@ public class AnnounceScheduler {
             }
         }
 
-        //calculate the ticks based on the recurrence
-        long ticks = announcement.getRecurrence() * 20L;
-
+        // Safely handle null recurrence by defaulting to RECURRENCE_UNSET (-1)
+        Long recurrence = announcement.getRecurrence();
+        long ticks = recurrence != null ? recurrence * 20L : RECURRENCE_UNSET;
 
         if (ticks > 0) {
             ticks = applyRandomTicks(ticks);

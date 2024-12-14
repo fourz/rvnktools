@@ -65,7 +65,6 @@ public class AnnounceConfig {
             return ConfigOperation.FALLBACK_TO_YML;
         }
 
-        // Connect to database and check if it is empty
         try {
             plugin.getLogger().info("Attempting database connection...");
             dataStore.connect();
@@ -73,39 +72,109 @@ public class AnnounceConfig {
             
             boolean dbEmpty = dataStore.isEmpty();
             plugin.getLogger().info("Database empty check result: " + dbEmpty);
-            
-            // Check if database and YAML configurations match
-            if (!dbEmpty && dbMatchesYml()) {
-                plugin.getLogger().info("Database matches YAML content");
-                return ConfigOperation.NO_UPDATE;
-            }
-            
-            dataStore.disconnect();
 
             if (dbEmpty) {
                 plugin.getLogger().info("Empty database detected - will import YAML");
                 return ConfigOperation.IMPORT_YML_TO_NEW_DB;
-
-            } else if (!dbEmpty && (ymlAnnouncements.isEmpty() || ymlTypes.isEmpty())) {
-                return ConfigOperation.UPDATE_MISSING_YML_FROM_DB;
-
-            } else if (!dbEmpty && !ymlAnnouncements.isEmpty() && !ymlTypes.isEmpty()) {
-                //output a warning message
-                plugin.getLogger().warning("Database and YAML configurations do not match. Merging YAML data into database.");
-
+            }
+            
+            // Load data from both sources for comparison
+            List<Announcement> dbAnnouncements = dataStore.loadAnnouncements();
+            List<AnnounceType> dbTypes = dataStore.loadAnnounceTypes();
+            
+            if ((dbAnnouncements.isEmpty() || dbTypes.isEmpty()) && 
+                (!ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty())) {
+                plugin.getLogger().info("Database partially empty - will import YAML");
+                return ConfigOperation.IMPORT_YML_TO_NEW_DB;
+            }
+            
+            if (!dbAnnouncements.isEmpty() && !dbTypes.isEmpty()) {
+                if (ymlAnnouncements.isEmpty() || ymlTypes.isEmpty()) {
+                    return ConfigOperation.UPDATE_MISSING_YML_FROM_DB;
+                }
                 return ConfigOperation.MERGE_YML_INTO_DB;
             }
 
-            //output a warning message
-            plugin.getLogger().warning("Unable to determine configuration state. Using YAML configurations.");
             return ConfigOperation.FALLBACK_TO_YML;
+            
         } catch (Exception e) {
             plugin.getLogger().severe("Database connection/check failed: " + e.getMessage());
             e.printStackTrace();
             return ConfigOperation.FALLBACK_TO_YML;
         }
     }
-    
+
+    public void initializeDataStore() {
+        plugin.getLogger().info("AnnounceConfig using " + storageType + " storage");
+
+        // Initialize DataStore if not already done
+        if (dataStore == null) {
+            initializeDataStoreConnection();
+        }
+
+        // Connect to the database once during initialization
+        if (dataStore != null) {
+            dataStore.connect();
+        }
+
+        // Initialize preferences after dataStore is initialized
+        this.preferences = new AnnouncePreferences(plugin, dataStore);
+        preferences.loadPreferences();
+
+        // If not using database storage, use YAML data directly
+        if (dataStore == null) {
+            announceManager.setAnnouncements(ymlAnnouncements);
+            announceTypes = ymlTypes;
+            return;
+        }
+
+        boolean isChanged = false;
+
+        try {
+            switch (configOperation) {
+
+                case NO_UPDATE:
+                case FALLBACK_TO_YML:
+                    announceManager.setAnnouncements(ymlAnnouncements);
+                    announceTypes = ymlTypes;
+                    break;
+
+                case IMPORT_YML_TO_NEW_DB:
+                    announceTypes = ymlTypes;
+                    isChanged = importYML(ymlAnnouncements, ymlTypes);
+                    if (isChanged) {
+                        announceManager.setAnnouncements(dataStore.loadAnnouncements());
+                        announceManager.setAnnouncementsImported();
+                    }
+                    break;
+
+                case UPDATE_MISSING_YML_FROM_DB:
+                    List<Announcement> announcements = loadDataFromDatabase();
+                    announceManager.setAnnouncements(announcements);
+                    isChanged = true;
+                    break;
+
+                case MERGE_YML_INTO_DB:
+                    List<Announcement> announcements_ = loadDataFromDatabase();
+                    announceManager.setAnnouncements(announcements_);
+                    announceManager.setAnnouncementsImported();
+                    isChanged = importYML(ymlAnnouncements, ymlTypes);
+                    break;
+            }
+
+            if (isChanged) {
+                saveConfig();
+                plugin.getLogger().info("Saved announcements after import changes");
+            }
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to initialize database: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback to YAML data on database error
+            announceManager.setAnnouncements(ymlAnnouncements);
+            announceTypes = ymlTypes;
+        }
+    }
+
     private boolean dbMatchesYml() {
             Integer ymlHash = generateConfigHash(ymlAnnouncements, ymlTypes);
             Integer dbHash = generateConfigHash(dataStore.loadAnnouncements(), dataStore.loadAnnounceTypes());
@@ -195,78 +264,6 @@ public class AnnounceConfig {
 
         // return success if data is loaded
         return !ymlAnnouncements.isEmpty() && !ymlTypes.isEmpty();
-    }
-
-    // Sets up data storage and handles initial data migration from YAML to database if needed
-    public void initializeDataStore() {
-        plugin.getLogger().info("AnnounceConfig using " + storageType + " storage");
-
-        // Initialize DataStore if not already done
-        if (dataStore == null) {
-            initializeDataStoreConnection();
-        }
-
-        // Connect to the database once during initialization
-        if (dataStore != null) {
-            dataStore.connect();
-        }
-
-        // Initialize preferences after dataStore is initialized
-        this.preferences = new AnnouncePreferences(plugin, dataStore);
-        preferences.loadPreferences();
-
-        // If not using database storage, use YAML data directly
-        if (dataStore == null) {
-            announceManager.setAnnouncements(ymlAnnouncements);
-            announceTypes = ymlTypes;
-            return;
-        }
-
-        boolean isChanged = false;
-
-        try {
-            switch (configOperation) {
-
-                case NO_UPDATE:
-                case FALLBACK_TO_YML:
-                    announceManager.setAnnouncements(ymlAnnouncements);
-                    announceTypes = ymlTypes;
-                    break;
-
-                case IMPORT_YML_TO_NEW_DB:
-                    announceTypes = ymlTypes;
-                    isChanged = importYML(ymlAnnouncements, ymlTypes);
-                    if (isChanged) {
-                        announceManager.setAnnouncements(dataStore.loadAnnouncements());
-                        announceManager.setAnnouncementsImported();
-                    }
-                    break;
-
-                case UPDATE_MISSING_YML_FROM_DB:
-                    List<Announcement> announcements = loadDataFromDatabase();
-                    announceManager.setAnnouncements(announcements);
-                    isChanged = true;
-                    break;
-
-                case MERGE_YML_INTO_DB:
-                    List<Announcement> announcements_ = loadDataFromDatabase();
-                    announceManager.setAnnouncements(announcements_);
-                    announceManager.setAnnouncementsImported();
-                    isChanged = importYML(ymlAnnouncements, ymlTypes);
-                    break;
-            }
-
-            if (isChanged) {
-                saveConfig();
-                plugin.getLogger().info("Saved announcements after import changes");
-            }
-        } catch (Exception e) {
-            plugin.getLogger().severe("Failed to initialize database: " + e.getMessage());
-            e.printStackTrace();
-            // Fallback to YAML data on database error
-            announceManager.setAnnouncements(ymlAnnouncements);
-            announceTypes = ymlTypes;
-        }
     }
 
     private boolean importYML(List<Announcement> ymlAnnouncements, Map<String, AnnounceType> ymlTypes) {

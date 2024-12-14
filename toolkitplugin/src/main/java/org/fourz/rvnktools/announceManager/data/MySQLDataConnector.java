@@ -250,7 +250,25 @@ public class MySQLDataConnector implements DataStore {
 
     @Override
     public boolean isEmpty() {
-        return empty;
+        try {
+            ensureConnection();
+            
+            // Check both tables for data
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs1 = stmt.executeQuery("SELECT COUNT(*) FROM announcements");
+                rs1.next();
+                int announceCount = rs1.getInt(1);
+                
+                ResultSet rs2 = stmt.executeQuery("SELECT COUNT(*) FROM announce_types");
+                rs2.next();
+                int typeCount = rs2.getInt(1);
+                
+                return announceCount == 0 && typeCount == 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return true; // Assume empty on error
+        }
     }
 
     @Override
