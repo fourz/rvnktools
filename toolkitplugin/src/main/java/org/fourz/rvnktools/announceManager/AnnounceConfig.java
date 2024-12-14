@@ -153,6 +153,32 @@ public class AnnounceConfig {
         return generateConfigHash(announcements, types.values());
     }
 
+    // Updated hash generation for Map structure
+    private Integer generateConfigHash(Map<String, Announcement> announcements, Collection<AnnounceType> types) {
+        List<String> elements = new ArrayList<>();
+        
+        // Add sorted announcement entries from map
+        announcements.values().stream()
+            .sorted(Comparator.comparing(a -> a.getId().toLowerCase()))
+            .forEach(a -> elements.add(String.format("%s:%s:%s:%s",
+                a.getId().toLowerCase(),
+                a.getType().toLowerCase(),
+                a.getText(),
+                Optional.ofNullable(a.getPermission()).orElse(""))));
+        
+        // Add sorted type entries
+        types.stream()
+            .sorted(Comparator.comparing(t -> t.getId().toLowerCase()))
+            .forEach(t -> elements.add(String.format("%s:%s:%s:%s:%s",
+                t.getId().toLowerCase(),
+                Optional.ofNullable(t.getPrefix()).orElse(""),
+                Optional.ofNullable(t.getSuffix()).orElse(""),
+                Optional.ofNullable(t.getPermission()).orElse(""),
+                Optional.ofNullable(t.getListingFee()).map(Object::toString).orElse(""))));
+
+        return String.join("|", elements).hashCode();
+    }
+
     // Loads or creates the YAML configuration file
     public boolean loadConfig() {
         if (!configFile.exists()) {
@@ -304,16 +330,78 @@ public class AnnounceConfig {
         return needsSaving;
     }
 
-    // Reads and parses announcement data from YAML configuration
+    // Updated import method for Map structure
+    private boolean importYML(Map<String, Announcement> ymlAnnouncements, Map<String, AnnounceType> ymlTypes) {
+        boolean needsSaving = false;
+        Set<String> importedIds = new HashSet<>();
+
+        // Import types first with validation
+        for (AnnounceType type : ymlTypes.values()) {
+            try {
+                if (type.getId() == null) {
+                    plugin.getLogger().warning("Skipping announce type with null ID");
+                    continue;
+                }
+                
+                if (!dataStore.loadAnnounceTypes().stream()
+                        .anyMatch(t -> t.getId().equalsIgnoreCase(type.getId()))) {
+                    dataStore.saveAnnounceType(type);
+                    plugin.getLogger().info("Imported announce type: " + type.getId());
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to import announce type " + type.getId() + ": " + e.getMessage());
+            }
+        }
+
+        // Import announcements with validation
+        for (Announcement announcement : ymlAnnouncements.values()) {
+            try {
+                if (validateAnnouncement(announcement) && 
+                    !dataStore.announcementExists(announcement.getId())) {
+                    
+                    announceManager.addAnnouncement(announcement);
+                    importedIds.add(announcement.getId().toLowerCase());
+                    needsSaving = true;
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to import announcement " + announcement.getId() + ": " + e.getMessage());
+            }
+        }
+
+        // Mark successful imports
+        if (!importedIds.isEmpty()) {
+            ymlAnnouncements.values().stream()
+                .filter(a -> importedIds.contains(a.getId().toLowerCase()))
+                .forEach(Announcement::setImported);
+        }
+
+        return needsSaving;
+    }
+
+    // Updated YAML loading with better error handling
     private List<Announcement> loadDataFromYAML() {
         List<Announcement> announcements = new ArrayList<>();
-        if (configFile.exists()) {
-            List<Map<?, ?>> announcementMaps = config.getMapList("announcements");
-            for (Map<?, ?> map : announcementMaps) {
+        if (!configFile.exists()) {
+            plugin.getLogger().warning("Config file does not exist: " + configFile.getName());
+            return announcements;
+        }
+
+        List<Map<?, ?>> announcementMaps = config.getMapList("announcements");
+        Set<String> usedIds = new HashSet<>();
+        
+        for (Map<?, ?> map : announcementMaps) {
+            try {
                 Announcement announcement = parseAnnouncement(map);
-                if (announcement != null) {
+                if (announcement != null && announcement.getId() != null) {
+                    if (usedIds.contains(announcement.getId().toLowerCase())) {
+                        plugin.getLogger().warning("Duplicate announcement ID found: " + announcement.getId());
+                        continue;
+                    }
+                    usedIds.add(announcement.getId().toLowerCase());
                     announcements.add(announcement);
                 }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error parsing announcement: " + e.getMessage());
             }
         }
         return announcements;
@@ -503,6 +591,31 @@ public class AnnounceConfig {
         return announceType;
     }
 
+    // New validation method
+    private boolean validateAnnouncement(Announcement announcement) {
+        if (announcement == null) {
+            plugin.getLogger().warning("Null announcement found during validation");
+            return false;
+        }
+
+        if (announcement.getId() == null || announcement.getId().trim().isEmpty()) {
+            plugin.getLogger().warning("Invalid announcement: missing ID");
+            return false;
+        }
+
+        if (announcement.getText() == null || announcement.getText().trim().isEmpty()) {
+            plugin.getLogger().warning("Invalid announcement: missing text for ID " + announcement.getId());
+            return false;
+        }
+
+        if (announcement.getType() == null || announcement.getType().trim().isEmpty()) {
+            plugin.getLogger().warning("Invalid announcement: missing type for ID " + announcement.getId());
+            return false;
+        }
+
+        return true;
+    }
+
     // Persists player preferences for disabled announcement types
     public void savePlayerDisabledTypes() {
         preferences.savePreferences();
@@ -516,76 +629,55 @@ public class AnnounceConfig {
 
     // Persists announcements and announcement types to YAML configuration
     public void saveConfig() {
-        // Create a list to hold the announcements data
         List<Map<String, Object>> announcementMaps = new ArrayList<>();
 
-        plugin.getLogger().info("Saving " + announceManager.getAnnouncements().size() + " announcements to file");
+        // Get a snapshot of announcements to avoid concurrent modification
+        Collection<Announcement> currentAnnouncements = new ArrayList<>(announceManager.getAnnouncements());
+        plugin.getLogger().info("Saving " + currentAnnouncements.size() + " announcements to file");
 
-        for (Announcement announcement : announceManager.getAnnouncements()) {
-            // Ensure required fields are not null
-            if (announcement.getId() == null || announcement.getType() == null || announcement.getText() == null) {
-                plugin.getLogger().warning("Skipping announcement due to missing required fields: " + announcement.getId());
-                continue;
-            }
+        for (Announcement announcement : currentAnnouncements) {
+            try {
+                // Validate required fields
+                if (announcement.getId() == null || announcement.getType() == null || announcement.getText() == null) {
+                    plugin.getLogger().warning("Skipping invalid announcement: " + announcement.getId());
+                    continue;
+                }
 
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id", announcement.getId());
-            map.put("text", announcement.getText());
-            map.put("type", announcement.getType());
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("id", announcement.getId());
+                map.put("text", announcement.getText());
+                map.put("type", announcement.getType());
 
-            // Add optional fields only if they are not null
-            if (announcement.getRecurrence() != null) {
-                map.put("recurrence", announcement.getRecurrence());
-            }
-            if (announcement.getOwner() != null) {
-                map.put("owner", announcement.getOwner());
-            }
-            if (announcement.getPermission() != null) {
-                map.put("permission", announcement.getPermission());
-            }
-            if (announcement.getDate() != null) {
-                map.put("date", announcement.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-            }
-            if (announcement.getTime() != null) {
-                map.put("time", announcement.getTime().format(DateTimeFormatter.ofPattern("HHmm")));
-            }
-            
-            // Add the imported flag
-            map.put("imported", announcement.isImported());
+                // Optional fields
+                Optional.ofNullable(announcement.getRecurrence()).ifPresent(r -> map.put("recurrence", r));
+                Optional.ofNullable(announcement.getOwner()).ifPresent(o -> map.put("owner", o));
+                Optional.ofNullable(announcement.getPermission()).ifPresent(p -> map.put("permission", p));
 
-            announcementMaps.add(map);
+                if (announcement.getDate() != null) {
+                    map.put("date", announcement.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+                }
+                if (announcement.getTime() != null) {
+                    map.put("time", announcement.getTime().format(DateTimeFormatter.ofPattern("HHmm")));
+                }
+                
+                map.put("imported", announcement.isImported());
+                announcementMaps.add(map);
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error saving announcement " + announcement.getId() + ": " + e.getMessage());
+            }
         }
 
-        // Check if announcementMaps is empty
         if (announcementMaps.isEmpty()) {
-            plugin.getLogger().warning("Announcements list is empty. Not saving announcements to config file.");
-            return; // Do not save empty announcements
+            plugin.getLogger().warning("No valid announcements to save");
+            return;
         }
-
-        // Set the 'announcements' section in the config
-        config.set("announcements", announcementMaps);
-        
-        // Create a list to hold the announce types data
-        List<Map<String, Object>> announceTypeMaps = new ArrayList<>();
-        
-        for (AnnounceType type : announceTypes.values()) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id", type.getId());
-            map.put("prefix", type.getPrefix());
-            map.put("suffix", type.getSuffix());
-            if (type.getListingFee() != null) {
-                map.put("list_fee", type.getListingFee());
-            }
-            map.put("permission", type.getPermission());            
-            announceTypeMaps.add(map);
-        }
-
-        config.set("announce_types", announceTypeMaps);
 
         try {
-            config.save(configFile);            
+            config.set("announcements", announcementMaps);
+            config.save(configFile);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save announcements to file: " + e.getMessage());
+            plugin.getLogger().severe("Failed to save announcements: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
