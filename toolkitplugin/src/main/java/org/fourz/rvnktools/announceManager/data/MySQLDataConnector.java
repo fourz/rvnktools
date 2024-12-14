@@ -8,7 +8,9 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
-import org.bukkit.Bukkit;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Optional;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
 
@@ -278,6 +280,59 @@ public class MySQLDataConnector implements DataStore {
                 debug.debug("announce_prefs table already exists");
             }
             
+            // Create stored procedure for hash calculation
+            try {
+                Statement dropStmt = connection.createStatement();
+                dropStmt.execute("DROP PROCEDURE IF EXISTS CalculateConfigHash");
+                
+                Statement createStmt = connection.createStatement();
+                String createHashProcedure = 
+                    "CREATE PROCEDURE CalculateConfigHash(OUT configHash INT) " +
+                    "BEGIN " +
+                    "    DECLARE done INT DEFAULT FALSE; " +
+                    "    DECLARE temp_str TEXT; " +
+                    "    DECLARE hash_str TEXT DEFAULT ''; " +
+                    "    DECLARE ann_cur CURSOR FOR " +
+                    "        SELECT CONCAT('A|', LOWER(id), '|', LOWER(type), '|', text, '|', COALESCE(permission,'')) " +
+                    "        FROM announcements ORDER BY LOWER(id); " +
+                    "    DECLARE type_cur CURSOR FOR " +
+                    "        SELECT CONCAT('T|', LOWER(id), '|', COALESCE(prefix,''), '|', " +
+                    "                     COALESCE(suffix,''), '|', COALESCE(permission,''), '|', " +
+                    "                     COALESCE(listing_fee,'')) " +
+                    "        FROM announce_types ORDER BY LOWER(id); " +
+                    "    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE; " +
+                    
+                    "    SET hash_str = ''; " +  // Ensure clean start
+                    
+                    "    OPEN ann_cur; " +
+                    "    read_announcements: LOOP " +
+                    "        FETCH ann_cur INTO temp_str; " +
+                    "        IF done THEN " +
+                    "            LEAVE read_announcements; " +
+                    "        END IF; " +
+                    "        SET hash_str = CONCAT(hash_str, temp_str, '\n'); " +
+                    "    END LOOP; " +
+                    "    CLOSE ann_cur; " +
+                    
+                    "    SET done = FALSE; " +
+                    "    OPEN type_cur; " +
+                    "    read_types: LOOP " +
+                    "        FETCH type_cur INTO temp_str; " +
+                    "        IF done THEN " +
+                    "            LEAVE read_types; " +
+                    "        END IF; " +
+                    "        SET hash_str = CONCAT(hash_str, temp_str, '\n'); " +
+                    "    END LOOP; " +
+                    "    CLOSE type_cur; " +
+                    
+                    "    SET configHash = CAST(CONV(LEFT(MD5(hash_str), 8), 16, 10) AS SIGNED); " +
+                    "END";
+                createStmt.execute(createHashProcedure);
+                debug.debug("Created hash calculation stored procedure");
+            } catch (SQLException e) {
+                debug.error("Failed to create hash calculation stored procedure: " + e.getMessage(), e);
+            }
+            
             debug.debug("All database tables verified/created successfully");
             setTablesInitialized(true);
             
@@ -432,5 +487,125 @@ public class MySQLDataConnector implements DataStore {
             debug.error("Error retrieving player preferences for playerId: " + playerId, e);
         }
         return null;
+    }
+
+    /**
+     * Calculates configuration hash using database stored procedure
+     * @return Integer hash value of current database configuration
+     */
+    public Integer calculateDatabaseHash() {
+        try {
+            ensureConnection();
+            
+            // Get raw string for hashing
+            StringBuilder fullHashStr = new StringBuilder();
+            debug.debug("\nHASH CALCULATION SUMMARY");
+            debug.debug("------------------------");
+            
+            // Get announcements in sorted order
+            try (Statement stmt = connection.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery(
+                    "SELECT CONCAT('A|', LOWER(id), '|', LOWER(type), '|', text, '|', COALESCE(recurrence,'')) AS data " +
+                    "FROM announcements ORDER BY LOWER(id)")) {
+                    while (rs.next()) {
+                        String dataLine = rs.getString("data");
+                        fullHashStr.append(dataLine).append("\n");
+                    }
+                }
+            }
+            
+            // Calculate both hash methods
+            String hashSource = fullHashStr.toString();
+            int javaHash = hashSource.hashCode();
+            
+            // Get MySQL stored procedure hash
+            CallableStatement cStmt = connection.prepareCall("{CALL CalculateConfigHash(?)}");
+            cStmt.registerOutParameter(1, Types.INTEGER);
+            cStmt.execute();
+            int mysqlHash = cStmt.getInt(1);
+            
+            // Log hash comparison
+            debug.debug("String length: " + hashSource.length());
+            debug.debug("Java hashCode(): " + javaHash);
+            debug.debug("MySQL proc hash: " + mysqlHash);
+            
+            if (javaHash != mysqlHash) {
+                debug.debug("!!! HASH MISMATCH DETECTED !!!");
+                debug.debug("Hash difference: " + (javaHash - mysqlHash));
+                
+                // Compare first different character
+                try (Statement diffStmt = connection.createStatement()) {
+                    String mysqlStr = "";
+                    try (ResultSet rs = diffStmt.executeQuery(
+                        "SELECT GROUP_CONCAT(CONCAT('A|', LOWER(id), '|', LOWER(type), '|', text, '|', COALESCE(recurrence,'')) " + 
+                        "ORDER BY LOWER(id) SEPARATOR '\n') as str FROM announcements")) {
+                        if (rs.next()) {
+                            mysqlStr = rs.getString("str");
+                            for (int i = 0; i < Math.min(hashSource.length(), mysqlStr.length()); i++) {
+                                if (hashSource.charAt(i) != mysqlStr.charAt(i)) {
+                                    debug.debug(String.format("First difference at position %d: Java='%c' (ASCII: %d), MySQL='%c' (ASCII: %d)",
+                                        i, hashSource.charAt(i), (int)hashSource.charAt(i), 
+                                        mysqlStr.charAt(i), (int)mysqlStr.charAt(i)));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                debug.debug("✓ Hashes match perfectly");
+            }
+            debug.debug("------------------------\n");
+            
+            return mysqlHash;
+            
+        } catch (SQLException e) {
+            debug.error("Error calculating database hash", e);
+            return null;
+        }
+    }
+
+    /**
+     * @deprecated Use calculateDatabaseHash() instead
+     */
+    @Deprecated
+    private Integer generateConfigHash(Map<String, Announcement> announcements, Collection<AnnounceType> types) {
+        StringBuilder hashBuilder = new StringBuilder();
+        debug.debug("--- Java Hash Source Data ---");
+
+        // Process announcements
+        announcements.values().stream()
+            .sorted(Comparator.comparing(a -> a.getId().toLowerCase()))
+            .forEach(a -> {
+                String entry = String.format("A|%s|%s|%s|%s\n",
+                    a.getId().toLowerCase(),
+                    a.getType().toLowerCase(),
+                    a.getText(),
+                    Optional.ofNullable(a.getPermission()).orElse(""));
+                hashBuilder.append(entry);
+                debug.debug("Announcement entry: " + entry.trim());
+            });
+
+        // Process types
+        types.stream()
+            .sorted(Comparator.comparing(t -> t.getId().toLowerCase()))
+            .forEach(t -> {
+                String entry = String.format("T|%s|%s|%s|%s|%s\n",
+                    t.getId().toLowerCase(),
+                    Optional.ofNullable(t.getPrefix()).orElse(""),
+                    Optional.ofNullable(t.getSuffix()).orElse(""),
+                    Optional.ofNullable(t.getPermission()).orElse(""),
+                    Optional.ofNullable(t.getListingFee()).map(Object::toString).orElse(""));
+                hashBuilder.append(entry);
+                debug.debug("Type entry: " + entry.trim());
+            });
+
+        debug.debug("--- End Java Hash Source Data ---");
+        
+        String hashStr = hashBuilder.toString();
+        int hash = hashStr.hashCode();
+        debug.debug("Java hash string length: " + hashStr.length());
+        debug.debug("Java raw hash value: " + hash);
+        return hash;
     }
 }

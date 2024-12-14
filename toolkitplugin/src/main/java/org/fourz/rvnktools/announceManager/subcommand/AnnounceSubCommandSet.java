@@ -53,7 +53,8 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
                     return false;
                 }                
                 if (isValidRecurrence(value)) {
-                    announcement.setRecurrence(convertRecurrenceToSecondsLong(value));                    
+                    announcement.setRecurrence(convertRecurrenceToSecondsLong(value));
+                    announcement.setRecurrenceString(value);                    
                     messagePlayer(player, "&aSet recurrence to: " + value);
                 } else {
                     messagePlayer(player, "&cInvalid recurrence value. Use: daily or none, or time values like 90m, 2h");

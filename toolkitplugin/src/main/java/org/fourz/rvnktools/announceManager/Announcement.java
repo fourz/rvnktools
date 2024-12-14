@@ -9,6 +9,7 @@ public class Announcement {
     private String text;
     private String type;
     private Long recurrence;
+    private String recurrenceString;
     private String owner;
     private String permission;
     private LocalDate date;
@@ -50,6 +51,13 @@ public class Announcement {
     }
     public void setRecurrence(Long recurrence) {
         this.recurrence = recurrence;
+    }
+    public String getRecurrenceString() {
+        return recurrenceString;
+    }
+    
+    public void setRecurrenceString(String recurrenceString) {
+        this.recurrenceString = recurrenceString;
     }
     public String getOwner() {
         return owner;

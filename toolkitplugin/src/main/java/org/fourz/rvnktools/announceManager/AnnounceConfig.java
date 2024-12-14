@@ -209,18 +209,25 @@ public class AnnounceConfig {
     }
 
     private boolean dbMatchesYml() {
-            Integer ymlHash = generateConfigHash(ymlAnnouncements, ymlTypes);
-            Integer dbHash = generateConfigHash(dataStore.loadAnnouncements(), dataStore.loadAnnounceTypes());
+        Integer ymlHash = generateConfigHash(ymlAnnouncements, ymlTypes);
+        
+        if (dataStore instanceof MySQLDataConnector) {
+            MySQLDataConnector mysqlStore = (MySQLDataConnector) dataStore;
+            Integer dbHash = mysqlStore.calculateDatabaseHash();
             
-            if (ymlHash.equals(dbHash)) {
+            if (ymlHash != null && ymlHash.equals(dbHash)) {
                 debug.log("Database and YAML configurations match (Hash: " + ymlHash + ")");
                 dataStore.disconnect();
                 return true;
             }
-            return false;
+        }
+        return false;
     }
 
-    // Generates a hash of the configuration data for comparison
+    /**
+     * @deprecated Use MySQLDataConnector.calculateDatabaseHash() instead
+     */
+    @Deprecated
     private Integer generateConfigHash(List<Announcement> announcements, Collection<AnnounceType> types) {
         return generateConfigHash(
             announcements.stream()
@@ -229,7 +236,10 @@ public class AnnounceConfig {
         );
     }
 
-    // Overloaded method to generate hash of configuration data
+    /**
+     * @deprecated Use MySQLDataConnector.calculateDatabaseHash() instead
+     */
+    @Deprecated
     private Integer generateConfigHash(List<Announcement> announcements, Map<String, AnnounceType> types) {
         return generateConfigHash(
             announcements.stream()
@@ -241,36 +251,28 @@ public class AnnounceConfig {
     // Updated hash generation for Map structure
     private Integer generateConfigHash(Map<String, Announcement> announcements, Collection<AnnounceType> types) {
         StringBuilder hashBuilder = new StringBuilder();
-        debug.debug("Generating config hash for " + announcements.size() + " announcements and " + types.size() + " types");
+        debug.debug("\nJAVA CONFIG HASH SOURCE");
+        debug.debug("---------------------");
 
-        // Process announcements
+        // Process announcements only with essential fields, excluding recurrence
         announcements.values().stream()
             .sorted(Comparator.comparing(a -> a.getId().toLowerCase()))
             .forEach(a -> {
-                String announcementEntry = String.format("A|%s|%s|%s|%s\n",
+                String announcementEntry = String.format("A|%s|%s|%s",
                     a.getId().toLowerCase(),
                     a.getType().toLowerCase(),
-                    a.getText(),
-                    Optional.ofNullable(a.getPermission()).orElse(""));
-                hashBuilder.append(announcementEntry);
+                    a.getText());
+                hashBuilder.append(announcementEntry).append("\n");
             });
 
-        // Process types
-        types.stream()
-            .sorted(Comparator.comparing(t -> t.getId().toLowerCase()))
-            .forEach(t -> {
-                String typeEntry = String.format("T|%s|%s|%s|%s|%s\n",
-                    t.getId().toLowerCase(),
-                    Optional.ofNullable(t.getPrefix()).orElse(""),
-                    Optional.ofNullable(t.getSuffix()).orElse(""),
-                    Optional.ofNullable(t.getPermission()).orElse(""),
-                    Optional.ofNullable(t.getListingFee()).map(Object::toString).orElse(""));
-                hashBuilder.append(typeEntry);
-            });
-
-        int finalHash = hashBuilder.toString().hashCode();
-        debug.debug("Generated hash value: " + finalHash);
-        return finalHash;
+        String hashStr = hashBuilder.toString();
+        int hash = hashStr.hashCode();
+        
+        debug.debug("String length: " + hashStr.length());
+        debug.debug("Hash value: " + hash);
+        debug.debug("---------------------\n");
+        
+        return hash;
     }
 
     // Loads or creates the YAML configuration file
@@ -342,10 +344,10 @@ public class AnnounceConfig {
         // Process announcements that need importing
         for (Announcement announcement : ymlAnnouncements) {
             boolean exists = existingAnnouncementIds.contains(announcement.getId().toLowerCase());
-            // Remove isImported() check since we want to import all announcements from YML
             if (!exists) {
                 try {
-                    announceManager.addAnnouncement(announcement);
+                    dataStore.saveAnnouncement(announcement); // Save to database
+                    announceManager.addAnnouncement(announcement); // Add to manager
                     successfulImports.add(announcement.getId().toLowerCase());              
                     debug.log("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
@@ -495,15 +497,20 @@ public class AnnounceConfig {
         String type = (String) map.get("type");
         Object recurrence = map.get("recurrence");
         Long recurrenceSeconds = null;
+        String originalRecurrence = null;
         
         if (recurrence != null) {
+            originalRecurrence = recurrence.toString();
             if (recurrence instanceof Long) {
                 recurrenceSeconds = (Long) recurrence;
             } else if (recurrence instanceof String) {
-                // Convert string format to seconds
                 String recStr = (String) recurrence;
                 try {
-                    if (recStr.endsWith("s")) {
+                    if (recStr.equalsIgnoreCase("none")) {
+                        recurrenceSeconds = null;
+                    } else if (recStr.equalsIgnoreCase("daily")) {
+                        recurrenceSeconds = 86400L;
+                    } else if (recStr.endsWith("s")) {
                         recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1));
                     } else if (recStr.endsWith("m")) {
                         recurrenceSeconds = Long.parseLong(recStr.substring(0, recStr.length() - 1)) * 60;
@@ -553,6 +560,7 @@ public class AnnounceConfig {
         announcement.setText(text);
         announcement.setType(type);
         announcement.setRecurrence(recurrenceSeconds);
+        announcement.setRecurrenceString(originalRecurrence); // Store original string
         announcement.setOwner(owner);
         announcement.setPermission(permission);
         announcement.setDate(date);
@@ -615,8 +623,11 @@ public class AnnounceConfig {
                 map.put("text", announcement.getText());
                 map.put("type", announcement.getType());
 
-                // Optional fields
-                Optional.ofNullable(announcement.getRecurrence()).ifPresent(r -> map.put("recurrence", r));
+                // Only save recurrence if it exists
+                if (announcement.getRecurrenceString() != null) {
+                    map.put("recurrence", announcement.getRecurrenceString());
+                }
+
                 Optional.ofNullable(announcement.getOwner()).ifPresent(o -> map.put("owner", o));
                 Optional.ofNullable(announcement.getPermission()).ifPresent(p -> map.put("permission", p));
 
