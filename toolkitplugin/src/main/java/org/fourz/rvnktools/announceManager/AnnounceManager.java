@@ -20,14 +20,14 @@ public class AnnounceManager {
     private final AnnounceScheduler announceScheduler;
     private final ChatServiceInterface chatService;    
     boolean usingPlaceholderAPI;    
-    private List<Announcement> announcements;
+    private Map<String, Announcement> announcements;
 
     public AnnounceManager(RVNKTools plugin) {
         plugin.getLogger().info("Enabling AnnounceManager.");
         this.plugin = plugin;
         this.chatService = new ChatService();
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
-        this.announcements = new ArrayList<>();
+        this.announcements = new HashMap<>();
         this.announceConfig = new AnnounceConfig(plugin, this);
         this.announceConfig.initializeDataStore();
         this.announceScheduler = new AnnounceScheduler(plugin, this);
@@ -63,7 +63,7 @@ public class AnnounceManager {
                 setImported(announcement.getId());
                 // fall through
             case ADD_ANNOUNCEMENT:
-                announcements.add(announcement);
+                announcements.put(announcement.getId(), announcement);
                 return true;
             default:
                 return false;
@@ -72,11 +72,9 @@ public class AnnounceManager {
 
     // private setImported method
     private void setImported(String id) {
-        for (Announcement a : announcements) {
-            if (a.getId().equalsIgnoreCase(id)) {
-                a.setImported();
-                break;
-            }
+        Announcement announcement = announcements.get(id);
+        if (announcement != null) {
+            announcement.setImported();
         }
     }
 
@@ -195,8 +193,8 @@ public class AnnounceManager {
             announceConfig.getDataStore().deleteAnnouncement(id);
         }
 
-        boolean removed = announcements.removeIf(announcement -> announcement.getId().equalsIgnoreCase(id));
-        if (removed) {
+        Announcement removed = announcements.remove(id);
+        if (removed != null) {
             plugin.getLogger().info("Deleted announcement: " + id);
             announceConfig.saveConfig();
             return true;
@@ -291,19 +289,18 @@ public class AnnounceManager {
     }
 
     public Set<String> getAnnouncementIds() {
-        Set<String> ids = new HashSet<>();
-        for (Announcement announcement : this.announcements) {
-            ids.add(announcement.getId());
-        }
-        return ids;
+        return announcements.keySet();
     }
 
     public List<Announcement> getAnnouncements() {
-        return announcements;
+        return new ArrayList<>(announcements.values());
     }
 
     public void setAnnouncements(List<Announcement> announcements) {
-        this.announcements = announcements;
+        this.announcements = new HashMap<>();
+        for (Announcement announcement : announcements) {
+            this.announcements.put(announcement.getId(), announcement);
+        }
     }
 
     public void savePlayerDisabledTypes() {
@@ -311,11 +308,10 @@ public class AnnounceManager {
     }
 
     public boolean sendAnnouncementNow(Player player, String id) {
-        for (Announcement announcement : this.announcements) {
-            if (announcement.getId().equalsIgnoreCase(id)) {
-                broadcastAnnouncement(announcement);
-                return true;
-            }
+        Announcement announcement = announcements.get(id);
+        if (announcement != null) {
+            broadcastAnnouncement(announcement);
+            return true;
         }
         return false;
     }
@@ -326,11 +322,9 @@ public class AnnounceManager {
 
     public boolean announcementExists(String id) {
         // First check in memory
-        for (Announcement announcement : announcements) {
-            if (announcement.getId().equalsIgnoreCase(id)) {
-                plugin.getLogger().info("Announcement with ID '" + id + "' found in memory");
-                return true;
-            }
+        if (announcements.containsKey(id)) {
+            plugin.getLogger().info("Announcement with ID '" + id + "' found in memory");
+            return true;
         }
 
         // Then check in database if available
@@ -346,26 +340,20 @@ public class AnnounceManager {
     }
 
     public void setAnnouncementImported(String id) {
-        for (Announcement announcement : announcements) {
-            if (announcement.getId().equalsIgnoreCase(id)) {
-                announcement.setImported();         
-                break;
-            }
+        Announcement announcement = announcements.get(id);
+        if (announcement != null) {
+            announcement.setImported();
         }
     }
 
     public void setAnnouncementsImported() {
-        for (Announcement announcement : announcements) {
+        for (Announcement announcement : announcements.values()) {
             announcement.setImported();
         }
     }
 
     public boolean isAnnouncementImported(String id) {
-        for (Announcement announcement : announcements) {
-            if (announcement.getId().equalsIgnoreCase(id)) {
-                return announcement.isImported();
-            }
-        }
-        return false;
+        Announcement announcement = announcements.get(id);
+        return announcement != null && announcement.isImported();
     }
 }
