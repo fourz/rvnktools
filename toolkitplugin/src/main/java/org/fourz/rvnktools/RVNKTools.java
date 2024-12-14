@@ -77,9 +77,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        announceManager.shutdown();
-
-        // keep it cleaned up
+        if (announceManager != null) {
+            announceManager.shutdown(); // This will trigger AnnounceConfig.shutdown()
+        }
+        // ...rest of shutdown code...
         announceManager = null;
         cycleCommands = null;
         linkMaker = null;

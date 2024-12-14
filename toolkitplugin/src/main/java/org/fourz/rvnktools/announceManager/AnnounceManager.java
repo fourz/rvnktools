@@ -41,27 +41,31 @@ public class AnnounceManager {
 
     // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
     public boolean addAnnouncement(Announcement announcement) {
-        if (announcement == null) {
-            plugin.getLogger().warning("Cannot add null announcement");
-            return false;
-        }
-        if (announcement.getId() == null) {
-            plugin.getLogger().warning("Cannot add announcement with null ID");
+        if (announcement == null || announcement.getId() == null) {
+            plugin.getLogger().warning("Cannot add invalid announcement");
             return false;
         }
 
-        // Check for existing announcement
-        if (announcements.containsKey(announcement.getId())) {
-            plugin.getLogger().warning("Announcement with ID '" + announcement.getId() + "' already exists");
+        String id = announcement.getId().toLowerCase();
+        // Check for existing announcement in memory first
+        if (announcements.containsKey(id)) {
+            plugin.getLogger().warning("Announcement with ID '" + id + "' already exists in memory");
             return false;
         }
 
         try {
+            // Only save to database if not imported and database exists
             if (announceConfig.getDataStore() != null && !announcement.isImported()) {
+                // Check database before saving
+                if (announceConfig.getDataStore().announcementExists(id)) {
+                    plugin.getLogger().warning("Announcement with ID '" + id + "' already exists in database");
+                    return false;
+                }
                 announceConfig.getDataStore().saveAnnouncement(announcement);
                 announcement.setImported();
             }
-            announcements.put(announcement.getId(), announcement);
+            
+            announcements.put(id, announcement);
             return true;
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to add announcement: " + e.getMessage());

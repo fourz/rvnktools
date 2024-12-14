@@ -170,6 +170,7 @@ public class AnnounceConfig {
                 case FALLBACK_TO_YML:
                     announceManager.setAnnouncements(ymlAnnouncements);
                     announceTypes = ymlTypes;
+                    debug.log("Using existing announcements from local configuration");
                     break;
 
                 case IMPORT_YML_TO_NEW_DB:
@@ -195,10 +196,6 @@ public class AnnounceConfig {
                     break;
             }
 
-            if (isChanged) {
-                saveConfig();
-                debug.log("Saved announcements after import changes");
-            }
         } catch (Exception e) {
             debug.error("Failed to initialize database: " + e.getMessage(), e);
             e.printStackTrace();
@@ -209,70 +206,39 @@ public class AnnounceConfig {
     }
 
     private boolean dbMatchesYml() {
-        Integer ymlHash = generateConfigHash(ymlAnnouncements, ymlTypes);
+        String ymlHash = generateIdsHash(ymlAnnouncements.stream()
+            .map(a -> a.getId().toLowerCase())
+            .collect(Collectors.toSet()));
         
         if (dataStore instanceof MySQLDataConnector) {
             MySQLDataConnector mysqlStore = (MySQLDataConnector) dataStore;
-            Integer dbHash = mysqlStore.calculateDatabaseHash();
+            String dbHash = mysqlStore.calculateDatabaseHash();
             
-            if (ymlHash != null && ymlHash.equals(dbHash)) {
-                debug.log("Database and YAML configurations match (Hash: " + ymlHash + ")");
+            debug.log("Configuration hash comparison - YAML=" + ymlHash + " DB=" + dbHash);
+            
+            if (ymlHash != null && dbHash != null && ymlHash.equals(dbHash)) {
+                debug.log("Loading " + ymlAnnouncements.size() + " announcements from local configuration");
                 dataStore.disconnect();
                 return true;
+            } else {
+                debug.log("Configuration mismatch - will synchronize with database");
             }
         }
         return false;
     }
 
-    /**
-     * @deprecated Use MySQLDataConnector.calculateDatabaseHash() instead
-     */
-    @Deprecated
-    private Integer generateConfigHash(List<Announcement> announcements, Collection<AnnounceType> types) {
-        return generateConfigHash(
-            announcements.stream()
-                .collect(Collectors.toMap(Announcement::getId, a -> a)),
-            types
-        );
-    }
-
-    /**
-     * @deprecated Use MySQLDataConnector.calculateDatabaseHash() instead
-     */
-    @Deprecated
-    private Integer generateConfigHash(List<Announcement> announcements, Map<String, AnnounceType> types) {
-        return generateConfigHash(
-            announcements.stream()
-                .collect(Collectors.toMap(Announcement::getId, a -> a)),
-            types.values()
-        );
-    }
-
-    // Updated hash generation for Map structure
-    private Integer generateConfigHash(Map<String, Announcement> announcements, Collection<AnnounceType> types) {
+    private String generateIdsHash(Set<String> ids) {
+        if (ids.isEmpty()) return null;
+        
         StringBuilder hashBuilder = new StringBuilder();
-        debug.debug("\nJAVA CONFIG HASH SOURCE");
-        debug.debug("---------------------");
-
-        // Process announcements only with essential fields, excluding recurrence
-        announcements.values().stream()
-            .sorted(Comparator.comparing(a -> a.getId().toLowerCase()))
-            .forEach(a -> {
-                String announcementEntry = String.format("A|%s|%s|%s",
-                    a.getId().toLowerCase(),
-                    a.getType().toLowerCase(),
-                    a.getText());
-                hashBuilder.append(announcementEntry).append("\n");
-            });
-
+        debug.debug("Processing " + ids.size() + " announcements for hash generation");
+        
+        ids.stream()
+            .sorted()
+            .forEach(id -> hashBuilder.append(id).append("\n"));
+            
         String hashStr = hashBuilder.toString();
-        int hash = hashStr.hashCode();
-        
-        debug.debug("String length: " + hashStr.length());
-        debug.debug("Hash value: " + hash);
-        debug.debug("---------------------\n");
-        
-        return hash;
+        return org.apache.commons.codec.digest.DigestUtils.md5Hex(hashStr);
     }
 
     // Loads or creates the YAML configuration file
@@ -315,10 +281,9 @@ public class AnnounceConfig {
         List<Announcement> existingAnnouncements = dataStore.loadAnnouncements();
         List<AnnounceType> existingTypes = dataStore.loadAnnounceTypes();
 
-        Set<String> existingAnnouncementIds = new HashSet<>();
-        for (Announcement announcement : existingAnnouncements) {
-            existingAnnouncementIds.add(announcement.getId().toLowerCase());
-        }
+        Set<String> existingAnnouncementIds = existingAnnouncements.stream()
+            .map(a -> a.getId().toLowerCase())
+            .collect(Collectors.toSet());
 
         Set<String> existingTypeIds = new HashSet<>();
         for (AnnounceType type : existingTypes) {
@@ -343,11 +308,9 @@ public class AnnounceConfig {
         
         // Process announcements that need importing
         for (Announcement announcement : ymlAnnouncements) {
-            boolean exists = existingAnnouncementIds.contains(announcement.getId().toLowerCase());
-            if (!exists) {
+            if (!existingAnnouncementIds.contains(announcement.getId().toLowerCase())) {
                 try {
-                    dataStore.saveAnnouncement(announcement); // Save to database
-                    announceManager.addAnnouncement(announcement); // Add to manager
+                    dataStore.saveAnnouncement(announcement); // Save to database only
                     successfulImports.add(announcement.getId().toLowerCase());              
                     debug.log("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
@@ -623,9 +586,24 @@ public class AnnounceConfig {
                 map.put("text", announcement.getText());
                 map.put("type", announcement.getType());
 
-                // Only save recurrence if it exists
-                if (announcement.getRecurrenceString() != null) {
-                    map.put("recurrence", announcement.getRecurrenceString());
+                // Handle recurrence value
+                Long recurrence = announcement.getRecurrence();
+                if (recurrence != null) {
+                    // If we have the original string format, use that
+                    if (announcement.getRecurrenceString() != null) {
+                        map.put("recurrence", announcement.getRecurrenceString());
+                    } else {
+                        // Convert seconds back to a readable format
+                        if (recurrence % 86400 == 0) {
+                            map.put("recurrence", (recurrence / 86400) + "d");
+                        } else if (recurrence % 3600 == 0) {
+                            map.put("recurrence", (recurrence / 3600) + "h");
+                        } else if (recurrence % 60 == 0) {
+                            map.put("recurrence", (recurrence / 60) + "m");
+                        } else {
+                            map.put("recurrence", recurrence + "s");
+                        }
+                    }
                 }
 
                 Optional.ofNullable(announcement.getOwner()).ifPresent(o -> map.put("owner", o));
@@ -685,6 +663,7 @@ public class AnnounceConfig {
     // Add a shutdown method to disconnect the DataStore
     public void shutdown() {
         if (dataStore != null) {
+            saveConfig(); // Save any pending changes
             dataStore.disconnect();
         }
     }
