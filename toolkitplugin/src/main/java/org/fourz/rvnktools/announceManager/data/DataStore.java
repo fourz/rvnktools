@@ -11,6 +11,10 @@ import org.fourz.rvnktools.announceManager.Announcement;
 public interface DataStore {
     void connect();
     void disconnect();
+    
+    // Add table state tracking methods
+    boolean areTablesInitialized();
+    void setTablesInitialized(boolean initialized);
     void initializeTables();
     
     boolean isEmpty();

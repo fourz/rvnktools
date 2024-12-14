@@ -31,7 +31,6 @@ announcements:
   text: '&e&lEvents &7are held every &eSaturday &7at &e7pm CST.'
   type: news
   recurrence: 90m
-  owner: wizardofire
   imported: false
 - id: trains
   text: '&7Use &d/trains &7for train help pages.'
@@ -47,20 +46,6 @@ announcements:
   text: '&6Vote daily &7for &eMickyHats&7! Do &6/vote'
   type: help
   recurrence: 2h  
-  imported: false
-- id: ant_shop1
-  text: '&e&lBarterSigns &acoming Soon!'
-  type: advert
-  recurrence: 40m
-  owner: wizardofire
-  cost: 1  
-  imported: false
-- id: toastyday
-  text: '&e&lHappy &6Cheese Toasty &e&lDay!'
-  type: scheduled
-  recurrence: 120m
-  date: '2028-09-24'
-  time: '1900'  
   imported: false
 - id: ads
   text: '&aUse &d/ads &ato toggle &eplayer adverts &aon and off.'
@@ -117,29 +102,6 @@ announcements:
   type: guide
   recurrence: 2h  
   imported: false
-- id: xmasevent
-  text: '&2Get started on your &c&lHOLIDAY VILLAGE &2build. &aDates and times are
-    coming soon!'
-  type: scheduled
-  recurrence: 4h
-  date: '2028-12-25'  
-  imported: false
-- id: xmasevent_week1
-  text: Winter Village Build Event starts tonite at 8PM EST! RVSP on the {discord-link}
-    if you can.
-  type: news
-  recurrence: 4h  
-  imported: false
-- id: xmasevent_reminder
-  text: The last day for Winter Village Build event will be January 18th.
-  type: news
-  recurrence: 3h  
-  imported: false
-- id: todayexample
-  text: '&e&lToday &7is &a day.'
-  type: scheduled
-  date: '2024-11-16'  
-  imported: false
 - id: announcer
   text: '&7Use &d/announcer &7to cycle &eannouncer &7modes.'
   type: server
@@ -160,9 +122,12 @@ storage:
     database: announcements.db
 
 debug:
-  # Available levels: OFF, SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST, ALL
-  level: INFO
-  # Enable timing logs
-  timing: false
+  # Available levels: OFF, SEVERE, WARNING, INFO, DEBUG
+  # OFF: No logging
+  # SEVERE: Only critical errors
+  # WARNING: Errors and warnings
+  # INFO: Standard operational messages
+  # DEBUG: Detailed debugging information
+  level: WARNING
   # Log file name (optional)
   file: announcements.log

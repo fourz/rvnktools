@@ -10,11 +10,12 @@ import java.util.Map;
 import java.util.HashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import java.util.logging.Level;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.util.Debug;
-import org.fourz.rvnktools.util.Debug.LogLevel;
+import org.fourz.rvnktools.announceManager.AnnounceConfig;
 
 public class MySQLDataConnector implements DataStore {
     private static final String CLASS_NAME = "MySQLDataConnector";
@@ -25,33 +26,43 @@ public class MySQLDataConnector implements DataStore {
     private Connection connection;
     private boolean empty = false;
     private final Debug debug;
+    private boolean tablesInitialized = false;
 
     public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL) {
         this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
         this.username = username;
         this.password = password;
         this.database = database;
-        this.debug = new Debug(plugin, CLASS_NAME, LogLevel.INFO) {};
+        this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
     }
-    public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, LogLevel level) {
-        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
-        this.username = username;
-        this.password = password;
-        this.database = database;
-        this.debug = new Debug(plugin, CLASS_NAME, level) {};
+
+    public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, Level level) {
+        this(plugin, host, port, database, username, password, useSSL);
+    }
+
+    @Override
+    public boolean areTablesInitialized() {
+        return tablesInitialized;
+    }
+
+    @Override
+    public void setTablesInitialized(boolean initialized) {
+        this.tablesInitialized = initialized;
     }
 
     @Override
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
-                debug.log(LogLevel.CONFIG, "Attempting to establish MySQL connection to " + url);
+                debug.debug("Attempting to establish MySQL connection to " + url);
                 connection = DriverManager.getConnection(url, username, password);
-                debug.log(LogLevel.FINE, "MySQL connection established successfully");
-                initializeTables();
+                debug.debug("MySQL connection established successfully");
+                if (!areTablesInitialized()) {
+                    initializeTables();
+                }
             }
         } catch (SQLException e) {
-            debug.error("Failed to connect to MySQL: " + e.getMessage(), e);
+            debug.error("Failed to connect to MySQL", e);
         }
     }
 
@@ -60,6 +71,7 @@ public class MySQLDataConnector implements DataStore {
         try {
             if (connection != null && !connection.isClosed()) {
                 connection.close();
+                debug.debug("MySQL connection closed successfully");
             }
         } catch (SQLException e) {
             debug.error("Error disconnecting from database", e);
@@ -68,7 +80,7 @@ public class MySQLDataConnector implements DataStore {
 
     private void ensureConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            debug.log(LogLevel.FINE, "Re-establishing lost MySQL connection");
+            debug.debug("Re-establishing lost MySQL connection");
             connect();
         }
     }
@@ -131,6 +143,7 @@ public class MySQLDataConnector implements DataStore {
                     announcements.put(announcement.getId(), announcement);
                 }
             }
+            debug.log(Level.FINE, "Loaded " + announcements.size() + " announcements from database");
         } catch (SQLException e) {
             debug.error("Error loading announcements", e);
         }
@@ -181,17 +194,22 @@ public class MySQLDataConnector implements DataStore {
 
     @Override
     public void initializeTables() {
+        if (areTablesInitialized()) {
+            debug.debug("Tables already initialized, skipping verification");
+            return;
+        }
+
         try {
             ensureConnection();
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
-            debug.log(LogLevel.CONFIG, "Checking and creating necessary MySQL tables");
+            debug.debug("Checking and creating necessary MySQL tables");
             
             // Check if announcements table exists
             tables = metaData.getTables(database, null, "announcements", null);
             if (!tables.next()) {
-                debug.log(LogLevel.CONFIG, "Creating announcements table");
+                debug.debug("Creating announcements table - table does not exist");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -205,16 +223,16 @@ public class MySQLDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
-                debug.log(LogLevel.INFO, "announcements table created successfully");
+                debug.debug("announcements table created successfully");
                 empty = true;
             } else {
-                debug.log(LogLevel.FINE, "announcements table already exists");
+                debug.debug("announcements table already exists");
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(database, null, "announce_types", null);
             if (!tables.next()) {
-                debug.log(LogLevel.CONFIG, "Creating announce_types table");
+                debug.debug("Creating announce_types table - table does not exist");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -224,15 +242,15 @@ public class MySQLDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
-                debug.log(LogLevel.INFO, "announce_types table created successfully");
+                debug.debug("announce_types table created successfully");
             } else {
-                debug.log(LogLevel.FINE, "announce_types table already exists");
+                debug.debug("announce_types table already exists");
             }
 
             // Check if announce_disabledtypes table exists
             tables = metaData.getTables(database, null, "announce_disabledtypes", null);
             if (!tables.next()) {
-                debug.log(LogLevel.CONFIG, "Creating announce_disabledtypes table");
+                debug.debug("Creating announce_disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -240,27 +258,28 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
-                debug.log(LogLevel.INFO, "announce_disabledtypes table created successfully");
+                debug.debug("announce_disabledtypes table created successfully");
             } else {
-                debug.log(LogLevel.FINE, "announce_disabledtypes table already exists");
+                debug.debug("announce_disabledtypes table already exists");
             }
 
             // Check if announce_prefs table exists
             tables = metaData.getTables(database, null, "announce_prefs", null);
             if (!tables.next()) {
-                debug.log(LogLevel.CONFIG, "Creating announce_prefs table");
+                debug.debug("Creating announce_prefs table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
                     "text VARCHAR(512)" +
                     ")";
                 stmt.executeUpdate(createAnnouncePrefsTable);
-                debug.log(LogLevel.INFO, "announce_prefs table created successfully");
+                debug.debug("announce_prefs table created successfully");
             } else {
-                debug.log(LogLevel.FINE, "announce_prefs table already exists");
+                debug.debug("announce_prefs table already exists");
             }
             
-            debug.log(LogLevel.CONFIG, "All database tables verified/created successfully");
+            debug.debug("All database tables verified/created successfully");
+            setTablesInitialized(true);
             
         } catch (SQLException e) {
             debug.error("Failed to initialize database tables: " + e.getMessage(), e);
@@ -290,6 +309,7 @@ public class MySQLDataConnector implements DataStore {
     public boolean isEmpty() {
         try {
             ensureConnection();
+            debug.debug("Checking if the database is empty");
             
             // Check both tables for data
             try (Statement stmt = connection.createStatement()) {

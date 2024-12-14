@@ -28,6 +28,7 @@ public class SQLiteDataConnector implements DataStore {
     private Connection connection;
     private final JavaPlugin plugin;
     private boolean empty = false;
+    private boolean tablesInitialized = false;
 
     public SQLiteDataConnector(JavaPlugin plugin, String databasePath) {
         this.plugin = plugin;
@@ -404,5 +405,15 @@ public class SQLiteDataConnector implements DataStore {
             e.printStackTrace();
         }
         return preferences;
+    }
+
+    @Override
+    public boolean areTablesInitialized() {
+        return tablesInitialized;
+    }
+
+    @Override
+    public void setTablesInitialized(boolean initialized) {
+        this.tablesInitialized = initialized;
     }
 }
