@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
+import org.bukkit.Bukkit;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
@@ -31,10 +32,13 @@ public class MySQLDataConnector implements DataStore {
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
+                Bukkit.getLogger().info("[RVNKToolKit] Attempting to establish MySQL connection to " + url);
                 connection = DriverManager.getConnection(url, username, password);
+                Bukkit.getLogger().info("[RVNKToolKit] MySQL connection established successfully");
                 initializeTables();
             }
         } catch (SQLException e) {
+            Bukkit.getLogger().severe("[RVNKToolKit] Failed to connect to MySQL: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -52,6 +56,7 @@ public class MySQLDataConnector implements DataStore {
 
     private void ensureConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
+            Bukkit.getLogger().info("[RVNKToolKit] Re-establishing lost MySQL connection");
             connect();
         }
     }
@@ -169,9 +174,12 @@ public class MySQLDataConnector implements DataStore {
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
+            Bukkit.getLogger().info("[RVNKToolKit] Checking and creating necessary MySQL tables");
+            
             // Check if announcements table exists
             tables = metaData.getTables(database, null, "announcements", null);
             if (!tables.next()) {
+                Bukkit.getLogger().info("[RVNKToolKit] Creating announcements table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -185,12 +193,16 @@ public class MySQLDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
+                Bukkit.getLogger().info("[RVNKToolKit] announcements table created successfully");
                 empty = true;
+            } else {
+                Bukkit.getLogger().info("[RVNKToolKit] announcements table already exists");
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(database, null, "announce_types", null);
             if (!tables.next()) {
+                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_types table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -200,11 +212,15 @@ public class MySQLDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
+                Bukkit.getLogger().info("[RVNKToolKit] announce_types table created successfully");
+            } else {
+                Bukkit.getLogger().info("[RVNKToolKit] announce_types table already exists");
             }
 
             // Check if announce_disabledtypes table exists
             tables = metaData.getTables(database, null, "announce_disabledtypes", null);
             if (!tables.next()) {
+                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -212,19 +228,30 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
+                Bukkit.getLogger().info("[RVNKToolKit] announce_disabledtypes table created successfully");
+            } else {
+                Bukkit.getLogger().info("[RVNKToolKit] announce_disabledtypes table already exists");
             }
 
             // Check if announce_prefs table exists
             tables = metaData.getTables(database, null, "announce_prefs", null);
             if (!tables.next()) {
+                Bukkit.getLogger().info("[RVNKToolKit] Creating announce_prefs table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
                     "text VARCHAR(512)" +
                     ")";
                 stmt.executeUpdate(createAnnouncePrefsTable);
+                Bukkit.getLogger().info("[RVNKToolKit] announce_prefs table created successfully");
+            } else {
+                Bukkit.getLogger().info("[RVNKToolKit] announce_prefs table already exists");
             }
+            
+            Bukkit.getLogger().info("[RVNKToolKit] All database tables verified/created successfully");
+            
         } catch (SQLException e) {
+            Bukkit.getLogger().severe("[RVNKToolKit] Failed to initialize database tables: " + e.getMessage());
             e.printStackTrace();
         }
     }
