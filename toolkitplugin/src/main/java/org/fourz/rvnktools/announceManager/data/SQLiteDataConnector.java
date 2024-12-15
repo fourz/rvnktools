@@ -1,5 +1,8 @@
 package org.fourz.rvnktools.announceManager.data;
 
+// Add new import
+import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnktools.announceManager.AnnounceConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
@@ -24,15 +27,18 @@ import java.io.File;
 import java.io.IOException;
 
 public class SQLiteDataConnector implements DataStore {
+    private static final String CLASS_NAME = "SQLiteDataConnector";
     private final String databasePath;
     private Connection connection;
     private final JavaPlugin plugin;
     private boolean empty = false;
     private boolean tablesInitialized = false;
+    private final Debug debug;  // Add Debug field
 
     public SQLiteDataConnector(JavaPlugin plugin, String databasePath) {
         this.plugin = plugin;
         this.databasePath = new File(plugin.getDataFolder(), databasePath).getAbsolutePath();
+        this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
     }
 
     @Override
@@ -48,20 +54,18 @@ public class SQLiteDataConnector implements DataStore {
                 
                 if (!dbFile.exists()) {
                     dbFile.createNewFile();
-                    plugin.getLogger().info("SQLite database file created at: " + dbFile.getAbsolutePath());
+                    debug.debug("SQLite database file created at: " + dbFile.getAbsolutePath());
                 }
 
                 Class.forName("org.sqlite.JDBC");
                 this.connection = DriverManager.getConnection("jdbc:sqlite:" + this.databasePath);
                 this.connection.setAutoCommit(true);
                 
-                // Initialize tables immediately after connection
                 initializeTables();
-                plugin.getLogger().info("Successfully connected to SQLite database");
+                debug.debug("Successfully connected to SQLite database");
             }
         } catch (ClassNotFoundException | SQLException | IOException e) {
-            plugin.getLogger().severe("Failed to connect to SQLite database: " + e.getMessage());
-            e.printStackTrace();
+            debug.error("Failed to connect to SQLite database: " + e.getMessage(), e);
             this.connection = null;
         }
     }
@@ -73,8 +77,7 @@ public class SQLiteDataConnector implements DataStore {
                 this.connection.close();
                 this.connection = null;
             } catch (SQLException e) {
-                plugin.getLogger().severe("Error closing SQLite connection: " + e.getMessage());
-                e.printStackTrace();
+                debug.error("Error closing SQLite connection: " + e.getMessage(), e);
             }
         }
     }
@@ -415,5 +418,62 @@ public class SQLiteDataConnector implements DataStore {
     @Override
     public void setTablesInitialized(boolean initialized) {
         this.tablesInitialized = initialized;
+    }
+
+    public String calculateDatabaseHash() {
+        List<String> ids = new ArrayList<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT LOWER(id) FROM announcements ORDER BY LOWER(id)";
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    ids.add(rs.getString(1));
+                }
+            }
+
+            if (ids.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder hashStr = new StringBuilder();
+            for (String id : ids) {
+                hashStr.append(id).append('\n');
+            }
+
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+                byte[] digest = md.digest(hashStr.toString().getBytes());
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : digest) {
+                    hexString.append(String.format("%02x", b));
+                }
+                return hexString.toString();
+            } catch (java.security.NoSuchAlgorithmException e) {
+                debug.error("MD5 algorithm not available: " + e.getMessage(), e);
+                return null;
+            }
+
+        } catch (SQLException e) {
+            debug.error("Error calculating database hash: " + e.getMessage(), e);
+            return null;
+        }
+    }
+
+    public Set<String> getExistingAnnouncementIds() {
+        Set<String> ids = new HashSet<>();
+        try {
+            ensureConnected();
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT LOWER(id) FROM announcements")) {
+                while (rs.next()) {
+                    ids.add(rs.getString(1));
+                }
+            }
+            debug.debug("Retrieved " + ids.size() + " announcement IDs from database");
+        } catch (SQLException e) {
+            debug.error("Error retrieving announcement IDs: " + e.getMessage(), e);
+        }
+        return ids;
     }
 }

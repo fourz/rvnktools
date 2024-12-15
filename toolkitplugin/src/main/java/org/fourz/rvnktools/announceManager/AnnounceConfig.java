@@ -144,6 +144,11 @@ public class AnnounceConfig {
         if (dataStore == null) {
             initializeDataStoreConnection();
         }
+        
+        // Add memory check
+        debug.debug("Memory state before initialization - YML: " + 
+                   (ymlAnnouncements != null ? ymlAnnouncements.size() : 0) + 
+                   " announcements");
 
         // Connect to the database once during initialization
         if (dataStore != null) {
@@ -259,19 +264,13 @@ public class AnnounceConfig {
         this.ymlTypes = loadTypesFromYAML();
         debug.log("Loaded " + ymlTypes.size() + " announce types from file");
 
-        // Validate YAML data when using YAML storage
-        if (storageType.equals("yml")) {
-            if (ymlAnnouncements.isEmpty()) {
-                debug.log(Level.WARNING, "No announcements found in YAML configuration");
-            }
-            if (ymlTypes.isEmpty()) {
-                debug.log(Level.WARNING, "No announcement types found in YAML configuration");
-            }
-        }
-
         // Consider config loaded if either announcements or types exist
         boolean hasData = !ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty();
-        debug.log("Configuration loaded " + (hasData ? "successfully" : "with no data"));
+        if (hasData) {
+            debug.log(Level.INFO, "Configuration loaded successfully"); // Only log once
+        } else {
+            debug.log(Level.WARNING, "Configuration loaded but no data found");
+        }
         return hasData;
     }
 
@@ -311,6 +310,7 @@ public class AnnounceConfig {
             if (!existingAnnouncementIds.contains(announcement.getId().toLowerCase())) {
                 try {
                     dataStore.saveAnnouncement(announcement); 
+                    announcement.setImported(); // Mark as imported immediately
                     successfulImports.add(announcement.getId().toLowerCase());
                     announceManager.getAnnouncements().add(announcement); // Add to memory
                     debug.log("Imported announcement: " + announcement.getId());
@@ -398,9 +398,7 @@ public class AnnounceConfig {
             String password = config.getString("storage.mysql.password", "");
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
             
-            debug.log("MySQL configuration - Host: " + host + ", Port: " + port + 
-                ", Database: " + database + ", Username: " + username + 
-                ", SSL: " + useSSL);
+            debug.log("MySQL configured for " + host + ": " + port);
             
             if (host.isEmpty() || database.isEmpty() || username.isEmpty()) {
                 debug.log(Level.SEVERE, "Invalid MySQL configuration - missing required fields");
@@ -409,7 +407,6 @@ public class AnnounceConfig {
             }
             
             dataStore = new MySQLDataConnector(plugin, host, port, database, username, password, useSSL);
-            debug.log("MySQL connector created successfully");
         } else if (storageType.equalsIgnoreCase("sqlite")) {
             String databasePath = config.getString("storage.sqlite.database", "announcements.db");
             dataStore = new SQLiteDataConnector(plugin, databasePath);
@@ -436,6 +433,7 @@ public class AnnounceConfig {
         List<Announcement> announcementList = new ArrayList<>();
         List<Announcement> dbAnnouncements = dataStore.loadAnnouncements();
         for (Announcement announcement : dbAnnouncements) {
+            announcement.setImported(); // Mark as imported when loading from DB
             announcementList.add(announcement);
         }
         return announcementList;
@@ -579,6 +577,7 @@ public class AnnounceConfig {
         // Get a snapshot of announcements to avoid concurrent modification
         Collection<Announcement> currentAnnouncements = new ArrayList<>(announceManager.getAnnouncements());
         debug.log("Saving " + currentAnnouncements.size() + " announcements to file");
+        int importedCount = 0;
 
         for (Announcement announcement : currentAnnouncements) {
             try {
@@ -623,21 +622,23 @@ public class AnnounceConfig {
                     map.put("time", announcement.getTime().format(DateTimeFormatter.ofPattern("HHmm")));
                 }
                 
-                map.put("imported", announcement.isImported());
+                // Ensure imported status is correctly tracked
+                boolean isImported = announcement.isImported();
+                map.put("imported", isImported);
+                if (isImported) importedCount++;
+                
                 announcementMaps.add(map);
             } catch (Exception e) {
                 debug.error("Error saving announcement " + announcement.getId() + ": " + e.getMessage(), e);
             }
         }
 
-        if (announcementMaps.isEmpty()) {
-            debug.log(Level.WARNING, "No valid announcements to save");
-            return;
-        }
+        debug.log("Saving " + announcementMaps.size() + " announcements (" + importedCount + " imported)");
 
         try {
             config.set("announcements", announcementMaps);
             config.save(configFile);
+            debug.log("Configuration saved successfully");
         } catch (IOException e) {
             debug.error("Failed to save announcements: " + e.getMessage(), e);
             e.printStackTrace();
