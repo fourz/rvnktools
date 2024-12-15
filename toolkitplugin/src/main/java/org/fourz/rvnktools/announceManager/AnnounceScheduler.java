@@ -17,6 +17,7 @@ public class AnnounceScheduler {
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
     private static final long DEFAULT_RANDOM_RANGE = 144000 * 2;
     private static final long DEFAULT_DELAY = 72000;
+    private static final long DEFAULT_RECURRENCE_TICKS = 3 * 60 * 60 * 20L; // 3 hours in ticks
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
@@ -36,16 +37,6 @@ public class AnnounceScheduler {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
-        // Comment out the scheduleSaveConfig() method to prevent periodic saving
-        // private void scheduleSaveConfig() {
-        //     // Schedule saveConfig to run every 20 minutes (24000 ticks)
-        //     // new BukkitRunnable() {
-        //     //     @Override
-        //     //     public void run() {
-        //     //         saveConfig();
-        //     //     }
-        //     // }.runTaskTimer(plugin, 24000L, 24000L);
-        // }
     }
 
     // schedules all announcements
@@ -136,15 +127,9 @@ public class AnnounceScheduler {
 
     // handle scheduling of periodic announcements
     private void handlePeriodicAnnouncement(Announcement announcement, long ticks) {
-
-        // if ticks is set to RECURRENCE_UNSET (-1), the recurrence was not set, calculate an interval that will only run once before midnight
-        // using factor of 0.7, if the server starts at midnight, the announcement will run at 4:48 PM
-        // using factor of 0.7, if the server starts at 5am, the announcement will run at 6:18 PM
+        // if ticks is set to RECURRENCE_UNSET (-1), use the default recurrence of 3 hours
         if (ticks == RECURRENCE_UNSET) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime midnight = now.toLocalDate().atStartOfDay().plusDays(1);
-            long ticks_until_midnight = Duration.between(now, midnight).toMillis() / 50L;
-            ticks = (long) (ticks_until_midnight * 0.7);
+            ticks = DEFAULT_RECURRENCE_TICKS;
         }
 
         BukkitTask task = new BukkitRunnable() {
@@ -156,7 +141,6 @@ public class AnnounceScheduler {
         }.runTaskTimer(plugin, ticks, ticks);
 
         scheduledTasks.put(announcement, task);
-        //logInfo("Scheduled announcement '" + announcement.getId() + "' with delay " + ticks + " ticks.");
     }
 
     // applies a random multiplier to the ticks value

@@ -73,14 +73,6 @@ public class AnnounceManager {
         }
     }
 
-    // private setImported method
-    private void setImported(String id) {
-        Announcement announcement = announcements.get(id);
-        if (announcement != null) {
-            announcement.setImported();
-        }
-    }
-
     // Add an announcement to the announcements list, used by AnnounceCommand
     public boolean addAnnouncement(Player player, String input) {
 
