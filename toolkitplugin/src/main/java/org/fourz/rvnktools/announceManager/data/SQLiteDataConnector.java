@@ -1,5 +1,8 @@
 package org.fourz.rvnktools.announceManager.data;
 
+// Add new import
+import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnktools.announceManager.AnnounceConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
@@ -15,46 +18,54 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.UUID;
 import java.io.File;
 import java.io.IOException;
 
 public class SQLiteDataConnector implements DataStore {
+    private static final String CLASS_NAME = "SQLiteDataConnector";
     private final String databasePath;
     private Connection connection;
     private final JavaPlugin plugin;
     private boolean empty = false;
+    private boolean tablesInitialized = false;
+    private final Debug debug;  // Add Debug field
 
     public SQLiteDataConnector(JavaPlugin plugin, String databasePath) {
         this.plugin = plugin;
         this.databasePath = new File(plugin.getDataFolder(), databasePath).getAbsolutePath();
+        this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
     }
 
     @Override
     public void connect() {
         try {
-            File dbFile = new File(this.databasePath);
-            File parentDir = dbFile.getParentFile();
-            
-            if (!parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-            
-            if (!dbFile.exists()) {
-                dbFile.createNewFile();
-                plugin.getLogger().info("SQLite database file created at: " + dbFile.getAbsolutePath());
-            }
+            if (connection == null || connection.isClosed()) {
+                File dbFile = new File(this.databasePath);
+                File parentDir = dbFile.getParentFile();
+                
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs();
+                }
+                
+                if (!dbFile.exists()) {
+                    dbFile.createNewFile();
+                    debug.debug("SQLite database file created at: " + dbFile.getAbsolutePath());
+                }
 
-            Class.forName("org.sqlite.JDBC");
-            this.connection = DriverManager.getConnection("jdbc:sqlite:" + this.databasePath);
-            this.connection.setAutoCommit(true);
-            
-            // Initialize tables immediately after connection
-            initializeTables();
-            plugin.getLogger().info("Successfully connected to SQLite database");
-            
+                Class.forName("org.sqlite.JDBC");
+                this.connection = DriverManager.getConnection("jdbc:sqlite:" + this.databasePath);
+                this.connection.setAutoCommit(true);
+                
+                initializeTables();
+                debug.debug("Successfully connected to SQLite database");
+            }
         } catch (ClassNotFoundException | SQLException | IOException e) {
-            plugin.getLogger().severe("Failed to connect to SQLite database: " + e.getMessage());
-            e.printStackTrace();
+            debug.error("Failed to connect to SQLite database: " + e.getMessage(), e);
             this.connection = null;
         }
     }
@@ -66,8 +77,7 @@ public class SQLiteDataConnector implements DataStore {
                 this.connection.close();
                 this.connection = null;
             } catch (SQLException e) {
-                plugin.getLogger().severe("Error closing SQLite connection: " + e.getMessage());
-                e.printStackTrace();
+                debug.error("Error closing SQLite connection: " + e.getMessage(), e);
             }
         }
     }
@@ -92,26 +102,24 @@ public class SQLiteDataConnector implements DataStore {
 
     @Override
     public void saveAnnouncement(Announcement announcement) {
+        String sql = "INSERT INTO announcements (id, text, type, recurrence, owner, permission, date, time, expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
             ensureConnected();
+            try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
+                pstmt.setString(1, announcement.getId());
+                pstmt.setString(2, announcement.getText());
+                pstmt.setString(3, announcement.getType());
+                pstmt.setObject(4, announcement.getRecurrence()); // Changed to handle Long
+                pstmt.setString(5, announcement.getOwner());
+                pstmt.setString(6, announcement.getPermission());
+                pstmt.setString(7, announcement.getDate() != null ? announcement.getDate().toString() : null);
+                pstmt.setString(8, announcement.getTime() != null ? announcement.getTime().toString() : null);
+                pstmt.setString(9, announcement.getExpiration() != null ? announcement.getExpiration().toString() : null);
+                pstmt.executeUpdate();
+                debug.debug("Saved announcement with ID: " + announcement.getId());
+            }
         } catch (SQLException e) {
-            e.printStackTrace();
-            return;
-        }
-        String sql = "INSERT INTO announcements (id, text, type, recurrence, owner, permission, date, time, expiration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
-            pstmt.setString(1, announcement.getId());
-            pstmt.setString(2, announcement.getText());
-            pstmt.setString(3, announcement.getType());
-            pstmt.setString(4, announcement.getRecurrence());
-            pstmt.setString(5, announcement.getOwner());
-            pstmt.setString(6, announcement.getPermission());
-            pstmt.setString(7, announcement.getDate() != null ? announcement.getDate().toString() : null);
-            pstmt.setString(8, announcement.getTime() != null ? announcement.getTime().toString() : null);
-            pstmt.setString(9, announcement.getExpiration() != null ? announcement.getExpiration().toString() : null);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving announcement: " + announcement.getId(), e);
         }
     }
 
@@ -119,48 +127,44 @@ public class SQLiteDataConnector implements DataStore {
     public void deleteAnnouncement(String id) {
         try {
             ensureConnected();
+            String sql = "DELETE FROM announcements WHERE id = ?";
+            try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
+                pstmt.setString(1, id);
+                int rows = pstmt.executeUpdate();
+                debug.debug("Deleted announcement with ID: " + id + " (" + rows + " rows affected)");
+            }
         } catch (SQLException e) {
-            e.printStackTrace();
-            return;
-        }
-        String sql = "DELETE FROM announcements WHERE id = ?";
-        try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error deleting announcement: " + id, e);
         }
     }
 
     @Override
     public List<Announcement> loadAnnouncements() {
+        Map<String, Announcement> announcements = new HashMap<>();
+        String sql = "SELECT * FROM announcements";
         try {
             ensureConnected();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-        List<Announcement> announcements = new ArrayList<>();
-        String sql = "SELECT * FROM announcements";
-        try (Statement stmt = this.connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                Announcement announcement = new Announcement();
-                announcement.setId(rs.getString("id"));
-                announcement.setText(rs.getString("text"));
-                announcement.setType(rs.getString("type"));
-                announcement.setRecurrence(rs.getString("recurrence"));
-                announcement.setOwner(rs.getString("owner"));
-                announcement.setPermission(rs.getString("permission"));
-                announcement.setDate(rs.getString("date") != null ? LocalDate.parse(rs.getString("date")) : null);
-                announcement.setTime(rs.getString("time") != null ? LocalTime.parse(rs.getString("time")) : null);
-                announcement.setExpiration(rs.getString("expiration") != null ? LocalDateTime.parse(rs.getString("expiration")) : null);
-                announcements.add(announcement);
+            try (Statement stmt = this.connection.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    Announcement announcement = new Announcement();
+                    announcement.setId(rs.getString("id"));
+                    announcement.setText(rs.getString("text"));
+                    announcement.setType(rs.getString("type"));
+                    announcement.setRecurrence(rs.getObject("recurrence") != null ? rs.getLong("recurrence") : null);
+                    announcement.setOwner(rs.getString("owner"));
+                    announcement.setPermission(rs.getString("permission"));
+                    announcement.setDate(rs.getString("date") != null ? LocalDate.parse(rs.getString("date")) : null);
+                    announcement.setTime(rs.getString("time") != null ? LocalTime.parse(rs.getString("time")) : null);
+                    announcement.setExpiration(rs.getString("expiration") != null ? LocalDateTime.parse(rs.getString("expiration")) : null);
+                    announcements.put(announcement.getId(), announcement);
+                }
             }
+            debug.debug("Loaded " + announcements.size() + " announcements from database");
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error loading announcements", e);
         }
-        return announcements;
+        return new ArrayList<>(announcements.values());
     }
 
     @Override
@@ -217,15 +221,18 @@ public class SQLiteDataConnector implements DataStore {
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
+            debug.debug("Starting table initialization check");
+            
             // Check if announcements table exists
             tables = metaData.getTables(null, null, "announcements", null);
             if (!tables.next()) {
+                debug.debug("Creating announcements table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
                     "text TEXT NOT NULL," +
                     "type VARCHAR(32) NOT NULL," +
-                    "recurrence VARCHAR(32)," +
+                    "recurrence BIGINT," + // Changed from VARCHAR to BIGINT
                     "owner VARCHAR(64)," +
                     "permission VARCHAR(128)," +
                     "date DATE," +
@@ -233,12 +240,14 @@ public class SQLiteDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
+                debug.debug("Announcements table created successfully");
                 empty = true;
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(null, null, "announce_types", null);
             if (!tables.next()) {
+                debug.debug("Creating announce_types table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -248,9 +257,40 @@ public class SQLiteDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
+                debug.debug("announce_types table created successfully");
             }
+            
+            // Check if announce_disabledtypes table exists
+            tables = metaData.getTables(null, null, "announce_disabledtypes", null);
+            if (!tables.next()) {
+                debug.debug("Creating announce_disabledtypes table");
+                Statement stmt = connection.createStatement();
+                String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
+                    "player_id VARCHAR(36)," +
+                    "type VARCHAR(64)," +
+                    "PRIMARY KEY (player_id, type)" +
+                    ")";
+                stmt.executeUpdate(createAnnounceDisabledTypesTable);
+                debug.debug("announce_disabledtypes table created successfully");
+            }
+            
+            // Check if announce_prefs table exists
+            tables = metaData.getTables(null, null, "announce_prefs", null);
+            if (!tables.next()) {
+                debug.debug("Creating announce_prefs table");
+                Statement stmt = connection.createStatement();
+                String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
+                    "player_id VARCHAR(36) PRIMARY KEY," +
+                    "text VARCHAR(512)" +
+                    ")";
+                stmt.executeUpdate(createAnnouncePrefsTable);
+                debug.debug("announce_prefs table created successfully");
+            }
+            
+            debug.debug("Table initialization complete");
+            
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error initializing database tables", e);
         }
     }
 
@@ -275,6 +315,179 @@ public class SQLiteDataConnector implements DataStore {
 
     @Override
     public boolean isEmpty() {
+        debug.debug("Checking if database is empty");
         return empty;
+    }
+
+    @Override
+    public void savePlayerDisabledType(UUID playerId, String type) {
+        try {
+            ensureConnected();
+            String sql = "INSERT OR IGNORE INTO announce_disabledtypes (player_id, type) VALUES (?, ?)";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, type);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void removePlayerDisabledType(UUID playerId, String type) {
+        try {
+            ensureConnected();
+            String sql = "DELETE FROM announce_disabledtypes WHERE player_id = ? AND type = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, type);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public Set<String> getPlayerDisabledTypes(UUID playerId) {
+        Set<String> types = new HashSet<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT type FROM announce_disabledtypes WHERE player_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        types.add(rs.getString("type"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return types;
+    }
+
+    @Override
+    public Map<UUID, Set<String>> getAllPlayerDisabledTypes() {
+        Map<UUID, Set<String>> allTypes = new HashMap<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT player_id, type FROM announce_disabledtypes";
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    UUID playerId = UUID.fromString(rs.getString("player_id"));
+                    String type = rs.getString("type");
+                    allTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return allTypes;
+    }
+
+    @Override
+    public void savePlayerPreferences(UUID playerId, String preferences) {
+        try {
+            ensureConnected();
+            String sql = "INSERT OR REPLACE INTO announce_prefs (player_id, text) VALUES (?, ?)";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, preferences);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String getPlayerPreferences(UUID playerId) {
+        String preferences = null;
+        try {
+            ensureConnected();
+            String sql = "SELECT text FROM announce_prefs WHERE player_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        preferences = rs.getString("text");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return preferences;
+    }
+
+    @Override
+    public boolean areTablesInitialized() {
+        return tablesInitialized;
+    }
+
+    @Override
+    public void setTablesInitialized(boolean initialized) {
+        this.tablesInitialized = initialized;
+    }
+
+    public String calculateDatabaseHash() {
+        List<String> ids = new ArrayList<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT LOWER(id) FROM announcements ORDER BY LOWER(id)";
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    ids.add(rs.getString(1));
+                }
+            }
+
+            if (ids.isEmpty()) {
+                return null;
+            }
+
+            StringBuilder hashStr = new StringBuilder();
+            for (String id : ids) {
+                hashStr.append(id).append('\n');
+            }
+
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+                byte[] digest = md.digest(hashStr.toString().getBytes());
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : digest) {
+                    hexString.append(String.format("%02x", b));
+                }
+                return hexString.toString();
+            } catch (java.security.NoSuchAlgorithmException e) {
+                debug.error("MD5 algorithm not available: " + e.getMessage(), e);
+                return null;
+            }
+
+        } catch (SQLException e) {
+            debug.error("Error calculating database hash: " + e.getMessage(), e);
+            return null;
+        }
+    }
+
+    public Set<String> getExistingAnnouncementIds() {
+        Set<String> ids = new HashSet<>();
+        try {
+            ensureConnected();
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT LOWER(id) FROM announcements")) {
+                while (rs.next()) {
+                    ids.add(rs.getString(1));
+                }
+            }
+            debug.debug("Retrieved " + ids.size() + " announcement IDs from database");
+        } catch (SQLException e) {
+            debug.error("Error retrieving announcement IDs: " + e.getMessage(), e);
+        }
+        return ids;
     }
 }

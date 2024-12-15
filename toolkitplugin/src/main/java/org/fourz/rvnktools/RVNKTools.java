@@ -77,24 +77,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-
-        announceManager.savePlayerDisabledTypes();
-        announceManager.shutdown();
-
-        //garbage collection        
+        if (announceManager != null) {
+            announceManager.shutdown(); // This will trigger AnnounceConfig.shutdown()
+        }
+        // ...rest of shutdown code...
         announceManager = null;
         cycleCommands = null;
         linkMaker = null;
         
-        
-        // Code that runs when the plugin is disabled
         getLogger().info("RVNK Toolkit has been disabled.");
     }
 
     public Economy getEconomy() {
-
         return economy;
-
     }
-
 }

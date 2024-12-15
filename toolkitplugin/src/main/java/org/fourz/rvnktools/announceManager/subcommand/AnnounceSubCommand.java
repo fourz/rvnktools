@@ -1,4 +1,3 @@
-
 package org.fourz.rvnktools.announceManager.subcommand;
 
 import org.bukkit.Bukkit;
@@ -32,5 +31,13 @@ public abstract class AnnounceSubCommand {
         
         TextComponent constructedMessage = ChatFormat.parse(message, plugin.linkMaker);
         player.spigot().sendMessage(constructedMessage);
+    }
+
+    protected boolean checkPermission(Player player, String permission) {
+        if (!player.hasPermission(permission)) {
+            messagePlayer(player, "&cYou don't have permission to do this");
+            return false;
+        }
+        return true;
     }
 }

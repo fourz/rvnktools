@@ -15,8 +15,7 @@ public class AnnounceScheduler {
     // constant for random tick multiplier and default values
     private static final double RANDOM_TICK_MULTIPLIER_MIN = 0.9;
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
-    private static final long DEFAULT_RANDOM_RANGE = 144000 * 2;
-    private static final long DEFAULT_DELAY = 72000;
+    private static final long DEFAULT_RECURRENCE_TICKS = 3 * 60 * 60 * 20L; // 3 hours in ticks
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
@@ -25,47 +24,32 @@ public class AnnounceScheduler {
     private final Random rand = new Random();
 
     // constants for improved readability in conditional statements
-    private static final int RECURRENCE_UNSET = -1;
-    private static final int TIME_SET__BEFORE_TIME = 0;
-    private static final int TIME_SET__TICKS_POSITIVE = 1;
-    private static final int TIME_SET__DATE_EQUAL = 3;
-    private static final int TIME_NULL__DATE_EQUAL = 4;    
+    private static final int RECURRENCE_UNSET = -1; 
 
-    // initialize the scheduler 
+    // Initialize the scheduler
     public AnnounceScheduler(RVNKTools plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
-        // Comment out the scheduleSaveConfig() method to prevent periodic saving
-        // private void scheduleSaveConfig() {
-        //     // Schedule saveConfig to run every 20 minutes (24000 ticks)
-        //     // new BukkitRunnable() {
-        //     //     @Override
-        //     //     public void run() {
-        //     //         saveConfig();
-        //     //     }
-        //     // }.runTaskTimer(plugin, 24000L, 24000L);
-        // }
     }
 
-    // schedules all announcements
+    // Schedule all announcements
     public void scheduleAnnouncements() {
         // Cancel existing tasks if any
-        if (scheduledTasks != null) {
-            for (BukkitTask task : scheduledTasks.values()) {
-                task.cancel();
-            }
-        }
-        scheduledTasks = new ConcurrentHashMap<>();
+        cleanup();
 
         // Schedule each announcement
         for (Announcement announcement : announceManager.getAnnouncements()) {
             scheduleAnnouncement(announcement);
         }
-        logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
+        
+        // Only log the final count
+        if (scheduledTasks.size() > 0) {
+            logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
+        }
     }
 
-    // schedule a single announcement given an announcement object
+    // Schedule a single announcement
     private void scheduleAnnouncement(Announcement announcement) {
 
         // Check if the announcement has an expiration date and if it has past, skip it
@@ -75,9 +59,9 @@ public class AnnounceScheduler {
             }
         }
 
-        //calculate the ticks based on the recurrence
-        long ticks = convertRecurrenceToTicks(announcement.getRecurrence());
-
+        // Safely handle null recurrence by defaulting to RECURRENCE_UNSET (-1)
+        Long recurrence = announcement.getRecurrence();
+        long ticks = recurrence != null ? recurrence * 20L : RECURRENCE_UNSET;
 
         if (ticks > 0) {
             ticks = applyRandomTicks(ticks);
@@ -85,42 +69,45 @@ public class AnnounceScheduler {
 
         // if the type is 'scheduled' and the date is set, handle it as a scheduled announcement
         if ("scheduled".equalsIgnoreCase(announcement.getType()) && announcement.getDate() != null) {
-            handleScheduledAnnouncement(announcement, ticks);
+            handleScheduledAnnouncement(announcement);
             return;
         }
 
         handlePeriodicAnnouncement(announcement, ticks);
     }
 
-    // handle scheduling of announcements with a specific date and time
-    private void handleScheduledAnnouncement(Announcement announcement, long ticks) {
+    // Handle scheduling of announcements with a specific date and time
+    private void handleScheduledAnnouncement(Announcement announcement) {
         LocalDateTime now = LocalDateTime.now();
-        Integer condition = TIME_SET__TICKS_POSITIVE;
 
-        // announcement has time set
-        if (announcement.getTime() != null) {
-            // Check if the announcement is set to run before the current time
-            if (now.toLocalDate().isEqual(announcement.getDate()) && now.toLocalTime().isBefore(announcement.getTime())) {
-                condition = TIME_SET__BEFORE_TIME;
-            // Check if the announcement is set to run after the current time
-            } else if (now.toLocalDate().isEqual(announcement.getDate()) && ticks > 0) {
-                condition = TIME_SET__TICKS_POSITIVE;
-            // Check if the announcement is set to run on the same date as the current date
-            } else if (now.toLocalDate().isEqual(announcement.getDate())) {
-                condition = TIME_SET__DATE_EQUAL;
-            }
-        // announcement has no time set
-        } else {
-            // Check if the announcement is set to run on the same date as the current date
-            if (now.toLocalDate().isEqual(announcement.getDate())) {
-                condition = TIME_NULL__DATE_EQUAL;
-            }
-        }
+        // Check if the announcement date is today
+        if (now.toLocalDate().isEqual(announcement.getDate())) {
+            long delay = 0L;
 
-        switch (condition) {            
-            case TIME_SET__BEFORE_TIME:
-                // Schedule to run later at a specific time
-                long delay = Duration.between(now, LocalDateTime.of(announcement.getDate(), announcement.getTime())).toMillis() / 50L;
+            // If time is specified
+            if (announcement.getTime() != null) {
+                if (now.toLocalTime().isBefore(announcement.getTime())) {
+                    // Calculate delay until the specified time
+                    delay = Duration.between(now.toLocalTime(), announcement.getTime()).toMillis() / 50L;
+                } else {
+                    // Time has already passed today, do not schedule
+                    return;
+                }
+            }
+
+            // If recurrence is set, schedule periodically on the scheduled day
+            long ticks = announcement.getRecurrence() * 20L;
+            if (ticks > 0) {
+                ticks = applyRandomTicks(ticks);
+                BukkitTask task = new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        broadcastAnnouncement(announcement);
+                    }
+                }.runTaskTimer(plugin, delay, ticks);
+                scheduledTasks.put(announcement, task);
+            } else {
+                // Schedule the announcement to run once after the calculated delay
                 BukkitTask task = new BukkitRunnable() {
                     @Override
                     public void run() {
@@ -128,56 +115,15 @@ public class AnnounceScheduler {
                     }
                 }.runTaskLater(plugin, delay);
                 scheduledTasks.put(announcement, task);
-                return;
-            case TIME_SET__TICKS_POSITIVE:
-                // Schedule to run later with a positive ticks value
-                handlePeriodicAnnouncement(announcement, ticks);
-                return;
-
-            case TIME_SET__DATE_EQUAL:
-                // Schedule to run later without specific time
-                long delayDateEqual = Duration.between(now, LocalDateTime.of(announcement.getDate(), now.toLocalTime())).toMillis() / 50L;
-                BukkitTask taskDateEqual = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskLater(plugin, delayDateEqual);
-                scheduledTasks.put(announcement, taskDateEqual);
-                return;
-
-            case TIME_NULL__DATE_EQUAL:
-                // Schedule to run every 4 hours
-                int nextHour = ((now.getHour() / 4) + 1) * 4 % 24;
-                LocalDateTime nextTime = now.withHour(nextHour).withMinute(0).withSecond(0).withNano(0);
-                long delayNullTime = Duration.between(now, nextTime).toMillis() / 50L;
-                long period = 4 * 60L * 60L * 20L; // 4 hours in ticks
-
-                BukkitTask taskNullTime = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskTimer(plugin, delayNullTime, period);
-                scheduledTasks.put(announcement, taskNullTime);
-                return;
-            default:
-                // No action needed
-                break;
+            }
         }
     }
 
-    // handle scheduling of periodic announcements
+    // Handle scheduling of periodic announcements
     private void handlePeriodicAnnouncement(Announcement announcement, long ticks) {
-
-        // if ticks is set to RECURRENCE_UNSET (-1), the recurrence was not set, calculate an interval that will only run once before midnight
-        // using factor of 0.7, if the server starts at midnight, the announcement will run at 4:48 PM
-        // using factor of 0.7, if the server starts at 5am, the announcement will run at 6:18 PM
+        // if ticks is set to RECURRENCE_UNSET (-1), use the default recurrence of 3 hours
         if (ticks == RECURRENCE_UNSET) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime midnight = now.toLocalDate().atStartOfDay().plusDays(1);
-            long ticks_until_midnight = Duration.between(now, midnight).toMillis() / 50L;
-            ticks = (long) (ticks_until_midnight * 0.7);
+            ticks = DEFAULT_RECURRENCE_TICKS;
         }
 
         BukkitTask task = new BukkitRunnable() {
@@ -189,50 +135,25 @@ public class AnnounceScheduler {
         }.runTaskTimer(plugin, ticks, ticks);
 
         scheduledTasks.put(announcement, task);
-        //logInfo("Scheduled announcement '" + announcement.getId() + "' with delay " + ticks + " ticks.");
     }
 
-    // applies a random multiplier to the ticks value
+    // Apply a random multiplier to the ticks value
     private long applyRandomTicks(long ticks) {
         return (long) (ticks * (RANDOM_TICK_MULTIPLIER_MIN + rand.nextDouble() * (RANDOM_TICK_MULTIPLIER_MAX - RANDOM_TICK_MULTIPLIER_MIN)));
     }
 
-    // log an informational message
+    // Log an informational message
     private void logInfo(String message) {
         plugin.getLogger().info(message);
     }
 
-    // parse the recurrence string to ticks
-    private long convertRecurrenceToTicks(String recurrence) {
-        if (recurrence == null) {
-            return RECURRENCE_UNSET;
-        }
-        recurrence = recurrence.toLowerCase();
-        long ticks = 0;
-        try {
-            if (recurrence.endsWith("h")) {
-                int hours = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = hours * 60L * 60L * 20L;
-            } else if (recurrence.endsWith("m")) {
-                int minutes = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = minutes * 60L * 20L;
-            } else if (recurrence.endsWith("s")) {
-                int seconds = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = seconds * 20L;
-            }
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        }
-        return ticks;
-    }
-
-    // broadcast the announcement to all players
+    // Broadcast the announcement to all players
     public void broadcastAnnouncement(Announcement announcement) {
         this.announceManager.broadcastAnnouncement(announcement);
 
     }
 
-    // shut down the scheduler and cancels all tasks
+    // Shut down the scheduler and cancel all tasks
     public void shutdown() {
         if (scheduledTasks != null) {
             for (BukkitTask task : scheduledTasks.values()) {
@@ -241,12 +162,11 @@ public class AnnounceScheduler {
         }
     }
 
+    // Cancel all tasks and clear the scheduled tasks map
     public void cleanup() {
-
+        // Cancel all tasks and clear the map
+        shutdown();
+        scheduledTasks.clear();
     }
 
-    // Remove or comment out the saveConfig() method if it's no longer needed
-    // public void saveConfig() {
-    //     announceManager.saveConfig();
-    // }
 }
