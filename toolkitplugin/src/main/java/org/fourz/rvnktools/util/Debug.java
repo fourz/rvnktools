@@ -2,8 +2,25 @@ package org.fourz.rvnktools.util;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
+/**
+ * Debug logging utility class that provides structured logging with different severity levels.
+ * 
+ * Recommended Log Level Usage:
+ * - SEVERE: Critical errors that prevent core functionality from working
+ *          Examples: Database connection failures, configuration errors, plugin initialization failures
+ * 
+ * - WARNING: Important issues that don't break core functionality but need attention
+ *          Examples: Deprecated feature usage, recoverable errors, performance issues
+ * 
+ * - INFO: General operational information about the plugin's normal functioning
+ *          Examples: Plugin startup/shutdown, feature activation, major state changes
+ * 
+ * - FINE (DEBUG): Detailed information useful for debugging and development
+ *          Examples: Method entry/exit, variable values, detailed flow control
+ * 
+ * - OFF: Completely disables all logging
+ */
 public abstract class Debug {
     private final JavaPlugin plugin;
     private final String className;

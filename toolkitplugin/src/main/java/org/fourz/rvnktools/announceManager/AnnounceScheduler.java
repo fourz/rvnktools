@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.Debug;
+import java.util.logging.Level;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -12,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AnnounceScheduler {
 
+    private static final String CLASS_NAME = "AnnounceScheduler";
+    private final Debug debug;
     // constant for random tick multiplier and default values
     private static final double RANDOM_TICK_MULTIPLIER_MIN = 0.9;
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
@@ -28,8 +32,10 @@ public class AnnounceScheduler {
 
     // Initialize the scheduler
     public AnnounceScheduler(RVNKTools plugin, AnnounceManager announceManager) {
+        String CLASS_NAME = "AnnounceScheduler";
         this.plugin = plugin;
         this.announceManager = announceManager;
+        this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
 
@@ -45,7 +51,7 @@ public class AnnounceScheduler {
         
         // Only log the final count
         if (scheduledTasks.size() > 0) {
-            logInfo("Scheduled " + scheduledTasks.size() + " announcements.");
+            debug.log("Scheduled " + scheduledTasks.size() + " announcements.");
         }
     }
 
@@ -55,6 +61,7 @@ public class AnnounceScheduler {
         // Check if the announcement has an expiration date and if it has past, skip it
         if (announcement.getExpiration() != null) {
             if (LocalDateTime.now().isAfter(announcement.getExpiration())) {
+                debug.debug("Skipping expired announcement: " + announcement.getId());
                 return;
             }
         }
@@ -69,10 +76,12 @@ public class AnnounceScheduler {
 
         // if the type is 'scheduled' and the date is set, handle it as a scheduled announcement
         if ("scheduled".equalsIgnoreCase(announcement.getType()) && announcement.getDate() != null) {
+            debug.debug("Handling scheduled announcement: " + announcement.getId());
             handleScheduledAnnouncement(announcement);
             return;
         }
 
+        debug.debug("Handling periodic announcement: " + announcement.getId() + " with ticks: " + ticks);
         handlePeriodicAnnouncement(announcement, ticks);
     }
 
@@ -89,8 +98,10 @@ public class AnnounceScheduler {
                 if (now.toLocalTime().isBefore(announcement.getTime())) {
                     // Calculate delay until the specified time
                     delay = Duration.between(now.toLocalTime(), announcement.getTime()).toMillis() / 50L;
+                    debug.debug("Scheduled announcement " + announcement.getId() + " will run in " + delay + " ticks");
                 } else {
                     // Time has already passed today, do not schedule
+                    debug.debug("Skipping scheduled announcement " + announcement.getId() + " as time has passed");
                     return;
                 }
             }
@@ -106,6 +117,7 @@ public class AnnounceScheduler {
                     }
                 }.runTaskTimer(plugin, delay, ticks);
                 scheduledTasks.put(announcement, task);
+                debug.debug("Scheduled announcement " + announcement.getId() + " task created");
             } else {
                 // Schedule the announcement to run once after the calculated delay
                 BukkitTask task = new BukkitRunnable() {
@@ -115,7 +127,10 @@ public class AnnounceScheduler {
                     }
                 }.runTaskLater(plugin, delay);
                 scheduledTasks.put(announcement, task);
+                debug.debug("Scheduled announcement " + announcement.getId() + " task created");
             }
+        } else {
+            debug.debug("Announcement " + announcement.getId() + " is not scheduled for today");
         }
     }
 
@@ -124,12 +139,13 @@ public class AnnounceScheduler {
         // if ticks is set to RECURRENCE_UNSET (-1), use the default recurrence of 3 hours
         if (ticks == RECURRENCE_UNSET) {
             ticks = DEFAULT_RECURRENCE_TICKS;
+            debug.debug("Using default recurrence for " + announcement.getId() + ": " + ticks + " ticks");
         }
 
         BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
-                logInfo("Broadcasting announcement: " + announcement.getId());
+                debug.debug("Broadcasting periodic announcement: " + announcement.getId());
                 broadcastAnnouncement(announcement);
             }
         }.runTaskTimer(plugin, ticks, ticks);
@@ -139,12 +155,8 @@ public class AnnounceScheduler {
 
     // Apply a random multiplier to the ticks value
     private long applyRandomTicks(long ticks) {
-        return (long) (ticks * (RANDOM_TICK_MULTIPLIER_MIN + rand.nextDouble() * (RANDOM_TICK_MULTIPLIER_MAX - RANDOM_TICK_MULTIPLIER_MIN)));
-    }
-
-    // Log an informational message
-    private void logInfo(String message) {
-        plugin.getLogger().info(message);
+        long randomizedTicks = (long) (ticks * (RANDOM_TICK_MULTIPLIER_MIN + rand.nextDouble() * (RANDOM_TICK_MULTIPLIER_MAX - RANDOM_TICK_MULTIPLIER_MIN)));
+        return randomizedTicks;
     }
 
     // Broadcast the announcement to all players
@@ -155,15 +167,18 @@ public class AnnounceScheduler {
 
     // Shut down the scheduler and cancel all tasks
     public void shutdown() {
+        debug.log("Shutting down announcement scheduler");
         if (scheduledTasks != null) {
             for (BukkitTask task : scheduledTasks.values()) {
                 task.cancel();
             }
+            debug.debug("Cancelled " + scheduledTasks.size() + " scheduled tasks");
         }
     }
 
     // Cancel all tasks and clear the scheduled tasks map
     public void cleanup() {
+        debug.debug("Cleaning up announcement scheduler");
         // Cancel all tasks and clear the map
         shutdown();
         scheduledTasks.clear();

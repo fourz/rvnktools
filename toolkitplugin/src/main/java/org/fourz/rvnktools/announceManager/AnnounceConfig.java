@@ -171,11 +171,11 @@ public class AnnounceConfig {
         try {
             switch (configOperation) {
 
-                case NO_UPDATE:
                 case FALLBACK_TO_YML:
-                    announceManager.setAnnouncements(ymlAnnouncements);
-                    announceTypes = ymlTypes;
                     debug.log("Using existing announcements from local configuration");
+                case NO_UPDATE:                
+                    announceManager.setAnnouncements(ymlAnnouncements);
+                    announceTypes = ymlTypes;                    
                     break;
 
                 case IMPORT_YML_TO_NEW_DB:
