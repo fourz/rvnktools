@@ -245,10 +245,16 @@ public class AnnounceManager {
     }    
 
     public void shutdown() {    
+        plugin.getLogger().info("Saving announcements before shutdown...");
+        // Ensure we have all announcements in memory
+        if (announceConfig.getDataStore() != null) {
+            setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
+        }
         saveConfig();    
         announceScheduler.shutdown();
         savePlayerDisabledTypes();
-        announceConfig.shutdown(); // Disconnect the DataStore during shutdown
+        announceConfig.shutdown();
+        plugin.getLogger().info("AnnounceManager shutdown complete");
     }
 
     public boolean validateAnnounceType(String type) {

@@ -310,14 +310,21 @@ public class AnnounceConfig {
         for (Announcement announcement : ymlAnnouncements) {
             if (!existingAnnouncementIds.contains(announcement.getId().toLowerCase())) {
                 try {
-                    dataStore.saveAnnouncement(announcement); // Save to database only
-                    successfulImports.add(announcement.getId().toLowerCase());              
+                    dataStore.saveAnnouncement(announcement); 
+                    successfulImports.add(announcement.getId().toLowerCase());
+                    announceManager.getAnnouncements().add(announcement); // Add to memory
                     debug.log("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
                     debug.log(Level.WARNING, "Error importing announcement " + announcement.getId() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
             }            
+        }
+
+        // Update the local announcements list after import
+        if (!successfulImports.isEmpty()) {
+            announceManager.setAnnouncements(dataStore.loadAnnouncements());
+            debug.log("Updated in-memory announcements after import");
         }
 
         // Only mark announcements that were successfully imported
