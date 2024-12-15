@@ -15,8 +15,6 @@ public class AnnounceScheduler {
     // constant for random tick multiplier and default values
     private static final double RANDOM_TICK_MULTIPLIER_MIN = 0.9;
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
-    private static final long DEFAULT_RANDOM_RANGE = 144000 * 2;
-    private static final long DEFAULT_DELAY = 72000;
     private static final long DEFAULT_RECURRENCE_TICKS = 3 * 60 * 60 * 20L; // 3 hours in ticks
 
     private final RVNKTools plugin;
@@ -26,20 +24,16 @@ public class AnnounceScheduler {
     private final Random rand = new Random();
 
     // constants for improved readability in conditional statements
-    private static final int RECURRENCE_UNSET = -1;
-    private static final int TIME_SET__BEFORE_TIME = 0;
-    private static final int TIME_SET__TICKS_POSITIVE = 1;
-    private static final int TIME_SET__DATE_EQUAL = 3;
-    private static final int TIME_NULL__DATE_EQUAL = 4;    
+    private static final int RECURRENCE_UNSET = -1; 
 
-    // initialize the scheduler 
+    // Initialize the scheduler
     public AnnounceScheduler(RVNKTools plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.usingPlaceholderAPI = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
 
-    // schedules all announcements
+    // Schedule all announcements
     public void scheduleAnnouncements() {
         // Cancel existing tasks if any
         cleanup();
@@ -55,7 +49,7 @@ public class AnnounceScheduler {
         }
     }
 
-    // schedule a single announcement given an announcement object
+    // Schedule a single announcement
     private void scheduleAnnouncement(Announcement announcement) {
 
         // Check if the announcement has an expiration date and if it has past, skip it
@@ -82,7 +76,7 @@ public class AnnounceScheduler {
         handlePeriodicAnnouncement(announcement, ticks);
     }
 
-    // handle scheduling of announcements with a specific date and time
+    // Handle scheduling of announcements with a specific date and time
     private void handleScheduledAnnouncement(Announcement announcement) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -125,7 +119,7 @@ public class AnnounceScheduler {
         }
     }
 
-    // handle scheduling of periodic announcements
+    // Handle scheduling of periodic announcements
     private void handlePeriodicAnnouncement(Announcement announcement, long ticks) {
         // if ticks is set to RECURRENCE_UNSET (-1), use the default recurrence of 3 hours
         if (ticks == RECURRENCE_UNSET) {
@@ -143,47 +137,23 @@ public class AnnounceScheduler {
         scheduledTasks.put(announcement, task);
     }
 
-    // applies a random multiplier to the ticks value
+    // Apply a random multiplier to the ticks value
     private long applyRandomTicks(long ticks) {
         return (long) (ticks * (RANDOM_TICK_MULTIPLIER_MIN + rand.nextDouble() * (RANDOM_TICK_MULTIPLIER_MAX - RANDOM_TICK_MULTIPLIER_MIN)));
     }
 
-    // log an informational message
+    // Log an informational message
     private void logInfo(String message) {
         plugin.getLogger().info(message);
     }
 
-    // parse the recurrence string to ticks
-    private long convertRecurrenceToTicks(String recurrence) {
-        if (recurrence == null) {
-            return RECURRENCE_UNSET;
-        }
-        recurrence = recurrence.toLowerCase();
-        long ticks = 0;
-        try {
-            if (recurrence.endsWith("h")) {
-                int hours = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = hours * 60L * 60L * 20L;
-            } else if (recurrence.endsWith("m")) {
-                int minutes = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = minutes * 60L * 20L;
-            } else if (recurrence.endsWith("s")) {
-                int seconds = Integer.parseInt(recurrence.substring(0, recurrence.length() - 1));
-                ticks = seconds * 20L;
-            }
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        }
-        return ticks;
-    }
-
-    // broadcast the announcement to all players
+    // Broadcast the announcement to all players
     public void broadcastAnnouncement(Announcement announcement) {
         this.announceManager.broadcastAnnouncement(announcement);
 
     }
 
-    // shut down the scheduler and cancels all tasks
+    // Shut down the scheduler and cancel all tasks
     public void shutdown() {
         if (scheduledTasks != null) {
             for (BukkitTask task : scheduledTasks.values()) {
@@ -192,6 +162,7 @@ public class AnnounceScheduler {
         }
     }
 
+    // Cancel all tasks and clear the scheduled tasks map
     public void cleanup() {
         // Cancel all tasks and clear the map
         shutdown();

@@ -96,7 +96,7 @@ public class AnnounceConfig {
             
             if (dataStore != null) {
                 try {
-                    debug.log("Testing database connectivity");
+                    debug.debug("Testing database connectivity"); // Moved to debug level
                     dataStore.connect();
                     
                     // Wait briefly for connection to stabilize
@@ -112,7 +112,7 @@ public class AnnounceConfig {
                         }
                         
                         if (dbMatchesYml()) {
-                            debug.log("Database matches YAML configuration");
+                            debug.debug("Database matches YAML configuration"); // Moved to debug level
                             return ConfigOperation.NO_UPDATE;
                         } else {
                             debug.log("Database differs from YAML - will merge");
@@ -219,10 +219,10 @@ public class AnnounceConfig {
             MySQLDataConnector mysqlStore = (MySQLDataConnector) dataStore;
             String dbHash = mysqlStore.calculateDatabaseHash();
             
-            debug.log("Configuration hash comparison - YAML=" + ymlHash + " DB=" + dbHash);
+            debug.debug("Configuration hash comparison - YAML=" + ymlHash + " DB=" + dbHash); // Moved to debug level
             
             if (ymlHash != null && dbHash != null && ymlHash.equals(dbHash)) {
-                debug.log("Loading " + ymlAnnouncements.size() + " announcements from local configuration");
+                debug.debug("Loading announcements from local configuration"); // Moved to debug level
                 dataStore.disconnect();
                 return true;
             } else {
@@ -255,23 +255,15 @@ public class AnnounceConfig {
 
         config = YamlConfiguration.loadConfiguration(configFile);
         storageType = config.getString("storage.type", "yml").toLowerCase();
-        debug.log("Storage type configured as: " + storageType);
-
-        // Load data from YAML
+        
+        // Consolidate loading messages into a single INFO message
         this.ymlAnnouncements = loadDataFromYAML();
-        debug.log("Loaded " + ymlAnnouncements.size() + " announcements from file");
-
         this.ymlTypes = loadTypesFromYAML();
-        debug.log("Loaded " + ymlTypes.size() + " announce types from file");
+        
+        debug.log(String.format("Loaded configuration: %d announcements, %d types, storage: %s", 
+            ymlAnnouncements.size(), ymlTypes.size(), storageType));
 
-        // Consider config loaded if either announcements or types exist
-        boolean hasData = !ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty();
-        if (hasData) {
-            debug.log(Level.INFO, "Configuration loaded successfully"); // Only log once
-        } else {
-            debug.log(Level.WARNING, "Configuration loaded but no data found");
-        }
-        return hasData;
+        return !ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty();
     }
 
     private boolean importYML(List<Announcement> ymlAnnouncements, Map<String, AnnounceType> ymlTypes) {
@@ -398,14 +390,13 @@ public class AnnounceConfig {
             String password = config.getString("storage.mysql.password", "");
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
             
-            debug.log("MySQL configured for " + host + ": " + port);
-            
             if (host.isEmpty() || database.isEmpty() || username.isEmpty()) {
                 debug.log(Level.SEVERE, "Invalid MySQL configuration - missing required fields");
                 dataStore = null;
                 return;
             }
             
+            debug.debug("Configuring MySQL connection for " + host + ":" + port); // Moved to debug level
             dataStore = new MySQLDataConnector(plugin, host, port, database, username, password, useSSL);
         } else if (storageType.equalsIgnoreCase("sqlite")) {
             String databasePath = config.getString("storage.sqlite.database", "announcements.db");
