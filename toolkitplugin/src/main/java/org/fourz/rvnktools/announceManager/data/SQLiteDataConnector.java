@@ -116,9 +116,10 @@ public class SQLiteDataConnector implements DataStore {
                 pstmt.setString(8, announcement.getTime() != null ? announcement.getTime().toString() : null);
                 pstmt.setString(9, announcement.getExpiration() != null ? announcement.getExpiration().toString() : null);
                 pstmt.executeUpdate();
+                debug.debug("Saved announcement with ID: " + announcement.getId());
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error saving announcement: " + announcement.getId(), e);
         }
     }
 
@@ -126,16 +127,14 @@ public class SQLiteDataConnector implements DataStore {
     public void deleteAnnouncement(String id) {
         try {
             ensureConnected();
+            String sql = "DELETE FROM announcements WHERE id = ?";
+            try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
+                pstmt.setString(1, id);
+                int rows = pstmt.executeUpdate();
+                debug.debug("Deleted announcement with ID: " + id + " (" + rows + " rows affected)");
+            }
         } catch (SQLException e) {
-            e.printStackTrace();
-            return;
-        }
-        String sql = "DELETE FROM announcements WHERE id = ?";
-        try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error deleting announcement: " + id, e);
         }
     }
 
@@ -161,8 +160,9 @@ public class SQLiteDataConnector implements DataStore {
                     announcements.put(announcement.getId(), announcement);
                 }
             }
+            debug.debug("Loaded " + announcements.size() + " announcements from database");
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error loading announcements", e);
         }
         return new ArrayList<>(announcements.values());
     }
@@ -221,9 +221,12 @@ public class SQLiteDataConnector implements DataStore {
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
             
+            debug.debug("Starting table initialization check");
+            
             // Check if announcements table exists
             tables = metaData.getTables(null, null, "announcements", null);
             if (!tables.next()) {
+                debug.debug("Creating announcements table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -237,12 +240,14 @@ public class SQLiteDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
+                debug.debug("Announcements table created successfully");
                 empty = true;
             }
             
             // Check if announce_types table exists
             tables = metaData.getTables(null, null, "announce_types", null);
             if (!tables.next()) {
+                debug.debug("Creating announce_types table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -252,11 +257,13 @@ public class SQLiteDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
+                debug.debug("announce_types table created successfully");
             }
             
             // Check if announce_disabledtypes table exists
             tables = metaData.getTables(null, null, "announce_disabledtypes", null);
             if (!tables.next()) {
+                debug.debug("Creating announce_disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -264,20 +271,26 @@ public class SQLiteDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
+                debug.debug("announce_disabledtypes table created successfully");
             }
             
             // Check if announce_prefs table exists
             tables = metaData.getTables(null, null, "announce_prefs", null);
             if (!tables.next()) {
+                debug.debug("Creating announce_prefs table");
                 Statement stmt = connection.createStatement();
                 String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
                     "text VARCHAR(512)" +
                     ")";
                 stmt.executeUpdate(createAnnouncePrefsTable);
+                debug.debug("announce_prefs table created successfully");
             }
+            
+            debug.debug("Table initialization complete");
+            
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error initializing database tables", e);
         }
     }
 
@@ -302,6 +315,7 @@ public class SQLiteDataConnector implements DataStore {
 
     @Override
     public boolean isEmpty() {
+        debug.debug("Checking if database is empty");
         return empty;
     }
 
