@@ -36,7 +36,7 @@ public class AnnounceSubCommandList extends AnnounceSubCommand {
     private void listAll(Player player) {
         messagePlayer(player, "&6All announcements:");
         for (Announcement announcement : announceManager.getAnnouncements()) {
-            messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getText());
+            messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getMessage());
         }
     }
 
@@ -45,7 +45,7 @@ public class AnnounceSubCommandList extends AnnounceSubCommand {
         for (Announcement announcement : announceManager.getAnnouncements()) {
             if (player.hasPermission("rvnktools.announce.type.*") || 
                 player.hasPermission("rvnktools.announce.type." + announcement.getType().toLowerCase())) {
-                messagePlayer(player, " &7- &3" + announcement.getId() + " &7(&a" + announcement.getType() + "&7) - &f" + announcement.getText());
+                messagePlayer(player, " &7- &3" + announcement.getId() + " &7(&a" + announcement.getType() + "&7) - &f" + announcement.getMessage());
             }
         }
     }
@@ -63,7 +63,7 @@ public class AnnounceSubCommandList extends AnnounceSubCommand {
         messagePlayer(player, "&6Announcements for type &a" + type + "&6:");
         for (Announcement announcement : announceManager.getAnnouncements()) {
             if (announcement.getType().equalsIgnoreCase(type)) {
-                messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getText());
+                messagePlayer(player, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getMessage());
             }
         }
         return true;

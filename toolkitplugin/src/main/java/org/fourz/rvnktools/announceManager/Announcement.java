@@ -3,10 +3,14 @@ package org.fourz.rvnktools.announceManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Announcement {
     private String id;
-    private String text;
+    private String message;
+    private long interval;
+    private boolean enabled;
     private String type;
     private Long recurrence;
     private String recurrenceString;
@@ -29,11 +33,23 @@ public class Announcement {
     public void setId(String id) {
         this.id = id;
     }
-    public String getText() {
-        return text;
+    public String getMessage() {
+        return message;
     }
-    public void setText(String text) {
-        this.text = text;
+    public void setMessage(String message) {
+        this.message = message;
+    }
+    public long getInterval() {
+        return interval;
+    }
+    public void setInterval(long interval) {
+        this.interval = interval;
+    }
+    public boolean isEnabled() {
+        return enabled;
+    }
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
     public String getType() {
         return type;

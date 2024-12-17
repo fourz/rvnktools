@@ -10,7 +10,9 @@ import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.ChatService;
 import org.fourz.rvnktools.util.Debug;
 import java.util.logging.Level;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AnnounceManager {
     private static final String CLASS_NAME = "AnnounceManager";
     private final Debug debug;
@@ -163,7 +165,7 @@ public class AnnounceManager {
         // Only construct message after all null checks have passed
         String prefix = type.getPrefix() != null ? type.getPrefix() : "";
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
-        String message = prefix + announcement.getText() + suffix;
+        String message = prefix + announcement.getMessage() + suffix;
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
