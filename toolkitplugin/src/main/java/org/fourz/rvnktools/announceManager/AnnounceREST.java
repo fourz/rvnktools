@@ -9,12 +9,12 @@ public class AnnounceREST {
     //private final SpringBootServer springBootServer;
     private final Plugin plugin;
     private final AnnounceManager announceManager;
-    private final AnnounceRESTDebug debug;
+    //private final AnnounceRESTDebug debug;
 
     public AnnounceREST(Plugin plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
-        this.debug = new AnnounceRESTDebug((JavaPlugin)plugin);
+        //this.debug = new AnnounceRESTDebug((JavaPlugin)plugin);
 
     }
 

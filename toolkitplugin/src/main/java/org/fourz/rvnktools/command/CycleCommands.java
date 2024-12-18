@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.Permission.PermissionService;
+import org.fourz.rvnktools.permission.PermissionService;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;

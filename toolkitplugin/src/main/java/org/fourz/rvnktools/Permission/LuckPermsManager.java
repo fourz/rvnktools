@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.Permission;
+package org.fourz.rvnktools.permission;
 
 import net.luckperms.api.LuckPerms;
 import org.bukkit.Bukkit;

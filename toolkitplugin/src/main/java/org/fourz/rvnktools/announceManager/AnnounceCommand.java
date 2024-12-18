@@ -5,7 +5,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.announceManager.subcommand.*;
+import org.fourz.rvnktools.announceManager.command.*;
 
 import java.util.HashMap;
 import java.util.Map;

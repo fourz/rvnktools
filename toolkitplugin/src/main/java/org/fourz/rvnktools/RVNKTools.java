@@ -10,12 +10,12 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.permission.LuckPermsManager;
+import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.announceManager.AnnounceREST;
 
 import net.milkbowl.vault.economy.Economy;
 
-import org.fourz.rvnktools.Permission.LuckPermsManager;
-import org.fourz.rvnktools.Permission.PermissionService;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
