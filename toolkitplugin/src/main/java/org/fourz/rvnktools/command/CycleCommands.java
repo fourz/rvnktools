@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Iterator;
-
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -14,19 +13,15 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.fourz.rvnktools.util.ChatFormat;
-import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.permission.PermissionService;
 
 import me.clip.placeholderapi.PlaceholderAPI;
+
+import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnktools.RVNKTools;
 import net.md_5.bungee.api.chat.TextComponent;
-
-import org.bukkit.configuration.file.YamlConfiguration;
-
-
 
 public class CycleCommands {
     private final RVNKTools plugin;
