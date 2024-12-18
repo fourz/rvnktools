@@ -10,9 +10,7 @@ import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.ChatService;
 import org.fourz.rvnktools.util.Debug;
 import java.util.logging.Level;
-import org.springframework.stereotype.Service;
 
-@Service
 public class AnnounceManager {
     private static final String CLASS_NAME = "AnnounceManager";
     private final Debug debug;

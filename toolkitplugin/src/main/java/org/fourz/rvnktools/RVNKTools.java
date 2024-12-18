@@ -43,9 +43,9 @@ public class RVNKTools extends JavaPlugin implements Listener {
         
         // Initialize AnnounceManager and REST API
         announceManager = new AnnounceManager(this);
-        announceREST = new AnnounceREST(this, announceManager);
-        announceREST.start();
-        getLogger().info("REST API server started on port 8080");
+        //announceREST = new AnnounceREST(this, announceManager);
+        //announceREST.start();
+        //getLogger().info("REST API server started on port 8080");
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
