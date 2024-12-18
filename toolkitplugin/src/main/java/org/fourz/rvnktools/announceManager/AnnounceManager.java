@@ -24,8 +24,8 @@ public class AnnounceManager {
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
     private final ChatServiceInterface chatService;    
-    boolean usingPlaceholderAPI;    
     private final Map<String, Announcement> announcements = new ConcurrentHashMap<>();
+    private boolean usingPlaceholderAPI;    
 
     public AnnounceManager(RVNKTools plugin) {
         this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
@@ -190,7 +190,7 @@ public class AnnounceManager {
         try {
             if (announceConfig.getDataStore() != null) {
                 if (!announceConfig.getDataStore().announcementExists(id)) {
-                    plugin.getLogger().warning("Announcement with ID '" + id + "' does not exist");
+                    debug.debug("Announcement with ID '" + id + "' does not exist");
                     return false;
                 }
                 announceConfig.getDataStore().deleteAnnouncement(id);
@@ -198,15 +198,15 @@ public class AnnounceManager {
 
             Announcement removed = announcements.remove(id);
             if (removed != null) {
-                plugin.getLogger().info("Deleted announcement: " + id);
+                debug.debug("Deleted announcement: " + id);
                 announceConfig.saveConfig();
                 return true;
             }
 
-            plugin.getLogger().warning("Could not find announcement with ID: " + id);
+            debug.debug("Could not find announcement with ID: " + id);
             return false;
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to delete announcement: " + e.getMessage());
+            debug.log("Failed to delete announcement: " + id);
             return false;
         }
     }
@@ -239,8 +239,7 @@ public class AnnounceManager {
 
     public void saveConfig() {
         announceConfig.saveConfig();
-        //log to console
-        plugin.getLogger().info("Saved AnnounceManager configuration.");
+        debug.log("Saved AnnounceManager configuration.");
     }    
 
     public void shutdown() {    
