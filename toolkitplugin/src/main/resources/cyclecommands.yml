@@ -1,0 +1,60 @@
+commands:
+  cyclegamemode:
+    description: Cycle through gamemodes.
+    usage: /cyclegamemode
+    alias: gmc
+    instructions:
+      creative:
+        - run_command_as_player: "gamemode creative"
+      survival:
+        - run_command_as_player: "gamemode survival"
+      spectator:
+        - run_command_as_player: "gamemode spectator"
+  railroad:
+    description: Cycle through minecart placement modes.
+    alias: cycletrainmode
+    usage: /railroad
+    instructions:
+      trainmodeon:
+        - run_command_as_server: lp user $player permission unset group.rail-trains
+        - send_message_to_player: "Newly placed minecarts will now be train minecarts."
+      trainmodeoff:
+        - run_command_as_server: lp user $player permission set group.rail-trains
+        - send_message_to_player: "Newly placed minecarts will now be vanilla minecarts."
+  announcer:
+    description: Enable or disable announcements feature.
+    usage: /announcer
+    instructions:
+      enabled_base:
+        - unset_permission: group.announce-all
+        - set_permission: group.announce-base
+        - send_message_to_player: "&6Essential announcements only are enabled."
+        - send_message_to_player: "&aUse &d/announcer &aagain to enable all announcement types."  
+      enabled_all:
+        - unset_permission: group.announce-base
+        - set_permission: group.announce-all
+        - send_message_to_player: "&6All announcements are available."
+        - send_message_to_player: "&aUse &d/announcer &aagain to disable the announcements feature."
+      disabled:
+        - unset_permission: group.announce-all  
+        - send_message_to_player: "&6Announcements feature is disabled."
+        - send_message_to_player: "&aUse &d/announcer &aagain to renable the announcements feature."
+  countdown:
+    description: Countdown for restarting the server.
+    usage: /countdown
+    permission: 
+      - rvnktools.command.countdown
+    instructions:
+      5minute:
+        - run_command_as_server: "broadcast &cServer restart in 5 minutes."
+        - wait: 3m
+        - run_command_as_server: "broadcast &cServer restart in 2 minutes."
+        - wait: 1m        
+        - send_command_as_server: "broadcast &cServer restart in 1 minute."
+        - wait: 1m
+        - send_message_to_all_players: "server restarting..."
+        - wait: 5s        
+        #- run_command_as_server: restart
+      cancel:
+        - run_command_as_server: "broadcast &cServer restart cancelled."
+        - cancel_all_tasks: countdown

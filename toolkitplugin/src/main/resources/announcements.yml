@@ -1,0 +1,133 @@
+announce_types:
+- id: news
+  prefix: '&a[News] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.news
+- id: help
+  prefix: '&b[Help] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.help
+- id: advert
+  prefix: '&d[Advert] &f'
+  suffix: '&7'
+  list_fee: 4
+  weekly_fee: 10
+  permission: rvnktools.announce.type.advert
+- id: scheduled
+  prefix: '&a[!!] &7'
+  suffix: ' &a[!!]'
+  permission: rvnktools.announce.type.scheduled
+- id: server
+  prefix: '&c[Server] &f'
+  suffix: '&7'
+  permission: rvnktools.announce.type.server
+- id: guide
+  prefix: '&e[Guide] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.guide
+
+announcements:
+- id: events
+  text: '&e&lEvents &7are held every &eSaturday &7at &e7pm CST.'
+  type: news
+  recurrence: 90m
+  imported: false
+- id: trains
+  text: '&7Use &d/trains &7for train help pages.'
+  type: help
+  recurrence: 2h  
+  imported: false
+- id: welcome
+  text: '&e&lWelcome &7to &aRavenkraft&7!'
+  type: help
+  permission: rvnktools.announce.welcome  
+  imported: false
+- id: mickyhats
+  text: '&6Vote daily &7for &eMickyHats&7! Do &6/vote'
+  type: help
+  recurrence: 2h  
+  imported: false
+- id: ads
+  text: '&aUse &d/ads &ato toggle &eplayer adverts &aon and off.'
+  type: server
+  recurrence: 100m  
+  imported: false
+- id: railroad
+  text: '&aUse &d/railroad &ato toggle &eTraincart modes.'
+  type: help
+  recurrence: 2h  
+  imported: false
+- id: announcements
+  text: '&aUse &d/announce toggle help &ato toggle &eserver help tips &aon and off.'
+  type: server
+  recurrence: 80m  
+  imported: false
+- id: announcements_disabled
+  text: '&aUse &d/announce disabled &ato see which announcement types you have disabled.'
+  type: help
+  recurrence: 80m  
+  imported: false
+- id: ignoreclaims
+  text: '&7Use &d/ignoreclaims &7or &d/ic &7if you need to bypass claims.'
+  type: server
+  recurrence: 90m
+  permission: griefprevention.ignoreclaims  
+  imported: false
+- id: facebook
+  text: '&aCheck out our &9{facebook-link}'
+  type: help  
+  imported: false
+- id: information
+  text: '&aCheck out &e{information-link} &achannel on {discord-link}'
+  type: help
+  recurrence: 120m  
+  imported: false
+- id: trains_help
+  text: '&7Use &d/trains &7for train help pages.'
+  type: guide
+  recurrence: 1h  
+  imported: false
+- id: help_guide
+  text: '&7Try &d/help &7for a command guide'
+  type: guide
+  recurrence: 2h  
+  imported: false
+- id: patreon
+  text: '&aCheck out our &c{patreon-link}!'
+  type: guide
+  recurrence: 2h  
+  imported: false
+- id: discord
+  text: '&aJoin us on &9{discord-link}!'
+  type: guide
+  recurrence: 2h  
+  imported: false
+- id: announcer
+  text: '&7Use &d/announcer &7to cycle &eannouncer &7modes.'
+  type: server
+  recurrence: 2h
+  imported: false
+storage:
+# types: mysql, sqlite, flatfile
+  type: flatfile 
+  mysql:
+    host: localhost
+    port: 3306
+    username: root
+    password: ''
+    useSSL: false
+    database: rvnktools
+    tablePrefix: announce_
+  sqlite:
+    database: announcements.db
+
+debug:
+  # Available levels: OFF, SEVERE, WARNING, INFO, DEBUG
+  # OFF: No logging
+  # SEVERE: Only critical errors
+  # WARNING: Errors and warnings
+  # INFO: Standard operational messages
+  # DEBUG: Detailed debugging information
+  level: WARNING
+  # Log file name (optional)
+  file: announcements.log
