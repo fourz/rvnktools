@@ -10,6 +10,7 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.announceManager.AnnounceREST;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -19,9 +20,11 @@ import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.hatManager.PutHatCommand;
+
 public class RVNKTools extends JavaPlugin implements Listener {
 
     private AnnounceManager announceManager;
+    private AnnounceREST announceREST;
     private Economy economy;    
     private CycleCommands cycleCommands;
     public LinkMaker linkMaker;
@@ -31,17 +34,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
 
-        // Save default config if not present
-        // saveDefaultConfig();
-
+        // Initialize LuckPermsManager and PermissionService
         LuckPermsManager.init();
         permissionService = new PermissionService();
         
         // Initialize Economy
         this.economy = getServer().getServicesManager().getRegistration(Economy.class).getProvider();
         
-        // Initialize AnnouncementManager
+        // Initialize AnnounceManager and REST API
         announceManager = new AnnounceManager(this);
+        announceREST = new AnnounceREST(this, announceManager);
+        announceREST.start();
+        getLogger().info("REST API server started on port 8080");
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
@@ -68,19 +72,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
 
-        // Schedule periodic garbage collection
-        // scheduleGarbageCollection();
-
-        getLogger().info("RVNK Toolkit has been enabled.");
-                
+        getLogger().info("RVNK Toolkit has been enabled.");                
     }
 
     @Override
     public void onDisable() {
-        if (announceManager != null) {
-            announceManager.shutdown(); // This will trigger AnnounceConfig.shutdown()
+        if (announceREST != null) {
+            announceREST.stop();
         }
-        // ...rest of shutdown code...
+        
+        if (announceManager != null) {
+            announceManager.shutdown(); 
+        }
         announceManager = null;
         cycleCommands = null;
         linkMaker = null;

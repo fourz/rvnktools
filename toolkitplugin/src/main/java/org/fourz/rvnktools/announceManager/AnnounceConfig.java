@@ -25,12 +25,13 @@ public class AnnounceConfig {
     public static Level getLogLevel() {
         return logLevel;
     }
-    private enum ConfigOperation {
-        IMPORT_YML_TO_NEW_DB,
-        UPDATE_MISSING_YML_FROM_DB,
-        MERGE_YML_INTO_DB,
-        FALLBACK_TO_YML,
-        NO_UPDATE
+    private enum ConfigOperation {        
+        DB_NO_UPDATE,
+        DB_MERGE_YML,        
+        DB_IMPORT,
+        YML_ONLY,  
+        YML_FALLBACK,
+        DB_REBUILD_YML
     }
 
     private class ConfigDebug extends Debug {
@@ -55,7 +56,7 @@ public class AnnounceConfig {
 
     // initializes the configuration and data storage settings
     public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
-        // Store dependencies
+
         this.plugin = plugin;
         this.announceManager = announceManager;
         
@@ -63,20 +64,15 @@ public class AnnounceConfig {
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
         this.usingPlaceholderAPI = (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null);
         
-        // Load config and set shared log level
-        config = YamlConfiguration.loadConfiguration(configFile);
-        String logLevelStr = config.getString("debug.level", "INFO");
-        logLevel = Debug.parseLevel(logLevelStr); // Use Debug.parseLevel instead of Level.parse
-        
-        // Initialize debug with shared level
+        // Load config and set log level, default to INFO.
+        config = YamlConfiguration.loadConfiguration(configFile);       
+        logLevel = Debug.getLevel(config.getString("debug.level", "INFO")); 
         this.debug = new ConfigDebug(plugin, CLASS_NAME);
         
-        // Now load rest of config
-        if (loadConfig()) {
-            debug.log(Level.INFO, "Configuration loaded successfully");
-        }
+        //Load the configuration
+        if (loadConfig()) debug.log(Level.INFO, "Configuration loaded successfully");
         
-        // Rest of initialization
+        // Detect and initialize data storage
         this.configOperation = detectConfigState();
         debug.log("AnnounceConfig Operation: " + configOperation);
     }
@@ -84,13 +80,13 @@ public class AnnounceConfig {
     private ConfigOperation detectConfigState() {
         debug.log("Detecting config state...");
 
-        // First check if storage type is explicitly set to yml
-        if (storageType.equalsIgnoreCase("yml")) {
+        // check if storage type is set to yml or flatfile
+        if (storageType.equalsIgnoreCase("flatfile") || storageType.equalsIgnoreCase("yml")) {
             debug.log("YAML storage explicitly configured");
-            return ConfigOperation.FALLBACK_TO_YML;
+            return ConfigOperation.YML_ONLY;
         }
 
-        // Then check for database configurations
+        // check for database configurations
         if (storageType.equalsIgnoreCase("mysql") || storageType.equalsIgnoreCase("sqlite")) {
             initializeDataStoreConnection();
             
@@ -98,43 +94,40 @@ public class AnnounceConfig {
                 try {
                     debug.debug("Testing database connectivity"); // Moved to debug level
                     dataStore.connect();
-                    
-                    // Wait briefly for connection to stabilize
-                    Thread.sleep(100);
-                    
+                                        
                     try {
                         boolean dbEmpty = dataStore.isEmpty();
                         debug.debug("Database empty check result: " + dbEmpty);
                         
                         if (dbEmpty) {
                             debug.log("Empty database detected - will import from YAML");
-                            return ConfigOperation.IMPORT_YML_TO_NEW_DB;
+                            return ConfigOperation.DB_IMPORT;
                         }
                         
                         if (dbMatchesYml()) {
                             debug.debug("Database matches YAML configuration"); // Moved to debug level
-                            return ConfigOperation.NO_UPDATE;
+                            return ConfigOperation.DB_NO_UPDATE;
                         } else {
                             debug.log("Database differs from YAML - will merge");
-                            return ConfigOperation.MERGE_YML_INTO_DB;
+                            return ConfigOperation.DB_MERGE_YML;
                         }
                         
                     } catch (Exception e) {
                         debug.error("Database access test failed", e);
                         debug.log("Falling back to YAML storage");
-                        return ConfigOperation.FALLBACK_TO_YML;
+                        return ConfigOperation.YML_FALLBACK;
                     }
                     
                 } catch (Exception e) {
                     debug.error("Database connectivity test failed", e);
                     debug.log("Falling back to YAML storage");
-                    return ConfigOperation.FALLBACK_TO_YML;
+                    return ConfigOperation.YML_FALLBACK;
                 }
             }
         }
         
-        debug.log(Level.WARNING, "No database configuration found - falling back to YAML storage");
-        return ConfigOperation.FALLBACK_TO_YML;
+        debug.log(Level.WARNING, "No database configuration found - using YAML storage");
+        return ConfigOperation.YML_ONLY;
     }
 
     public void initializeDataStore() {
@@ -147,8 +140,7 @@ public class AnnounceConfig {
         
         // Add memory check
         debug.debug("Memory state before initialization - YML: " + 
-                   (ymlAnnouncements != null ? ymlAnnouncements.size() : 0) + 
-                   " announcements");
+            (ymlAnnouncements != null ? ymlAnnouncements.size() : 0) + " announcements");
 
         // Connect to the database once during initialization
         if (dataStore != null) {
@@ -170,15 +162,15 @@ public class AnnounceConfig {
 
         try {
             switch (configOperation) {
-
-                case FALLBACK_TO_YML:
+                case YML_FALLBACK:
+                case YML_ONLY:
                     debug.log("Using existing announcements from local configuration");
-                case NO_UPDATE:                
+                case DB_NO_UPDATE:                
                     announceManager.setAnnouncements(ymlAnnouncements);
                     announceTypes = ymlTypes;                    
                     break;
 
-                case IMPORT_YML_TO_NEW_DB:
+                case DB_IMPORT:
                     announceTypes = ymlTypes;
                     isChanged = importYML(ymlAnnouncements, ymlTypes);
                     if (isChanged) {
@@ -187,13 +179,13 @@ public class AnnounceConfig {
                     }
                     break;
 
-                case UPDATE_MISSING_YML_FROM_DB:
+                case DB_REBUILD_YML:
                     List<Announcement> announcements = loadDataFromDatabase();
                     announceManager.setAnnouncements(announcements);
                     isChanged = true;
                     break;
 
-                case MERGE_YML_INTO_DB:
+                case DB_MERGE_YML:
                     List<Announcement> announcements_ = loadDataFromDatabase();
                     announceManager.setAnnouncements(announcements_);
                     announceManager.setAnnouncementsImported();
@@ -435,7 +427,7 @@ public class AnnounceConfig {
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setType(type);
-        announcement.setText(text);
+        announcement.setMessage(text);
         announcement.setOwner(playerName);
         return announceManager.addAnnouncement(announcement);
     }
@@ -445,7 +437,7 @@ public class AnnounceConfig {
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setType(type);
-        announcement.setText(text);        
+        announcement.setMessage(text);        
         return announceManager.addAnnouncement(announcement);
     }
 
@@ -516,7 +508,7 @@ public class AnnounceConfig {
 
         Announcement announcement = new Announcement();
         announcement.setId(id);
-        announcement.setText(text);
+        announcement.setMessage(text);
         announcement.setType(type);
         announcement.setRecurrence(recurrenceSeconds);
         announcement.setRecurrenceString(originalRecurrence); // Store original string
@@ -573,14 +565,14 @@ public class AnnounceConfig {
         for (Announcement announcement : currentAnnouncements) {
             try {
                 // Validate required fields
-                if (announcement.getId() == null || announcement.getType() == null || announcement.getText() == null) {
+                if (announcement.getId() == null || announcement.getType() == null || announcement.getMessage() == null) {
                     debug.log(Level.WARNING, "Skipping invalid announcement: " + announcement.getId());
                     continue;
                 }
 
                 Map<String, Object> map = new LinkedHashMap<>();
                 map.put("id", announcement.getId());
-                map.put("text", announcement.getText());
+                map.put("text", announcement.getMessage());
                 map.put("type", announcement.getType());
 
                 // Handle recurrence value

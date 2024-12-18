@@ -10,10 +10,10 @@ import java.util.Map;
 import java.util.HashMap;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
+import org.fourz.rvnktools.util.Debug;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
-import org.fourz.rvnktools.util.Debug;
 import org.fourz.rvnktools.announceManager.AnnounceConfig;
 
 public class MySQLDataConnector implements DataStore {
@@ -61,6 +61,15 @@ public class MySQLDataConnector implements DataStore {
             }
         } catch (SQLException e) {
             debug.error("Failed to connect to MySQL", e);
+        } finally {
+            if (connection != null) {
+                try {
+                    // sleep for a bit to allow connection to establish
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    debug.error("Error sleeping thread", e);
+                }
+            }
         }
     }
 
@@ -90,7 +99,7 @@ public class MySQLDataConnector implements DataStore {
             ensureConnection();
             try (PreparedStatement statement = connection.prepareStatement(query)) {
                 statement.setString(1, announcement.getId());
-                statement.setString(2, announcement.getText());
+                statement.setString(2, announcement.getMessage());
                 statement.setString(3, announcement.getType());
                 statement.setObject(4, announcement.getRecurrence()); // Changed to handle Long
                 statement.setString(5, announcement.getOwner());
@@ -130,7 +139,7 @@ public class MySQLDataConnector implements DataStore {
                 while (resultSet.next()) {
                     Announcement announcement = new Announcement();
                     announcement.setId(resultSet.getString("id"));
-                    announcement.setText(resultSet.getString("text"));
+                    announcement.setMessage(resultSet.getString("text"));
                     announcement.setType(resultSet.getString("type"));
                     announcement.setRecurrence(resultSet.getObject("recurrence") != null ? resultSet.getLong("recurrence") : null);
                     announcement.setOwner(resultSet.getString("owner"));

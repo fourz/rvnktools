@@ -71,7 +71,7 @@ public abstract class Debug {
         return messageLevel.intValue() >= logLevel.intValue();
     }
 
-    public static Level parseLevel(String levelStr) {
+    public static Level getLevel(String levelStr) {
         if (levelStr == null) return Level.INFO;
         try {
             if (levelStr.equalsIgnoreCase("DEBUG")) {
