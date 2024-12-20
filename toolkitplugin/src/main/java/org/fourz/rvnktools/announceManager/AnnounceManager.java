@@ -29,14 +29,13 @@ public class AnnounceManager {
 
     public AnnounceManager(RVNKTools plugin) {
         this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
-        debug.log("Enabling AnnounceManager.");
+        debug.info("Enabling AnnounceManager.");
         this.plugin = plugin;
         this.chatService = new ChatService();
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
         this.announceConfig = new AnnounceConfig(plugin, this);
         this.announceConfig.initializeDataStore();
         this.announceScheduler = new AnnounceScheduler(plugin, this);
-
         // Register commands
         plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
         plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
@@ -47,14 +46,14 @@ public class AnnounceManager {
     // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
     public boolean addAnnouncement(Announcement announcement) {
         if (announcement == null || announcement.getId() == null) {
-            debug.log(Level.WARNING, "Cannot add invalid announcement");
+            debug.warning("Cannot add invalid announcement");
             return false;
         }
 
         String id = announcement.getId().toLowerCase();
         // Check for existing announcement in memory first
         if (announcements.containsKey(id)) {
-            debug.log(Level.WARNING, "Announcement with ID '" + id + "' already exists in memory");
+            debug.warning("Announcement with ID '" + id + "' already exists in memory");
             return false;
         }
 
@@ -63,7 +62,7 @@ public class AnnounceManager {
             if (announceConfig.getDataStore() != null && !announcement.isImported()) {
                 // Check database before saving
                 if (announceConfig.getDataStore().announcementExists(id)) {
-                    debug.log(Level.WARNING, "Announcement with ID '" + id + "' already exists in database");
+                    debug.warning("Announcement with ID '" + id + "' already exists in database");
                     return false;
                 }
                 announceConfig.getDataStore().saveAnnouncement(announcement);
@@ -143,19 +142,19 @@ public class AnnounceManager {
 
     public void broadcastAnnouncement(Announcement announcement) {      
         if (announcement == null) {
-            debug.log(Level.WARNING, "Cannot broadcast null announcement");
+            debug.warning("Cannot broadcast null announcement");
             return;
         }
 
         String announcementType = announcement.getType();
         if (announcementType == null || announcementType.isEmpty()) {
-            debug.log(Level.WARNING, "Announcement has null or empty type");
+            debug.warning("Announcement has null or empty type");
             return;
         }
                 
         AnnounceType type = announceConfig.getAnnounceTypes().get(announcementType);        
         if (type == null) {
-            debug.log(Level.WARNING, "Could not find announcement type '" + announcementType + 
+            debug.warning("Could not find announcement type '" + announcementType + 
                 "' in config. Available types: " + String.join(", ", announceConfig.getAnnounceTypes().keySet()));
             return;
         }
@@ -190,7 +189,7 @@ public class AnnounceManager {
         try {
             if (announceConfig.getDataStore() != null) {
                 if (!announceConfig.getDataStore().announcementExists(id)) {
-                    debug.debug("Announcement with ID '" + id + "' does not exist");
+                    debug.warning("Announcement with ID '" + id + "' does not exist");
                     return false;
                 }
                 announceConfig.getDataStore().deleteAnnouncement(id);
@@ -206,7 +205,7 @@ public class AnnounceManager {
             debug.debug("Could not find announcement with ID: " + id);
             return false;
         } catch (Exception e) {
-            debug.log("Failed to delete announcement: " + id);
+            debug.info("Failed to delete announcement: " + id);
             return false;
         }
     }
@@ -239,11 +238,11 @@ public class AnnounceManager {
 
     public void saveConfig() {
         announceConfig.saveConfig();
-        debug.log("Saved AnnounceManager configuration.");
+        debug.info("Saved AnnounceManager configuration.");
     }    
 
     public void shutdown() {    
-        debug.log("Saving announcements before shutdown...");
+        debug.info("Saving announcements before shutdown...");
         // Ensure we have all announcements in memory
         if (announceConfig.getDataStore() != null) {
             setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
@@ -252,7 +251,7 @@ public class AnnounceManager {
         announceScheduler.shutdown();
         savePlayerDisabledTypes();
         announceConfig.shutdown();
-        debug.log("AnnounceManager shutdown complete");
+        debug.info("AnnounceManager shutdown complete");
     }
 
     public boolean validateAnnounceType(String type) {
@@ -310,13 +309,13 @@ public class AnnounceManager {
 
     public void setAnnouncements(List<Announcement> announcementList) {
         if (announcementList == null) {
-            debug.log(Level.WARNING, "Skipping null announcement list");
+            debug.warning("Skipping null announcement list");
             return;
         }
         announcements.clear();
         for (Announcement announcement : announcementList) {
             if (announcement.getId() == null) {
-                debug.log(Level.WARNING, "Skipping announcement with null ID");
+                debug.warning("Skipping announcement with null ID");
                 continue;
             }
             announcements.put(announcement.getId(), announcement);

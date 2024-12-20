@@ -18,6 +18,7 @@ public class Announcement {
     private LocalTime time;
     private LocalDateTime expiration;
     private boolean imported;
+    private String originalDateString;
 
     public Announcement() { 
         this.type = "system";   
@@ -111,5 +112,13 @@ public class Announcement {
     
     public void setImported() {
         this.imported = true;
+    }
+
+    public String getOriginalDateString() {
+        return originalDateString;
+    }
+
+    public void setOriginalDateString(String dateString) {
+        this.originalDateString = dateString;
     }
 }

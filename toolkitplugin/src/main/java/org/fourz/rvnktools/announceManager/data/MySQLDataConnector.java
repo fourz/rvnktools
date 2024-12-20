@@ -150,7 +150,7 @@ public class MySQLDataConnector implements DataStore {
                     announcements.put(announcement.getId(), announcement);
                 }
             }
-            debug.log(Level.FINE, "Loaded " + announcements.size() + " announcements from database");
+            debug.info("Loaded " + announcements.size() + " announcements from database");
         } catch (SQLException e) {
             debug.error("Error loading announcements", e);
         }

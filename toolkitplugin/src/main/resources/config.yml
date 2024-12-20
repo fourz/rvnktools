@@ -1,0 +1,42 @@
+api:
+  enabled: false
+  port: 8080
+  key: changeme
+  context-path: /api
+
+  cors:
+    enabled: false
+    allowed-origins: "*"
+    allowed-methods: "GET,POST,DELETE"
+
+  server:
+    min-threads: 2
+    max-threads: 8
+    queue-size: 100
+    idle-timeout: 30000
+    connection-timeout: 5000
+
+  tls:
+    enabled: false
+    port: 8443
+    keystore-path: "keystore.jks"
+    keystore-password: "changeme"
+    keymanager-password: "changeme"
+
+  security:
+    use-forwarded-headers: false
+    allowed-ips: []
+    rate-limit:
+      requests: 30
+      period: 60
+    request-header-size: 8192
+    response-header-size: 8192
+
+  performance:
+    compression: true
+    compression-min-size: 2048
+
+  logging:
+    enabled: true
+    retain-days: 7
+    filename: "api-access-%d{yyyy-MM-dd}.log"

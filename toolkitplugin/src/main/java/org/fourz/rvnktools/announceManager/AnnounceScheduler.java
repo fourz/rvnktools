@@ -5,13 +5,13 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.Debug;
-import java.util.logging.Level;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
- import java.time.LocalDate;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 public class AnnounceScheduler {
 
@@ -22,6 +22,9 @@ public class AnnounceScheduler {
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
     private static final long DEFAULT_RECURRENCE_TICKS = 4 * 60 * 60 * 20L; // 4 hours in ticks
     private static final long DAILY_RECURRENCE_TICKS = 12 * 60 * 60 * 20L; // 12 hours in ticks
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM-dd");
+    private static final DateTimeFormatter FULL_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final String ANNUAL_DATE_PATTERN = "\\d{2}-\\d{2}";  // MM-dd pattern
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
@@ -53,7 +56,7 @@ public class AnnounceScheduler {
         
         // Only log the final count
         if (scheduledTasks.size() > 0) {
-            debug.log("Scheduled " + scheduledTasks.size() + " announcements.");
+            debug.info("Scheduled " + scheduledTasks.size() + " announcements.");
         }
     }
 
@@ -90,8 +93,9 @@ public class AnnounceScheduler {
     // Handle scheduling of announcements with a specific date and time
     private void handleScheduledAnnouncement(Announcement announcement) {
         LocalDateTime now = LocalDateTime.now();
+        String dateStr = announcement.getOriginalDateString(); // You'll need to add this to Announcement class
         
-        if (!isDateMatch(now.toLocalDate(), announcement.getDate())) {
+        if (!isDateMatch(now.toLocalDate(), announcement.getDate(), dateStr)) {
             debug.debug("Announcement " + announcement.getId() + " is not scheduled for today");
             return;
         }
@@ -138,10 +142,22 @@ public class AnnounceScheduler {
     }
 
     // Helper method to compare only month and day of dates
-    private boolean isDateMatch(LocalDate today, LocalDate announcementDate) {
+    private boolean isDateMatch(LocalDate today, LocalDate announcementDate, String originalDateString) {
         if (announcementDate == null) return false;
-        return today.getMonth() == announcementDate.getMonth() 
-            && today.getDayOfMonth() == announcementDate.getDayOfMonth();
+        
+        // Default to exact date comparison if originalDateString is null
+        if (originalDateString == null) {
+            return today.equals(announcementDate);
+        }
+        
+        // If it's an annual date (MM-dd format)
+        if (originalDateString.matches(ANNUAL_DATE_PATTERN)) {
+            return today.getMonth() == announcementDate.getMonth() 
+                && today.getDayOfMonth() == announcementDate.getDayOfMonth();
+        }
+        
+        // For full date format (yyyy-MM-dd), compare exact dates
+        return today.equals(announcementDate);
     }
 
     // Handle scheduling of periodic announcements
@@ -187,7 +203,7 @@ public class AnnounceScheduler {
 
     // Shut down the scheduler and cancel all tasks
     public void shutdown() {
-        debug.log("Shutting down announcement scheduler");
+        debug.info("Shutting down announcement scheduler");
         if (scheduledTasks != null) {
             for (BukkitTask task : scheduledTasks.values()) {
                 task.cancel();

@@ -33,11 +33,11 @@ public abstract class Debug {
         setLogLevel(level);
     }
 
-    public void log(String message) {
+    public void info(String message) {
         log(Level.INFO, message);
     }
 
-    public void log(Level level, String message) {
+    private void log(Level level, String message) {
         if (shouldLog(level)) {
             // Map FINE to INFO when actually logging
             Level logLevel = (level == Level.FINE) ? Level.INFO : level;
@@ -54,6 +54,10 @@ public abstract class Debug {
         if (e != null && shouldLog(Level.SEVERE)) {
             e.printStackTrace();
         }
+    }
+
+    public void warning(String message) {
+        log(Level.WARNING, message);
     }
 
     public void debug(String message) {

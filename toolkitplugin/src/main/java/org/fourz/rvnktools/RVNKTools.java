@@ -12,7 +12,7 @@ import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
-import org.fourz.rvnktools.announceManager.AnnounceREST;
+import org.fourz.rvnktools.api.RVNKToolsAPI;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -24,12 +24,12 @@ import org.fourz.rvnktools.hatManager.PutHatCommand;
 public class RVNKTools extends JavaPlugin implements Listener {
 
     private AnnounceManager announceManager;
-    private AnnounceREST announceREST;
     private Economy economy;    
     private CycleCommands cycleCommands;
     public LinkMaker linkMaker;
     public PermissionService permissionService;
     private int gcTaskId = -1;
+    private RVNKToolsAPI api;
 
     @Override
     public void onEnable() {
@@ -41,11 +41,12 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Initialize Economy
         this.economy = getServer().getServicesManager().getRegistration(Economy.class).getProvider();
         
-        // Initialize AnnounceManager and REST API
+        // Initialize AnnounceManager
         announceManager = new AnnounceManager(this);
-        //announceREST = new AnnounceREST(this, announceManager);
-        //announceREST.start();
-        //getLogger().info("REST API server started on port 8080");
+
+        // Initialize API
+        api = new RVNKToolsAPI(this, announceManager);
+        api.start();
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
@@ -77,10 +78,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (announceREST != null) {
-            announceREST.stop();
-        }
-        
+
+        if (api != null) api.stop();
+        api = null;
+
         if (announceManager != null) {
             announceManager.shutdown(); 
         }

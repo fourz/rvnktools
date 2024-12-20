@@ -70,19 +70,19 @@ public class AnnounceConfig {
         this.debug = new ConfigDebug(plugin, CLASS_NAME);
         
         //Load the configuration
-        if (loadConfig()) debug.log(Level.INFO, "Configuration loaded successfully");
+        if (loadConfig()) debug.info("Configuration loaded successfully");
         
         // Detect and initialize data storage
         this.configOperation = detectConfigState();
-        debug.log("AnnounceConfig Operation: " + configOperation);
+        debug.info("AnnounceConfig Operation: " + configOperation);
     }
 
     private ConfigOperation detectConfigState() {
-        debug.log("Detecting config state...");
+        debug.info("Detecting config state...");
 
         // check if storage type is set to yml or flatfile
         if (storageType.equalsIgnoreCase("flatfile") || storageType.equalsIgnoreCase("yml")) {
-            debug.log("YAML storage explicitly configured");
+            debug.info("YAML storage explicitly configured");
             return ConfigOperation.YML_ONLY;
         }
 
@@ -100,7 +100,7 @@ public class AnnounceConfig {
                         debug.debug("Database empty check result: " + dbEmpty);
                         
                         if (dbEmpty) {
-                            debug.log("Empty database detected - will import from YAML");
+                            debug.info("Empty database detected - will import from YAML");
                             return ConfigOperation.DB_IMPORT;
                         }
                         
@@ -108,30 +108,30 @@ public class AnnounceConfig {
                             debug.debug("Database matches YAML configuration"); // Moved to debug level
                             return ConfigOperation.DB_NO_UPDATE;
                         } else {
-                            debug.log("Database differs from YAML - will merge");
+                            debug.info("Database differs from YAML - will merge");
                             return ConfigOperation.DB_MERGE_YML;
                         }
                         
                     } catch (Exception e) {
                         debug.error("Database access test failed", e);
-                        debug.log("Falling back to YAML storage");
+                        debug.warning("Falling back to YAML storage");
                         return ConfigOperation.YML_FALLBACK;
                     }
                     
                 } catch (Exception e) {
                     debug.error("Database connectivity test failed", e);
-                    debug.log("Falling back to YAML storage");
+                    debug.warning("Falling back to YAML storage");
                     return ConfigOperation.YML_FALLBACK;
                 }
             }
         }
         
-        debug.log(Level.WARNING, "No database configuration found - using YAML storage");
+        debug.warning("No database configuration found - using YAML storage");
         return ConfigOperation.YML_ONLY;
     }
 
     public void initializeDataStore() {
-        debug.log("AnnounceConfig using " + storageType + " storage");
+        debug.info("AnnounceConfig using " + storageType + " storage");
 
         // Initialize DataStore if not already done
         if (dataStore == null) {
@@ -164,7 +164,7 @@ public class AnnounceConfig {
             switch (configOperation) {
                 case YML_FALLBACK:
                 case YML_ONLY:
-                    debug.log("Using existing announcements from local configuration");
+                    debug.info("Using existing announcements from local configuration");
                 case DB_NO_UPDATE:                
                     announceManager.setAnnouncements(ymlAnnouncements);
                     announceTypes = ymlTypes;                    
@@ -218,7 +218,7 @@ public class AnnounceConfig {
                 dataStore.disconnect();
                 return true;
             } else {
-                debug.log("Configuration mismatch - will synchronize with database");
+                debug.info("Configuration mismatch - will synchronize with database");
             }
         }
         return false;
@@ -242,7 +242,7 @@ public class AnnounceConfig {
     public boolean loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
-            debug.log("Created default announcements.yml");
+            debug.info("Created default announcements.yml");
         }
 
         config = YamlConfiguration.loadConfiguration(configFile);
@@ -252,7 +252,7 @@ public class AnnounceConfig {
         this.ymlAnnouncements = loadDataFromYAML();
         this.ymlTypes = loadTypesFromYAML();
         
-        debug.log(String.format("Loaded configuration: %d announcements, %d types, storage: %s", 
+        debug.info(String.format("Loaded configuration: %d announcements, %d types, storage: %s", 
             ymlAnnouncements.size(), ymlTypes.size(), storageType));
 
         return !ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty();
@@ -278,9 +278,9 @@ public class AnnounceConfig {
             if (!existingTypeIds.contains(type.getId().toLowerCase())) {
                 try {                    
                     dataStore.saveAnnounceType(type);                    
-                    debug.log("Imported announce type: " + type.getId());                    
+                    debug.info("Imported announce type: " + type.getId());                    
                 } catch (Exception e) {
-                    debug.log(Level.WARNING, "Error saving announce type: " + type.getId());
+                    debug.warning("Error saving announce type: " + type.getId());
                     e.printStackTrace();
                 }
             }
@@ -297,9 +297,9 @@ public class AnnounceConfig {
                     announcement.setImported(); // Mark as imported immediately
                     successfulImports.add(announcement.getId().toLowerCase());
                     announceManager.getAnnouncements().add(announcement); // Add to memory
-                    debug.log("Imported announcement: " + announcement.getId());
+                    debug.info("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
-                    debug.log(Level.WARNING, "Error importing announcement " + announcement.getId() + ": " + e.getMessage());
+                    debug.warning("Error importing announcement " + announcement.getId() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
             }            
@@ -308,7 +308,7 @@ public class AnnounceConfig {
         // Update the local announcements list after import
         if (!successfulImports.isEmpty()) {
             announceManager.setAnnouncements(dataStore.loadAnnouncements());
-            debug.log("Updated in-memory announcements after import");
+            debug.info("Updated in-memory announcements after import");
         }
 
         // Only mark announcements that were successfully imported
@@ -328,7 +328,7 @@ public class AnnounceConfig {
     private List<Announcement> loadDataFromYAML() {
         List<Announcement> announcements = new ArrayList<>();
         if (!configFile.exists()) {
-            debug.log(Level.WARNING, "Config file does not exist: " + configFile.getName());
+            debug.warning("Config file does not exist: " + configFile.getName());
             return announcements;
         }
 
@@ -340,14 +340,14 @@ public class AnnounceConfig {
                 Announcement announcement = parseAnnouncement(map);
                 if (announcement != null && announcement.getId() != null) {
                     if (usedIds.contains(announcement.getId().toLowerCase())) {
-                        debug.log(Level.WARNING, "Duplicate announcement ID found: " + announcement.getId());
+                        debug.warning("Duplicate announcement ID found: " + announcement.getId());
                         continue;
                     }
                     usedIds.add(announcement.getId().toLowerCase());
                     announcements.add(announcement);
                 }
             } catch (Exception e) {
-                debug.log(Level.WARNING, "Error parsing announcement: " + e.getMessage());
+                debug.warning("Error parsing announcement: " + e.getMessage());
             }
         }
         return announcements;
@@ -365,14 +365,14 @@ public class AnnounceConfig {
                 }
             }
         } else {
-            debug.log(Level.WARNING, "Config file not found: " + configFile.getName());
+            debug.warning("Config file not found: " + configFile.getName());
         }
         return types;
     }
 
     // Creates appropriate DataStore instance based on configuration settings
     private void initializeDataStoreConnection() {
-        debug.log("Initializing data store connection with type: " + storageType);
+        debug.info("Initializing data store connection with type: " + storageType);
         
         if (storageType.equalsIgnoreCase("mysql")) {
             String host = config.getString("storage.mysql.host", "");
@@ -383,7 +383,7 @@ public class AnnounceConfig {
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
             
             if (host.isEmpty() || database.isEmpty() || username.isEmpty()) {
-                debug.log(Level.SEVERE, "Invalid MySQL configuration - missing required fields");
+                debug.warning("Invalid MySQL configuration - missing required fields");
                 dataStore = null;
                 return;
             }
@@ -398,7 +398,7 @@ public class AnnounceConfig {
         }
         
         if (dataStore == null) {
-            debug.log(Level.WARNING, "Using YAML storage - no valid database configuration");
+            debug.warning("Using YAML storage - no valid database configuration");
         }
     }
 
@@ -441,6 +441,22 @@ public class AnnounceConfig {
         return announceManager.addAnnouncement(announcement);
     }
 
+    private LocalDate parseDate(String dateStr) {
+        try {
+            if (dateStr.matches("\\d{2}-\\d{2}")) { // MM-dd format
+                // Parse as current year
+                return LocalDate.parse(LocalDate.now().getYear() + "-" + dateStr, 
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            } else {
+                // Parse as full date
+                return LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+            }
+        } catch (Exception e) {
+            debug.warning("Failed to parse date: " + dateStr);
+            return null;
+        }
+    }
+
     // Converts a YAML map into an Announcement object
     private Announcement parseAnnouncement(Map<?, ?> map) {
         String id = (String) map.get("id");
@@ -473,7 +489,7 @@ public class AnnounceConfig {
                         recurrenceSeconds = Long.parseLong(recStr);
                     }
                 } catch (NumberFormatException e) {
-                    debug.log(Level.WARNING, "Invalid recurrence format for announcement " + id + ": " + recStr);
+                    debug.warning("Invalid recurrence format for announcement " + id + ": " + recStr);
                 }
             }
         }
@@ -487,7 +503,7 @@ public class AnnounceConfig {
 
         // Check if PlaceholderAPI is used and available
         if (text.contains("%") && !usingPlaceholderAPI) {
-            debug.log(Level.WARNING, "PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
+            debug.warning("PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
             return null;
         }
 
@@ -495,15 +511,16 @@ public class AnnounceConfig {
         LocalTime time = null;
         try {
             if (dateStr != null) {
+                // Store original date string before parsing
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                date = LocalDate.parse(dateStr, dateFormatter);
+                date = parseDate(dateStr);
             }
             if (timeStr != null) {
                 DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HHmm");
                 time = LocalTime.parse(timeStr, timeFormatter);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            debug.warning("Error parsing date/time: " + e.getMessage());
         }
 
         Announcement announcement = new Announcement();
@@ -516,6 +533,7 @@ public class AnnounceConfig {
         announcement.setPermission(permission);
         announcement.setDate(date);
         announcement.setTime(time);
+        announcement.setOriginalDateString(dateStr); // Set the original date string
         if (imported) announcement.setImported();
 
         return announcement;
@@ -559,14 +577,14 @@ public class AnnounceConfig {
 
         // Get a snapshot of announcements to avoid concurrent modification
         Collection<Announcement> currentAnnouncements = new ArrayList<>(announceManager.getAnnouncements());
-        debug.log("Saving " + currentAnnouncements.size() + " announcements to file");
+        debug.info("Saving " + currentAnnouncements.size() + " announcements to file");
         int importedCount = 0;
 
         for (Announcement announcement : currentAnnouncements) {
             try {
                 // Validate required fields
                 if (announcement.getId() == null || announcement.getType() == null || announcement.getMessage() == null) {
-                    debug.log(Level.WARNING, "Skipping invalid announcement: " + announcement.getId());
+                    debug.warning("Skipping invalid announcement: " + announcement.getId());
                     continue;
                 }
 
@@ -616,12 +634,12 @@ public class AnnounceConfig {
             }
         }
 
-        debug.log("Saving " + announcementMaps.size() + " announcements (" + importedCount + " imported)");
+        debug.info("Saving " + announcementMaps.size() + " announcements (" + importedCount + " imported)");
 
         try {
             config.set("announcements", announcementMaps);
             config.save(configFile);
-            debug.log("Configuration saved successfully");
+            debug.info("Configuration saved successfully");
         } catch (IOException e) {
             debug.error("Failed to save announcements: " + e.getMessage(), e);
             e.printStackTrace();
