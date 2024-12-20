@@ -42,11 +42,6 @@ announcements:
   type: help
   permission: rvnktools.announce.welcome  
   imported: false
-- id: mickyhats
-  text: '&6Vote daily &7for &eMickyHats&7! Do &6/vote'
-  type: help
-  recurrence: 2h  
-  imported: false
 - id: ads
   text: '&aUse &d/ads &ato toggle &eplayer adverts &aon and off.'
   type: server
@@ -107,6 +102,28 @@ announcements:
   type: server
   recurrence: 2h
   imported: false
+- id: toastyday
+  text: "&e&lHappy &6Cheese Toasty &e&lDay!"
+  type: scheduled
+  date: "09-24"
+  time: '1900'
+  recurrence: 120m
+- id: mickyhats
+  text: "&6Vote daily &7for &eMickyHats&7! Do &6/vote"
+  type: help
+  recurrence: 2h
+  expiration: '2028-11-24'
+- id: xmasday
+  text: "&e&lM&6e&er&7r&ey &e&lC&6h&er&7i&es&et&7m&as!"
+  type: scheduled
+  date: "2024-12-18"
+  recurrence: 4h
+- id: newyear
+  text: "&e&lHappy &6New &e&lYear!"
+  type: scheduled
+  date: "12-18"
+
+
 storage:
 # types: mysql, sqlite, flatfile
   type: flatfile 

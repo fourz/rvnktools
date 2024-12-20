@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+ import java.time.LocalDate;
 
 public class AnnounceScheduler {
 
@@ -19,7 +20,8 @@ public class AnnounceScheduler {
     // constant for random tick multiplier and default values
     private static final double RANDOM_TICK_MULTIPLIER_MIN = 0.9;
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
-    private static final long DEFAULT_RECURRENCE_TICKS = 3 * 60 * 60 * 20L; // 3 hours in ticks
+    private static final long DEFAULT_RECURRENCE_TICKS = 4 * 60 * 60 * 20L; // 4 hours in ticks
+    private static final long DAILY_RECURRENCE_TICKS = 12 * 60 * 60 * 20L; // 12 hours in ticks
 
     private final RVNKTools plugin;
     private final AnnounceManager announceManager;
@@ -81,74 +83,78 @@ public class AnnounceScheduler {
             return;
         }
 
-        debug.debug("Handling periodic announcement: " + announcement.getId() + " with ticks: " + ticks);
+        debug.debug("Handling periodic announcement: " + announcement.getId() + " running in " + ticks + " ticks");
         handlePeriodicAnnouncement(announcement, ticks);
     }
 
     // Handle scheduling of announcements with a specific date and time
     private void handleScheduledAnnouncement(Announcement announcement) {
         LocalDateTime now = LocalDateTime.now();
-
-        // Check if the announcement date is today
-        if (now.toLocalDate().isEqual(announcement.getDate())) {
-            long delay = 0L;
-
-            // If time is specified
-            if (announcement.getTime() != null) {
-                if (now.toLocalTime().isBefore(announcement.getTime())) {
-                    // Calculate delay until the specified time
-                    delay = Duration.between(now.toLocalTime(), announcement.getTime()).toMillis() / 50L;
-                    debug.debug("Scheduled announcement " + announcement.getId() + " will run in " + delay + " ticks");
-                } else {
-                    // Time has already passed today, do not schedule
-                    debug.debug("Skipping scheduled announcement " + announcement.getId() + " as time has passed");
-                    return;
-                }
-            }
-
-            // If recurrence is set, schedule periodically on the scheduled day
-            long ticks = announcement.getRecurrence() * 20L;
-            if (ticks > 0) {
-                ticks = applyRandomTicks(ticks);
-                BukkitTask task = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskTimer(plugin, delay, ticks);
-                scheduledTasks.put(announcement, task);
-                debug.debug("Scheduled announcement " + announcement.getId() + " task created");
-            } else {
-                // Schedule the announcement to run once after the calculated delay
-                BukkitTask task = new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        broadcastAnnouncement(announcement);
-                    }
-                }.runTaskLater(plugin, delay);
-                scheduledTasks.put(announcement, task);
-                debug.debug("Scheduled announcement " + announcement.getId() + " task created");
-            }
-        } else {
+        
+        if (!isDateMatch(now.toLocalDate(), announcement.getDate())) {
             debug.debug("Announcement " + announcement.getId() + " is not scheduled for today");
+            return;
+        }
+
+        long delayInTicks = 0L;
+        if (announcement.getTime() != null) {
+            if (now.toLocalTime().isAfter(announcement.getTime())) {
+                debug.debug("Skipping announcement " + announcement.getId() + " - time already passed today");
+                return;
+            }
+            delayInTicks = Duration.between(now.toLocalTime(), announcement.getTime()).toMillis() / 50L;
+        }
+
+        long recurrence = calculateRecurrence(announcement);
+        if ("daily".equalsIgnoreCase(announcement.getRecurrenceString())) {
+            scheduleOneTimeAnnouncement(announcement, delayInTicks);
+        } else {
+            scheduleRecurringAnnouncement(announcement, delayInTicks, recurrence);
         }
     }
 
+    private void scheduleRecurringAnnouncement(Announcement announcement, long initialDelay, long period) {
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                broadcastAnnouncement(announcement);
+            }
+        }.runTaskTimer(plugin, initialDelay, period);
+        scheduledTasks.put(announcement, task);
+        debug.debug("Scheduled recurring announcement " + announcement.getId() + 
+                   " (delay: " + initialDelay + " ticks, period: " + period + " ticks)");
+    }
+
+    private void scheduleOneTimeAnnouncement(Announcement announcement, long delay) {
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                broadcastAnnouncement(announcement);
+            }
+        }.runTaskLater(plugin, delay);
+        scheduledTasks.put(announcement, task);
+        debug.debug("Scheduled one-time announcement " + announcement.getId() + 
+                   " (delay: " + delay + " ticks)");
+    }
+
+    // Helper method to compare only month and day of dates
+    private boolean isDateMatch(LocalDate today, LocalDate announcementDate) {
+        if (announcementDate == null) return false;
+        return today.getMonth() == announcementDate.getMonth() 
+            && today.getDayOfMonth() == announcementDate.getDayOfMonth();
+    }
+
     // Handle scheduling of periodic announcements
-    private void handlePeriodicAnnouncement(Announcement announcement, long ticks) {
-        // if ticks is set to RECURRENCE_UNSET (-1), use the default recurrence of 3 hours
-        if (ticks == RECURRENCE_UNSET) {
-            ticks = DEFAULT_RECURRENCE_TICKS;
-            debug.debug("Using default recurrence for " + announcement.getId() + ": " + ticks + " ticks");
-        }
+    private void handlePeriodicAnnouncement(Announcement announcement, long unusedTicks) {
+        long recurrence = calculateRecurrence(announcement);
+        debug.debug("Scheduling periodic announcement " + announcement.getId() + " with recurrence " + recurrence + " ticks");
 
         BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
-                debug.debug("Broadcasting periodic announcement: " + announcement.getId());
                 broadcastAnnouncement(announcement);
             }
-        }.runTaskTimer(plugin, ticks, ticks);
+        }.runTaskTimer(plugin, recurrence, recurrence);
 
         scheduledTasks.put(announcement, task);
     }
@@ -157,6 +163,20 @@ public class AnnounceScheduler {
     private long applyRandomTicks(long ticks) {
         long randomizedTicks = (long) (ticks * (RANDOM_TICK_MULTIPLIER_MIN + rand.nextDouble() * (RANDOM_TICK_MULTIPLIER_MAX - RANDOM_TICK_MULTIPLIER_MIN)));
         return randomizedTicks;
+    }
+
+    private long calculateRecurrence(Announcement announcement) {
+        String recurrenceStr = announcement.getRecurrenceString();
+        Long recurrence = announcement.getRecurrence();
+
+        // Handle different recurrence scenarios
+        if (recurrence != null && recurrence > 0) {
+            return applyRandomTicks(recurrence * 20L);
+        }
+        if ("daily".equalsIgnoreCase(recurrenceStr)) {
+            return DAILY_RECURRENCE_TICKS;
+        }
+        return applyRandomTicks(DEFAULT_RECURRENCE_TICKS);
     }
 
     // Broadcast the announcement to all players
@@ -183,5 +203,4 @@ public class AnnounceScheduler {
         shutdown();
         scheduledTasks.clear();
     }
-
 }
