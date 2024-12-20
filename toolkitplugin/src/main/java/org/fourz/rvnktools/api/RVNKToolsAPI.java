@@ -34,7 +34,7 @@ public class RVNKToolsAPI {
         if (config.isEnabled()) {
             jettyServer = new JettyServer(announceManager, config, plugin);
             jettyServer.start();
-            debug.info("API server started on port " + config.getPort());
+            debug.info("API server initialized"); // Changed message to avoid duplication
         } else {
             debug.info("API server disabled by configuration");
         }

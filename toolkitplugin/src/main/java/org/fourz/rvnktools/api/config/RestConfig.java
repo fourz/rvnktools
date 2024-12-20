@@ -4,6 +4,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 import java.io.File;
+import org.fourz.rvnktools.api.security.KeyStoreGenerator;
 
 public class RestConfig {
     private final int port;
@@ -31,11 +32,12 @@ public class RestConfig {
     private final int rateLimitPeriod;
     private final boolean compressionEnabled;
     private final int compressionMinSize;
-    private final boolean tlsEnabled;
+    private boolean tlsEnabled;
     private final String keystorePath;
-    private final String keystorePassword;
-    private final String keyManagerPassword;
+    private String keystorePassword;
+    private String keyManagerPassword;
     private final int httpsPort;
+    private final boolean allowHttpWithTls;
 
     public RestConfig(Plugin plugin) {
         File configFile = new File(plugin.getDataFolder(), "config.yml");
@@ -82,12 +84,43 @@ public class RestConfig {
         this.logRetainDays = config.getInt("api.logging.retain-days", 7);
         this.logFilename = config.getString("api.logging.filename", "api-access-%d{yyyy-MM-dd}.log");
         
-        // TLS settings
+        // TLS settings with auto-generation support
         this.tlsEnabled = config.getBoolean("api.tls.enabled", false);
         this.httpsPort = config.getInt("api.tls.port", 8443);
-        this.keystorePath = config.getString("api.tls.keystore-path", "keystore.jks");
-        this.keystorePassword = config.getString("api.tls.keystore-password", "changeme");
-        this.keyManagerPassword = config.getString("api.tls.keymanager-password", "changeme");
+        this.allowHttpWithTls = config.getBoolean("api.tls.allow-http", false);
+        
+        if (tlsEnabled) {
+            this.keystorePath = new File(plugin.getDataFolder(), 
+                config.getString("api.tls.keystore-path", "keystore.jks")).getAbsolutePath();
+            this.keystorePassword = config.getString("api.tls.keystore-password", null);
+            this.keyManagerPassword = config.getString("api.tls.keymanager-password", null);
+
+            // Auto-generate keystore if needed
+            if (keystorePassword == null || keyManagerPassword == null || 
+                !new File(keystorePath).exists()) {
+                try {
+                    String generatedPassword = KeyStoreGenerator.generateSecurePassword();
+                    this.keystorePassword = generatedPassword;
+                    this.keyManagerPassword = generatedPassword;
+                    
+                    KeyStoreGenerator.generateKeyStore(keystorePath, generatedPassword, "jetty");
+                    
+                    // Save generated passwords back to config
+                    config.set("api.tls.keystore-password", generatedPassword);
+                    config.set("api.tls.keymanager-password", generatedPassword);
+                    config.save(configFile);
+                    
+                    plugin.getLogger().info("Generated new SSL keystore for HTTPS");
+                } catch (Exception e) {
+                    plugin.getLogger().severe("Failed to generate SSL keystore: " + e.getMessage());
+                    this.tlsEnabled = false;
+                }
+            }
+        } else {
+            this.keystorePath = "keystore.jks";
+            this.keystorePassword = "changeme";
+            this.keyManagerPassword = "changeme";
+        }
     }
 
     // Add getters for all fields
@@ -209,5 +242,9 @@ public class RestConfig {
 
     public int getHttpsPort() {
         return httpsPort;
+    }
+
+    public boolean isAllowHttpWithTls() {
+        return allowHttpWithTls;
     }
 }

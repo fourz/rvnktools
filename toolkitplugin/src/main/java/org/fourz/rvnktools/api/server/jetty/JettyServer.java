@@ -25,11 +25,19 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.fourz.rvnktools.util.Debug;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
+import com.google.gson.TypeAdapter;
+import com.google.gson.GsonBuilder;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 public class JettyServer {
     private Server server;
     private final AnnounceManager announceManager;
-    private final Gson gson = new Gson();
+    private final Gson gson = createGson();
     private final RestConfig config;
     private final JettyServerDebug debug;
     private final JavaPlugin plugin;
@@ -95,8 +103,10 @@ public class JettyServer {
             public void info(String msg, Object... args) { 
                 if (msg != null) {
                     String formatted = formatMessage(msg, args);
-                    // Filter out noisy startup messages but log everything else
-                    if (!formatted.contains("Started @")) {
+                    // Filter out noisy startup messages
+                    if (!formatted.contains("Started @") && 
+                        !formatted.contains("Started Server@") &&
+                        !formatted.contains("Started o.e.j.s.ServletContextHandler")) {
                         debug.debug(formatted);
                     }
                 }
@@ -142,11 +152,14 @@ public class JettyServer {
         httpConfig.setRequestHeaderSize(config.getRequestHeaderSize());
         httpConfig.setResponseHeaderSize(config.getResponseHeaderSize());
 
-        // Add HTTP connector
-        ServerConnector connector = new ServerConnector(server,
-                new HttpConnectionFactory(httpConfig));
-        connector.setPort(config.getPort());
-        connector.setIdleTimeout(config.getIdleTimeout());
+        // Only add HTTP connector if TLS is disabled or explicitly allowed
+        if (!config.isTlsEnabled() || config.isAllowHttpWithTls()) {
+            ServerConnector connector = new ServerConnector(server,
+                    new HttpConnectionFactory(httpConfig));
+            connector.setPort(config.getPort());
+            connector.setIdleTimeout(config.getIdleTimeout());
+            server.addConnector(connector);
+        }
 
         // Add HTTPS connector if TLS is enabled
         if (config.isTlsEnabled()) {
@@ -169,8 +182,6 @@ public class JettyServer {
             server.addConnector(sslConnector);
         }
 
-        server.addConnector(connector);
-
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/");
         
@@ -185,16 +196,97 @@ public class JettyServer {
 
         try {
             server.start();
-            debug.info("HTTP server started on port " + config.getPort());
             if (config.isTlsEnabled()) {
-                debug.info("HTTPS server started on port " + config.getHttpsPort());
+                String ports = config.isAllowHttpWithTls() ? 
+                    String.format("HTTP on port %d, HTTPS on port %d", config.getPort(), config.getHttpsPort()) :
+                    String.format("HTTPS on port %d (HTTP disabled)", config.getHttpsPort());
+                debug.info("Server started (" + ports + ")");
+            } else {
+                debug.info(String.format("Server started on port %d", config.getPort()));
             }
         } catch (Exception e) {
             debug.error("Failed to start server", e);
         }
     }
 
+    private Gson createGson() {
+        return new GsonBuilder()
+            .registerTypeAdapter(LocalDateTime.class, new TypeAdapter<LocalDateTime>() {
+                @Override
+                public void write(JsonWriter out, LocalDateTime value) throws IOException {
+                    if (value == null) {
+                        out.nullValue();
+                    } else {
+                        out.value(value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    }
+                }
+
+                @Override
+                public LocalDateTime read(JsonReader in) throws IOException {
+                    String dateStr = in.nextString();
+                    return dateStr == null ? null : LocalDateTime.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                }
+            })
+            .registerTypeAdapter(LocalTime.class, new TypeAdapter<LocalTime>() {
+                @Override
+                public void write(JsonWriter out, LocalTime value) throws IOException {
+                    if (value == null) {
+                        out.nullValue();
+                    } else {
+                        out.value(value.format(DateTimeFormatter.ISO_LOCAL_TIME));
+                    }
+                }
+
+                @Override
+                public LocalTime read(JsonReader in) throws IOException {
+                    String timeStr = in.nextString();
+                    return timeStr == null ? null : LocalTime.parse(timeStr, DateTimeFormatter.ISO_LOCAL_TIME);
+                }
+            })
+            .registerTypeAdapter(LocalDate.class, new TypeAdapter<LocalDate>() {
+                @Override
+                public void write(JsonWriter out, LocalDate value) throws IOException {
+                    if (value == null) {
+                        out.nullValue();
+                    } else {
+                        out.value(value.format(DateTimeFormatter.ISO_LOCAL_DATE));
+                    }
+                }
+
+                @Override
+                public LocalDate read(JsonReader in) throws IOException {
+                    String dateStr = in.nextString();
+                    return dateStr == null ? null : LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+                }
+            })
+            .create();
+    }
+
     private class AnnouncementServlet extends HttpServlet {
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            String pathInfo = req.getPathInfo();
+            resp.setContentType("application/json");
+
+            if (pathInfo == null || pathInfo.equals("/")) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.getWriter().println("{\"status\":\"error\",\"message\":\"Announcement ID is required\"}");
+                return;
+            }
+
+            String id = pathInfo.substring(1); // Remove leading slash
+            Announcement announcement = announceManager.getAnnouncement(id);
+
+            if (announcement == null) {
+                resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                resp.getWriter().println("{\"status\":\"error\",\"message\":\"Announcement not found\"}");
+                return;
+            }
+
+            resp.setStatus(HttpServletResponse.SC_OK);
+            resp.getWriter().println(gson.toJson(announcement));
+        }
+
         @Override
         protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
             String pathInfo = req.getPathInfo();
