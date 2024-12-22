@@ -24,7 +24,6 @@ public class AnnounceSubCommandDelete extends AnnounceSubCommand {
         }
 
         String id = args[1];
-        // Assuming AnnounceManager has a deleteAnnouncement method
         if (announceManager.deleteAnnouncement(id)) {
             messagePlayer(player, "&aAnnouncement deleted successfully");
             return true;

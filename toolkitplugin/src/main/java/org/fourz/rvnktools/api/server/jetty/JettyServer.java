@@ -8,6 +8,7 @@ import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.api.config.RestConfig;
 import org.fourz.rvnktools.api.security.ApiKeyAuthFilter;
+import org.fourz.rvnktools.api.model.CreateAnnouncementRequest;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +34,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import org.fourz.rvnktools.api.security.KeyStoreImporter;
 
 public class JettyServer {
     private Server server;
@@ -163,7 +166,20 @@ public class JettyServer {
 
         // Add HTTPS connector if TLS is enabled
         if (config.isTlsEnabled()) {
-            validateTlsConfig();
+            if (config.isImportCert()) {
+                KeyStoreImporter.importKeyStore(
+                    config.getImportCertPath(),
+                    config.getImportKeyPath(),
+                    config.getImportChainPath(),  // Added chain path
+                    config.getKeystorePath(),
+                    config.getKeystorePassword(),
+                    config.getKeyManagerPassword(),
+                    debug
+                );
+            } else {
+                // Use KeyStoreGenerator
+            }
+            debug.debug("TLS Configuration is " + (validateTlsConfig() ? "valid" : "invalid"));
             
             HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
             httpsConfig.addCustomizer(new SecureRequestCustomizer());
@@ -269,11 +285,14 @@ public class JettyServer {
             resp.setContentType("application/json");
 
             if (pathInfo == null || pathInfo.equals("/")) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("{\"status\":\"error\",\"message\":\"Announcement ID is required\"}");
+                // Return list of all announcements
+                List<Announcement> announcements = announceManager.getAnnouncements();
+                resp.setStatus(HttpServletResponse.SC_OK);
+                resp.getWriter().println(gson.toJson(announcements));
                 return;
             }
 
+            // Handle single announcement request
             String id = pathInfo.substring(1); // Remove leading slash
             Announcement announcement = announceManager.getAnnouncement(id);
 
@@ -290,14 +309,32 @@ public class JettyServer {
         @Override
         protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
             String pathInfo = req.getPathInfo();
+            resp.setContentType("application/json");
+
             if (pathInfo == null || pathInfo.equals("/")) {
-                // Add announcement
                 BufferedReader reader = req.getReader();
-                Announcement announcement = gson.fromJson(reader, Announcement.class);
+                CreateAnnouncementRequest request = gson.fromJson(reader, CreateAnnouncementRequest.class);
+                
+                if (!request.isValid()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Missing required fields: id, type, and message\"}");
+                    return;
+                }
+
+                // Validate announcement type
+                if (!announceManager.validateAnnounceType(request.getType())) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Invalid announcement type\"}");
+                    return;
+                }
+
+                Announcement announcement = new Announcement();
+                announcement.setId(request.getId());
+                announcement.setType(request.getType());
+                announcement.setMessage(request.getMessage());
                 
                 boolean success = announceManager.addAnnouncement(announcement);
                 
-                resp.setContentType("application/json");
                 if (success) {
                     resp.setStatus(HttpServletResponse.SC_CREATED);
                     resp.getWriter().println("{\"status\":\"success\",\"message\":\"Announcement created\"}");

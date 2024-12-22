@@ -193,12 +193,12 @@ public class AnnounceManager {
                     return false;
                 }
                 announceConfig.getDataStore().deleteAnnouncement(id);
+                debug.debug("Announcement '" + id + "' deleted from data store.");
             }
 
             Announcement removed = announcements.remove(id);
             if (removed != null) {
                 debug.debug("Deleted announcement: " + id);
-                announceConfig.saveConfig();
                 return true;
             }
 

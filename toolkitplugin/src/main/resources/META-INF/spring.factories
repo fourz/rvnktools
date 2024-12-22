@@ -1,2 +1,0 @@
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-org.fourz.rvnktools.announceManager.api.WebConfig

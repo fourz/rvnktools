@@ -59,6 +59,9 @@ public abstract class Debug {
     public void warning(String message) {
         log(Level.WARNING, message);
     }
+     public void severe(String message) {
+        log(Level.SEVERE, message);
+    }
 
     public void debug(String message) {
         log(Level.FINE, message);

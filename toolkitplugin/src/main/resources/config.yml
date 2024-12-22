@@ -11,14 +11,21 @@ api:
 
   server:
     min-threads: 2
-    max-threads: 8
+    max-threads: 4
     queue-size: 100
     idle-timeout: 30000
     connection-timeout: 5000
 
   tls:
+    # if enabled, the server will use https and disable http
     enabled: false
     port: 8443
+    # if set to true, the server will use the provided cert and key
+    # if set to false, the server will generate a self-signed cert
+    import-cert: false    
+    import-cert-path: "cert.pem"
+    import-key-path: "key.pem"
+    import-chain-path: "chain.pem"
     keystore-path: "keystore.jks"
     keystore-password: "changeme"
     keymanager-password: "changeme"
@@ -37,6 +44,6 @@ api:
     compression-min-size: 2048
 
   logging:
-    enabled: true
-    retain-days: 7
+    enabled: false
+    retain-days: 1
     filename: "api-access-%d{yyyy-MM-dd}.log"

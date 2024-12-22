@@ -38,6 +38,10 @@ public class RestConfig {
     private String keyManagerPassword;
     private final int httpsPort;
     private final boolean allowHttpWithTls;
+    private final boolean importCert;
+    private final String importCertPath;
+    private final String importKeyPath;
+    private final String importChainPath;
 
     public RestConfig(Plugin plugin) {
         File configFile = new File(plugin.getDataFolder(), "config.yml");
@@ -88,6 +92,10 @@ public class RestConfig {
         this.tlsEnabled = config.getBoolean("api.tls.enabled", false);
         this.httpsPort = config.getInt("api.tls.port", 8443);
         this.allowHttpWithTls = config.getBoolean("api.tls.allow-http", false);
+        this.importCert = config.getBoolean("api.tls.import-cert", false);
+        this.importCertPath = config.getString("api.tls.import-cert-path", "cert.pem");
+        this.importKeyPath = config.getString("api.tls.import-key-path", "key.pem");
+        this.importChainPath = config.getString("api.tls.import-chain-path", "chain.pem");
         
         if (tlsEnabled) {
             this.keystorePath = new File(plugin.getDataFolder(), 
@@ -247,4 +255,21 @@ public class RestConfig {
     public boolean isAllowHttpWithTls() {
         return allowHttpWithTls;
     }
+
+    public boolean isImportCert() {
+        return importCert;
+    }
+
+    public String getImportCertPath() {
+        return importCertPath;
+    }
+
+    public String getImportKeyPath() {
+        return importKeyPath;
+    }
+
+    public String getImportChainPath() {
+        return importChainPath;
+    }
+
 }

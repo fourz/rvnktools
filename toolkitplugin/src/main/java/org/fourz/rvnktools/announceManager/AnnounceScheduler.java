@@ -203,7 +203,6 @@ public class AnnounceScheduler {
 
     // Shut down the scheduler and cancel all tasks
     public void shutdown() {
-        debug.info("Shutting down announcement scheduler");
         if (scheduledTasks != null) {
             for (BukkitTask task : scheduledTasks.values()) {
                 task.cancel();
@@ -214,8 +213,6 @@ public class AnnounceScheduler {
 
     // Cancel all tasks and clear the scheduled tasks map
     public void cleanup() {
-        debug.debug("Cleaning up announcement scheduler");
-        // Cancel all tasks and clear the map
         shutdown();
         scheduledTasks.clear();
     }
