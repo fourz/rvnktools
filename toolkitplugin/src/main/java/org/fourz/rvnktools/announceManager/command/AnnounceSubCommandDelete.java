@@ -1,5 +1,5 @@
 
-package org.fourz.rvnktools.announceManager.subcommand;
+package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
@@ -24,7 +24,6 @@ public class AnnounceSubCommandDelete extends AnnounceSubCommand {
         }
 
         String id = args[1];
-        // Assuming AnnounceManager has a deleteAnnouncement method
         if (announceManager.deleteAnnouncement(id)) {
             messagePlayer(player, "&aAnnouncement deleted successfully");
             return true;

@@ -107,7 +107,7 @@ public class SQLiteDataConnector implements DataStore {
             ensureConnected();
             try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
                 pstmt.setString(1, announcement.getId());
-                pstmt.setString(2, announcement.getText());
+                pstmt.setString(2, announcement.getMessage());
                 pstmt.setString(3, announcement.getType());
                 pstmt.setObject(4, announcement.getRecurrence()); // Changed to handle Long
                 pstmt.setString(5, announcement.getOwner());
@@ -149,7 +149,7 @@ public class SQLiteDataConnector implements DataStore {
                 while (rs.next()) {
                     Announcement announcement = new Announcement();
                     announcement.setId(rs.getString("id"));
-                    announcement.setText(rs.getString("text"));
+                    announcement.setMessage(rs.getString("text"));
                     announcement.setType(rs.getString("type"));
                     announcement.setRecurrence(rs.getObject("recurrence") != null ? rs.getLong("recurrence") : null);
                     announcement.setOwner(rs.getString("owner"));

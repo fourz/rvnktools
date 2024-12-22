@@ -2,6 +2,7 @@ package org.fourz.rvnktools;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
@@ -10,15 +11,17 @@ import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.permission.LuckPermsManager;
+import org.fourz.rvnktools.permission.PermissionService;
+import org.fourz.rvnktools.api.RVNKToolsAPI;
 
 import net.milkbowl.vault.economy.Economy;
 
-import org.fourz.rvnktools.Permission.LuckPermsManager;
-import org.fourz.rvnktools.Permission.PermissionService;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.hatManager.PutHatCommand;
+
 public class RVNKTools extends JavaPlugin implements Listener {
 
     private AnnounceManager announceManager;
@@ -27,21 +30,31 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public LinkMaker linkMaker;
     public PermissionService permissionService;
     private int gcTaskId = -1;
+    private RVNKToolsAPI api;
 
     @Override
     public void onEnable() {
 
-        // Save default config if not present
-        // saveDefaultConfig();
-
+        // Initialize LuckPermsManager and PermissionService used for permission integration
         LuckPermsManager.init();
         permissionService = new PermissionService();
         
-        // Initialize Economy
-        this.economy = getServer().getServicesManager().getRegistration(Economy.class).getProvider();
+        // Initialize Economy if available        
+        if (setupEconomy()) {  
+            getLogger().info("Economy integration enabled.");
+        } else {
+            getLogger().info("Economy not found. Economy features will be disabled.");   
+        }
+
+        // Initialize LinkMaker
+        linkMaker = new LinkMaker(this);        
         
-        // Initialize AnnouncementManager
+        // Initialize AnnounceManager
         announceManager = new AnnounceManager(this);
+
+        // Initialize RVNKToolsAPI (AnnounceManager, ...)
+        api = new RVNKToolsAPI(this, announceManager);
+        api.start();
 
         // Register PlaceholderAPI integration or flag as unavailable
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
@@ -49,9 +62,6 @@ public class RVNKTools extends JavaPlugin implements Listener {
         } else {
             getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
         } 
-
-        // Initialize LinkMaker
-        linkMaker = new LinkMaker(this);
 
         // Register Events
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
@@ -68,27 +78,35 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
 
-        // Schedule periodic garbage collection
-        // scheduleGarbageCollection();
-
-        getLogger().info("RVNK Toolkit has been enabled.");
-                
+        getLogger().info("RVNK Toolkit has been enabled.");                
     }
 
     @Override
     public void onDisable() {
+        if (api != null) api.stop();
         if (announceManager != null) {
-            announceManager.shutdown(); // This will trigger AnnounceConfig.shutdown()
+            announceManager.shutdown(); 
         }
-        // ...rest of shutdown code...
+        api = null;        
         announceManager = null;
         cycleCommands = null;
-        linkMaker = null;
-        
+        linkMaker = null;        
         getLogger().info("RVNK Toolkit has been disabled.");
     }
 
     public Economy getEconomy() {
         return economy;
+    }
+
+    private boolean setupEconomy() {
+        if (getServer().getPluginManager().getPlugin("Vault") == null) {
+            return false;
+        }
+        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
+        if (rsp == null) {
+            return false;
+        }
+        economy = rsp.getProvider();
+        return economy != null;
     }
 }

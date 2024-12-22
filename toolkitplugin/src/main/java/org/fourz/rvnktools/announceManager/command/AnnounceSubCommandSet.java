@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.announceManager.subcommand;
+package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
