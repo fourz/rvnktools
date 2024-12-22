@@ -381,6 +381,7 @@ public class AnnounceConfig {
             String username = config.getString("storage.mysql.username", "");
             String password = config.getString("storage.mysql.password", "");
             boolean useSSL = config.getBoolean("storage.mysql.useSSL", false);
+            String tablePrefix = config.getString("storage.mysql.tablePrefix", "");
             
             if (host.isEmpty() || database.isEmpty() || username.isEmpty()) {
                 debug.warning("Invalid MySQL configuration - missing required fields");
@@ -389,7 +390,7 @@ public class AnnounceConfig {
             }
             
             debug.debug("Configuring MySQL connection for " + host + ":" + port); // Moved to debug level
-            dataStore = new MySQLDataConnector(plugin, host, port, database, username, password, useSSL);
+            dataStore = new MySQLDataConnector(plugin, host, port, database, username, password, useSSL, tablePrefix);
         } else if (storageType.equalsIgnoreCase("sqlite")) {
             String databasePath = config.getString("storage.sqlite.database", "announcements.db");
             dataStore = new SQLiteDataConnector(plugin, databasePath);
