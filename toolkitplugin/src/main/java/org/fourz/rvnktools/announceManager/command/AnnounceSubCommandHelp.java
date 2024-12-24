@@ -1,6 +1,7 @@
 package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.entity.Player;
+import org.checkerframework.checker.units.qual.m;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 
@@ -136,6 +137,13 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
         messagePlayer(player, "&8- &fdate &7(YYYY-MM-DD)");
         messagePlayer(player, "&8- &ftype &7(announcement type)");
         messagePlayer(player, "&8- &fpermission &7(permission node or 'none')");
+        messagePlayer(player, "&8- &fmessage &7(announcement message)");
+        messagePlayer(player, "");
+        messagePlayer(player, "Examples:");
+        messagePlayer(player, "&8- &f/announce set ad_woodnthings recurrence daily");
+        messagePlayer(player, "&8- &f/announce set xmas date 2020-12-25");
+        messagePlayer(player, "&8- &f/announce set events permission none");   
+
         return true;
     }
 }
