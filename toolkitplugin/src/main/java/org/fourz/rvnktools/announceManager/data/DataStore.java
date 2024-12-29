@@ -35,6 +35,17 @@ public interface DataStore {
     Set<String> getPlayerDisabledTypes(UUID playerId);
     Map<UUID, Set<String>> getAllPlayerDisabledTypes();
     
+    // New preference methods
+    void setPlayerPreference(UUID playerId, String property, String value);
+    String getPlayerPreference(UUID playerId, String property);
+    Map<String, String> getPlayerPreferences(UUID playerId);
+    void deletePlayerPreference(UUID playerId, String property);
+    
+    // Mark old methods as deprecated
+    /**
+     * @deprecated Use setPlayerPreference(UUID, String, String) instead
+     */
+    @Deprecated
     void savePlayerPreferences(UUID playerId, String preferences);
-    String getPlayerPreferences(UUID playerId);
+
 }

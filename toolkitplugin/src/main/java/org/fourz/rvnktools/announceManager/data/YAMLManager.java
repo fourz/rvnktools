@@ -356,15 +356,41 @@ public class YAMLManager {
         }
     }
 
-    private AnnounceType parseAnnounceType(Map<?, ?> map) {
-        // ... existing type parsing code from AnnounceConfig ...
-        return null; // Implement based on existing code
+    // Converts a YAML map into an AnnounceType object
+    public AnnounceType parseAnnounceType(Map<?, ?> map) {
+        String id = (String) map.get("id");
+        String prefix = (String) map.get("prefix");
+        String suffix = (String) map.get("suffix");
+        Double listingFee = map.get("list_fee") == null ? null : (map.get("list_fee") instanceof Integer ? ((Integer) map.get("list_fee")).doubleValue() : (Double) map.get("list_fee"));
+        String permission = (String) map.get("permission");        
+
+        AnnounceType announceType = new AnnounceType();
+        announceType.setId(id);
+        announceType.setPrefix(prefix);
+        announceType.setSuffix(suffix);
+        if (listingFee != null) {
+            announceType.setListingFee(listingFee);
+        }
+        announceType.setPermission(permission);
+        return announceType;
     }
 
     private LocalDate parseDate(String dateStr) {
-        // ... existing date parsing code from AnnounceConfig ...
-        return null; // Implement based on existing code
+        try {
+            if (dateStr.matches("\\d{2}-\\d{2}")) { // MM-dd format
+                // Parse as current year
+                return LocalDate.parse(LocalDate.now().getYear() + "-" + dateStr, 
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            } else {
+                // Parse as full date
+                return LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+            }
+        } catch (Exception e) {
+            debug.warning("Failed to parse date: " + dateStr);
+            return null;
+        }
     }
+
 
     public FileConfiguration getConfig() {
         return config;

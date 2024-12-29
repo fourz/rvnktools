@@ -7,13 +7,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.data.DataStore;
 import org.fourz.rvnktools.announceManager.data.DataStoreManager;
 import org.fourz.rvnktools.announceManager.data.YAMLManager;
-import org.fourz.rvnktools.announceManager.data.MySQLDataConnector;
-import org.fourz.rvnktools.announceManager.data.SQLiteDataConnector;
+import org.fourz.rvnktools.announceManager.preferences.AnnouncePreferences;
 
 import java.io.File;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.logging.Level;
 import org.fourz.rvnktools.util.Debug;
@@ -304,7 +300,7 @@ public class AnnounceConfig {
         if (configFile.exists()) {
             List<Map<?, ?>> typesMaps = config.getMapList("announce_types");
             for (Map<?, ?> map : typesMaps) {
-                AnnounceType announceType = parseAnnounceType(map);
+                AnnounceType announceType = yamlManager.parseAnnounceType(map);
                 if (announceType != null) {
                     types.put(announceType.getId(), announceType);
                 }
@@ -353,27 +349,6 @@ public class AnnounceConfig {
         announcement.setMessage(text);        
         return announceManager.addAnnouncement(announcement);
     }
-
-    // Converts a YAML map into an AnnounceType object
-    private AnnounceType parseAnnounceType(Map<?, ?> map) {
-        String id = (String) map.get("id");
-        String prefix = (String) map.get("prefix");
-        String suffix = (String) map.get("suffix");
-        Double listingFee = map.get("list_fee") == null ? null : (map.get("list_fee") instanceof Integer ? ((Integer) map.get("list_fee")).doubleValue() : (Double) map.get("list_fee"));
-        String permission = (String) map.get("permission");        
-
-        AnnounceType announceType = new AnnounceType();
-        announceType.setId(id);
-        announceType.setPrefix(prefix);
-        announceType.setSuffix(suffix);
-        if (listingFee != null) {
-            announceType.setListingFee(listingFee);
-        }
-        announceType.setPermission(permission);
-        return announceType;
-    }
-
-
 
     // Persists player preferences for disabled announcement types
     public void savePlayerDisabledTypes() {
@@ -427,5 +402,37 @@ public class AnnounceConfig {
 
     public boolean isDataStoreAvailable() {
         return dataManager != null && dataManager.isUsingDatabase();
+    }
+
+    /**
+     * Gets a specific preference value for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @return The preference value, or default value if not set
+     */
+    public String getPreference(UUID playerId, String property) {
+        return preferences.getPreference(playerId, property);
+    }
+
+    /**
+     * Gets all preferences for a player
+     * @param playerId The UUID of the player
+     * @return Map of preference properties and their values
+     */
+    public Map<String, String> getAllPreferences(UUID playerId) {
+        if (dataManager != null && dataManager.isInitialized()) {
+            return dataManager.getPreferences(playerId);
+        }
+        return new HashMap<>();
+    }
+
+    /**
+     * Sets a specific preference value for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @param value The preference value to set
+     */
+    public void setPreference(UUID playerId, String property, String value) {
+        preferences.setPreference(playerId, property, value);
     }
 }

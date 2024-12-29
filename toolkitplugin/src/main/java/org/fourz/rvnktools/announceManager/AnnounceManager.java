@@ -368,4 +368,37 @@ public class AnnounceManager {
         }
         return announcements.get(id);
     }
+
+    public AnnounceConfig getConfig() {
+        return announceConfig;
+    }
+
+    /**
+     * Sets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @param value The value to set
+     */
+    public void setPreference(UUID playerId, String property, String value) {
+        announceConfig.setPreference(playerId, property, value);
+    }
+
+    /**
+     * Gets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @return The preference value, or default if not set
+     */
+    public String getPreference(UUID playerId, String property) {
+        return announceConfig.getPreference(playerId, property);
+    }
+
+    /**
+     * Gets all preferences for a player
+     * @param playerId The UUID of the player
+     * @return Map of preference properties and their values
+     */
+    public Map<String, String> getPreferences(UUID playerId) {
+        return announceConfig.getAllPreferences(playerId);
+    }
 }

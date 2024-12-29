@@ -94,6 +94,25 @@ public class DataStoreManager {
         return initialized && dataStore != null;
     }
 
+    /**
+     * Gets all preferences for a player
+     * @param playerId The UUID of the player
+     * @return Map of preference properties and values, or empty map if not found
+     */
+    public Map<String, String> getPreferences(UUID playerId) {
+        if (!isInitialized()) return new HashMap<>();
+
+        try {
+            connectAndInitialize();
+            Map<String, String> prefs = dataStore.getPlayerPreferences(playerId);
+            // Ensure we return an empty map rather than null
+            return prefs != null ? prefs : new HashMap<>();
+        } catch (Exception e) {
+            debug.error("Failed to get player preferences", e);
+            return new HashMap<>();
+        }
+    }
+
     // CRUD Operations for Announcements
     public boolean saveAnnouncement(Announcement announcement) {
         if (!isInitialized() || announcement == null) return false;
@@ -243,15 +262,52 @@ public class DataStoreManager {
         }
     }
 
-    public String getPlayerPreferences(UUID playerId) {
+    public Map<String, String> getPlayerPreferences(UUID playerId) {
+        if (!isInitialized()) return new HashMap<>();
+
+        try {
+            connectAndInitialize();
+            Map<String, String> prefs = dataStore.getPlayerPreferences(playerId);
+            // Ensure we return an empty map rather than null
+            return prefs != null ? prefs : new HashMap<>();
+        } catch (Exception e) {
+            debug.error("Failed to get player preferences", e);
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * Gets a specific player preference
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @return The preference value, or null if not found
+     */
+    public String getPlayerPreference(UUID playerId, String property) {
         if (!isInitialized()) return null;
 
         try {
             connectAndInitialize();
-            return dataStore.getPlayerPreferences(playerId);
+            return dataStore.getPlayerPreference(playerId, property);
         } catch (Exception e) {
-            debug.error("Failed to get player preferences", e);
+            debug.error("Failed to get player preference", e);
             return null;
+        }
+    }
+
+    /**
+     * Sets a specific player preference
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @param value The preference value to set
+     */
+    public void setPlayerPreference(UUID playerId, String property, String value) {
+        if (!isInitialized()) return;
+
+        try {
+            connectAndInitialize();
+            dataStore.setPlayerPreference(playerId, property, value);
+        } catch (Exception e) {
+            debug.error("Failed to set player preference", e);
         }
     }
 

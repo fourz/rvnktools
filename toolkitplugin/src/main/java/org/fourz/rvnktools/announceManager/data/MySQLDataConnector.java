@@ -15,6 +15,7 @@ import org.fourz.rvnktools.util.Debug;
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.announceManager.AnnounceConfig;
+import org.fourz.rvnktools.announceManager.preferences.PreferenceProperty;
 
 public class MySQLDataConnector implements DataStore {
     private static final String CLASS_NAME = "MySQLDataConnector";
@@ -290,6 +291,21 @@ public class MySQLDataConnector implements DataStore {
             } else {
                 debug.debug("announce_prefs table already exists");
             }
+
+            // Create new preferences table
+            tables = metaData.getTables(database, null, tablePrefix + "player_preferences", null);
+            if (!tables.next()) {
+                debug.debug("Creating player_preferences table");
+                Statement stmt = connection.createStatement();
+                String createPreferencesTable = "CREATE TABLE " + tablePrefix + "player_preferences (" +
+                    "player_id VARCHAR(36)," +
+                    "property VARCHAR(32)," +
+                    "value TEXT," +
+                    "PRIMARY KEY (player_id, property)" +
+                    ")";
+                stmt.executeUpdate(createPreferencesTable);
+                debug.debug("player_preferences table created successfully");
+            }
             
             // Create stored procedure for hash calculation
             try {
@@ -473,54 +489,82 @@ public class MySQLDataConnector implements DataStore {
     }
 
     @Override
+    @Deprecated
     public void savePlayerPreferences(UUID playerId, String preferences) {
-        String query = "INSERT INTO " + tablePrefix + "announce_prefs (player_id, text) VALUES (?, ?) ON DUPLICATE KEY UPDATE text = ?";
+        debug.warning("Using deprecated savePlayerPreferences method - update to use setPlayerPreference");
+        // Store as a single 'legacy' property to maintain backwards compatibility
+        setPlayerPreference(playerId, "legacy", preferences);
+    }
+
+
+    @Override
+    public void setPlayerPreference(UUID playerId, String property, String value) {
+        String query = "INSERT INTO " + tablePrefix + "player_preferences (player_id, property, value) " +
+                      "VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?";
         try {
             ensureConnection();
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
-                statement.setString(1, playerId.toString());
-                statement.setString(2, preferences);
-                statement.setString(3, preferences);
-                statement.executeUpdate();
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, playerId.toString());
+                stmt.setString(2, property);
+                stmt.setString(3, value);
+                stmt.setString(4, value);
+                stmt.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error saving player preferences for playerId: " + playerId, e);
+            debug.error("Error setting player preference", e);
         }
     }
 
     @Override
-    public String getPlayerPreferences(UUID playerId) {
-        String query = "SELECT text FROM " + tablePrefix + "announce_prefs WHERE player_id = ?";
+    public String getPlayerPreference(UUID playerId, String property) {
+        String query = "SELECT value FROM " + tablePrefix + "player_preferences WHERE player_id = ? AND property = ?";
         try {
             ensureConnection();
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
-                statement.setString(1, playerId.toString());
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    if (resultSet.next()) {
-                        return resultSet.getString("text");
-                    }
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, playerId.toString());
+                stmt.setString(2, property);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getString("value");
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error retrieving player preferences for playerId: " + playerId, e);
+            debug.error("Error getting player preference", e);
         }
-        return null;
+        return PreferenceProperty.fromKey(property).getDefaultValue();
     }
 
-    public Set<String> getExistingAnnouncementIds() {
-        Set<String> ids = new HashSet<>();
+    @Override
+    public Map<String, String> getPlayerPreferences(UUID playerId) {
+        Map<String, String> preferences = new HashMap<>();
+        String query = "SELECT property, value FROM " + tablePrefix + "player_preferences WHERE player_id = ?";
         try {
             ensureConnection();
-            try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT LOWER(id) FROM " + tablePrefix + "announcements")) {
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, playerId.toString());
+                ResultSet rs = stmt.executeQuery();
                 while (rs.next()) {
-                    ids.add(rs.getString(1));
+                    preferences.put(rs.getString("property"), rs.getString("value"));
                 }
             }
-            debug.debug("Retrieved " + ids.size() + " announcement IDs from database");
         } catch (SQLException e) {
-            debug.error("Error retrieving announcement IDs", e);
+            debug.error("Error getting player preferences", e);
         }
-        return ids;
+        return preferences;
+    }
+
+    @Override
+    public void deletePlayerPreference(UUID playerId, String property) {
+        String query = "DELETE FROM " + tablePrefix + "player_preferences WHERE player_id = ? AND property = ?";
+        try {
+            ensureConnection();
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, playerId.toString());
+                stmt.setString(2, property);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            debug.error("Error deleting player preference", e);
+        }
     }
 }
