@@ -99,12 +99,10 @@ public class AnnounceManager {
         String text = args[2];
 
         // Check if announcement already exists
-        if (announceConfig.getDataStore() != null) {
-            if (checkAnnounceExist(id)) {
+        if (announceConfig.isDataStoreAvailable()) {  // Changed this line
+            if (announcementExists(id)) {
                 if (player != null) {
                     chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
-                } else {
-                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
                 }
                 return false;
             }
@@ -187,23 +185,12 @@ public class AnnounceManager {
         }
 
         try {
-            if (announceConfig.getDataStore() != null) {
-                if (!announceConfig.getDataStore().announcementExists(id)) {
-                    debug.warning("Announcement with ID '" + id + "' does not exist");
-                    return false;
-                }
+            if (announceConfig.isDataStoreAvailable()) {
                 announceConfig.getDataStore().deleteAnnouncement(id);
-                debug.debug("Announcement '" + id + "' deleted from data store.");
             }
-
-            Announcement removed = announcements.remove(id);
-            if (removed != null) {
-                debug.debug("Deleted announcement: " + id);
-                return true;
-            }
-
-            debug.debug("Could not find announcement with ID: " + id);
-            return false;
+            announcements.remove(id);
+            debug.debug("Deleted announcement: " + id);
+            return true;
         } catch (Exception e) {
             debug.info("Failed to delete announcement: " + id);
             return false;
@@ -349,12 +336,8 @@ public class AnnounceManager {
         }
 
         // Then check in database if available
-        if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();
-            boolean exists = announceConfig.getDataStore().announcementExists(id);
-            announceConfig.getDataStore().disconnect();
-            debug.debug("Announcement with ID '" + id + "' found in database: " + exists);
-            return exists;
+        if (announceConfig.isDataStoreAvailable()) {
+            return announceConfig.getDataStore().announcementExists(id);
         }
 
         return false;

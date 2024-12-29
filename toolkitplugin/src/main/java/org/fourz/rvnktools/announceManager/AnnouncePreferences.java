@@ -1,163 +1,108 @@
 package org.fourz.rvnktools.announceManager;
 
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.announceManager.data.DataStore;
+import org.fourz.rvnktools.announceManager.data.DataStoreManager;
+import org.fourz.rvnktools.announceManager.data.YAMLManager;
+import org.fourz.rvnktools.util.Debug;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
 
 public class AnnouncePreferences {
+    private static final String CLASS_NAME = "AnnouncePreferences";
     private final JavaPlugin plugin;
-    private final DataStore dataStore;
+    private final DataStoreManager dataManager;
+    private final YAMLManager yamlManager;
+    private final Debug debug;
     private Map<UUID, Set<String>> playerDisabledTypes;
     private Map<UUID, String> playerPreferences;
 
-    public AnnouncePreferences(JavaPlugin plugin, DataStore dataStore) {
+    public AnnouncePreferences(JavaPlugin plugin, DataStoreManager dataManager) {
         this.plugin = plugin;
-        this.dataStore = dataStore;
+        this.dataManager = dataManager;
+        this.yamlManager = new YAMLManager(plugin);
+        this.debug = new AnnouncePreferencesDebug(plugin, CLASS_NAME);
         this.playerDisabledTypes = new HashMap<>();
         this.playerPreferences = new HashMap<>();
         loadPreferences();
     }
 
+    private class AnnouncePreferencesDebug extends Debug {
+        public AnnouncePreferencesDebug(JavaPlugin plugin, String className) {
+            super(plugin, CLASS_NAME, Level.FINE);
+        }
+    }    
+
     public void loadPreferences() {
-        if (dataStore != null) {
-            dataStore.connect();
-            // Load disabled types
-            playerDisabledTypes = dataStore.getAllPlayerDisabledTypes();
+        if (dataManager != null && dataManager.isInitialized()) {
+            // Load from database
+            playerDisabledTypes = dataManager.getAllPlayerDisabledTypes();
             
             // Load preferences for each player
+            playerPreferences = new HashMap<>();
             for (UUID playerId : playerDisabledTypes.keySet()) {
-                String prefs = dataStore.getPlayerPreferences(playerId);
+                String prefs = dataManager.getPlayerPreferences(playerId);
                 if (prefs != null) {
                     playerPreferences.put(playerId, prefs);
                 }
             }
-            dataStore.disconnect();
             
             // Sync to YML backup
-            saveToYml();
+            syncToYAML();
+            debug.debug("Loaded preferences from database");
             return;
         }
 
-        // Fallback to YML if no datastore
-        loadFromYml();
+        // Fallback to YML if no database
+        loadFromYAML();
+        debug.debug("Loaded preferences from YAML");
     }
 
-    private void loadFromYml() {
-        File configFile = new File(plugin.getDataFolder(), "announceDisabledTypes.yml");
-        if (!configFile.exists()) {
-            return;
-        }
-
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-        for (String key : config.getKeys(false)) {
-            UUID playerId = UUID.fromString(key);
-            List<String> disabledTypesList = config.getStringList(key);
-            Set<String> disabledTypesSet = new HashSet<>(disabledTypesList);
-            playerDisabledTypes.put(playerId, disabledTypesSet);
-        }
-        
-        // Load preferences
-        configFile = new File(plugin.getDataFolder(), "announcePreferences.yml");
-        if (configFile.exists()) {
-            config = YamlConfiguration.loadConfiguration(configFile);
-            for (String key : config.getKeys(false)) {
-                UUID playerId = UUID.fromString(key);
-                if (config.contains(key + ".preferences")) {
-                    playerPreferences.put(playerId, config.getString(key + ".preferences"));
-                }
-            }
-        }
+    private void loadFromYAML() {
+        playerDisabledTypes = yamlManager.loadPlayerDisabledTypes();
+        playerPreferences = yamlManager.loadPlayerPreferences();
     }
 
     public void savePreferences() {
         // Always maintain YML backup
-        saveToYml();
+        syncToYAML();
 
         // Save to database if available
-        if (dataStore != null) {
-            dataStore.connect();
-            
+        if (dataManager != null && dataManager.isInitialized()) {
             // Save preferences
             for (Map.Entry<UUID, String> entry : playerPreferences.entrySet()) {
-                dataStore.savePlayerPreferences(entry.getKey(), entry.getValue());
+                dataManager.savePlayerPreferences(entry.getKey(), entry.getValue());
             }
             
             // Save disabled types
             for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
                 for (String type : entry.getValue()) {
-                    dataStore.savePlayerDisabledType(entry.getKey(), type);
+                    dataManager.savePlayerDisabledType(entry.getKey(), type);
                 }
             }
-            
-            dataStore.disconnect();
         }
     }
 
-    private void saveToYml() {
-        File dataFolder = plugin.getDataFolder();
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-
-        File configFile = new File(dataFolder, "announceDisabledTypes.yml");
-        YamlConfiguration config = new YamlConfiguration();
-
-        for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
-            String key = entry.getKey().toString();
-            List<String> disabledTypesList = new ArrayList<>(entry.getValue());
-            config.set(key, disabledTypesList);
-        }
-
-        try {
-            config.save(configFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to sync announceDisabledTypes to YML: " + e.getMessage());
-        }
-        
-        configFile = new File(dataFolder, "announcePreferences.yml");
-        config = new YamlConfiguration();
-        
-        // Save both disabled types and preferences
-        for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
-            String key = entry.getKey().toString();
-            config.set(key + ".disabled_types", new ArrayList<>(entry.getValue()));
-            
-            // Save preferences if they exist
-            String prefs = playerPreferences.get(entry.getKey());
-            if (prefs != null) {
-                config.set(key + ".preferences", prefs);
-            }
-        }
-
-        try {
-            config.save(configFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save preferences to YML: " + e.getMessage());
-        }
+    private void syncToYAML() {
+        yamlManager.savePreferences(playerDisabledTypes, playerPreferences);
     }
 
     public void addDisabledType(UUID playerId, String type) {
-        if (dataStore != null) {
-            dataStore.connect();
-            dataStore.savePlayerDisabledType(playerId, type);
-            dataStore.disconnect();
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.savePlayerDisabledType(playerId, type);
         }
         playerDisabledTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+        syncToYAML();
     }
 
     public void removeDisabledType(UUID playerId, String type) {
-        if (dataStore != null) {
-            dataStore.connect();
-            dataStore.removePlayerDisabledType(playerId, type);
-            dataStore.disconnect();
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.removePlayerDisabledType(playerId, type);
         }
         Set<String> types = playerDisabledTypes.get(playerId);
         if (types != null) {
             types.remove(type);
+            syncToYAML();
         }
     }
 
@@ -166,19 +111,18 @@ public class AnnouncePreferences {
     }
 
     public Map<UUID, Set<String>> getAllDisabledTypes() {
-        return playerDisabledTypes;
+        return new HashMap<>(playerDisabledTypes);
     }
 
     public void setPlayerPreferences(UUID playerId, String preferences) {
-        if (dataStore != null) {
-            dataStore.connect();
-            dataStore.savePlayerPreferences(playerId, preferences);
-            dataStore.disconnect();
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.savePlayerPreferences(playerId, preferences);
         }
         playerPreferences.put(playerId, preferences);
+        syncToYAML();
     }
 
     public String getPlayerPreferences(UUID playerId) {
-        return playerPreferences.getOrDefault(playerId, null);
+        return playerPreferences.get(playerId);
     }
 }
