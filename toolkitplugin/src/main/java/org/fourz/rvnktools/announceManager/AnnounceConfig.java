@@ -435,4 +435,13 @@ public class AnnounceConfig {
     public void setPreference(UUID playerId, String property, String value) {
         preferences.setPreference(playerId, property, value);
     }
+
+    /**
+     * Deletes a specific preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key to delete
+     */
+    public void deletePreference(UUID playerId, String property) {
+        preferences.deletePreference(playerId, property);
+    }
 }

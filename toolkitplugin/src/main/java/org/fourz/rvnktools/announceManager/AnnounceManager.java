@@ -9,6 +9,9 @@ import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.ChatService;
 import org.fourz.rvnktools.util.Debug;
+
+import net.md_5.bungee.api.ChatMessageType;
+
 import java.util.logging.Level;
 
 public class AnnounceManager {
@@ -164,8 +167,36 @@ public class AnnounceManager {
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                chatService.sendMessage(player, message, plugin.linkMaker);
-                debug.debug("Broadcasting to " + player.getName() + ": " + message);
+                // Get player's location preference, default to "chat"
+                String locationPref = announceConfig.getPreference(player.getUniqueId(), "location");
+                locationPref = (locationPref == null || locationPref.isEmpty()) ? "chat" : locationPref.toLowerCase();
+
+                // Send message based on location preference
+                switch (locationPref) {
+                    case "title":
+                        player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
+                        break;
+                    case "action-bar":
+                        //send with action bat a top of the screen
+                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
+                        break;
+                    default:
+                        chatService.sendMessage(player, message, plugin.linkMaker);
+                        break;
+                }
+                
+                // Handle sound preference
+                String soundPref = announceConfig.getPreference(player.getUniqueId(), "sound");
+                if (soundPref != null && !soundPref.isEmpty() && !soundPref.equalsIgnoreCase("none")) {
+                    try {
+                        org.bukkit.Sound sound = org.bukkit.Sound.valueOf(soundPref.toUpperCase());
+                        player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+                    } catch (IllegalArgumentException e) {
+                        debug.warning("Invalid sound preference for player " + player.getName() + ": " + soundPref);
+                    }
+                }
+                
+                debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + locationPref + ")");
             }
         }
     }
@@ -400,5 +431,62 @@ public class AnnounceManager {
      */
     public Map<String, String> getPreferences(UUID playerId) {
         return announceConfig.getAllPreferences(playerId);
+    }
+
+    public boolean updateAnnouncement(String id, String newMessage) {
+        if (id == null || newMessage == null) {
+            debug.warning("Cannot update announcement: ID or message is null");
+            return false;
+        }
+
+        Announcement oldAnnouncement = announcements.get(id);
+        if (oldAnnouncement == null) {
+            debug.warning("Cannot update announcement: No announcement found with ID " + id);
+            return false;
+        }
+
+        try {
+            // Unschedule the old announcement first
+            announceScheduler.unscheduleAnnouncement(oldAnnouncement);
+
+            // Create new announcement with updated message but keeping other properties
+            Announcement updatedAnnouncement = new Announcement();
+            updatedAnnouncement.setId(oldAnnouncement.getId());
+            updatedAnnouncement.setType(oldAnnouncement.getType());
+            updatedAnnouncement.setMessage(newMessage);
+            updatedAnnouncement.setPermission(oldAnnouncement.getPermission());
+            updatedAnnouncement.setOwner(oldAnnouncement.getOwner());
+            updatedAnnouncement.setDate(oldAnnouncement.getDate());
+            updatedAnnouncement.setTime(oldAnnouncement.getTime());
+            updatedAnnouncement.setExpiration(oldAnnouncement.getExpiration());
+            updatedAnnouncement.setRecurrence(oldAnnouncement.getRecurrence());
+            
+            // Remove old announcement
+            announcements.remove(id);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().deleteAnnouncement(id);
+            }
+            
+            // Add updated announcement
+            announcements.put(id, updatedAnnouncement);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().saveAnnouncement(updatedAnnouncement);
+            }
+
+            // Reschedule the updated announcement
+            announceScheduler.scheduleAnnouncement(updatedAnnouncement);
+            
+            debug.debug("Updated and rescheduled announcement: " + id);
+            return true;
+        } catch (Exception e) {
+            debug.error("Failed to update announcement: " + id, e);
+            // Attempt to restore old announcement on failure
+            if (!announcements.containsKey(id)) {
+                announcements.put(id, oldAnnouncement);
+                // Try to reschedule the old announcement
+                announceScheduler.scheduleAnnouncement(oldAnnouncement);
+            }
+            return false;
+        }
     }
 }

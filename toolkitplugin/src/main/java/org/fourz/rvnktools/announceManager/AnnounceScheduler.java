@@ -61,7 +61,7 @@ public class AnnounceScheduler {
     }
 
     // Schedule a single announcement
-    private void scheduleAnnouncement(Announcement announcement) {
+    public void scheduleAnnouncement(Announcement announcement) {
 
         // Check if the announcement has an expiration date and if it has past, skip it
         if (announcement.getExpiration() != null) {
@@ -215,5 +215,13 @@ public class AnnounceScheduler {
     public void cleanup() {
         shutdown();
         scheduledTasks.clear();
+    }
+
+    public void unscheduleAnnouncement(Announcement announcement) {
+        BukkitTask task = scheduledTasks.remove(announcement);
+        if (task != null) {
+            task.cancel();
+            debug.debug("Unscheduled announcement: " + announcement.getId());
+        }
     }
 }

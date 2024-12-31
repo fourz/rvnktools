@@ -200,7 +200,7 @@ public class SQLiteDataConnector implements DataStore {
         List<AnnounceType> announceTypes = new ArrayList<>();
         String sql = "SELECT * FROM announce_types";
         try (Statement stmt = this.connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 AnnounceType announceType = new AnnounceType();
                 announceType.setId(rs.getString("id"));
@@ -377,7 +377,7 @@ public class SQLiteDataConnector implements DataStore {
             ensureConnected();
             String sql = "SELECT player_id, type FROM announce_disabledtypes";
             try (Statement stmt = this.connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
                 while (rs.next()) {
                     UUID playerId = UUID.fromString(rs.getString("player_id"));
                     String type = rs.getString("type");
@@ -483,7 +483,7 @@ public class SQLiteDataConnector implements DataStore {
             ensureConnected();
             String sql = "SELECT LOWER(id) FROM announcements ORDER BY LOWER(id)";
             try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
                 while (rs.next()) {
                     ids.add(rs.getString(1));
                 }

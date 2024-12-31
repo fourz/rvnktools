@@ -14,13 +14,30 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
 
     @Override
     public boolean execute(Player player, String[] args) {
-        if (args.length < 3) {
+        if (args.length < 2) {
             showCurrentPrefs(player);
             return true;
         }
 
-        String property = args[1].toLowerCase();
-        String value = args[2].toLowerCase();
+        // Handle both formats: /announce prefs <value> and /announce preference <property> <value>
+        String property;
+        String value;
+
+        if (args.length == 2) {
+            // Format: /announce prefs <value>
+            property = args[1].toLowerCase();
+            value = null;
+        } else {
+            // Format: /announce preference <property> <value>
+            property = args[1].toLowerCase();
+            value = args[2].toLowerCase();
+        }
+
+        if (value == null) {
+            // Show current value for specific property
+            showPropertyValue(player, property);
+            return true;
+        }
 
         switch (property) {
             case "location":
@@ -30,6 +47,26 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
             default:
                 messagePlayer(player, "&cUnknown preference: " + property);
                 return false;
+        }
+    }
+
+    private void showPropertyValue(Player player, String property) {
+        String value;
+        switch (property) {
+            case "location":
+                value = announceManager.getConfig().getPreference(player.getUniqueId(), 
+                    PreferenceProperty.LOCATION.getKey());
+                messagePlayer(player, "&7Current location: &f" + value);
+                messagePlayer(player, "&7To change: &f/announce prefs location <chat|title|action-bar|none>");
+                break;
+            case "sound":
+                value = announceManager.getConfig().getPreference(player.getUniqueId(),
+                    PreferenceProperty.SOUND.getKey());
+                messagePlayer(player, "&7Current sound: &f" + (value.isEmpty() ? "none" : value));
+                messagePlayer(player, "&7To change: &f/announce prefs sound <sound_name|none>");
+                break;
+            default:
+                messagePlayer(player, "&cUnknown preference: " + property);
         }
     }
 
@@ -48,8 +85,15 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
     }
 
     private boolean setLocation(Player player, String location) {
-        if (!location.matches("chat|title-top|title-right")) {
-            messagePlayer(player, "&cInvalid location. Use: chat, title-top, or title-right");
+        if (location.equals("none")) {
+            announceManager.getConfig().deletePreference(player.getUniqueId(),
+                PreferenceProperty.LOCATION.getKey());
+            messagePlayer(player, "&aAnnouncement location reset to default");
+            return true;
+        }
+
+        if (!location.matches("chat|title|action-bar")) {
+            messagePlayer(player, "&cInvalid location. Use: chat, title-top, title-right, or none");
             return false;
         }
 
@@ -61,9 +105,9 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
 
     private boolean setSound(Player player, String soundName) {
         if (soundName.equals("none")) {
-            announceManager.getConfig().setPreference(player.getUniqueId(),
-                PreferenceProperty.SOUND.getKey(), "");
-            messagePlayer(player, "&aAnnouncement sound disabled");
+            announceManager.getConfig().deletePreference(player.getUniqueId(),
+                PreferenceProperty.SOUND.getKey());
+            messagePlayer(player, "&aAnnouncement sound reset to default");
             return true;
         }
 

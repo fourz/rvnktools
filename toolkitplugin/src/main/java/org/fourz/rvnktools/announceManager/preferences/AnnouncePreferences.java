@@ -197,4 +197,18 @@ public class AnnouncePreferences {
         }
         return playerPreferenceMap.getOrDefault(playerId, new HashMap<>());
     }
+
+    public void deletePreference(UUID playerId, String property) {
+        // Remove from structured preferences
+        Map<String, String> prefs = playerPreferenceMap.get(playerId);
+        if (prefs != null) {
+            prefs.remove(property);
+        }
+
+        // Remove from database if available
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.getDataStore().deletePlayerPreference(playerId, property);
+        }
+        syncToYAML();
+    }
 }
