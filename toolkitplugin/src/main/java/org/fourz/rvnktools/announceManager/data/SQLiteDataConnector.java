@@ -6,6 +6,7 @@ import org.fourz.rvnktools.announceManager.AnnounceConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
+import org.fourz.rvnktools.announceManager.preferences.PreferenceProperty;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -175,7 +176,7 @@ public class SQLiteDataConnector implements DataStore {
             e.printStackTrace();
             return;
         }
-        String sql = "INSERT INTO announce_types (id, prefix, suffix, permission, listing_fee) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO types (id, prefix, suffix, permission, listing_fee) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = this.connection.prepareStatement(sql)) {
             pstmt.setString(1, announceType.getId());
             pstmt.setString(2, announceType.getPrefix());
@@ -197,9 +198,9 @@ public class SQLiteDataConnector implements DataStore {
             return new ArrayList<>();
         }
         List<AnnounceType> announceTypes = new ArrayList<>();
-        String sql = "SELECT * FROM announce_types";
+        String sql = "SELECT * FROM types";
         try (Statement stmt = this.connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 AnnounceType announceType = new AnnounceType();
                 announceType.setId(rs.getString("id"));
@@ -244,12 +245,12 @@ public class SQLiteDataConnector implements DataStore {
                 empty = true;
             }
             
-            // Check if announce_types table exists
-            tables = metaData.getTables(null, null, "announce_types", null);
+            // Check if types table exists
+            tables = metaData.getTables(null, null, "types", null);
             if (!tables.next()) {
-                debug.debug("Creating announce_types table");
+                debug.debug("Creating types table");
                 Statement stmt = connection.createStatement();
-                String createAnnounceTypesTable = "CREATE TABLE announce_types (" +
+                String createAnnounceTypesTable = "CREATE TABLE types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
                     "prefix VARCHAR(128)," + 
                     "suffix VARCHAR(128)," +
@@ -257,34 +258,34 @@ public class SQLiteDataConnector implements DataStore {
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
-                debug.debug("announce_types table created successfully");
+                debug.debug("types table created successfully");
             }
             
-            // Check if announce_disabledtypes table exists
-            tables = metaData.getTables(null, null, "announce_disabledtypes", null);
+            // Check if disabledtypes table exists
+            tables = metaData.getTables(null, null, "disabledtypes", null);
             if (!tables.next()) {
-                debug.debug("Creating announce_disabledtypes table");
+                debug.debug("Creating disabledtypes table");
                 Statement stmt = connection.createStatement();
-                String createAnnounceDisabledTypesTable = "CREATE TABLE announce_disabledtypes (" +
+                String createAnnounceDisabledTypesTable = "CREATE TABLE disabledtypes (" +
                     "player_id VARCHAR(36)," +
                     "type VARCHAR(64)," +
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
-                debug.debug("announce_disabledtypes table created successfully");
+                debug.debug("disabledtypes table created successfully");
             }
             
             // Check if announce_prefs table exists
-            tables = metaData.getTables(null, null, "announce_prefs", null);
+            tables = metaData.getTables(null, null, "preferences", null);
             if (!tables.next()) {
-                debug.debug("Creating announce_prefs table");
+                debug.debug("Creating preferences table");
                 Statement stmt = connection.createStatement();
-                String createAnnouncePrefsTable = "CREATE TABLE announce_prefs (" +
+                String createAnnouncePrefsTable = "CREATE TABLE " + "preferences (" +
                     "player_id VARCHAR(36) PRIMARY KEY," +
                     "text VARCHAR(512)" +
                     ")";
                 stmt.executeUpdate(createAnnouncePrefsTable);
-                debug.debug("announce_prefs table created successfully");
+                debug.debug("preferences table created successfully");
             }
             
             debug.debug("Table initialization complete");
@@ -323,7 +324,7 @@ public class SQLiteDataConnector implements DataStore {
     public void savePlayerDisabledType(UUID playerId, String type) {
         try {
             ensureConnected();
-            String sql = "INSERT OR IGNORE INTO announce_disabledtypes (player_id, type) VALUES (?, ?)";
+            String sql = "INSERT OR IGNORE INTO disabledtypes (player_id, type) VALUES (?, ?)";
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, playerId.toString());
                 pstmt.setString(2, type);
@@ -338,7 +339,7 @@ public class SQLiteDataConnector implements DataStore {
     public void removePlayerDisabledType(UUID playerId, String type) {
         try {
             ensureConnected();
-            String sql = "DELETE FROM announce_disabledtypes WHERE player_id = ? AND type = ?";
+            String sql = "DELETE FROM disabledtypes WHERE player_id = ? AND type = ?";
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, playerId.toString());
                 pstmt.setString(2, type);
@@ -354,7 +355,7 @@ public class SQLiteDataConnector implements DataStore {
         Set<String> types = new HashSet<>();
         try {
             ensureConnected();
-            String sql = "SELECT type FROM announce_disabledtypes WHERE player_id = ?";
+            String sql = "SELECT type FROM disabledtypes WHERE player_id = ?";
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, playerId.toString());
                 try (ResultSet rs = pstmt.executeQuery()) {
@@ -374,9 +375,9 @@ public class SQLiteDataConnector implements DataStore {
         Map<UUID, Set<String>> allTypes = new HashMap<>();
         try {
             ensureConnected();
-            String sql = "SELECT player_id, type FROM announce_disabledtypes";
-            try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+            String sql = "SELECT player_id, type FROM disabledtypes";
+            try (Statement stmt = this.connection.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
                 while (rs.next()) {
                     UUID playerId = UUID.fromString(rs.getString("player_id"));
                     String type = rs.getString("type");
@@ -390,38 +391,80 @@ public class SQLiteDataConnector implements DataStore {
     }
 
     @Override
+    @Deprecated
     public void savePlayerPreferences(UUID playerId, String preferences) {
+        debug.warning("Using deprecated savePlayerPreferences method - update to use setPlayerPreference");
+        // Store as a single 'legacy' property to maintain backwards compatibility
+        setPlayerPreference(playerId, "legacy", preferences);
+    }
+
+    @Override
+    public void setPlayerPreference(UUID playerId, String property, String value) {
         try {
             ensureConnected();
-            String sql = "INSERT OR REPLACE INTO announce_prefs (player_id, text) VALUES (?, ?)";
+            String sql = "INSERT OR REPLACE INTO preferences (player_id, property, value) VALUES (?, ?, ?)";
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, playerId.toString());
-                pstmt.setString(2, preferences);
+                pstmt.setString(2, property);
+                pstmt.setString(3, value);
                 pstmt.executeUpdate();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error setting player preference", e);
         }
     }
 
     @Override
-    public String getPlayerPreferences(UUID playerId) {
-        String preferences = null;
+    public String getPlayerPreference(UUID playerId, String property) {
         try {
             ensureConnected();
-            String sql = "SELECT text FROM announce_prefs WHERE player_id = ?";
+            String sql = "SELECT value FROM preferences WHERE player_id = ? AND property = ?";
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, playerId.toString());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        preferences = rs.getString("text");
-                    }
+                pstmt.setString(2, property);
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getString("value");
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            debug.error("Error getting player preference", e);
+        }
+        return PreferenceProperty.fromKey(property).getDefaultValue();
+    }
+
+    @Override
+    public Map<String, String> getPlayerPreferences(UUID playerId) {
+        Map<String, String> preferences = new HashMap<>();
+        try {
+            ensureConnected();
+            String sql = "SELECT property, value FROM preferences WHERE player_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                ResultSet rs = pstmt.executeQuery();
+                while (rs.next()) {
+                    preferences.put(rs.getString("property"), rs.getString("value"));
+                }
+            }
+        } catch (SQLException e) {
+            debug.error("Error getting player preferences", e);
         }
         return preferences;
+    }
+
+    @Override
+    public void deletePlayerPreference(UUID playerId, String property) {
+        try {
+            ensureConnected();
+            String sql = "DELETE FROM preferences WHERE player_id = ? AND property = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, playerId.toString());
+                pstmt.setString(2, property);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            debug.error("Error deleting player preference", e);
+        }
     }
 
     @Override
@@ -440,7 +483,7 @@ public class SQLiteDataConnector implements DataStore {
             ensureConnected();
             String sql = "SELECT LOWER(id) FROM announcements ORDER BY LOWER(id)";
             try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
                 while (rs.next()) {
                     ids.add(rs.getString(1));
                 }

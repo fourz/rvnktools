@@ -5,16 +5,13 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
-import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.api.config.RestConfig;
 import org.fourz.rvnktools.api.security.ApiKeyAuthFilter;
-import org.fourz.rvnktools.api.model.CreateAnnouncementRequest;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.servlet.FilterHolder;
-import java.io.BufferedReader;
 import java.io.IOException;
 
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -34,7 +31,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import org.fourz.rvnktools.api.security.KeyStoreImporter;
 
 public class JettyServer {
@@ -44,10 +40,9 @@ public class JettyServer {
     private final RestConfig config;
     private final JettyServerDebug debug;
     private final JavaPlugin plugin;
-
     private class JettyServerDebug extends Debug {
         public JettyServerDebug(JavaPlugin plugin) {
-            super(plugin, "JettyServer", Level.INFO);
+            super(plugin, "JettyServer", Level.FINE);
         }
     }
 
@@ -205,7 +200,7 @@ public class JettyServer {
         context.addFilter(new FilterHolder(new ApiKeyAuthFilter(config.getApiKey())), "/api/*", null);
         
         // Add servlets
-        context.addServlet(new ServletHolder(new AnnouncementServlet()), "/api/announcements/*");
+        context.addServlet(new ServletHolder(new JettyServerAnnouncement(announceManager, gson)), "/api/announcements/*");
         context.addServlet(new ServletHolder(new StatusServlet()), "/api/status");
         
         server.setHandler(context);
@@ -276,92 +271,6 @@ public class JettyServer {
                 }
             })
             .create();
-    }
-
-    private class AnnouncementServlet extends HttpServlet {
-        @Override
-        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-            String pathInfo = req.getPathInfo();
-            resp.setContentType("application/json");
-
-            if (pathInfo == null || pathInfo.equals("/")) {
-                // Return list of all announcements
-                List<Announcement> announcements = announceManager.getAnnouncements();
-                resp.setStatus(HttpServletResponse.SC_OK);
-                resp.getWriter().println(gson.toJson(announcements));
-                return;
-            }
-
-            // Handle single announcement request
-            String id = pathInfo.substring(1); // Remove leading slash
-            Announcement announcement = announceManager.getAnnouncement(id);
-
-            if (announcement == null) {
-                resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                resp.getWriter().println("{\"status\":\"error\",\"message\":\"Announcement not found\"}");
-                return;
-            }
-
-            resp.setStatus(HttpServletResponse.SC_OK);
-            resp.getWriter().println(gson.toJson(announcement));
-        }
-
-        @Override
-        protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-            String pathInfo = req.getPathInfo();
-            resp.setContentType("application/json");
-
-            if (pathInfo == null || pathInfo.equals("/")) {
-                BufferedReader reader = req.getReader();
-                CreateAnnouncementRequest request = gson.fromJson(reader, CreateAnnouncementRequest.class);
-                
-                if (!request.isValid()) {
-                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Missing required fields: id, type, and message\"}");
-                    return;
-                }
-
-                // Validate announcement type
-                if (!announceManager.validateAnnounceType(request.getType())) {
-                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Invalid announcement type\"}");
-                    return;
-                }
-
-                Announcement announcement = new Announcement();
-                announcement.setId(request.getId());
-                announcement.setType(request.getType());
-                announcement.setMessage(request.getMessage());
-                
-                boolean success = announceManager.addAnnouncement(announcement);
-                
-                if (success) {
-                    resp.setStatus(HttpServletResponse.SC_CREATED);
-                    resp.getWriter().println("{\"status\":\"success\",\"message\":\"Announcement created\"}");
-                } else {
-                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Failed to create announcement\"}");
-                }
-            }
-        }
-
-        @Override
-        protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-            String pathInfo = req.getPathInfo();
-            if (pathInfo != null && pathInfo.length() > 1) {
-                String id = pathInfo.substring(1); // Remove leading slash
-                boolean success = announceManager.deleteAnnouncement(id);
-                
-                resp.setContentType("application/json");
-                if (success) {
-                    resp.setStatus(HttpServletResponse.SC_OK);
-                    resp.getWriter().println("{\"status\":\"success\",\"message\":\"Announcement deleted\"}");
-                } else {
-                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    resp.getWriter().println("{\"status\":\"error\",\"message\":\"Announcement not found\"}");
-                }
-            }
-        }
     }
 
     private class StatusServlet extends HttpServlet {

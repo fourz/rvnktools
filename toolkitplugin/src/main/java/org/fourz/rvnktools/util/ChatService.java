@@ -1,10 +1,11 @@
-
 package org.fourz.rvnktools.util;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.announceManager.PlayerMessageService;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
+import net.md_5.bungee.api.ChatMessageType;
+import java.util.Map;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -41,4 +42,30 @@ public class ChatService implements ChatServiceInterface {
         return formattedMessage;
     }
 
+    @Override
+    public void sendTitle(Player player, String message) {
+        player.sendTitle(ChatFormat.parseTitle(message), "", 10, 100, 20);
+    }
+
+    @Override
+    public void sendActionBar(Player player, String message) {        
+        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, ChatFormat.parseActionBar(message));
+    }
+
+    @Override
+    public void sendMessage(Player player, String message, Map<String, String> placeholders) {
+        String formattedMessage = message;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            formattedMessage = formattedMessage.replace(entry.getKey(), entry.getValue());
+        }
+        sendMessage(player, formattedMessage);
+    }
+
+    public String parseTitle(String message) {
+        return ChatFormat.parseTitle(formatMessage(null, message));
+    }
+
+    public net.md_5.bungee.api.chat.BaseComponent[] parseActionBar(String message) {
+        return ChatFormat.parseActionBar(formatMessage(null, message));
+    }
 }

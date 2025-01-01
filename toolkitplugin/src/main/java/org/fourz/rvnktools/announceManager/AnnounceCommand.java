@@ -29,6 +29,9 @@ public class AnnounceCommand implements CommandExecutor {
         subcommands.put("now", new AnnounceSubCommandNow(announceManager, plugin));
         subcommands.put("status", new AnnounceSubCommandStatus(announceManager, plugin));
         subcommands.put("reload", new AnnounceSubCommandReload(announceManager, plugin));
+        subcommands.put("pref", new AnnounceSubCommandPrefs(announceManager, plugin));
+        subcommands.put("preference", new AnnounceSubCommandPrefs(announceManager, plugin));
+        subcommands.put("update", new AnnounceSubCommandUpdate(announceManager, plugin));
     }
 
     @Override
@@ -68,6 +71,7 @@ public class AnnounceCommand implements CommandExecutor {
         player.sendMessage("/announce add <message> - Add new announcement");
         player.sendMessage("/announce remove <id> - Remove an announcement");
         player.sendMessage("/announce reload - Reload announcements configuration");
+        player.sendMessage("/announce update <id> <message> - Update an announcement");
     }
 }
 

@@ -3,6 +3,7 @@ package org.fourz.rvnktools.util;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.bukkit.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.ChatMessageType;
 
 public class ChatFormat {  
 
@@ -35,5 +36,24 @@ public class ChatFormat {
     public static TextComponent parse (TextComponent text, LinkMaker linkMaker) {
         return makeLink(colorize(text), linkMaker);            
     }
-    
+
+    // Creates a title message component
+    public static String parseTitle(String text) {
+        return colorize(text);
+    }
+
+    // Creates a title message component with link support
+    public static String parseTitle(String text, LinkMaker linkMaker) {
+        return parse(text, linkMaker).toLegacyText();
+    }
+
+    // Creates a TextComponent for action bar messages
+    public static net.md_5.bungee.api.chat.BaseComponent[] parseActionBar(String text) {
+        return net.md_5.bungee.api.chat.TextComponent.fromLegacyText(colorize(text));
+    }
+
+    // Creates a TextComponent for action bar messages with link support
+    public static net.md_5.bungee.api.chat.BaseComponent[] parseActionBar(String text, LinkMaker linkMaker) {
+        return net.md_5.bungee.api.chat.TextComponent.fromLegacyText(parse(text, linkMaker).toLegacyText());
+    }
 }

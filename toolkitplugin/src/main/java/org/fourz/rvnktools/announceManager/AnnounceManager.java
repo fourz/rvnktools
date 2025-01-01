@@ -9,6 +9,9 @@ import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.ChatService;
 import org.fourz.rvnktools.util.Debug;
+
+import net.md_5.bungee.api.ChatMessageType;
+
 import java.util.logging.Level;
 
 public class AnnounceManager {
@@ -99,12 +102,10 @@ public class AnnounceManager {
         String text = args[2];
 
         // Check if announcement already exists
-        if (announceConfig.getDataStore() != null) {
-            if (checkAnnounceExist(id)) {
+        if (announceConfig.isDataStoreAvailable()) {  // Changed this line
+            if (announcementExists(id)) {
                 if (player != null) {
                     chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
-                } else {
-                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
                 }
                 return false;
             }
@@ -166,8 +167,36 @@ public class AnnounceManager {
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                chatService.sendMessage(player, message, plugin.linkMaker);
-                debug.debug("Broadcasting to " + player.getName() + ": " + message);
+                // Get player's location preference, default to "chat"
+                String locationPref = announceConfig.getPreference(player.getUniqueId(), "location");
+                locationPref = (locationPref == null || locationPref.isEmpty()) ? "chat" : locationPref.toLowerCase();
+
+                // Send message based on location preference
+                switch (locationPref) {
+                    case "title":
+                        player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
+                        break;
+                    case "action-bar":
+                        //send with action bat a top of the screen
+                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
+                        break;
+                    default:
+                        chatService.sendMessage(player, message, plugin.linkMaker);
+                        break;
+                }
+                
+                // Handle sound preference
+                String soundPref = announceConfig.getPreference(player.getUniqueId(), "sound");
+                if (soundPref != null && !soundPref.isEmpty() && !soundPref.equalsIgnoreCase("none")) {
+                    try {
+                        org.bukkit.Sound sound = org.bukkit.Sound.valueOf(soundPref.toUpperCase());
+                        player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+                    } catch (IllegalArgumentException e) {
+                        debug.warning("Invalid sound preference for player " + player.getName() + ": " + soundPref);
+                    }
+                }
+                
+                debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + locationPref + ")");
             }
         }
     }
@@ -187,23 +216,12 @@ public class AnnounceManager {
         }
 
         try {
-            if (announceConfig.getDataStore() != null) {
-                if (!announceConfig.getDataStore().announcementExists(id)) {
-                    debug.warning("Announcement with ID '" + id + "' does not exist");
-                    return false;
-                }
+            if (announceConfig.isDataStoreAvailable()) {
                 announceConfig.getDataStore().deleteAnnouncement(id);
-                debug.debug("Announcement '" + id + "' deleted from data store.");
             }
-
-            Announcement removed = announcements.remove(id);
-            if (removed != null) {
-                debug.debug("Deleted announcement: " + id);
-                return true;
-            }
-
-            debug.debug("Could not find announcement with ID: " + id);
-            return false;
+            announcements.remove(id);
+            debug.debug("Deleted announcement: " + id);
+            return true;
         } catch (Exception e) {
             debug.info("Failed to delete announcement: " + id);
             return false;
@@ -349,12 +367,8 @@ public class AnnounceManager {
         }
 
         // Then check in database if available
-        if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();
-            boolean exists = announceConfig.getDataStore().announcementExists(id);
-            announceConfig.getDataStore().disconnect();
-            debug.debug("Announcement with ID '" + id + "' found in database: " + exists);
-            return exists;
+        if (announceConfig.isDataStoreAvailable()) {
+            return announceConfig.getDataStore().announcementExists(id);
         }
 
         return false;
@@ -384,5 +398,95 @@ public class AnnounceManager {
             return null;
         }
         return announcements.get(id);
+    }
+
+    public AnnounceConfig getConfig() {
+        return announceConfig;
+    }
+
+    /**
+     * Sets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @param value The value to set
+     */
+    public void setPreference(UUID playerId, String property, String value) {
+        announceConfig.setPreference(playerId, property, value);
+    }
+
+    /**
+     * Gets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @return The preference value, or default if not set
+     */
+    public String getPreference(UUID playerId, String property) {
+        return announceConfig.getPreference(playerId, property);
+    }
+
+    /**
+     * Gets all preferences for a player
+     * @param playerId The UUID of the player
+     * @return Map of preference properties and their values
+     */
+    public Map<String, String> getPreferences(UUID playerId) {
+        return announceConfig.getAllPreferences(playerId);
+    }
+
+    public boolean updateAnnouncement(String id, String newMessage) {
+        if (id == null || newMessage == null) {
+            debug.warning("Cannot update announcement: ID or message is null");
+            return false;
+        }
+
+        Announcement oldAnnouncement = announcements.get(id);
+        if (oldAnnouncement == null) {
+            debug.warning("Cannot update announcement: No announcement found with ID " + id);
+            return false;
+        }
+
+        try {
+            // Unschedule the old announcement first
+            announceScheduler.unscheduleAnnouncement(oldAnnouncement);
+
+            // Create new announcement with updated message but keeping other properties
+            Announcement updatedAnnouncement = new Announcement();
+            updatedAnnouncement.setId(oldAnnouncement.getId());
+            updatedAnnouncement.setType(oldAnnouncement.getType());
+            updatedAnnouncement.setMessage(newMessage);
+            updatedAnnouncement.setPermission(oldAnnouncement.getPermission());
+            updatedAnnouncement.setOwner(oldAnnouncement.getOwner());
+            updatedAnnouncement.setDate(oldAnnouncement.getDate());
+            updatedAnnouncement.setTime(oldAnnouncement.getTime());
+            updatedAnnouncement.setExpiration(oldAnnouncement.getExpiration());
+            updatedAnnouncement.setRecurrence(oldAnnouncement.getRecurrence());
+            
+            // Remove old announcement
+            announcements.remove(id);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().deleteAnnouncement(id);
+            }
+            
+            // Add updated announcement
+            announcements.put(id, updatedAnnouncement);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().saveAnnouncement(updatedAnnouncement);
+            }
+
+            // Reschedule the updated announcement
+            announceScheduler.scheduleAnnouncement(updatedAnnouncement);
+            
+            debug.debug("Updated and rescheduled announcement: " + id);
+            return true;
+        } catch (Exception e) {
+            debug.error("Failed to update announcement: " + id, e);
+            // Attempt to restore old announcement on failure
+            if (!announcements.containsKey(id)) {
+                announcements.put(id, oldAnnouncement);
+                // Try to reschedule the old announcement
+                announceScheduler.scheduleAnnouncement(oldAnnouncement);
+            }
+            return false;
+        }
     }
 }

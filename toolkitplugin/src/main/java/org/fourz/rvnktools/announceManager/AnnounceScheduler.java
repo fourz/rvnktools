@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 public class AnnounceScheduler {
 
@@ -22,8 +21,6 @@ public class AnnounceScheduler {
     private static final double RANDOM_TICK_MULTIPLIER_MAX = 1.1;
     private static final long DEFAULT_RECURRENCE_TICKS = 4 * 60 * 60 * 20L; // 4 hours in ticks
     private static final long DAILY_RECURRENCE_TICKS = 12 * 60 * 60 * 20L; // 12 hours in ticks
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM-dd");
-    private static final DateTimeFormatter FULL_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final String ANNUAL_DATE_PATTERN = "\\d{2}-\\d{2}";  // MM-dd pattern
 
     private final RVNKTools plugin;
@@ -61,7 +58,7 @@ public class AnnounceScheduler {
     }
 
     // Schedule a single announcement
-    private void scheduleAnnouncement(Announcement announcement) {
+    public void scheduleAnnouncement(Announcement announcement) {
 
         // Check if the announcement has an expiration date and if it has past, skip it
         if (announcement.getExpiration() != null) {
@@ -125,8 +122,8 @@ public class AnnounceScheduler {
             }
         }.runTaskTimer(plugin, initialDelay, period);
         scheduledTasks.put(announcement, task);
-        debug.debug("Scheduled recurring announcement " + announcement.getId() + 
-                   " (delay: " + initialDelay + " ticks, period: " + period + " ticks)");
+        debug.debug("Scheduled recurring announcement " + announcement.getId() + " (delay: " + initialDelay + 
+            " ticks, period: " + period + " ticks)");
     }
 
     private void scheduleOneTimeAnnouncement(Announcement announcement, long delay) {
@@ -137,8 +134,7 @@ public class AnnounceScheduler {
             }
         }.runTaskLater(plugin, delay);
         scheduledTasks.put(announcement, task);
-        debug.debug("Scheduled one-time announcement " + announcement.getId() + 
-                   " (delay: " + delay + " ticks)");
+        debug.debug("Scheduled one-time announcement " + announcement.getId() + " (delay: " + delay + " ticks)");
     }
 
     // Helper method to compare only month and day of dates
@@ -215,5 +211,13 @@ public class AnnounceScheduler {
     public void cleanup() {
         shutdown();
         scheduledTasks.clear();
+    }
+
+    public void unscheduleAnnouncement(Announcement announcement) {
+        BukkitTask task = scheduledTasks.remove(announcement);
+        if (task != null) {
+            task.cancel();
+            debug.debug("Unscheduled announcement: " + announcement.getId());
+        }
     }
 }
