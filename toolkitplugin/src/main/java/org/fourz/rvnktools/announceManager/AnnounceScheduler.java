@@ -59,6 +59,12 @@ public class AnnounceScheduler {
 
     // Schedule a single announcement
     public void scheduleAnnouncement(Announcement announcement) {
+        // Skip MOTD announcements if broadcasting is disabled
+        if ("motd".equalsIgnoreCase(announcement.getType()) && 
+            !announceManager.getConfig().getAnnounceMotd().shouldScheduleBroadcast()) {
+            debug.debug("Skipping MOTD announcement schedule: " + announcement.getId() + " (broadcasting disabled)");
+            return;
+        }
 
         // Check if the announcement has an expiration date and if it has past, skip it
         if (announcement.getExpiration() != null) {

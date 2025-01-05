@@ -25,6 +25,10 @@ announce_types:
   prefix: '&e[Guide] &7'
   suffix: '&7'
   permission: rvnktools.announce.type.guide
+- id: motd
+  prefix: '&b'
+  suffix: '&r'
+  permission: rvnktools.announce.type.motd
 
 announcements:
 - id: events
@@ -122,7 +126,18 @@ announcements:
   text: "&e&lHappy &6New &e&lYear!"
   type: scheduled
   date: "12-18"
-
+- id: motd1
+  text: 'Welcome to Ravenkraft! &7A friendly community'
+  type: motd
+  imported: false
+- id: motd2
+  text: '&bRavenkraft &7- &eBuilding dreams together!'
+  type: motd
+  imported: false
+- id: motd3
+  text: '&bJoin our amazing community! &7Survive & Build'
+  type: motd
+  imported: false
 
 storage:
 # types: mysql, sqlite, flatfile
@@ -138,6 +153,10 @@ storage:
   sqlite:
     database: announcements.db
 
+motd:
+  enable: true
+  schedule-broadcast: false
+  
 debug:
   # Available levels: OFF, SEVERE, WARNING, INFO, DEBUG
   # OFF: No logging

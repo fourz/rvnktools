@@ -325,6 +325,16 @@ public class AnnounceManager {
         return new ArrayList<>(announcements.values());
     }
 
+    public List<Announcement> getAnnouncements(String type) {
+        List<Announcement> typeAnnouncements = new ArrayList<>();
+        for (Announcement announcement : announcements.values()) {
+            if (type.equalsIgnoreCase(announcement.getType())) {
+                typeAnnouncements.add(announcement);
+            }
+        }
+        return typeAnnouncements;
+    }
+
     public void setAnnouncements(List<Announcement> announcementList) {
         if (announcementList == null) {
             debug.warning("Skipping null announcement list");

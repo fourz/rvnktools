@@ -50,6 +50,9 @@ public class AnnounceConfig {
     private List<Announcement> ymlAnnouncements;
     private Map<String, AnnounceType> ymlTypes;
     private AnnouncePreferences preferences;
+    private AnnounceMotd announceMotd;
+    private boolean doMotd;
+    private boolean doMotdScheduleBroadcast;
 
     // initializes the configuration and data storage settings
     public AnnounceConfig(JavaPlugin plugin, AnnounceManager announceManager) {
@@ -75,6 +78,7 @@ public class AnnounceConfig {
         
         this.configOperation = detectConfigState();
         debug.info("AnnounceConfig Operation: " + configOperation);
+        this.announceMotd = new AnnounceMotd(plugin, this);  // Updated constructor call
     }
 
     private ConfigOperation detectConfigState() {
@@ -165,12 +169,21 @@ public class AnnounceConfig {
                     break;
             }
 
+            // Only initialize MOTD if enabled
+            if (config.getBoolean("motd.enable", true)) {
+                announceMotd.setMotd(announceManager.getAnnouncements("motd"));
+            } else {
+                debug.info("MOTD system is disabled in config");
+            }
+
         } catch (Exception e) {
             debug.error("Failed to initialize database: " + e.getMessage(), e);
             e.printStackTrace();
             // Fallback to YAML data on database error
             announceManager.setAnnouncements(ymlAnnouncements);
             announceTypes = ymlTypes;
+            // Failed to initialize MOTD announcements
+            debug.error("Failed to initialize MOTD announcements", e);
         }
     }
 
@@ -210,6 +223,11 @@ public class AnnounceConfig {
 
         config = YamlConfiguration.loadConfiguration(configFile);
         
+        // Load MOTD configuration
+        this.doMotd = config.getBoolean("motd.enable", true);
+        this.doMotdScheduleBroadcast = config.getBoolean("motd.schedule-broadcast", false);
+        debug.debug("MOTD config - enabled: " + doMotd + ", schedule-broadcast: " + doMotdScheduleBroadcast);
+
         // Update storage type initialization
         dataManager.setStorageType(config.getString("storage.type", "yml").toLowerCase());
         
@@ -443,5 +461,17 @@ public class AnnounceConfig {
      */
     public void deletePreference(UUID playerId, String property) {
         preferences.deletePreference(playerId, property);
+    }
+
+    public AnnounceMotd getAnnounceMotd() {
+        return announceMotd;
+    }
+
+    public boolean isMotdEnabled() {
+        return doMotd;
+    }
+
+    public boolean isMotdScheduleBroadcast() {
+        return doMotdScheduleBroadcast;
     }
 }
