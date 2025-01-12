@@ -474,4 +474,25 @@ public class AnnounceConfig {
     public boolean isMotdScheduleBroadcast() {
         return doMotdScheduleBroadcast;
     }
+
+    /**
+     * Forces a reload of all user preferences from the database
+     * This is useful when preferences have been modified externally
+     * @return true if preferences were successfully reloaded, false if using flatfile or error occurred
+     */
+    public boolean forceUpdatePrefs() {
+        if (!isDataStoreAvailable()) {
+            debug.warning("Cannot force update preferences - no database available");
+            return false;
+        }
+
+        try {
+            preferences.loadPreferences();
+            debug.info("Successfully reloaded all user preferences from database");
+            return true;
+        } catch (Exception e) {
+            debug.error("Failed to force update preferences", e);
+            return false;
+        }
+    }
 }

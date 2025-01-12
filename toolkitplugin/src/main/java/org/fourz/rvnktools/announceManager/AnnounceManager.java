@@ -165,39 +165,59 @@ public class AnnounceManager {
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
         String message = prefix + announcement.getMessage() + suffix;
 
+        // Pre-fetch preferences for all online players
+        Map<Player, PlayerPreferences> playerPrefs = new HashMap<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                // Get player's location preference, default to "chat"
                 String locationPref = announceConfig.getPreference(player.getUniqueId(), "location");
-                locationPref = (locationPref == null || locationPref.isEmpty()) ? "chat" : locationPref.toLowerCase();
-
-                // Send message based on location preference
-                switch (locationPref) {
-                    case "title":
-                        player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
-                        break;
-                    case "action-bar":
-                        //send with action bat a top of the screen
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
-                        break;
-                    default:
-                        chatService.sendMessage(player, message, plugin.linkMaker);
-                        break;
-                }
-                
-                // Handle sound preference
                 String soundPref = announceConfig.getPreference(player.getUniqueId(), "sound");
-                if (soundPref != null && !soundPref.isEmpty() && !soundPref.equalsIgnoreCase("none")) {
-                    try {
-                        org.bukkit.Sound sound = org.bukkit.Sound.valueOf(soundPref.toUpperCase());
-                        player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
-                    } catch (IllegalArgumentException e) {
-                        debug.warning("Invalid sound preference for player " + player.getName() + ": " + soundPref);
-                    }
-                }
-                
-                debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + locationPref + ")");
+                playerPrefs.put(player, new PlayerPreferences(
+                    locationPref != null ? locationPref : "chat",
+                    soundPref != null ? soundPref : "none"
+                ));
             }
+        }
+
+        // Broadcast to all players using pre-fetched preferences
+        for (Map.Entry<Player, PlayerPreferences> entry : playerPrefs.entrySet()) {
+            Player player = entry.getKey();
+            PlayerPreferences prefs = entry.getValue();
+            
+            // Send message based on location preference
+            switch (prefs.location.toLowerCase()) {
+                case "title":
+                    player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
+                    break;
+                case "action-bar":
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
+                    break;
+                default: // "chat"
+                    chatService.sendMessage(player, message, plugin.linkMaker);
+                    break;
+            }
+            
+            // Play sound if configured
+            if (!prefs.sound.equalsIgnoreCase("none")) {
+                try {
+                    org.bukkit.Sound sound = org.bukkit.Sound.valueOf(prefs.sound.toUpperCase());
+                    player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+                } catch (IllegalArgumentException e) {
+                    debug.warning("Invalid sound preference for player " + player.getName() + ": " + prefs.sound);
+                }
+            }
+            
+            debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + prefs.location + ")");
+        }
+    }
+
+    // Helper class to store pre-fetched preferences
+    private static class PlayerPreferences {
+        final String location;
+        final String sound;
+
+        PlayerPreferences(String location, String sound) {
+            this.location = location;
+            this.sound = sound;
         }
     }
 

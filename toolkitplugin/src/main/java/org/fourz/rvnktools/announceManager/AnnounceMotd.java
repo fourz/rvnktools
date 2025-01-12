@@ -61,7 +61,9 @@ public class AnnounceMotd {
         }
 
         // Update server MOTD
-        String motdMessage = ChatFormat.colorize(newMotd.getMessage());
+        //String motdMessage = newMotd.getMessage();
+        String motdMessage = ChatFormat.parseMotd(newMotd.getMessage());
+        //colorize(newMotd.getMessage());
         currentMotd = newMotd.getMessage();
         
         try {

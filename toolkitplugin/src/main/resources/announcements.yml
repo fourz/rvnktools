@@ -125,19 +125,20 @@ announcements:
 - id: newyear
   text: "&e&lHappy &6New &e&lYear!"
   type: scheduled
-  date: "12-18"
+  date: "12-31"
 - id: motd1
-  text: 'Welcome to Ravenkraft! &7A friendly community'
+  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|Welcome to Ravenkraft! &7Survive & Build'
   type: motd
-  imported: false
 - id: motd2
-  text: '&bRavenkraft &7- &eBuilding dreams together!'
+  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&7- &eTrains?'
   type: motd
-  imported: false
 - id: motd3
-  text: '&bJoin our amazing community! &7Survive & Build'
+  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&9Transportation and &6Imagination!'
   type: motd
-  imported: false
+- id: motd4
+  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&9 Welcome to the Jungle!'
+  type: motd
+    
 
 storage:
 # types: mysql, sqlite, flatfile
