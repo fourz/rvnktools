@@ -2,6 +2,7 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,10 +84,15 @@ public class AnnounceManager {
     }
 
     // Add an announcement to the announcements list, used by AnnounceCommand
-    public boolean addAnnouncement(Player player, String input) {
+    public boolean addAnnouncement(CommandSender sender, String input) {
 
         // extract id, type, and text from input
         String[] args = input.split(" ", 3);
+        Player player = null;
+        
+        if (sender instanceof Player) {
+            player = (Player) sender;        
+        }
         
         if (args.length < 3) {
             if (player != null) {
@@ -106,8 +112,9 @@ public class AnnounceManager {
             if (announcementExists(id)) {
                 if (player != null) {
                     chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
+                } else {
+                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
                 }
-                return false;
             }
         }
 
@@ -375,10 +382,22 @@ public class AnnounceManager {
         announceConfig.savePlayerDisabledTypes();
     }
 
-    public boolean sendAnnouncementNow(Player player, String id) {
+    public boolean sendAnnouncementNow(CommandSender sender, String id) {
+        if (sender instanceof Player) {
+            Player player = (Player) sender;
+            if (!player.hasPermission("rvnktools.command.announce.now")) {
+                chatService.sendMessage(player, "You do not have permission to send announcements now.");
+                return false;
+            }
+        }           
+        
         Announcement announcement = announcements.get(id);
         if (announcement == null) {
-            plugin.getLogger().warning("Cannot send announcement: No announcement found with ID " + id);
+            if (sender instanceof Player) {
+                chatService.sendMessage((Player)sender, "Invalid announcement ID: " + id);
+            } else {
+                plugin.getLogger().warning("Cannot send announcement: No announcement found with ID " + id);
+            }
             return false;
         }
         broadcastAnnouncement(announcement);

@@ -1,6 +1,7 @@
 package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.Sound;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
@@ -13,7 +14,13 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
+    public boolean execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            messageSender(sender, "&cThis command can only be used by players");
+            return true;
+        }
+        // Cast sender to Player
+        Player player = (Player) sender;
         if (args.length < 2) {
             showCurrentPrefs(player);
             return true;
@@ -45,7 +52,7 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
             case "sound":
                 return setSound(player, value);
             default:
-                messagePlayer(player, "&cUnknown preference: " + property);
+                messageSender(player, "&cUnknown preference: " + property);
                 return false;
         }
     }
@@ -56,17 +63,17 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
             case "location":
                 value = announceManager.getConfig().getPreference(player.getUniqueId(), 
                     PreferenceProperty.LOCATION.getKey());
-                messagePlayer(player, "&7Current location: &f" + value);
-                messagePlayer(player, "&7To change: &f/announce prefs location <chat|title|action-bar|none>");
+                messageSender(player, "&7Current location: &f" + value);
+                messageSender(player, "&7To change: &f/announce prefs location <chat|title|action-bar|none>");
                 break;
             case "sound":
                 value = announceManager.getConfig().getPreference(player.getUniqueId(),
                     PreferenceProperty.SOUND.getKey());
-                messagePlayer(player, "&7Current sound: &f" + (value.isEmpty() ? "none" : value));
-                messagePlayer(player, "&7To change: &f/announce prefs sound <sound_name|none>");
+                messageSender(player, "&7Current sound: &f" + (value.isEmpty() ? "none" : value));
+                messageSender(player, "&7To change: &f/announce prefs sound <sound_name|none>");
                 break;
             default:
-                messagePlayer(player, "&cUnknown preference: " + property);
+                messageSender(player, "&cUnknown preference: " + property);
         }
     }
 
@@ -76,30 +83,30 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
         String sound = announceManager.getConfig().getPreference(player.getUniqueId(),
             PreferenceProperty.SOUND.getKey());
 
-        messagePlayer(player, "&6=== Your Announcement Preferences ===");
-        messagePlayer(player, "&7Location: &f" + location);
-        messagePlayer(player, "&7Sound: &f" + (sound.isEmpty() ? "none" : sound));
-        messagePlayer(player, "");
-        messagePlayer(player, "&7To change: &f/announce prefs <location|sound> <value>");
-        messagePlayer(player, "&7Example: &f/announce prefs location title-top");
+        messageSender(player, "&6=== Your Announcement Preferences ===");
+        messageSender(player, "&7Location: &f" + location);
+        messageSender(player, "&7Sound: &f" + (sound.isEmpty() ? "none" : sound));
+        messageSender(player, "");
+        messageSender(player, "&7To change: &f/announce prefs <location|sound> <value>");
+        messageSender(player, "&7Example: &f/announce prefs location title-top");
     }
 
     private boolean setLocation(Player player, String location) {
         if (location.equals("none")) {
             announceManager.getConfig().deletePreference(player.getUniqueId(),
                 PreferenceProperty.LOCATION.getKey());
-            messagePlayer(player, "&aAnnouncement location reset to default");
+            messageSender(player, "&aAnnouncement location reset to default");
             return true;
         }
 
         if (!location.matches("chat|title|action-bar")) {
-            messagePlayer(player, "&cInvalid location. Use: chat, title-top, title-right, or none");
+            messageSender(player, "&cInvalid location. Use: chat, title-top, title-right, or none");
             return false;
         }
 
         announceManager.getConfig().setPreference(player.getUniqueId(),
             PreferenceProperty.LOCATION.getKey(), location);
-        messagePlayer(player, "&aAnnouncement location set to: &f" + location);
+        messageSender(player, "&aAnnouncement location set to: &f" + location);
         return true;
     }
 
@@ -107,7 +114,7 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
         if (soundName.equals("none")) {
             announceManager.getConfig().deletePreference(player.getUniqueId(),
                 PreferenceProperty.SOUND.getKey());
-            messagePlayer(player, "&aAnnouncement sound reset to default");
+            messageSender(player, "&aAnnouncement sound reset to default");
             return true;
         }
 
@@ -115,10 +122,10 @@ public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
             Sound.valueOf(soundName.toUpperCase());
             announceManager.getConfig().setPreference(player.getUniqueId(),
                 PreferenceProperty.SOUND.getKey(), soundName.toUpperCase());
-            messagePlayer(player, "&aAnnouncement sound set to: &f" + soundName);
+            messageSender(player, "&aAnnouncement sound set to: &f" + soundName);
             return true;
         } catch (IllegalArgumentException e) {
-            messagePlayer(player, "&cInvalid sound name. Use a valid Minecraft sound or 'none'");
+            messageSender(player, "&cInvalid sound name. Use a valid Minecraft sound or 'none'");
             return false;
         }
     }
