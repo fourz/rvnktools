@@ -127,16 +127,16 @@ announcements:
   type: scheduled
   date: "12-31"
 - id: motd1
-  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|Welcome to Ravenkraft! &7Survive & Build'
+  text: '&6Ravenkraft &8| &e& 1.21 &8| 🛠️💎 \n &8www.ravenkraft.org &8|Welcome to Ravenkraft -- &8| &7Survive & Build '
   type: motd
 - id: motd2
-  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&7- &eTrains?'
+  text: '&6Ravenkraft &e1.21 &8| www.ravenkraft.org\n &8| 🚉 &eTrains?'
   type: motd
 - id: motd3
-  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&9Transportation and &6Imagination!'
+  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&9 Transportation and &6Imagination!'
   type: motd
 - id: motd4
-  text: '&6Ravenkraft &8| &e& 1.21 &8\n &8www.ravenkraft.org &8|&9 Welcome to the Jungle!'
+  text: '&6Ravenkraft &8| &e& 1.21 💎💎💎 Shops At Spawn 💎💎💎&8\n &8www.ravenkraft.org &8!'
   type: motd
     
 

@@ -30,7 +30,13 @@ public class MySQLDataConnector implements DataStore {
     private boolean tablesInitialized = false;
 
     public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, String tablePrefix) {
-        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=" + useSSL;
+        // Add connection timeout and validation settings
+        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + 
+                   "?useSSL=" + useSSL + 
+                   "&autoReconnect=true" +
+                   "&connectTimeout=5000" +
+                   "&socketTimeout=30000" +
+                   "&validationQuery=SELECT 1";
         this.username = username;
         this.password = password;
         this.database = database;
@@ -56,46 +62,71 @@ public class MySQLDataConnector implements DataStore {
         this.tablesInitialized = initialized;
     }
 
+    private void ensureConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            debug.debug("Re-establishing lost MySQL connection");
+            connect();
+            return;
+        }
+
+        // Test connection validity with a 5 second timeout
+        try {
+            if (!connection.isValid(5)) {
+                debug.debug("MySQL connection is invalid, reconnecting...");
+                disconnect();
+                connect();
+            }
+        } catch (SQLException e) {
+            debug.warning("Error testing connection validity, attempting reconnect");
+            disconnect();
+            connect();
+        }
+    }
+
     @Override
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
                 debug.debug("Establishing MySQL connection...");
                 connection = DriverManager.getConnection(url, username, password);
+                
+                // Set additional connection properties
+                connection.setAutoCommit(true);
+                
+                // Set a more reasonable timeout for queries
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("SET SESSION wait_timeout=28800"); // 8 hours
+                    stmt.execute("SET SESSION interactive_timeout=28800");
+                } catch (SQLException e) {
+                    debug.error("Could not set session timeouts", e);
+                }
+
                 if (!areTablesInitialized()) {
                     initializeTables();
                 }
             }
         } catch (SQLException e) {
             debug.error("Failed to connect to MySQL", e);
-        } finally {
-            if (connection != null) {
-                try {
-                    // sleep for a bit to allow connection to establish
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    debug.error("Error sleeping thread", e);
-                }
-            }
         }
     }
 
     @Override
     public void disconnect() {
         try {
-            if (connection != null && !connection.isClosed()) {
+            if (connection != null) {
+                try {
+                    // Reset session state before closing
+                    connection.rollback();
+                } catch (SQLException e) {
+                    // Ignore rollback errors on close
+                }
                 connection.close();
                 debug.debug("MySQL connection closed");
             }
         } catch (SQLException e) {
             debug.error("Error disconnecting from database", e);
-        }
-    }
-
-    private void ensureConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            debug.debug("Re-establishing lost MySQL connection");
-            connect();
+        } finally {
+            connection = null;
         }
     }
 
