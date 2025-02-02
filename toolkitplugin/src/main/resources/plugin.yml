@@ -58,6 +58,11 @@ commands:
   announcer:
     description: Enable or disable announcements feature.
     usage: /announcer
+  rvnktools:
+    description: RVNKTools main command
+    usage: /rvnktools <subcommand>
+    aliases: [rvnkt]
+
 permissions:
   rvnktools.command.broadcast:
     description: Allows the player to use the broadcast command
@@ -89,3 +94,15 @@ permissions:
   rvnktools.command.puthat:
     description: Allows the player to use the puthat command
     default: true
+  rvnktools.links:
+    description: Allows access to links commands
+    default: op
+  rvnktools.links.reload:
+    description: Allows reloading links configuration
+    default: op
+  rvnktools.cycle:
+    description: Allows access to cycle commands
+    default: op
+  rvnktools.cycle.reload:
+    description: Allows reloading cycle commands configuration
+    default: op

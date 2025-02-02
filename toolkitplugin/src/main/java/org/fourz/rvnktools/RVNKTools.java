@@ -21,6 +21,7 @@ import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.hatManager.PutHatCommand;
+import org.fourz.rvnktools.command.RVNKToolsCommand;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
@@ -74,6 +75,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
         this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
         this.getCommand("puthat").setExecutor(new PutHatCommand(this));
+        getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
 
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
@@ -96,6 +98,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     public Economy getEconomy() {
         return economy;
+    }
+
+    public CycleCommands getCycleCommands() {
+        return cycleCommands;
     }
 
     private boolean setupEconomy() {
