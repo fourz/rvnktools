@@ -25,7 +25,6 @@ public class MySQLDataConnector implements DataStore {
     private final String database;
     private final String tablePrefix;
     private Connection connection;
-    private boolean empty = false;
     private final Debug debug;
     private boolean tablesInitialized = false;
 
@@ -118,7 +117,7 @@ public class MySQLDataConnector implements DataStore {
                     // Reset session state before closing
                     connection.rollback();
                 } catch (SQLException e) {
-                    // Ignore rollback errors on close
+                    // Ignore rollback errors on close                    
                 }
                 connection.close();
                 debug.debug("MySQL connection closed");
@@ -269,7 +268,6 @@ public class MySQLDataConnector implements DataStore {
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
                 debug.debug("announcements table created successfully");
-                empty = true;
             } else {
                 debug.debug("announcements table already exists");
             }
@@ -505,7 +503,6 @@ public class MySQLDataConnector implements DataStore {
     }
 
     @Override
-    @Deprecated
     public void savePlayerPreferences(UUID playerId, String preferences) {
         debug.warning("Using deprecated savePlayerPreferences method - update to use setPlayerPreference");
         // Store as a single 'legacy' property to maintain backwards compatibility

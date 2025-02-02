@@ -286,17 +286,15 @@ public class AnnounceManager {
         debug.info("Saved AnnounceManager configuration.");
     }    
 
-    public void shutdown() {    
-        debug.info("Saving announcements before shutdown...");
+    public void shutdown() {
         // Ensure we have all announcements in memory
         if (announceConfig.getDataStore() != null) {
             setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
-        }
-        saveConfig();    
+        }        
         announceScheduler.shutdown();
-        savePlayerDisabledTypes();
+        debug.info("Saving announcements before shutdown...");        
         announceConfig.shutdown();
-        debug.info("AnnounceManager shutdown complete");
+        debug.info("AnnounceManager shutdown complete.");
     }
 
     public boolean validateAnnounceType(String type) {
@@ -405,7 +403,7 @@ public class AnnounceManager {
     }
 
     public AnnounceType getAnnounceType(String type) {
-        return announceConfig.getAnnounceTypes().get(type);
+        return announceConfig.getAnnounceTypes().get(type); 
     }
 
     public boolean announcementExists(String id) {

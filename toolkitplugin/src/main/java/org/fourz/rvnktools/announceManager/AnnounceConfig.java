@@ -414,7 +414,8 @@ public class AnnounceConfig {
 
     // Add a shutdown method to disconnect the DataStore
     public void shutdown() {
-        saveConfig(); // Save any pending changes
+        savePlayerDisabledTypes();
+        saveConfig();
         dataManager.shutdown();
     }
 
