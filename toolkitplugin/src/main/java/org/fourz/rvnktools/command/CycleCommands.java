@@ -143,16 +143,17 @@ public class CycleCommands {
                     break;
                 case "run_command_as_server":
                     String serverCommand = value.replace("$player", player.getName());
-                    //Bukkit.dispatchCommand(Bukkit.getConsoleSender(), serverCommand);
                     executeCommandAsync(serverCommand);
                     executeInstructions(player, iterator);
                     break;
                 case "send_message_to_player":
+                    value = value.replace("$player", player.getName());
                     messagePlayer(player, value);
                     executeInstructions(player, iterator);
                     break;
                 case "send_message_to_all_players":
-                    Bukkit.broadcastMessage(value);
+                    value = value.replace("$player", player.getName());
+                    messageAllPlayers(value);
                     executeInstructions(player, iterator);
                     break;
                 case "set_permission":
@@ -207,6 +208,28 @@ public class CycleCommands {
                 return 0;
             }
         }
+    }
+
+    private void messageAllPlayers (String message) {
+
+        //if message is null, return a vertical space to avoid using unnecessary parsing methods
+        if (message == null) {
+            Bukkit.broadcastMessage("");
+            return;
+        }   
+
+        //if placeholderAPI is enabled
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+
+            //set any placeholders in the message
+            message = PlaceholderAPI.setPlaceholders(null, message);
+        } 
+
+        //use ChatFormat to colorize the message and replace linkMaker placeholders
+        TextComponent constructedMessage = ChatFormat.parse(message, plugin.linkMaker);
+
+        //send the message to all players
+        Bukkit.spigot().broadcast(constructedMessage);        
     }
 
     private void messagePlayer (Player player, String message) {
