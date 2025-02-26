@@ -28,8 +28,12 @@ public class ChatFormat {
     }
 
     // Parses the text and returns a clickable link with colorized text
-    public static TextComponent parse (String text, LinkMaker linkMaker) {
-        return makeLink(colorize(text), linkMaker);            
+    public static TextComponent parse(String text, LinkMaker linkMaker) {
+        String colorized = colorize(text);
+        if (linkMaker == null) {
+            return new TextComponent(colorized);
+        }
+        return makeLink(colorized, linkMaker);
     }
 
     // Parses the text and returns a clickable link with colorized text
