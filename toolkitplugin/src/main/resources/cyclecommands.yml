@@ -58,3 +58,11 @@ commands:
       cancel:
         - run_command_as_server: "broadcast &cServer restart cancelled."
         - cancel_all_tasks: countdown
+data:
+  # yaml or sqlite
+  type: yaml
+  version: 1.0
+  file: cyclestate.yml
+  # table: cyclestate
+  # database: cyclestate.db
+  

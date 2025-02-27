@@ -24,11 +24,11 @@ import org.fourz.rvnktools.RVNKTools;
 public class CycleCommands {
     private final RVNKTools plugin;
     private FileConfiguration config;
+    private CycleState state;
     private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
     public CycleCommands(RVNKTools plugin) {
         this.plugin = plugin;
-        this.config = plugin.getConfig();
         this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
@@ -40,11 +40,32 @@ public class CycleCommands {
     }
 
     public void loadConfig() {
+        // Load main config
         File cycleCommandsFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
         if (!cycleCommandsFile.exists()) {
             plugin.saveResource("cyclecommands.yml", false);
         }
         this.config = YamlConfiguration.loadConfiguration(cycleCommandsFile);
+
+        // Initialize and load state
+        String stateFile = config.getString("data.file", "cyclestate.yml");
+        this.state = new CycleState(plugin.getDataFolder(), stateFile);
+        this.state.load();
+        
+        // Copy loaded state to working memory
+        Map<String, Map<UUID, Integer>> loadedState = this.state.getPlayerCommandPositions();
+        this.playerCommandPositions.clear();
+        this.playerCommandPositions.putAll(loadedState);
+    }
+
+    public void saveState() {
+        // Copy working memory to state manager
+        for (Map.Entry<String, Map<UUID, Integer>> entry : playerCommandPositions.entrySet()) {
+            for (Map.Entry<UUID, Integer> playerState : entry.getValue().entrySet()) {
+                state.setPlayerCommandPosition(entry.getKey(), playerState.getKey(), playerState.getValue());
+            }
+        }
+        state.save();
     }
 
     public void registerCommands() {
@@ -92,8 +113,10 @@ public class CycleCommands {
         int totalInstructions = instructionsSection.getKeys(false).size();
         String nextInstructionKey = (String) instructionsSection.getKeys(false).toArray()[position];
 
+        // Update position and save state
         position = (position + 1) % totalInstructions;
         commandPositions.put(playerId, position);
+        saveState();
 
         return nextInstructionKey;
     }
