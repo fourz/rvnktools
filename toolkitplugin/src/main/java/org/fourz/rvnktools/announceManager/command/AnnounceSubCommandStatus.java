@@ -1,6 +1,7 @@
 
 package org.fourz.rvnktools.announceManager.command;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
@@ -13,9 +14,15 @@ public class AnnounceSubCommandStatus extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
-        messagePlayer(player, "&6=== Enabled Announcement Types ===");
-        messagePlayer(player, "");
+    public boolean execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            messageSender(sender, "&cThis command can only be used by players");
+            return true;
+        }
+        // Cast sender to Player
+        Player player = (Player) sender;        
+        messageSender(player, "&6=== Enabled Announcement Types ===");
+        messageSender(player, "");
         
         String[] playerDisabledTypes = announceManager.getPlayerDisabledAnnouncementTypes(player);
         for (String type : announceManager.getAnnounceTypes()) {
@@ -23,14 +30,14 @@ public class AnnounceSubCommandStatus extends AnnounceSubCommand {
                 boolean isEnabled = !Arrays.asList(playerDisabledTypes).contains(type);
                 String symbol = isEnabled ? "✔" : "✘";
                 String color = isEnabled ? "&a" : "&c";
-                messagePlayer(player, " " + color + symbol + " &f" + type);
+                messageSender(player, " " + color + symbol + " &f" + type);
             }
         }
-        
-        messagePlayer(player, "");
-        messagePlayer(player, "&7✔ = Enabled for you");
-        messagePlayer(player, "&7✘ = Disabled by you");
-        messagePlayer(player, "&7Use &5/announce toggle [type]&7 to change settings");
+       
+        messageSender(player, "");
+        messageSender(player, "&7✔ = Enabled for you");
+        messageSender(player, "&7✘ = Disabled by you");
+        messageSender(player, "&7Use &5/announce toggle [type]&7 to change settings");
         return true;
     }
 }

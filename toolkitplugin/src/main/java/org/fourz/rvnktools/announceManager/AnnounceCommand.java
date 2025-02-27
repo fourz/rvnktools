@@ -31,47 +31,49 @@ public class AnnounceCommand implements CommandExecutor {
         subcommands.put("reload", new AnnounceSubCommandReload(announceManager, plugin));
         subcommands.put("pref", new AnnounceSubCommandPrefs(announceManager, plugin));
         subcommands.put("preference", new AnnounceSubCommandPrefs(announceManager, plugin));
+        subcommands.put("set", new AnnounceSubCommandSet(announceManager, plugin));
         subcommands.put("update", new AnnounceSubCommandUpdate(announceManager, plugin));
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage("This command can only be used by players");
-            return true;
+        if (sender instanceof Player) {
+            if (!sender.hasPermission("rvnktools.command.announce")) {
+                sender.sendMessage("You do not have permission to use this command");
+                return true;
+            }
         }
-
-        if (!sender.hasPermission("rvnktools.command.announce")) {
-            sender.sendMessage("You do not have permission to use this command");
-            return true;
-        }
-
-        Player player = (Player) sender;
 
         if (args.length < 1) {
-            sendUsage(player);
+            sendUsage(sender);            
             return false;
         }
 
         String subcommand = args[0].toLowerCase();
-        AnnounceSubCommand handler = subcommands.get(subcommand);
+        AnnounceSubCommand handler = subcommands.get(subcommand);        
         
-        if (handler != null) {
-            return handler.execute(player, args);
+        if (handler != null) {            
+            return handler.execute(sender, args);
         } else {
-            sendUsage(player);
+            if (sender instanceof Player) {
+                sendUsage((Player) sender);
+            }
             return false;
         }
     }
 
-    private void sendUsage(Player player) {
-        player.sendMessage("Usage:");
-        player.sendMessage("/announce toggle <type> - Toggle announcement type");
-        player.sendMessage("/announce list - List all announcements");
-        player.sendMessage("/announce add <message> - Add new announcement");
-        player.sendMessage("/announce remove <id> - Remove an announcement");
-        player.sendMessage("/announce reload - Reload announcements configuration");
-        player.sendMessage("/announce update <id> <message> - Update an announcement");
+    private void sendUsage(CommandSender sender) {
+        sender.sendMessage("Usage:");
+        sender.sendMessage("/announce toggle <type> - Toggle announcement type");
+        sender.sendMessage("/announce list - List all announcements");
+        sender.sendMessage("/announce add <message> - Add new announcement");
+        sender.sendMessage("/announce delete <id> - Remove an announcement");
+        sender.sendMessage("/announce reload - Reload announcements configuration");
+        sender.sendMessage("/announce update <id> <message> - Update an announcement");
+        sender.sendMessage("/announce now <id> - Send announcement immediately");
+        sender.sendMessage("/announce pref <type> - Set your announcement preferences");
+        sender.sendMessage("/announce status - View announcement system status");
+        sender.sendMessage("/announce reload - Reload announcements configuration");
     }
 }
 

@@ -1,6 +1,6 @@
 package org.fourz.rvnktools.announceManager.command;
 
-import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
@@ -12,13 +12,13 @@ public class AnnounceSubCommandUpdate extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
-        if (!checkPermission(player, "rvnktools.command.announce.update")) {
+    public boolean execute(CommandSender sender, String[] args) {
+        if (!checkPermission(sender, "rvnktools.command.announce.update")) {
             return true;
         }
 
         if (args.length < 3) {
-            messagePlayer(player, "&cUsage: /announce update <id> <message>");
+            messageSender(sender, "&cUsage: /announce update <id> <message>");
             return true;
         }
 
@@ -26,7 +26,7 @@ public class AnnounceSubCommandUpdate extends AnnounceSubCommand {
         Announcement announcement = announceManager.getAnnouncement(id);
         
         if (announcement == null) {
-            messagePlayer(player, "&cAnnouncement with ID '" + id + "' not found");
+            messageSender(sender, "&cAnnouncement with ID '" + id + "' not found");
             return true;
         }
 
@@ -38,9 +38,9 @@ public class AnnounceSubCommandUpdate extends AnnounceSubCommand {
         String newMessage = message.toString().trim();
 
         if (announceManager.updateAnnouncement(id, newMessage)) {
-            messagePlayer(player, "&aAnnouncement updated successfully");
+            messageSender(sender, "&aAnnouncement updated successfully");
         } else {
-            messagePlayer(player, "&cFailed to update announcement");
+            messageSender(sender, "&cFailed to update announcement");
         }
 
         return true;

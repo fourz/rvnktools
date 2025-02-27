@@ -2,6 +2,7 @@
 package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 
@@ -12,9 +13,16 @@ public class AnnounceSubCommandToggle extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
+    public boolean execute(CommandSender sender, String[] args) {
+        
+        if (!(sender instanceof Player)) { 
+            messageSender(sender, "&cYou must be a player to toggle announcement types");
+            return false;
+        }
+        Player player = (Player) sender;
+        
         if (args.length < 2) {
-            messagePlayer(player, "&cAnnouncement type cannot be empty");
+            messageSender(player, "&cAnnouncement type cannot be empty");
             return false;
         }
 
@@ -23,7 +31,7 @@ public class AnnounceSubCommandToggle extends AnnounceSubCommand {
             announceManager.toggleAnnouncementType(player, type);
             return true;
         } else {
-            messagePlayer(player, "&cInvalid announcement type: " + type);
+            messageSender(player, "&cInvalid announcement type: " + type);
             return false;
         }
     }

@@ -28,8 +28,12 @@ public class ChatFormat {
     }
 
     // Parses the text and returns a clickable link with colorized text
-    public static TextComponent parse (String text, LinkMaker linkMaker) {
-        return makeLink(colorize(text), linkMaker);            
+    public static TextComponent parse(String text, LinkMaker linkMaker) {
+        String colorized = colorize(text);
+        if (linkMaker == null) {
+            return new TextComponent(colorized);
+        }
+        return makeLink(colorized, linkMaker);
     }
 
     // Parses the text and returns a clickable link with colorized text
@@ -55,5 +59,11 @@ public class ChatFormat {
     // Creates a TextComponent for action bar messages with link support
     public static net.md_5.bungee.api.chat.BaseComponent[] parseActionBar(String text, LinkMaker linkMaker) {
         return net.md_5.bungee.api.chat.TextComponent.fromLegacyText(parse(text, linkMaker).toLegacyText());
+    }
+
+    public static String parseMotd(String message) {
+        //insert line breaks
+        message = message.replace("\\n", "\n");
+        return colorize(message);
     }
 }

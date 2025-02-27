@@ -53,7 +53,7 @@ public class MickyHatPlaceListener implements Listener {
                     event.getPlayer().teleport(event.getPlayer().getLocation());
 
                     // Send message to player
-                    event.getPlayer().sendMessage("Mickyhats cannot be placed at this time.");
+                    event.getPlayer().sendMessage("Mickyhats cannot be placed place as a block.");
                 }
             }
         }

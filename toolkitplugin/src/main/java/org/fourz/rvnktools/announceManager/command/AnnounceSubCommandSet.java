@@ -1,12 +1,12 @@
 package org.fourz.rvnktools.announceManager.command;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.Announcement;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
@@ -17,13 +17,9 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
-        if (!checkPermission(player, "rvnktools.command.announce.set")) {
-            return false;
-        }
-
+    public boolean execute(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            messagePlayer(player, "&cUsage: /announce set <id> <property> <value>");
+            messageSender(sender, "&cUsage: /announce set <id> <property> <value>");
             return false;
         }
 
@@ -31,74 +27,74 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
         String property = args[2].toLowerCase();
         String value = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
 
-        Announcement announcement = null;
-        for (Announcement a : announceManager.getAnnouncements()) {
-            if (a.getId().equalsIgnoreCase(id)) {
-                announcement = a;
-                break;
-            }
-        }
-
+        Announcement announcement = announceManager.getAnnouncement(id);
         if (announcement == null) {
-            messagePlayer(player, "&cAnnouncement with ID '" + id + "' not found");
+            messageSender(sender, "&cAnnouncement with ID '" + id + "' not found");
             return false;
         }
 
         switch (property) {
             case "recurrence":
                 // Allow owners to modify recurrence without permission check
-                boolean isOwner = announcement.getOwner() != null && 
-                                announcement.getOwner().equalsIgnoreCase(player.getName());
-                if (!isOwner || !checkPermission(player, "rvnktools.command.announce.set")) {
-                    return false;
-                }                
-                if (isValidRecurrence(value)) {
-                    announcement.setRecurrence(convertRecurrenceToSecondsLong(value));
-                    announcement.setRecurrenceString(value);                    
-                    messagePlayer(player, "&aSet recurrence to: " + value);
-                } else {
-                    messagePlayer(player, "&cInvalid recurrence value. Use: daily or none, or time values like 90m, 2h");
-                    return false;
+                boolean isOwner = false;
+                if (sender instanceof Player) {
+                    isOwner = announcement.getOwner().equalsIgnoreCase(((Player)sender).getName());
                 }
+                if (isOwner || checkPermission(sender, "rvnktools.command.announce.set")) {
+                    if (isValidRecurrence(value)) {
+                        announcement.setRecurrence(convertRecurrenceToSecondsLong(value));
+                        announcement.setRecurrenceString(value);                    
+                        messageSender(sender, "&aSet recurrence to: " + value + " for announcement, " + id + ".");
+                    } else {
+                        messageSender(sender, "&cInvalid recurrence value. Use: daily or none, or time values like 90m, 2h");
+                        return false;
+                    }
+                } else {
+                    messageSender(sender, "&cYou don't have permission to set recurrence");
+                    return false;
+                }             
+
                 break;
 
             case "date":
-                if (!checkPermission(player, "rvnktools.command.announce.set")) return false;
+                if (!checkPermission(sender, "rvnktools.command.announce.set")) {
+                    return false;
+                }
                 try {
                     LocalDate date = LocalDate.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
                     announcement.setDate(date);
-                    messagePlayer(player, "&aSet date to: " + value);
+                    messageSender(sender, "&aSet date to: " + value);
                 } catch (DateTimeParseException e) {
-                    messagePlayer(player, "&cInvalid date format. Use: YYYY-MM-DD");
+                    messageSender(sender, "&cInvalid date format. Use: YYYY-MM-DD");
                     return false;
                 }
                 break;
 
             case "type":
-                if (!checkPermission(player, "rvnktools.command.announce.set")) return false;
+                if (!checkPermission(sender, "rvnktools.command.announce.set")) return false;
                 if (announceManager.validateAnnounceType(value)) {
                     announcement.setType(value);
-                    messagePlayer(player, "&aSet type to: " + value);
+                    messageSender(sender, "&aSet type to: " + value);
                 } else {
-                    messagePlayer(player, "&cInvalid announcement type: " + value);
+                    messageSender(sender, "&cInvalid announcement type: " + value);
                     return false;
                 }
                 break;
 
             case "permission":
-                if (!checkPermission(player, "rvnktools.command.announce.set")) return false;
+                if (!checkPermission(sender, "rvnktools.command.announce.set")) return false;
                 if (value.equalsIgnoreCase("none")) {
                     announcement.setPermission(null);
-                    messagePlayer(player, "&aRemoved permission requirement");
+                    messageSender(sender, "&aRemoved permission requirement");
                 } else {
                     announcement.setPermission(value);
-                    messagePlayer(player, "&aSet permission to: " + value);
+                    messageSender(sender, "&aSet permission to: " + value);
                 }
                 break;
 
             default:
-                messagePlayer(player, "&cUnknown property: " + property);
-                messagePlayer(player, "&cValid properties: recurrence, date, type, permission");
+                messageSender(sender, "&cUnknown property: " + property);
+                messageSender(sender, "&cValid properties: recurrence, date, type, permission");
                 return false;
         }
 

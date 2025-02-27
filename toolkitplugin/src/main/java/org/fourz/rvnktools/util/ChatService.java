@@ -32,7 +32,7 @@ public class ChatService implements ChatServiceInterface {
             sendMessage(player, message);
         }
     }
-
+    
     @Override
     public String formatMessage(Player player, String message) {
         String formattedMessage = ChatFormat.colorize(message);

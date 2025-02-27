@@ -4,11 +4,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.command.CycleCommands;
 import org.fourz.rvnktools.command.DiscordCommand;
 import org.fourz.rvnktools.command.EventsCommand;
 import org.fourz.rvnktools.command.PingCommand;
 import org.fourz.rvnktools.command.TPSCommand;
+import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
@@ -21,6 +21,7 @@ import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.hatManager.PutHatCommand;
+import org.fourz.rvnktools.command.RVNKToolsCommand;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
@@ -74,6 +75,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
         this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
         this.getCommand("puthat").setExecutor(new PutHatCommand(this));
+        getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
 
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
@@ -96,6 +98,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     public Economy getEconomy() {
         return economy;
+    }
+
+    public CycleCommands getCycleCommands() {
+        return cycleCommands;
     }
 
     private boolean setupEconomy() {

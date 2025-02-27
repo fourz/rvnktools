@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.entity.Player;
-import org.checkerframework.checker.units.qual.m;
+import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 
@@ -12,7 +12,12 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
+    public boolean execute(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            messageSender(sender, "&cThis command can only be used by players");
+            return true;            
+        }
+        Player player = (Player) sender;
         String topic = args.length > 1 ? args[1] : null;
         return handleHelpCommand(player, topic);
     }
@@ -38,59 +43,59 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
             case "set":
                 return showSetHelp(player);
             case "help":
-                messagePlayer(player, "&cAre you ok?");
+                messageSender(player, "&cAre you ok?");
                 return true;
             default:
-                messagePlayer(player, "&cUnknown help topic: " + topic);
+                messageSender(player, "&cUnknown help topic: " + topic);
                 return false;
         }
     }
 
     private boolean showGeneralHelp(Player player) {
-        messagePlayer(player, "&6=== Announcement Help ===");
-        messagePlayer(player, "");
-        messagePlayer(player, " &f/announce status &8- &7View your enabled announcements types");
-        messagePlayer(player, " &f/announce toggle <type> &8- &7Enable/disable announcement types");
-        messagePlayer(player, " &f/announce list &8- &7List all announcements");
-        messagePlayer(player, " &f/announce list <type> &8- &7List all announcements by type");
+        messageSender(player, "&6=== Announcement Help ===");
+        messageSender(player, "");
+        messageSender(player, " &f/announce status &8- &7View your enabled announcements types");
+        messageSender(player, " &f/announce toggle <type> &8- &7Enable/disable announcement types");
+        messageSender(player, " &f/announce list &8- &7List all announcements");
+        messageSender(player, " &f/announce list <type> &8- &7List all announcements by type");
         
         if (player.hasPermission("rvnktools.command.announce.add")) {
-            messagePlayer(player, " &f/announce add &8- &7Create new announcements");
+            messageSender(player, " &f/announce add &8- &7Create new announcements");
         }
         if (player.hasPermission("rvnktools.command.announce.set")) {
-            messagePlayer(player, " &f/announce set &8- &7Modify announcement properties");
+            messageSender(player, " &f/announce set &8- &7Modify announcement properties");
         }
         if (player.hasPermission("rvnktools.command.announce.delete")) {
-            messagePlayer(player, " &f/announce delete &8- &7Remove announcements");
+            messageSender(player, " &f/announce delete &8- &7Remove announcements");
         }
         if (player.hasPermission("rvnktools.command.announce.now")) {
-            messagePlayer(player, " &f/announce now &8- &7Trigger immediate broadcast");
+            messageSender(player, " &f/announce now &8- &7Trigger immediate broadcast");
         }
 
-        messagePlayer(player, "");
-        messagePlayer(player, "&7For detailed help: &f/announce help <command>");
-        messagePlayer(player, "&8Example: &7/announce help toggle");
+        messageSender(player, "");
+        messageSender(player, "&7For detailed help: &f/announce help <command>");
+        messageSender(player, "&8Example: &7/announce help toggle");
         return true;
     }
 
     private boolean showStatusHelp(Player player) {
-        messagePlayer(player, "&6Help for &f/announce status");
-        messagePlayer(player, "&7Shows your current announcement type preferences");
-        messagePlayer(player, "&7Usage: &f/announce status");
+        messageSender(player, "&6Help for &f/announce status");
+        messageSender(player, "&7Shows your current announcement type preferences");
+        messageSender(player, "&7Usage: &f/announce status");
         return true;
     }
 
     private boolean showToggleHelp(Player player) {
-        messagePlayer(player, "&6Help for &f/announce toggle");
-        messagePlayer(player, "&7Toggle specific announcement types on/off");
-        messagePlayer(player, "&7Usage: &f/announce toggle <type>");
+        messageSender(player, "&6Help for &f/announce toggle");
+        messageSender(player, "&7Toggle specific announcement types on/off");
+        messageSender(player, "&7Usage: &f/announce toggle <type>");
         return true;
     }
 
     private boolean showListHelp(Player player) {
-        messagePlayer(player, "&6Help for &f/announce list");
-        messagePlayer(player, "&7List all announcements or filter by type");
-        messagePlayer(player, "&7Usage: &f/announce list [type|all]");
+        messageSender(player, "&6Help for &f/announce list");
+        messageSender(player, "&7List all announcements or filter by type");
+        messageSender(player, "&7Usage: &f/announce list [type|all]");
         return true;
     }
 
@@ -98,9 +103,9 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
         if (!player.hasPermission("rvnktools.command.announce.add")) {
             return true;
         }
-        messagePlayer(player, "&6Help for &f/announce add");
-        messagePlayer(player, "&7Add a new announcement to the system");
-        messagePlayer(player, "&7Usage: &f/announce add <message>");
+        messageSender(player, "&6Help for &f/announce add");
+        messageSender(player, "&7Add a new announcement to the system");
+        messageSender(player, "&7Usage: &f/announce add <message>");
         return true;
     }
 
@@ -108,9 +113,9 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
         if (!player.hasPermission("rvnktools.command.announce.delete")) {
             return true;
         }
-        messagePlayer(player, "&6Help for &f/announce delete");
-        messagePlayer(player, "&7Remove an announcement from the system");
-        messagePlayer(player, "&7Usage: &f/announce delete <id>");
+        messageSender(player, "&6Help for &f/announce delete");
+        messageSender(player, "&7Remove an announcement from the system");
+        messageSender(player, "&7Usage: &f/announce delete <id>");
         return true;
     }
 
@@ -118,9 +123,9 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
         if (!player.hasPermission("rvnktools.command.announce.now")) {
             return true;
         }
-        messagePlayer(player, "&6Help for &f/announce now");
-        messagePlayer(player, "&7Immediately broadcast an announcement");
-        messagePlayer(player, "&7Usage: &f/announce now <id>");
+        messageSender(player, "&6Help for &f/announce now");
+        messageSender(player, "&7Immediately broadcast an announcement");
+        messageSender(player, "&7Usage: &f/announce now <id>");
         return true;
     }
 
@@ -128,21 +133,21 @@ public class AnnounceSubCommandHelp extends AnnounceSubCommand {
         if (!player.hasPermission("rvnktools.command.announce.set")) {
             return true;
         }
-        messagePlayer(player, "&6Help for &f/announce set");
-        messagePlayer(player, "&7Modify properties of an existing announcement");
-        messagePlayer(player, "&7Usage: &f/announce set <id> <property> <value>");
-        messagePlayer(player, "");
-        messagePlayer(player, "&7Properties:");
-        messagePlayer(player, "&8- &frecurrence &7(daily, none, 90m, 2h)");
-        messagePlayer(player, "&8- &fdate &7(YYYY-MM-DD)");
-        messagePlayer(player, "&8- &ftype &7(announcement type)");
-        messagePlayer(player, "&8- &fpermission &7(permission node or 'none')");
-        messagePlayer(player, "&8- &fmessage &7(announcement message)");
-        messagePlayer(player, "");
-        messagePlayer(player, "Examples:");
-        messagePlayer(player, "&8- &f/announce set ad_woodnthings recurrence daily");
-        messagePlayer(player, "&8- &f/announce set xmas date 2020-12-25");
-        messagePlayer(player, "&8- &f/announce set events permission none");   
+        messageSender(player, "&6Help for &f/announce set");
+        messageSender(player, "&7Modify properties of an existing announcement");
+        messageSender(player, "&7Usage: &f/announce set <id> <property> <value>");
+        messageSender(player, "");
+        messageSender(player, "&7Properties:");
+        messageSender(player, "&8- &frecurrence &7(daily, none, 90m, 2h)");
+        messageSender(player, "&8- &fdate &7(YYYY-MM-DD)");
+        messageSender(player, "&8- &ftype &7(announcement type)");
+        messageSender(player, "&8- &fpermission &7(permission node or 'none')");
+        messageSender(player, "&8- &fmessage &7(announcement message)");
+        messageSender(player, "");
+        messageSender(player, "Examples:");
+        messageSender(player, "&8- &f/announce set ad_woodnthings recurrence daily");
+        messageSender(player, "&8- &f/announce set xmas date 2020-12-25");
+        messageSender(player, "&8- &f/announce set events permission none");   
 
         return true;
     }

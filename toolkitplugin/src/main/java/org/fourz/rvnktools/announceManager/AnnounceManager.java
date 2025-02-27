@@ -2,6 +2,7 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,10 +84,15 @@ public class AnnounceManager {
     }
 
     // Add an announcement to the announcements list, used by AnnounceCommand
-    public boolean addAnnouncement(Player player, String input) {
+    public boolean addAnnouncement(CommandSender sender, String input) {
 
         // extract id, type, and text from input
         String[] args = input.split(" ", 3);
+        Player player = null;
+        
+        if (sender instanceof Player) {
+            player = (Player) sender;        
+        }
         
         if (args.length < 3) {
             if (player != null) {
@@ -106,8 +112,9 @@ public class AnnounceManager {
             if (announcementExists(id)) {
                 if (player != null) {
                     chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
+                } else {
+                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
                 }
-                return false;
             }
         }
 
@@ -165,39 +172,59 @@ public class AnnounceManager {
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
         String message = prefix + announcement.getMessage() + suffix;
 
+        // Pre-fetch preferences for all online players
+        Map<Player, PlayerPreferences> playerPrefs = new HashMap<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
-                // Get player's location preference, default to "chat"
                 String locationPref = announceConfig.getPreference(player.getUniqueId(), "location");
-                locationPref = (locationPref == null || locationPref.isEmpty()) ? "chat" : locationPref.toLowerCase();
-
-                // Send message based on location preference
-                switch (locationPref) {
-                    case "title":
-                        player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
-                        break;
-                    case "action-bar":
-                        //send with action bat a top of the screen
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
-                        break;
-                    default:
-                        chatService.sendMessage(player, message, plugin.linkMaker);
-                        break;
-                }
-                
-                // Handle sound preference
                 String soundPref = announceConfig.getPreference(player.getUniqueId(), "sound");
-                if (soundPref != null && !soundPref.isEmpty() && !soundPref.equalsIgnoreCase("none")) {
-                    try {
-                        org.bukkit.Sound sound = org.bukkit.Sound.valueOf(soundPref.toUpperCase());
-                        player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
-                    } catch (IllegalArgumentException e) {
-                        debug.warning("Invalid sound preference for player " + player.getName() + ": " + soundPref);
-                    }
-                }
-                
-                debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + locationPref + ")");
+                playerPrefs.put(player, new PlayerPreferences(
+                    locationPref != null ? locationPref : "chat",
+                    soundPref != null ? soundPref : "none"
+                ));
             }
+        }
+
+        // Broadcast to all players using pre-fetched preferences
+        for (Map.Entry<Player, PlayerPreferences> entry : playerPrefs.entrySet()) {
+            Player player = entry.getKey();
+            PlayerPreferences prefs = entry.getValue();
+            
+            // Send message based on location preference
+            switch (prefs.location.toLowerCase()) {
+                case "title":
+                    player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
+                    break;
+                case "action-bar":
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
+                    break;
+                default: // "chat"
+                    chatService.sendMessage(player, message, plugin.linkMaker);
+                    break;
+            }
+            
+            // Play sound if configured
+            if (!prefs.sound.equalsIgnoreCase("none")) {
+                try {
+                    org.bukkit.Sound sound = org.bukkit.Sound.valueOf(prefs.sound.toUpperCase());
+                    player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+                } catch (IllegalArgumentException e) {
+                    debug.warning("Invalid sound preference for player " + player.getName() + ": " + prefs.sound);
+                }
+            }
+            
+            debug.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + prefs.location + ")");
+        }
+    }
+
+    // Helper class to store pre-fetched preferences
+    private static class PlayerPreferences {
+        final String location;
+        final String sound;
+
+        PlayerPreferences(String location, String sound) {
+            this.location = location;
+            this.sound = sound;
         }
     }
 
@@ -259,17 +286,15 @@ public class AnnounceManager {
         debug.info("Saved AnnounceManager configuration.");
     }    
 
-    public void shutdown() {    
-        debug.info("Saving announcements before shutdown...");
+    public void shutdown() {
         // Ensure we have all announcements in memory
         if (announceConfig.getDataStore() != null) {
             setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
-        }
-        saveConfig();    
+        }        
         announceScheduler.shutdown();
-        savePlayerDisabledTypes();
+        debug.info("Saving announcements before shutdown...");        
         announceConfig.shutdown();
-        debug.info("AnnounceManager shutdown complete");
+        debug.info("AnnounceManager shutdown complete.");
     }
 
     public boolean validateAnnounceType(String type) {
@@ -325,6 +350,16 @@ public class AnnounceManager {
         return new ArrayList<>(announcements.values());
     }
 
+    public List<Announcement> getAnnouncements(String type) {
+        List<Announcement> typeAnnouncements = new ArrayList<>();
+        for (Announcement announcement : announcements.values()) {
+            if (type.equalsIgnoreCase(announcement.getType())) {
+                typeAnnouncements.add(announcement);
+            }
+        }
+        return typeAnnouncements;
+    }
+
     public void setAnnouncements(List<Announcement> announcementList) {
         if (announcementList == null) {
             debug.warning("Skipping null announcement list");
@@ -345,10 +380,22 @@ public class AnnounceManager {
         announceConfig.savePlayerDisabledTypes();
     }
 
-    public boolean sendAnnouncementNow(Player player, String id) {
+    public boolean sendAnnouncementNow(CommandSender sender, String id) {
+        if (sender instanceof Player) {
+            Player player = (Player) sender;
+            if (!player.hasPermission("rvnktools.command.announce.now")) {
+                chatService.sendMessage(player, "You do not have permission to send announcements now.");
+                return false;
+            }
+        }           
+        
         Announcement announcement = announcements.get(id);
         if (announcement == null) {
-            plugin.getLogger().warning("Cannot send announcement: No announcement found with ID " + id);
+            if (sender instanceof Player) {
+                chatService.sendMessage((Player)sender, "Invalid announcement ID: " + id);
+            } else {
+                plugin.getLogger().warning("Cannot send announcement: No announcement found with ID " + id);
+            }
             return false;
         }
         broadcastAnnouncement(announcement);
@@ -356,7 +403,7 @@ public class AnnounceManager {
     }
 
     public AnnounceType getAnnounceType(String type) {
-        return announceConfig.getAnnounceTypes().get(type);
+        return announceConfig.getAnnounceTypes().get(type); 
     }
 
     public boolean announcementExists(String id) {

@@ -201,6 +201,8 @@ public class JettyServer {
         
         // Add servlets
         context.addServlet(new ServletHolder(new JettyServerAnnouncement(announceManager, gson)), "/api/announcements/*");
+        context.addServlet(new ServletHolder(new JettyServerPlayers(plugin, gson)), "/api/players/*");
+        context.addServlet(new ServletHolder(new JettyServerWorld(plugin, gson)), "/api/worlds/*");
         context.addServlet(new ServletHolder(new StatusServlet()), "/api/status");
         
         server.setHandler(context);

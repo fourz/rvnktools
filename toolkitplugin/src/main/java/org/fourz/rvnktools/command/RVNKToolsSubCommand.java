@@ -1,26 +1,22 @@
-package org.fourz.rvnktools.announceManager.command;
+package org.fourz.rvnktools.command;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.util.ChatFormat;
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
 
-public abstract class AnnounceSubCommand {
-    protected final AnnounceManager announceManager;
+public abstract class RVNKToolsSubCommand {
     protected final RVNKTools plugin;
 
-    public AnnounceSubCommand(AnnounceManager announceManager, RVNKTools plugin) {
-        this.announceManager = announceManager;
+    public RVNKToolsSubCommand(RVNKTools plugin) {
         this.plugin = plugin;
     }
 
     public abstract boolean execute(CommandSender sender, String[] args);
 
-    // delegates to CommandSender version
     public boolean execute(Player player, String[] args) {
         return execute((CommandSender)player, args);
     }

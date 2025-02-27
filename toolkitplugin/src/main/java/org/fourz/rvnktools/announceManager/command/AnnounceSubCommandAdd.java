@@ -1,5 +1,6 @@
 package org.fourz.rvnktools.announceManager.command;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
@@ -15,14 +16,16 @@ public class AnnounceSubCommandAdd extends AnnounceSubCommand {
     }
 
     @Override
-    public boolean execute(Player player, String[] args) {
-        if (!player.hasPermission("rvnktools.command.announce.add")) {
-            messagePlayer(player, "&cYou don't have permission to add announcements");
+    public boolean execute(CommandSender sender, String[] args) {
+        // Check permissions
+        if (!sender.hasPermission("rvnktools.command.announce.add")) {
+            messageSender(sender, "&cYou don't have permission to add announcements");
             return false;
         }
 
+        // Validate argument count
         if (args.length < 3) {
-            messagePlayer(player, "&cUsage: /announce add <type> <id> <message>");
+            messageSender(sender, "&cUsage: /announce add <type> <id> <message>");
             return false;
         }
 
@@ -31,42 +34,43 @@ public class AnnounceSubCommandAdd extends AnnounceSubCommand {
 
         // Check if announcement already exists
         if (announceManager.announcementExists(id)) {
-            messagePlayer(player, "&cAn announcement with ID '" + id + "' already exists");
+            messageSender(sender, "&cAn announcement with ID '" + id + "' already exists");
             return false;
         }
         
         // Get announcement type config
         AnnounceType announceType = announceManager.getAnnounceType(type);
         if (announceType == null) {
-            messagePlayer(player, "&cInvalid announcement type: " + type);
+            messageSender(sender, "&cInvalid announcement type: " + type);
             return false;
         }
 
         // Check if type has a listing fee
-        
-        if (announceType.getListingFee() != null) {            
+        // Handle listing fee if sender is a player
+        if (announceType.getListingFee() != null && sender instanceof Player) {
+            Player player = (Player) sender;
             Double fee = announceType.getListingFee();
             String typeName = announceType.getId();            
             String feeDesc = CurrencyFormatter.format(fee, plugin);
 
             // Check if player has enough money
             if (!plugin.getEconomy().has(player, fee)) {                
-
                 typeName = typeName.substring(0, 1).toUpperCase() + typeName.substring(1);
-                messagePlayer(player, "&c" + typeName + " announcements costs " + feeDesc + " &cto list.");
+                messageSender(sender, "&c" + typeName + " announcements costs " + feeDesc + " &cto list.");
                 return true;
             }
             
-            // Charge the player
+            // Charge the player and notify
             plugin.getEconomy().withdrawPlayer(player, fee);
-            messagePlayer(player, "&aYou have been debited " + feeDesc + " &afor this " + typeName + " listing.");
-
-            // output current balance to player            
+            messageSender(sender, "&aYou have been debited " + feeDesc + " &afor this " + typeName + " listing.");
+            
+            // Output current balance to player
             String balanceDesc = CurrencyFormatter.format(plugin.getEconomy().getBalance(player), plugin);
-            messagePlayer(player, "&aYour balance is now " + balanceDesc);
+            messageSender(sender, "&aYour balance is now " + balanceDesc);
         }
 
+        // Join remaining args as message and add announcement
         String message = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
-        return announceManager.addAnnouncement(player, type + " " + id + " " + message);
+        return announceManager.addAnnouncement(sender, type + " " + id + " " + message);
     }
 }
