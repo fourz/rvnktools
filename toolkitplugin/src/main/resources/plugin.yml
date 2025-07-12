@@ -3,6 +3,8 @@ version: ${project.version}
 author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
+api: "1.0"
+website: http://www.fourz.org
 api-version: 1.16
 depend: [PlaceholderAPI]
 softdepend: [Multiverse-Core]
@@ -69,6 +71,15 @@ commands:
   announcer:
     description: Enable or disable announcements feature.
     usage: /announcer
+  trains:
+    description: Manage TrainCarts settings and view help pages
+    usage: /trains [enable|disable|modes|examples|links]
+    aliases: [train-help]
+  railroad:
+    description: Toggle between TrainCarts and vanilla minecart modes
+    usage: /railroad
+    aliases: [cycletrainmode]
+    permission: rvnktools.command.railroad
 
 permissions:
   rvnktools.command:
@@ -101,11 +112,20 @@ permissions:
   rvnktools.command.announce:
     description: Allows the player to use the announce command
     default: false
+  rvnktools.command.trains:
+    description: Allows access to train commands
+    default: true
+  rvnktools.command.trains.enable:
+    description: Allows player enabling TrainCarts mode
+    default: true
+  rvnktools.command.trains.disable:
+    description: Allows disabling TrainCarts mode
+    default: true
   rvnktools.command.railroad:
-    description: Allows the player to use the railroad command
-    default: false
+    description: Allows the player to toggle between minecart modes
+    default: true
   rvnktools.announce.help:
-    description: Allows the player to get help messages 
+    description: Allows the player to access announcement help 
     default: true
   rvnktools.command.puthat:
     description: Allows the player to use the puthat command

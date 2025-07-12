@@ -2,98 +2,92 @@
 
 RVNKTools is a comprehensive Minecraft server plugin that provides a wide array of features to enhance server administration. It includes tools for managing announcements, permissions, events, and much more, tailored for ease of use and scalability.
 
-## Installation
-
-1. Download the latest version of `rvnktools.jar` from the [Releases](#).
-2. Place the JAR file in your server's `plugins` directory.
-3. Restart your server.
-4. Configure the plugin using the `config.yml` and `announcements.yml` files generated in the `plugins/RVNKTools` directory.
-
-# RVNKTools Minecraft Plugin
-
-RVNKTools is a versatile Minecraft server plugin designed to streamline server administration and enhance player experience. This plugin offers a range of features, making it a valuable tool for server owners and administrators.
-
-## Key Features
+## Features
 
 - **Announcements Management**:
-  - Schedule, manage, and remove announcements with YAML or database integration.
-  - Support for recurring announcements and categorized types.
+  - Schedule, manage, and remove announcements with YAML or database integration
+  - Support for recurring announcements and categorized types
+  - Player preference management for announcement visibility
 
 - **Permissions Handling**:
-  - Tools to efficiently manage player permissions and access control.
+  - Tools to efficiently manage player permissions and access control
+  - Integration with LuckPerms for extended permission functionality
+
+- **Admin Utilities**:
+  - Hat Manager for cosmetic item management
+  - Link Maker for creating and sharing clickable links in-game
+  - Cycle Commands for routine server maintenance tasks
+  - Join Message customization for player welcome messages
 
 - **Integration Support**:
-  - Seamless integration with PlaceholderAPI for dynamic messages and content.
-
-- **Custom Commands and Tools**:
-  - Extendable command system for managing announcements, preferences, and other features.
-  - Includes additional tools such as a hat manager and link maker.
+  - Seamless integration with PlaceholderAPI for dynamic messages and content
+  - Multiverse support for multi-world environments
+  - Vault integration for economy and permissions
 
 - **Database Compatibility**:
-  - Supports SQLite and MySQL for flexible data storage options.
+  - Supports SQLite for lightweight installations
+  - Configurable through application.properties
 
-## Suggested Use Cases
+## Installation
 
-- **Server Administration**:
-  - Simplify server management by automating announcements and schedules.
-  - Manage player permissions efficiently through built-in tools.
+1. Download the latest version of `rvnktools.jar` from the [Releases](https://github.com/fourz/rvnktools/releases) page
+2. Place the JAR file in your server's `plugins` directory
+3. Restart your server
+4. Configuration files will be generated in the `plugins/RVNKTools` directory
 
-- **Event Management**:
-  - Use the announcement system to keep players informed about server events, updates, and important information.
+## Commands
 
-- **Custom Player Experience**:
-  - Enhance interactivity by leveraging PlaceholderAPI integration for dynamic and personalized messages.
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/announce` | Manage server announcements | `rvnktools.announce` |
+| `/announce add` | Create a new announcement | `rvnktools.announce.add` |
+| `/announce remove` | Remove an announcement | `rvnktools.announce.remove` |
+| `/announce list` | List all announcements | `rvnktools.announce.list` |
+| `/hat` | Set the item in your hand as a hat | `rvnktools.hat` |
+| `/link` | Manage clickable links | `rvnktools.link` |
 
-- **Plugin Development**:
-  - Developers can extend RVNKTools to add custom features or integrate with other plugins.
+## Configuration
 
-## Getting Started
+RVNKTools uses several configuration files:
 
-1. Install the plugin by placing the `rvnktools.jar` file in your server's `plugins` directory.
-2. Restart the server to generate configuration files.
-3. Configure announcements and settings using the `announcements.yml` and `config.yml` files.
-4. Use the `/announce` commands to manage announcements directly in-game.
+- `config.yml` - Main plugin configuration
+- `announcements.yml` - Announcement definitions and schedules
+- `links.yml` - Stored links for the link maker
+- `joinmessages.yml` - Custom join message configuration
+- `application.properties` - Database and advanced settings
 
-## Support and Contributions
+## Development
 
-- **Support**:
-  - For help and troubleshooting, join our [Discord](#) or open an issue on GitHub.
+### Building from Source
 
-- **Contribute**:
-  - Contributions are welcome! Fork the repository, implement your changes, and submit a pull request.
+1. Clone the repository: `git clone https://github.com/fourz/rvnktools.git`
+2. Navigate to the project directory: `cd rvnktools/toolkitplugin`
+3. Build with Maven: `mvn clean package`
+4. Find the compiled JAR in the `target` directory
+
+### VS Code Tasks
+
+Several VS Code tasks are available for development:
+
+- **Build Plugin**: Compiles and packages the plugin
+- **Copy to Server**: Copies the built plugin to your development server
+- **Restart Server**: Restarts the development server with the new build
+- **Reload Server**: Reloads plugins without a full server restart
+- **Clean&Restart Server**: Cleans up and restarts the server
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a new branch: `git checkout -b feature-branch`
+3. Make your changes and test thoroughly
+4. Submit a pull request with a clear description of the changes
 
 ## License
 
 RVNKTools is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
 
-=======
-# rvnktools
-
-## Description
-rvnktools is a Java-based project.
-
-## Features
-- [Describe the main features of the project]
-
-## Installation
-To install and use rvnktools, follow these steps:
-1. Clone the repository: `git clone https://github.com/fourz/rvnktools.git`
-2. Navigate to the project directory: `cd rvnktools`
-3. [Add any additional installation steps]
-
-## Usage
-To use rvnktools:
-1. [Provide usage instructions and examples]
-
-## Contributing
-Contributions are welcome! Please follow these guidelines:
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature-branch`
-3. Make your changes
-4. Submit a pull request
-
-## License
-[Specify the license under which the project is distributed]
-
 ## Contact
-For any questions or issues, please contact [fourz](https://github.com/fourz).
+
+For any questions or issues, please contact [fourz](https://github.com/fourz) or open an issue on GitHub.

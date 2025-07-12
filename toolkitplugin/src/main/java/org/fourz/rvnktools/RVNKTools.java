@@ -82,6 +82,11 @@ public class RVNKTools extends JavaPlugin implements Listener {
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);
 
+        // Register TrainCarts related commands
+        TrainsCommand trainsCommand = new TrainsCommand(this);
+        getCommand("trains").setExecutor(trainsCommand);
+        getCommand("trains").setTabCompleter(trainsCommand);
+        
         getLogger().info("RVNK Toolkit has been enabled.");                
     }
 
