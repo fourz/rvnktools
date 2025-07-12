@@ -20,19 +20,23 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.util.logging.LogManager;
+import org.fourz.rvnktools.util.logging.RVNKLogger;
 
 public class CycleCommands {
     private final RVNKTools plugin;
+    private final RVNKLogger logger;
     private FileConfiguration config;
     private CycleState state;
     private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
     public CycleCommands(RVNKTools plugin) {
         this.plugin = plugin;
+        this.logger = LogManager.getInstance(plugin, getClass());
         this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
-        plugin.getLogger().info("CycleCommands initialized.");
+        logger.info("CycleCommands initialized.");
     }
 
     public RVNKTools getPlugin() {
@@ -78,7 +82,7 @@ public class CycleCommands {
                     PluginCommand pluginCommand = plugin.getCommand(commandKey);
                     if (pluginCommand != null) {
                         pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig, this));
-                        plugin.getLogger().info("CycleCommands registered command: " + commandKey);
+                        logger.info("CycleCommands registered command: " + commandKey);
 
                         List<String> aliases = commandConfig.getStringList("aliases");
                         for (String alias : aliases) {
@@ -90,19 +94,19 @@ public class CycleCommands {
                             pluginCommand.setDescription(description);
                         }
                     } else {
-                        plugin.getLogger().info("CycleCommands: Plugin command for " + commandKey + " is null");
+                        logger.warning("CycleCommands: Plugin command for " + commandKey + " is null");
                     }
                 } else {
-                    plugin.getLogger().info("CycleCommands: Command config for " + commandKey + " is null");
+                    logger.warning("CycleCommands: Command config for " + commandKey + " is null");
                 }
             }
         } else {
-            plugin.getLogger().info("CycleCommands: Commands section is null");
+            logger.warning("CycleCommands: Commands section is null");
         }
     }
 
     public String getNextInstructionKey(String commandKey, UUID playerId) {
-        Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
+        Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, _ -> new HashMap<>());
         int position = commandPositions.getOrDefault(playerId, 0);
 
         ConfigurationSection instructionsSection = config.getConfigurationSection("commands." + commandKey + ".instructions");
@@ -131,7 +135,7 @@ public class CycleCommands {
                 return Long.parseLong(timeStr) * 20;
             }
         } catch (NumberFormatException e) {
-            plugin.getLogger().warning("Invalid time format: " + timeStr);
+            logger.warning("Invalid time format: " + timeStr);
             return 0;
         }
     }
