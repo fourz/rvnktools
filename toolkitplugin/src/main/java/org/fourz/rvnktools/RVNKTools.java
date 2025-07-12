@@ -65,12 +65,12 @@ public class RVNKTools extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
 
         // Register standalone commands
-        this.getCommand("ping").setExecutor(new PingCommand());
-        this.getCommand("tps").setExecutor(new TPSCommand());
-        this.getCommand("events").setExecutor(new EventsCommand());
-        this.getCommand("discord").setExecutor(new DiscordCommand(this));        
-        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
-        this.getCommand("puthat").setExecutor(new PutHatCommand(this));
+        getCommand("ping").setExecutor(new PingCommand());
+        getCommand("tps").setExecutor(new TPSCommand());
+        getCommand("events").setExecutor(new EventsCommand());
+        getCommand("discord").setExecutor(new DiscordCommand(this));        
+        getCommand("broadcast").setExecutor(new BroadcastCommand(this));
+        getCommand("puthat").setExecutor(new PutHatCommand(this));
         
         // Register RVNKTools command
         getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
@@ -86,8 +86,8 @@ public class RVNKTools extends JavaPlugin implements Listener {
         TrainsCommand trainsCommand = new TrainsCommand(this);
         getCommand("trains").setExecutor(trainsCommand);
         getCommand("trains").setTabCompleter(trainsCommand);
-        
-        getLogger().info("RVNK Toolkit has been enabled.");                
+
+        getLogger().info("RVNK Toolkit has been enabled.");
     }
 
     @Override

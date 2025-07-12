@@ -26,9 +26,10 @@ The next phase of development focuses on improving the foundation of RVNKTools t
 #### Feature Set
 
 - [ ] **Logging System Refactoring** *(High Priority)*
-  - Implement LogManager pattern for consistent logging across all classes
-  - Create and implement optional DebugLogger for performance-critical sections.  
+  - Create and implement an optionally used DebugLogger for performance-critical sections.  
     - DebugLogger should share the same interface as LogManager, allowing for easy switching between normal and debug logging.
+  - Implement LogManager pattern for consistent logging across all classes
+    - Establish and implement LogManager as centralized logging configuration.
   - Add configurable log levels
   - Create log rotation and archiving
   - Add performance metrics logging
