@@ -18,8 +18,17 @@ public class RVNKToolsCommand implements CommandExecutor {
     }
 
     private void registerSubCommands() {
+        // Register basic utility commands
         subcommands.put("links", new RVNKToolsSubCommandLinks(plugin));
         subcommands.put("cycle", new RVNKToolsSubCommandCycle(plugin));
+        
+        // Register teleport-related commands
+        TeleportWorldSwapSubCommand worldSwapCommand = new TeleportWorldSwapSubCommand(plugin);
+        subcommands.put("teleport", new TeleportCommand(plugin, Map.of("worldswap", worldSwapCommand)));
+        
+        // Register convenience aliases
+        subcommands.put("worldswap", worldSwapCommand);
+        subcommands.put("event", worldSwapCommand);
     }
 
     @Override
@@ -46,5 +55,8 @@ public class RVNKToolsCommand implements CommandExecutor {
         sender.sendMessage("§f/rvnktools links reload §7- Reload links configuration");
         sender.sendMessage("§f/rvnktools cycle reload §7- Reload cycle commands configuration");
         sender.sendMessage("§f/rvnktools cycle help §7- Display cycle commands help");
+        sender.sendMessage("§f/rvnktools teleport worldswap [world] §7- Teleport between worlds preserving locations");
+        sender.sendMessage("§f/rvnktools worldswap [world] §7- Shortcut for teleport worldswap");
+        sender.sendMessage("§f/event [world] §7- Shortcut for teleport worldswap");
     }
 }

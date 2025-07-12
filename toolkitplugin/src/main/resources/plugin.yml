@@ -1,12 +1,18 @@
-name: RVNKToolKit 
-version: 1.0-SNAPSHOT
+name: RVNKTools
+version: ${project.version}
 author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
-api-version: 1.21
-softdepend: [PlaceholderAPI]
+api-version: 1.16
+depend: [PlaceholderAPI]
+softdepend: [Multiverse-Core]
 
 commands:
+  rvnktools:
+    description: Main command for RVNK Tools
+    usage: /rvnktools <subcommand> [args]
+    aliases: [rvnk]
+    permission: rvnktools.command
   puthat:
     description: Applies a custom Jack-o-Lantern to the nearest mob.
     usage: /puthat <customModelData>
@@ -50,8 +56,10 @@ commands:
     permissions: 
       - rvnktools.command.railroad
   event:
-    description: takes you to the events world and back.
-    usage: /event
+    description: Teleport between worlds preserving location history
+    usage: /event [world]
+    permission: rvnktools.command.worldswap
+    aliases: [worldswap]
   countdown:  
     description: Countdown for restarting the server.
     usage: /countdown 
@@ -61,12 +69,17 @@ commands:
   announcer:
     description: Enable or disable announcements feature.
     usage: /announcer
-  rvnktools:
-    description: RVNKTools main command
-    usage: /rvnktools <subcommand>
-    aliases: [rvnkt]
 
 permissions:
+  rvnktools.command:
+    description: Allows use of rvnktools commands
+    default: op
+  rvnktools.command.event:
+    description: Allows teleporting to event worlds
+    default: op
+  rvnktools.command.return:
+    description: Allows returning from event worlds
+    default: op
   rvnktools.command.broadcast:
     description: Allows the player to use the broadcast command
     default: op
@@ -108,4 +121,7 @@ permissions:
     default: op
   rvnktools.cycle.reload:
     description: Allows reloading cycle commands configuration
+    default: op
+  rvnktools.command.worldswap:
+    description: Allows swapping between worlds while maintaining location history
     default: op

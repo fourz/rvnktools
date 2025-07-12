@@ -4,10 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.command.DiscordCommand;
-import org.fourz.rvnktools.command.EventsCommand;
-import org.fourz.rvnktools.command.PingCommand;
-import org.fourz.rvnktools.command.TPSCommand;
+import org.fourz.rvnktools.command.*;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
@@ -21,7 +18,6 @@ import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.hatManager.PutHatCommand;
-import org.fourz.rvnktools.command.RVNKToolsCommand;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
@@ -68,14 +64,20 @@ public class RVNKTools extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
 
-        // Register Commands
+        // Register standalone commands
         this.getCommand("ping").setExecutor(new PingCommand());
         this.getCommand("tps").setExecutor(new TPSCommand());
         this.getCommand("events").setExecutor(new EventsCommand());
         this.getCommand("discord").setExecutor(new DiscordCommand(this));        
         this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
         this.getCommand("puthat").setExecutor(new PutHatCommand(this));
+        
+        // Register RVNKTools command
         getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
+        
+        // Register event/worldswap command aliases
+        TeleportWorldSwapSubCommand teleportWorldSwap = new TeleportWorldSwapSubCommand(this);
+        getCommand("event").setExecutor(new EventCommand(teleportWorldSwap));
 
         // Initialize and register CycleCommands
         cycleCommands = new CycleCommands(this);

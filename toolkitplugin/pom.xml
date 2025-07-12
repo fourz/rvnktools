@@ -34,6 +34,11 @@
 		    <id>jitpack.io</id>
 		    <url>https://jitpack.io</url>
 		</repository>
+        <!-- Multiverse Repository -->
+        <repository>
+            <id>onarandombox-repo</id>
+            <url>https://repo.onarandombox.com/content/groups/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -111,6 +116,13 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.70</version>
+        </dependency>
+        <!-- Multiverse Core Dependency -->
+        <dependency>
+            <groupId>com.onarandombox.multiversecore</groupId>
+            <artifactId>Multiverse-Core</artifactId>
+            <version>4.3.1</version>
+            <scope>provided</scope>
         </dependency>
 
     </dependencies>
