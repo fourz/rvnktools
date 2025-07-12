@@ -13,7 +13,7 @@ commands:
   rvnktools:
     description: Main command for RVNK Tools
     usage: /rvnktools <subcommand> [args]
-    aliases: [rvnk]
+    aliases: [tools]
     permission: rvnktools.command
   puthat:
     description: Applies a custom Jack-o-Lantern to the nearest mob.
@@ -75,11 +75,6 @@ commands:
     description: Manage TrainCarts settings and view help pages
     usage: /trains [enable|disable|modes|examples|links]
     aliases: [train-help]
-  railroad:
-    description: Toggle between TrainCarts and vanilla minecart modes
-    usage: /railroad
-    aliases: [cycletrainmode]
-    permission: rvnktools.command.railroad
 
 permissions:
   rvnktools.command:
