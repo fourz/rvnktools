@@ -106,7 +106,7 @@ public class CycleCommands {
     }
 
     public String getNextInstructionKey(String commandKey, UUID playerId) {
-        Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, _ -> new HashMap<>());
+        Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
         int position = commandPositions.getOrDefault(playerId, 0);
 
         ConfigurationSection instructionsSection = config.getConfigurationSection("commands." + commandKey + ".instructions");

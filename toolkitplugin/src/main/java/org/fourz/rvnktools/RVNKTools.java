@@ -6,6 +6,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.*;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
+import org.fourz.rvnktools.command.framework.CommandManager;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
@@ -28,6 +29,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public PermissionService permissionService;
     private int gcTaskId = -1;
     private RVNKToolsAPI api;
+    private CommandManager commandManager;
 
     @Override
     public void onEnable() {
@@ -64,25 +66,20 @@ public class RVNKTools extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
 
-        // Register standalone commands
-        getCommand("ping").setExecutor(new PingCommand());
-        getCommand("tps").setExecutor(new TPSCommand());
-        getCommand("events").setExecutor(new EventsCommand());
-        getCommand("discord").setExecutor(new DiscordCommand(this));        
-        getCommand("broadcast").setExecutor(new BroadcastCommand(this));
-        getCommand("puthat").setExecutor(new PutHatCommand(this));
-        
-        // Register RVNKTools command
-        getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
-        
-        // Register event/worldswap command aliases
-        TeleportWorldSwapSubCommand teleportWorldSwap = new TeleportWorldSwapSubCommand(this);
-        getCommand("event").setExecutor(new EventCommand(teleportWorldSwap));
+        // Initialize command framework
+        commandManager = CommandManager.getInstance(this);
+        commandManager.initializeCommands();  // This handles all framework commands
 
-        // Initialize and register CycleCommands
+        // Initialize and register CycleCommands (will be migrated to framework later)
         cycleCommands = new CycleCommands(this);
 
-        // Register TrainCarts related commands
+        // Legacy commands (to be migrated to framework)
+        getCommand("discord").setExecutor(new DiscordCommand(this));
+        getCommand("broadcast").setExecutor(new BroadcastCommand(this));
+        getCommand("puthat").setExecutor(new PutHatCommand(this));
+        getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
+        TeleportWorldSwapSubCommand teleportWorldSwap = new TeleportWorldSwapSubCommand(this);
+        getCommand("event").setExecutor(new EventCommand(teleportWorldSwap));
         TrainsCommand trainsCommand = new TrainsCommand(this);
         getCommand("trains").setExecutor(trainsCommand);
         getCommand("trains").setTabCompleter(trainsCommand);

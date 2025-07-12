@@ -19,12 +19,10 @@ commands:
     description: Applies a custom Jack-o-Lantern to the nearest mob.
     usage: /puthat <customModelData>
     permission: rvnktools.command.puthat
-  ping:
-    description: Shows your current ping.
-    usage: /ping
   tps:
-    description: Shows the server's current TPS.
+    description: Shows the server's current TPS and performance information.
     usage: /tps
+    aliases: [ping]
   events:
     description: Provides information about scheduled events.
     usage: /events
@@ -140,3 +138,6 @@ permissions:
   rvnktools.command.worldswap:
     description: Allows swapping between worlds while maintaining location history
     default: op
+  rvnktools.command.example:
+    description: Allows using the example command
+    default: true
