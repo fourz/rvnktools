@@ -39,11 +39,15 @@ public class CommandManager {
 
         // Register core framework commands
         registerCommand(new TPSCommand(plugin));
-        registerAlias("ping", "tps");  // Register ping as alias for TPS command
+        registerAlias("ping", "tps");
         
         // Register utility framework commands
+        registerCommand(new BroadcastCommand(plugin));
+        registerCommand(new DiscordCommand(plugin));
         registerCommand(new EventsFrameworkCommand(plugin));
-        
+        registerCommand(new TrainsCommand(plugin));
+        // Register puthat command with CommandManager
+        registerCommand(new PutHatCommand(plugin));
         logger.info("Command initialization complete!");
     }
     
