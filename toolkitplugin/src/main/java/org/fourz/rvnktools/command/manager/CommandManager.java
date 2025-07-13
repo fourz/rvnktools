@@ -8,6 +8,7 @@ import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
+import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.util.logging.LogManager;
 import org.fourz.rvnktools.util.logging.RVNKLogger;
 
@@ -26,12 +27,14 @@ public class CommandManager {
     private final RVNKLogger logger;
     private final Map<String, RVNKCommand> commands;
     private final Map<String, String> aliases;
+    private final CycleCommands cycleCommands;
     
     private CommandManager(RVNKTools plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.commands = new HashMap<>();
         this.aliases = new HashMap<>();
+        this.cycleCommands = new CycleCommands(plugin);
     }
     
     /**
@@ -55,6 +58,10 @@ public class CommandManager {
         registerCommand(new TrainsCommand(plugin));
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
+
+        // Register cycle commands
+        cycleCommands.registerCommands();
+
         logger.info("Command initialization complete!");
     }
     

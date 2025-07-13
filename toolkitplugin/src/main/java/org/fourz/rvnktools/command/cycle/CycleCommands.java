@@ -87,8 +87,9 @@ public class CycleCommands {
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
                     try {
-                        String permission = commandConfig.getString("permission");
-                        logger.debug("Registering command: " + commandKey + " with permission: " + permission);
+                        //register the command
+                        plugin.getCommand(commandKey).setExecutor(new CycleCommandExecutor(null, commandConfig, null));
+                        logger.debug("Registering command: " + commandKey);
                         registeredCount++;
                     } catch (Exception e) {
                         logger.error("Failed to register command: " + commandKey, e);
