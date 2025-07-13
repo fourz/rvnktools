@@ -1,8 +1,9 @@
-package org.fourz.rvnktools.command.manager;
+package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.command.manager.BaseCommand;
 
 import java.util.Collections;
 import java.util.List;

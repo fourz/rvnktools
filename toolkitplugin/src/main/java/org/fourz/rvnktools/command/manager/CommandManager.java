@@ -2,6 +2,11 @@ package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.PluginCommand;
 import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
+import org.fourz.rvnktools.command.manager.commands.EventsCommand;
+import org.fourz.rvnktools.command.manager.commands.PingCommand;
+import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
+import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.util.logging.LogManager;
 import org.fourz.rvnktools.util.logging.RVNKLogger;
 
