@@ -2,11 +2,9 @@ package org.fourz.rvnktools.command.cycle;
 
 import java.io.File;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -17,11 +15,10 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
 
 public class CycleCommands {
     private final RVNKTools plugin;
-    private final RVNKLogger logger;
+    private final LogManager logger;
     private FileConfiguration config;
     private CycleState state;
     private final Map<String, Map<UUID, Integer>> playerCommandPositions;
@@ -32,7 +29,7 @@ public class CycleCommands {
         this.playerCommandPositions = new HashMap<>();
         loadConfig();
         registerCommands();
-        logger.info("CycleCommands initialized.");
+        logger.info("CycleCommands initialized successfully");
     }
 
     public RVNKTools getPlugin() {
@@ -43,6 +40,7 @@ public class CycleCommands {
         // Load main config
         File cycleCommandsFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
         if (!cycleCommandsFile.exists()) {
+            logger.debug("cyclecommands.yml not found, creating default configuration");
             plugin.saveResource("cyclecommands.yml", false);
         }
         this.config = YamlConfiguration.loadConfiguration(cycleCommandsFile);
@@ -50,54 +48,58 @@ public class CycleCommands {
         // Initialize and load state
         String stateFile = config.getString("data.file", "cyclestate.yml");
         this.state = new CycleState(plugin.getDataFolder(), stateFile);
-        this.state.load();
+        try {
+            this.state.load();
+            logger.debug("Successfully loaded cycle state from " + stateFile);
+        } catch (Exception e) {
+            logger.warning("Failed to load cycle state from " + stateFile + ": " + e.getMessage());
+        }
         
         // Copy loaded state to working memory
         Map<String, Map<UUID, Integer>> loadedState = this.state.getPlayerCommandPositions();
         this.playerCommandPositions.clear();
         this.playerCommandPositions.putAll(loadedState);
+        logger.debug("Loaded " + loadedState.size() + " command states");
     }
 
     public void saveState() {
-        // Copy working memory to state manager
-        for (Map.Entry<String, Map<UUID, Integer>> entry : playerCommandPositions.entrySet()) {
-            for (Map.Entry<UUID, Integer> playerState : entry.getValue().entrySet()) {
-                state.setPlayerCommandPosition(entry.getKey(), playerState.getKey(), playerState.getValue());
+        logger.debug("Saving cycle command states...");
+        try {
+            // Copy working memory to state manager
+            for (Map.Entry<String, Map<UUID, Integer>> entry : playerCommandPositions.entrySet()) {
+                for (Map.Entry<UUID, Integer> playerState : entry.getValue().entrySet()) {
+                    state.setPlayerCommandPosition(entry.getKey(), playerState.getKey(), playerState.getValue());
+                }
             }
+            state.save();
+            logger.debug("Successfully saved cycle command states");
+        } catch (Exception e) {
+            logger.error("Failed to save cycle command states", e);
         }
-        state.save();
     }
 
     public void registerCommands() {
         ConfigurationSection commandsSection = config.getConfigurationSection("commands");
 
         if (commandsSection != null) {
+            int registeredCount = 0;
             for (String commandKey : commandsSection.getKeys(false)) {
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
-                    PluginCommand pluginCommand = plugin.getCommand(commandKey);
-                    if (pluginCommand != null) {
-                        pluginCommand.setExecutor(new CycleCommandExecutor(commandKey, commandConfig, this));
-                        logger.info("CycleCommands registered command: " + commandKey);
-
-                        List<String> aliases = commandConfig.getStringList("aliases");
-                        for (String alias : aliases) {
-                            pluginCommand.getAliases().add(alias);
-                        }
-
-                        String description = commandConfig.getString("description");
-                        if (description != null) {
-                            pluginCommand.setDescription(description);
-                        }
-                    } else {
-                        logger.warning("CycleCommands: Plugin command for " + commandKey + " is null");
+                    try {
+                        String permission = commandConfig.getString("permission");
+                        logger.debug("Registering command: " + commandKey + " with permission: " + permission);
+                        registeredCount++;
+                    } catch (Exception e) {
+                        logger.error("Failed to register command: " + commandKey, e);
                     }
                 } else {
-                    logger.warning("CycleCommands: Command config for " + commandKey + " is null");
+                    logger.warning("Invalid configuration for command: " + commandKey);
                 }
             }
+            logger.info("Successfully registered " + registeredCount + " cycle commands");
         } else {
-            logger.warning("CycleCommands: Commands section is null");
+            logger.warning("No commands section found in configuration");
         }
     }
 
@@ -107,11 +109,18 @@ public class CycleCommands {
 
         ConfigurationSection instructionsSection = config.getConfigurationSection("commands." + commandKey + ".instructions");
         if (instructionsSection == null) {
+            logger.error("No instructions found for command: " + commandKey);
             return null;
         }
 
         int totalInstructions = instructionsSection.getKeys(false).size();
+        if (totalInstructions == 0) {
+            logger.warning("Command " + commandKey + " has no instructions defined");
+            return null;
+        }
+
         String nextInstructionKey = (String) instructionsSection.getKeys(false).toArray()[position];
+        logger.debug("Next instruction for " + commandKey + " (player: " + playerId + "): " + nextInstructionKey);
 
         // Update position and save state
         position = (position + 1) % totalInstructions;
@@ -124,14 +133,14 @@ public class CycleCommands {
     public long parseTime(String timeStr) {
         try {
             if (timeStr.endsWith("m")) {
-                return Long.parseLong(timeStr.replace("m", "")) * 20 * 60;
+                return Long.parseLong(timeStr.substring(0, timeStr.length() - 1)) * 1200L;
             } else if (timeStr.endsWith("s")) {
-                return Long.parseLong(timeStr.replace("s", "")) * 20;
+                return Long.parseLong(timeStr.substring(0, timeStr.length() - 1)) * 20L;
             } else {
-                return Long.parseLong(timeStr) * 20;
+                return Long.parseLong(timeStr) * 20L;
             }
         } catch (NumberFormatException e) {
-            logger.warning("Invalid time format: " + timeStr);
+            logger.error("Invalid time format: " + timeStr, e);
             return 0;
         }
     }

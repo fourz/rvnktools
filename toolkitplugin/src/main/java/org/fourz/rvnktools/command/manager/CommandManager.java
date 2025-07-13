@@ -7,6 +7,7 @@ import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
 import org.fourz.rvnktools.util.logging.LogManager;
 import org.fourz.rvnktools.util.logging.RVNKLogger;
 
@@ -39,6 +40,9 @@ public class CommandManager {
      */
     public void initializeCommands() {
         logger.info("Initializing RVNKTools commands...");
+
+        // Register main plugin command first
+        registerCommand(new RVNKToolsCommand(plugin));
 
         // Register core framework commands
         registerCommand(new PingCommand(plugin));
