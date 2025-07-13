@@ -2,7 +2,7 @@ package org.fourz.rvnktools.command.cycle;
 
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.framework.BaseCommand;
+import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
 import java.util.Collections;

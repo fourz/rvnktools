@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.command.framework;
+package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.CommandSender;
 import java.util.List;

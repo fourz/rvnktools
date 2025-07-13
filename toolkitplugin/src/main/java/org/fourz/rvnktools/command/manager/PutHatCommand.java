@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.command.framework.commands;
+package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -9,7 +9,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.framework.BaseCommand;
 
 import java.util.Collections;
 import java.util.List;

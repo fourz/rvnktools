@@ -1,9 +1,9 @@
-package org.fourz.rvnktools.command.framework.examples;
+package org.fourz.rvnktools.command.manager.examples;
 
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.framework.BaseSubCommand;
-import org.fourz.rvnktools.command.framework.RVNKCommand;
+import org.fourz.rvnktools.command.manager.BaseSubCommand;
+import org.fourz.rvnktools.command.manager.RVNKCommand;
 
 import java.util.Collections;
 import java.util.List;

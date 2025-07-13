@@ -5,7 +5,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
-import org.fourz.rvnktools.command.framework.CommandManager;
+import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
@@ -29,7 +29,6 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-
         initializePermissions();
         initializeEconomy();
         initializeLinkMaker();

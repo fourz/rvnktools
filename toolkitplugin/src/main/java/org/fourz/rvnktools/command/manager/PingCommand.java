@@ -1,29 +1,24 @@
-package org.fourz.rvnktools.command;
+package org.fourz.rvnktools.command.manager;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.manager.BaseCommand;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
-import java.text.DecimalFormat;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * TPS Command using the new command framework.
- * Shows server performance information including TPS, memory usage, and system info.
- */
-public class TPSCommand extends BaseCommand {
+import org.bukkit.Bukkit;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+import java.text.DecimalFormat;
 
+public class PingCommand extends BaseCommand {
     private static final DecimalFormat df = new DecimalFormat("#.##");
 
-    public TPSCommand(RVNKTools plugin) {
-        super(plugin, "tps", 
+    public PingCommand(RVNKTools plugin) {
+        super(plugin, "ping", 
               "Shows server performance information including TPS and memory usage", 
-              "/tps",
+              "/ping",
               null); // No permission required
     }
 
@@ -66,13 +61,13 @@ public class TPSCommand extends BaseCommand {
             sender.sendMessage(message.toString().replaceAll("§[0-9a-fk-or]", ""));
         }
 
-        logger.debug("TPS command executed by " + sender.getName());
+        logger.debug("Ping command executed by " + sender.getName());
         return true;
     }
 
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
-        // TPS command doesn't need tab completion, it takes no arguments
+        // Ping command doesn't need tab completion, it takes no arguments
         return Collections.emptyList();
     }
 

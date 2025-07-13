@@ -1,10 +1,9 @@
-package org.fourz.rvnktools.command.framework.commands;
+package org.fourz.rvnktools.command.manager;
 
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.framework.BaseCommand;
 import org.fourz.rvnktools.util.ChatFormat;
 
 import java.util.Collections;

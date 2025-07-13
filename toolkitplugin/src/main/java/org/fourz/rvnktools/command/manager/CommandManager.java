@@ -1,11 +1,9 @@
-package org.fourz.rvnktools.command.framework;
+package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.PluginCommand;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.logging.LogManager;
 import org.fourz.rvnktools.util.logging.RVNKLogger;
-import org.fourz.rvnktools.command.TPSCommand;
-import org.fourz.rvnktools.command.framework.commands.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -38,13 +36,13 @@ public class CommandManager {
         logger.info("Initializing RVNKTools commands...");
 
         // Register core framework commands
-        registerCommand(new TPSCommand(plugin));
-        registerAlias("ping", "tps");
+        registerCommand(new PingCommand(plugin));
+        registerAlias("tps", "ping");
         
         // Register utility framework commands
         registerCommand(new BroadcastCommand(plugin));
         registerCommand(new DiscordCommand(plugin));
-        registerCommand(new EventsFrameworkCommand(plugin));
+        registerCommand(new EventsCommand(plugin));
         registerCommand(new TrainsCommand(plugin));
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));

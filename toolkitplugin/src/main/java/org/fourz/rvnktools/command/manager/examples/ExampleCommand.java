@@ -1,9 +1,9 @@
-package org.fourz.rvnktools.command.framework.examples;
+package org.fourz.rvnktools.command.manager.examples;
 
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.command.framework.BaseCommand;
-import org.fourz.rvnktools.command.framework.TabCompletionUtil;
+import org.fourz.rvnktools.command.manager.BaseCommand;
+import org.fourz.rvnktools.command.manager.TabCompletionUtil;
 
 import java.util.List;
 
