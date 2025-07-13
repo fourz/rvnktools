@@ -75,7 +75,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
         }
         
         // Initialize player's location map if it doesn't exist
-        playerLocations.computeIfAbsent(playerId, _ -> new HashMap<>());
+        playerLocations.computeIfAbsent(playerId, id -> new HashMap<>());
         
         // Store current location in the map
         playerLocations.get(playerId).put(currentWorld, player.getLocation());

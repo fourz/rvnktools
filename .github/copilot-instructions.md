@@ -56,20 +56,23 @@ These guidelines should be followed when modifying or creating code to maintain 
 
 ### Player-Facing Messages
 
-Use these standardized message prefixes:
+- Use `ChatFormat` for all player-facing command output, including messages, titles, and action bars.
+- Use standardized message prefixes:
 
-- `&c▶` for usage instructions and command help
-- `&6⚙` for operations in progress
-- `&a✓` for success messages
-- `&c✖` for error messages
-- `&e⚠` for warnings
-- `&7␣␣␣` for additional information or tips (three spaces after)
+  - `&c▶` for usage instructions and command help
+  - `&6⚙` for operations in progress
+  - `&a✓` for success messages
+  - `&c✖` for error messages
+  - `&e⚠` for warnings
+  - `&7␣␣␣` for additional information or tips (three spaces after)
 
 ### Console and Debug Messages
 
 - Use the designated logging system for all console output
 - **Do not use emojis or symbols in console messages**
 - **Do not use color codes in console output**
+- **Do not use ChatFormat for logger output**
+- For all command output to console (outside of logger), use `ChatFormat.stripColors()` to ensure clean output
 - Create clear, concise messages that explain the context
 - For errors, include actionable information to help troubleshoot
 - Use appropriate log levels (INFO, WARNING, ERROR, DEBUG)
@@ -202,10 +205,10 @@ public List<String> tabComplete(CommandSender sender, String[] args) {
 
 Use VS Code tasks for development:
 
-- **Build Plugin**: `mvn clean package`
+- **Build Plugin**: `mvn clean package` (builds the plugin JAR)
 - **Copy to Server**: Copy JAR to dev server
-- **Restart Server**: Full server restart
-- **Reload Server**: Plugin reload only
+- **Restart Server**: Build and full server restart on dev server
+- **Reload Server**: Build and plugin reload only via api call
 
 ## Testing Guidelines
 
