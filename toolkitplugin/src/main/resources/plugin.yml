@@ -89,40 +89,28 @@ permissions:
     default: op
   rvnktools.welcome:
     description: Allows the player to get welcome messages
-    default: true
   rvnktools.welcome.newplayer:
     description: Sends a welcome message to new players
-    default: true
   rvnktools.command.cyclegamemode:
     description: Allows the player to use the gmc command
-    default: false
   rvnktools.command.cycletrainmode:
     description: Allows the player to use cycle railroad modes
-    default: false        
   rvnktools.command.countdown:
     description: Allows the player to use the countdown command
-    default: false
   rvnktools.command.announce:
     description: Allows the player to use the announce command
-    default: false
   rvnktools.command.trains:
     description: Allows access to train commands
-    default: true
   rvnktools.command.trains.enable:
     description: Allows player enabling TrainCarts mode
-    default: true
   rvnktools.command.trains.disable:
     description: Allows disabling TrainCarts mode
-    default: true
   rvnktools.command.railroad:
     description: Allows the player to toggle between minecart modes
-    default: true
   rvnktools.announce.help:
     description: Allows the player to access announcement help 
-    default: true
   rvnktools.command.puthat:
     description: Allows the player to use the puthat command
-    default: true
   rvnktools.links:
     description: Allows access to links commands
     default: op
@@ -140,4 +128,3 @@ permissions:
     default: op
   rvnktools.command.example:
     description: Allows using the example command
-    default: true

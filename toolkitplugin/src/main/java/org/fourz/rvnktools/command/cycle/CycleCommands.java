@@ -16,6 +16,11 @@ import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.logging.LogManager;
 
+/**
+ * Manages cycle commands, which cycle through different instruction sets
+ * each time they are executed by a player. This allows for commands that
+ * toggle between different behaviors.
+ */
 public class CycleCommands {
     private final RVNKTools plugin;
     private final LogManager logger;
@@ -23,6 +28,11 @@ public class CycleCommands {
     private CycleState state;
     private final Map<String, Map<UUID, Integer>> playerCommandPositions;
 
+    /**
+     * Initializes the cycle commands manager.
+     *
+     * @param plugin The RVNKTools plugin instance
+     */
     public CycleCommands(RVNKTools plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -32,10 +42,18 @@ public class CycleCommands {
         logger.info("CycleCommands initialized successfully");
     }
 
+    /**
+     * Gets the plugin instance.
+     *
+     * @return The RVNKTools plugin instance
+     */
     public RVNKTools getPlugin() {
         return plugin;
     }
 
+    /**
+     * Loads the cycle commands configuration and state.
+     */
     public void loadConfig() {
         // Load main config
         File cycleCommandsFile = new File(plugin.getDataFolder(), "cyclecommands.yml");
@@ -47,7 +65,7 @@ public class CycleCommands {
 
         // Initialize and load state
         String stateFile = config.getString("data.file", "cyclestate.yml");
-        this.state = new CycleState(plugin.getDataFolder(), stateFile);
+        this.state = new CycleState(plugin, stateFile);
         try {
             this.state.load();
             logger.debug("Successfully loaded cycle state from " + stateFile);
@@ -62,6 +80,9 @@ public class CycleCommands {
         logger.debug("Loaded " + loadedState.size() + " command states");
     }
 
+    /**
+     * Saves the current state of all cycle commands.
+     */
     public void saveState() {
         logger.debug("Saving cycle command states...");
         try {
@@ -78,6 +99,9 @@ public class CycleCommands {
         }
     }
 
+    /**
+     * Registers all cycle commands defined in the configuration.
+     */
     public void registerCommands() {
         ConfigurationSection commandsSection = config.getConfigurationSection("commands");
 
@@ -87,9 +111,18 @@ public class CycleCommands {
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
                     try {
-                        //register the command
-                        plugin.getCommand(commandKey).setExecutor(new CycleCommandExecutor(null, commandConfig, null));
-                        logger.debug("Registering command: " + commandKey);
+                        // Register the command with a CycleCommandExecutor
+                        CycleCommandExecutor executor = new CycleCommandExecutor(commandKey, commandConfig, this);
+                        plugin.getCommand(commandKey).setExecutor(executor);
+                        
+                        // Get permission if specified in config
+                        String permission = commandConfig.getString("permission");
+                        if (permission != null) {
+                            logger.debug("Registering command: " + commandKey + " with permission: " + permission);
+                        } else {
+                            logger.debug("Registering command: " + commandKey + " with no permission");
+                        }
+                        
                         registeredCount++;
                     } catch (Exception e) {
                         logger.error("Failed to register command: " + commandKey, e);
@@ -104,6 +137,13 @@ public class CycleCommands {
         }
     }
 
+    /**
+     * Gets the next instruction key for a player executing a command.
+     *
+     * @param commandKey The command being executed
+     * @param playerId The UUID of the player executing the command
+     * @return The key of the next instruction set to execute
+     */
     public String getNextInstructionKey(String commandKey, UUID playerId) {
         Map<UUID, Integer> commandPositions = playerCommandPositions.computeIfAbsent(commandKey, k -> new HashMap<>());
         int position = commandPositions.getOrDefault(playerId, 0);
@@ -131,6 +171,12 @@ public class CycleCommands {
         return nextInstructionKey;
     }
 
+    /**
+     * Parses a time string into ticks.
+     *
+     * @param timeStr The time string (e.g., "5s" for 5 seconds, "2m" for 2 minutes)
+     * @return The number of ticks
+     */
     public long parseTime(String timeStr) {
         try {
             if (timeStr.endsWith("m")) {
@@ -146,16 +192,32 @@ public class CycleCommands {
         }
     }
 
+    /**
+     * Sends a message to all players on the server.
+     *
+     * @param message The message to send
+     */
     void messageAllPlayers(String message) {
         TextComponent processedMessage = processMessage(message, null);
         Bukkit.spigot().broadcast(processedMessage);
     }
 
+    /**
+     * Sends a message to a specific player.
+     *
+     * @param player The player to send the message to
+     * @param message The message to send
+     */
     void messagePlayer(Player player, String message) {
         TextComponent processedMessage = processMessage(message, player);
         player.spigot().sendMessage(processedMessage);
     }
 
+    /**
+     * Executes a command asynchronously.
+     *
+     * @param command The command to execute
+     */
     void executeCommandAsync(String command) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             new BukkitRunnable() {
@@ -167,10 +229,23 @@ public class CycleCommands {
         });
     }
 
+    /**
+     * Checks if a message contains link placeholders.
+     *
+     * @param message The message to check
+     * @return True if the message contains link placeholders
+     */
     private boolean containsLinkPlaceholder(String message) {
         return message != null && message.contains("{");
     }
 
+    /**
+     * Processes a message with placeholders and formatting.
+     *
+     * @param message The message to process
+     * @param player The player context for placeholders
+     * @return The processed message as a TextComponent
+     */
     private TextComponent processMessage(String message, Player player) {
         if (message == null) {
             return new TextComponent("");

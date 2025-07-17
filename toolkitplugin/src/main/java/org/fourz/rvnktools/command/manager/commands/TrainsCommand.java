@@ -29,7 +29,7 @@ public class TrainsCommand extends BaseCommand {
         if (args.length == 0) {
             showHelpPage(player, "");
             return true;
-        }
+        }        
 
         String subCommand = args[0].toLowerCase();
         switch (subCommand) {
@@ -100,7 +100,8 @@ public class TrainsCommand extends BaseCommand {
                 player.sendMessage("§e");
                 player.sendMessage("§e §c/train help §b-- §fTraincarts Default help.");
                 break;
-
+                
+            case "default":
             default:
                 player.sendMessage("§a -------------- §6TrainCarts Help §fWelcome §a-----------------");
                 player.sendMessage("§e Ravenkraft has an opt-in, per-player Train plugin, allowing");
