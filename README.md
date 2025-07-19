@@ -4,6 +4,28 @@ RVNKTools is a comprehensive Minecraft server plugin that provides a wide array 
 
 **Note**: RVNKTools is currently undergoing a major architectural refactor to extract core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem. This refactor is happening on the `derek/dev-core` branch and will provide better modularity, shared services, and cross-plugin integration capabilities.
 
+## RVNKCore Data Layer Abstraction
+
+The core innovation of this refactor is the extraction of database operations, service management, and API interfaces into a reusable framework that can be shared across all RVNK plugins. This provides:
+
+### Centralized Database Management
+- **Unified Connection Providers**: Abstracted database connections supporting SQLite and MySQL
+- **Query Builder Framework**: Database-agnostic query construction with dialect-specific implementations
+- **Repository Pattern**: Clean separation between business logic and data access
+- **Asynchronous Operations**: All database operations use CompletableFuture to prevent blocking the main thread
+
+### Service Framework Architecture
+- **Service Registry**: Centralized discovery and dependency injection for all services
+- **Event-Driven Communication**: Cross-plugin messaging and state synchronization
+- **API Versioning**: Backward-compatible interfaces for third-party integration
+- **Performance Monitoring**: Built-in logging and metrics collection
+
+### Plugin Ecosystem Benefits
+- **Shared Data Layer**: All RVNK plugins can access common player data, permissions, and configuration
+- **Consistent APIs**: Standardized interfaces across all plugins in the ecosystem
+- **Reduced Complexity**: Plugins focus on features rather than infrastructure
+- **Better Testing**: Mockable services and repositories for comprehensive testing
+
 ## Features
 
 - **Announcements Management**:
@@ -41,6 +63,41 @@ RVNKTools is being refactored to utilize RVNKCore, a centralized data and servic
 - **Cross-Plugin Communication**: Event system for plugin interactions
 - **API Framework**: Clean, versioned APIs for third-party integration
 - **Performance Optimization**: Connection pooling, caching, and async operations
+
+### Implementation Architecture
+
+The RVNKCore framework follows a simplified, performance-focused architecture:
+
+```text
+┌─────────────────────────┐
+│      RVNK Plugins       │
+│  (Tools, Lore, Quests)  │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│    Service Layer        │
+│  (Async Operations)     │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   Repository Layer      │────▶│    Database Layer       │
+│  (CompletableFuture)    │     │  (Connection Pooling)   │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### Key Design Principles
+
+- **Async-First**: All database operations use CompletableFuture to prevent main thread blocking
+- **Simple & Clean**: No unnecessary abstractions or complex frameworks
+- **Performance-Focused**: Connection pooling, caching, and performance monitoring built-in
+- **Plugin Ecosystem**: Designed for multiple RVNK plugins to share data and services
+- **Easy Migration**: Gradual transition from existing systems with backward compatibility
+
+### Current Implementation Status
+
+See the [ROADMAP.md](ROADMAP.md) for detailed implementation status and timelines.
 
 ## Installation
 

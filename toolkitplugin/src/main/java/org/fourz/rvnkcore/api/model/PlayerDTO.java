@@ -1,22 +1,34 @@
 package org.fourz.rvnkcore.api.model;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Data Transfer Object for player information.
+ * Data Transfer Object for comprehensive player information tracking.
  * 
  * This class represents player data as stored and transferred within
- * the RVNKCore system. It contains essential player information and
- * supports additional metadata through a flexible map structure.
+ * the RVNKCore system, including activity tracking, location history,
+ * name changes, and permission group information.
+ * 
+ * @since 1.0.0
  */
 public class PlayerDTO {
     private UUID id;
-    private String username;
+    private String currentName;
+    private List<String> nameHistory;
     private Timestamp firstJoin;
     private Timestamp lastSeen;
+    private String lastWorld;
+    private double lastX;
+    private double lastY;
+    private double lastZ;
+    private String primaryGroup;
+    private List<String> groups;
     private boolean banned;
     private Map<String, Object> metadata;
     
@@ -25,6 +37,8 @@ public class PlayerDTO {
      */
     public PlayerDTO() {
         this.metadata = new HashMap<>();
+        this.nameHistory = new ArrayList<>();
+        this.groups = new ArrayList<>();
         this.banned = false;
     }
     
@@ -38,7 +52,7 @@ public class PlayerDTO {
         this.id = id;
     }
     
-    // Getters and Setters
+    // Core player information getters and setters
     
     public UUID getId() {
         return id;
@@ -48,12 +62,32 @@ public class PlayerDTO {
         this.id = id;
     }
     
-    public String getUsername() {
-        return username;
+    public String getCurrentName() {
+        return currentName;
     }
     
-    public void setUsername(String username) {
-        this.username = username;
+    public void setCurrentName(String currentName) {
+        this.currentName = currentName;
+    }
+    
+    public List<String> getNameHistory() {
+        return nameHistory;
+    }
+    
+    public void setNameHistory(List<String> nameHistory) {
+        this.nameHistory = nameHistory != null ? nameHistory : new ArrayList<>();
+    }
+    
+    /**
+     * Updates the player's name and adds previous name to history if changed.
+     * 
+     * @param newName The new player name
+     */
+    public void updateName(String newName) {
+        if (this.currentName != null && !this.currentName.equals(newName)) {
+            this.nameHistory.add(this.currentName);
+        }
+        this.currentName = newName;
     }
     
     public Timestamp getFirstJoin() {
@@ -70,6 +104,85 @@ public class PlayerDTO {
     
     public void setLastSeen(Timestamp lastSeen) {
         this.lastSeen = lastSeen;
+    }
+    
+    // Location tracking
+    
+    public String getLastWorld() {
+        return lastWorld;
+    }
+    
+    public void setLastWorld(String lastWorld) {
+        this.lastWorld = lastWorld;
+    }
+    
+    public double getLastX() {
+        return lastX;
+    }
+    
+    public void setLastX(double lastX) {
+        this.lastX = lastX;
+    }
+    
+    public double getLastY() {
+        return lastY;
+    }
+    
+    public void setLastY(double lastY) {
+        this.lastY = lastY;
+    }
+    
+    public double getLastZ() {
+        return lastZ;
+    }
+    
+    public void setLastZ(double lastZ) {
+        this.lastZ = lastZ;
+    }
+    
+    /**
+     * Updates the player's last location.
+     * 
+     * @param world The world name
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @param z Z coordinate
+     */
+    public void updateLastLocation(String world, double x, double y, double z) {
+        this.lastWorld = world;
+        this.lastX = x;
+        this.lastY = y;
+        this.lastZ = z;
+        this.lastSeen = Timestamp.valueOf(LocalDateTime.now());
+    }
+    
+    // Permission group tracking
+    
+    public String getPrimaryGroup() {
+        return primaryGroup;
+    }
+    
+    public void setPrimaryGroup(String primaryGroup) {
+        this.primaryGroup = primaryGroup;
+    }
+    
+    public List<String> getGroups() {
+        return groups;
+    }
+    
+    public void setGroups(List<String> groups) {
+        this.groups = groups != null ? groups : new ArrayList<>();
+    }
+    
+    /**
+     * Updates the player's permission group information.
+     * 
+     * @param primaryGroup The primary permission group
+     * @param allGroups List of all groups the player belongs to
+     */
+    public void updateGroups(String primaryGroup, List<String> allGroups) {
+        this.primaryGroup = primaryGroup;
+        this.groups = allGroups != null ? new ArrayList<>(allGroups) : new ArrayList<>();
     }
     
     public boolean isBanned() {
@@ -119,8 +232,13 @@ public class PlayerDTO {
             return this;
         }
         
-        public Builder username(String username) {
-            dto.username = username;
+        public Builder currentName(String currentName) {
+            dto.currentName = currentName;
+            return this;
+        }
+        
+        public Builder nameHistory(List<String> nameHistory) {
+            dto.nameHistory = nameHistory != null ? new ArrayList<>(nameHistory) : new ArrayList<>();
             return this;
         }
         
@@ -131,6 +249,24 @@ public class PlayerDTO {
         
         public Builder lastSeen(Timestamp lastSeen) {
             dto.lastSeen = lastSeen;
+            return this;
+        }
+        
+        public Builder lastLocation(String world, double x, double y, double z) {
+            dto.lastWorld = world;
+            dto.lastX = x;
+            dto.lastY = y;
+            dto.lastZ = z;
+            return this;
+        }
+        
+        public Builder primaryGroup(String primaryGroup) {
+            dto.primaryGroup = primaryGroup;
+            return this;
+        }
+        
+        public Builder groups(List<String> groups) {
+            dto.groups = groups != null ? new ArrayList<>(groups) : new ArrayList<>();
             return this;
         }
         
@@ -147,5 +283,17 @@ public class PlayerDTO {
         public PlayerDTO build() {
             return dto;
         }
+    }
+    
+    @Override
+    public String toString() {
+        return "PlayerDTO{" +
+                "id=" + id +
+                ", currentName='" + currentName + '\'' +
+                ", lastSeen=" + lastSeen +
+                ", lastWorld='" + lastWorld + '\'' +
+                ", primaryGroup='" + primaryGroup + '\'' +
+                ", banned=" + banned +
+                '}';
     }
 }

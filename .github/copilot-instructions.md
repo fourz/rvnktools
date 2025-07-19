@@ -1,41 +1,347 @@
-# RVNKTools Copilot Instructions
+# RVNK Plugin Ecosystem Copilot Instructions
 
-These guidelines should be followed when modifying or creating code to maintain consistency throughout the codebase using documentation files as references.
+These guidelines should be followed when modifying or creating code to maintain consistency throughout the RVNK plugin ecosystem, including RVNKTools, RVNKCore, RVNKLore, RVNKQuests, and any other RVNK plugins.
 
-## General Directive
+## General Directives
 
 - **Use the CommandManager framework for all commands. Do not create standalone command executors.**
 - **Follow SOLID principles when adding new features or refactoring existing code.**
 - **Ensure proper resource cleanup in all managers and services.**
 - **Implement RVNKCore patterns when working on core functionality extraction.**
+- **Use asynchronous programming for all data operations and API calls.**
+
+## Asynchronous Data and API Layer Standards
+
+### Core Principles
+
+- **All database operations MUST use CompletableFuture** to prevent blocking the main thread
+- **All external API calls MUST be asynchronous** using CompletableFuture or similar patterns
+- **Service interfaces MUST return CompletableFuture** for any potentially blocking operations
+- **Repository methods MUST be async** with proper error handling and logging
+- **Configuration loading and saving MUST be asynchronous** when involving I/O operations
+
+### Database Operations
+
+```java
+// REQUIRED: All database operations use CompletableFuture
+public CompletableFuture<PlayerDTO> getPlayer(UUID playerId) {
+    return CompletableFuture.supplyAsync(() -> {
+        try (Connection conn = connectionProvider.getConnection()) {
+            // Database query logic
+            return playerDTO;
+        } catch (SQLException e) {
+            logger.error("Failed to retrieve player: " + playerId, e);
+            throw new DatabaseException("Player retrieval failed", e);
+        }
+    });
+}
+
+// REQUIRED: Chain async operations properly
+public CompletableFuture<AnnouncementDTO> saveAnnouncement(AnnouncementDTO announcement) {
+    return validateAnnouncement(announcement)
+        .thenCompose(validated -> repository.save(validated))
+        .thenCompose(saved -> updateCache(saved))
+        .exceptionally(ex -> {
+            logger.error("Failed to save announcement", ex);
+            throw new ServiceException("Save operation failed", ex);
+        });
+}
+```
+
+### API Integration
+
+```java
+// REQUIRED: External API calls must be async
+public CompletableFuture<EconomyResponse> processPayment(UUID player, double amount) {
+    return CompletableFuture.supplyAsync(() -> {
+        // Vault/Economy API interaction
+        return economyService.withdrawPlayer(player, amount);
+    }).exceptionally(ex -> {
+        logger.error("Payment processing failed for player: " + player, ex);
+        return new EconomyResponse(0, 0, ResponseType.FAILURE, "Payment failed");
+    });
+}
+```
 
 ## RVNKCore Integration Guidelines
 
-As RVNKTools undergoes refactoring to integrate with RVNKCore, follow these additional guidelines:
+As all RVNK plugins integrate with RVNKCore, follow these additional guidelines:
 
 ### Service Pattern
 
-- Use service interfaces for all business logic
-- Implement services through the ServiceRegistry pattern
-- Keep services focused on single responsibilities
+- **Use service interfaces** for all business logic across all RVNK plugins
+- **Implement services through the ServiceRegistry pattern** for dependency injection
+- **Keep services focused on single responsibilities** following SOLID principles
+- **Register services with RVNKCore** for cross-plugin access and dependency management
+
+```java
+// Service interface in RVNKCore API
+public interface IPlayerService {
+    CompletableFuture<Optional<PlayerDTO>> getPlayer(UUID playerId);
+    CompletableFuture<PlayerDTO> savePlayer(PlayerDTO player);
+    CompletableFuture<List<PlayerDTO>> getOnlinePlayers();
+}
+
+// Service implementation
+public class PlayerService implements IPlayerService {
+    private final PlayerRepository repository;
+    private final LogManager logger;
+    
+    public PlayerService(ServiceRegistry registry) {
+        this.repository = registry.getService(PlayerRepository.class);
+        this.logger = LogManager.getInstance(RVNKCore.getInstance().getPlugin(), getClass());
+    }
+}
+```
 
 ### Database Access
 
-- Use the Repository pattern for all data access
-- Implement async operations with CompletableFuture
-- Use DTOs for data transfer between layers
+- **Use the Repository pattern** for all data access across the ecosystem
+- **Implement async operations with CompletableFuture** for all database interactions
+- **Use DTOs for data transfer** between layers and across plugin boundaries
+- **Leverage RVNKCore's ConnectionProvider** for consistent database access
+
+```java
+// Repository implementation using RVNKCore infrastructure
+public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Long> {
+    
+    public AnnouncementRepository(ConnectionProvider provider, QueryBuilder builder) {
+        super(provider, builder, AnnouncementDTO.class);
+    }
+    
+    public CompletableFuture<List<AnnouncementDTO>> getActiveAnnouncements() {
+        return executeQueryList(
+            queryBuilder.select("*")
+                       .from("announcements")
+                       .where("active = ? AND expires_at > ?", true, Timestamp.valueOf(LocalDateTime.now()))
+                       .orderBy("created_at", false)
+        );
+    }
+}
+```
 
 ### API Design
 
-- Create clean, versioned API interfaces
-- Document all public APIs with complete JavaDoc
-- Use event-driven integration points
+- **Create clean, versioned API interfaces** for all plugin interactions
+- **Document all public APIs with complete JavaDoc** including examples and error conditions
+- **Use event-driven integration points** for loose coupling between plugins
+- **Implement backward compatibility** for API changes across versions
+
+```java
+/**
+ * API for managing player lore and item data across the RVNK ecosystem.
+ * 
+ * This service provides centralized access to player lore, custom items,
+ * and related metadata that can be shared across plugins.
+ * 
+ * @since 1.0.0
+ */
+public interface ILoreService {
+    /**
+     * Retrieves lore items for a specific player.
+     * 
+     * @param playerId The UUID of the player
+     * @param category The lore category to filter by (optional)
+     * @return CompletableFuture containing list of lore items
+     * @throws ServiceException if retrieval fails
+     * @since 1.0.0
+     */
+    CompletableFuture<List<LoreItemDTO>> getPlayerLore(UUID playerId, String category);
+}
+```
+
+### Cross-Plugin Event System
+
+- **Use RVNKCore's event system** for cross-plugin communication
+- **Implement event listeners** for responding to ecosystem-wide changes
+- **Fire events asynchronously** to prevent blocking plugin operations
+- **Provide event cancellation** where appropriate for plugin interaction
+
+```java
+// Event definition
+public class PlayerLoreUpdatedEvent extends RVNKEvent {
+    private final UUID playerId;
+    private final LoreItemDTO loreItem;
+    
+    public PlayerLoreUpdatedEvent(UUID playerId, LoreItemDTO loreItem) {
+        this.playerId = playerId;
+        this.loreItem = loreItem;
+    }
+}
+
+// Event firing (async)
+public CompletableFuture<Void> fireLoreUpdateEvent(UUID playerId, LoreItemDTO item) {
+    return CompletableFuture.runAsync(() -> {
+        PlayerLoreUpdatedEvent event = new PlayerLoreUpdatedEvent(playerId, item);
+        eventBus.fireEvent(event);
+    });
+}
+```
 
 ### Migration Strategy
 
-- Maintain backward compatibility during transition
-- Create migration utilities for existing data
-- Test all changes with both old and new systems
+- **Maintain backward compatibility** during transition to RVNKCore
+- **Create migration utilities** for existing data when upgrading plugins
+## Ecosystem-Wide Standards
+
+### Plugin Architecture
+
+All RVNK plugins should follow a consistent architecture:
+
+```
+Plugin Root/
+├── api/                    # Public plugin APIs
+├── service/               # Business logic services
+├── repository/            # Data access layer
+├── command/              # Command implementations
+├── listener/             # Event listeners
+├── config/               # Configuration management
+└── integration/          # Third-party integrations
+```
+
+### Dependency Management
+
+- **Declare RVNKCore as a dependency** in plugin.yml for all RVNK plugins
+- **Use ServiceRegistry** to obtain dependencies rather than direct instantiation
+- **Implement proper service lifecycle** with initialization and cleanup phases
+- **Handle missing dependencies gracefully** with appropriate fallback behavior
+
+```yaml
+# plugin.yml example
+depend: [RVNKCore]
+softdepend: [RVNKTools, RVNKLore, PlaceholderAPI, Vault]
+```
+
+### Error Handling and Resilience
+
+- **Use the RVNK exception hierarchy** for consistent error handling
+- **Implement circuit breaker patterns** for external service calls
+- **Provide meaningful error messages** with actionable information for administrators
+- **Log errors with appropriate context** including player IDs, operation details, and stack traces
+
+```java
+public CompletableFuture<Result> performOperation(UUID playerId) {
+    return serviceCall(playerId)
+        .handle((result, ex) -> {
+            if (ex != null) {
+                logger.error("Operation failed for player: " + playerId, ex);
+                // Return default result or throw appropriate exception
+                return Result.failure("Operation temporarily unavailable");
+            }
+            return result;
+        });
+}
+```
+
+### Performance and Monitoring
+
+- **Use DebugLogger for performance-critical sections** across all plugins
+- **Implement caching strategies** for frequently accessed data
+- **Monitor async operation completion** and log performance metrics
+- **Use connection pooling** through RVNKCore for database operations
+
+```java
+public class PerformanceMonitoredService {
+    private final DebugLogger logger;
+    
+    public CompletableFuture<Data> getData(String key) {
+        try (AutoCloseable timer = logger.timeSection("getData")) {
+            return cache.get(key)
+                .orElseGet(() -> repository.findByKey(key)
+                    .thenApply(data -> {
+                        cache.put(key, data);
+                        return data;
+                    }));
+        }
+    }
+}
+```
+
+### Configuration Standards
+
+- **Use YAML for all configuration files** with consistent naming conventions
+- **Implement configuration validation** with clear error messages
+- **Support configuration reloading** without server restart where possible
+- **Document all configuration options** with examples and default values
+
+```yaml
+# Standard configuration structure
+plugin-name:
+  database:
+    enabled: true
+    type: shared  # Use RVNKCore shared database
+  
+  features:
+    feature-name:
+      enabled: true
+      options:
+        option1: value1
+        option2: value2
+  
+  integration:
+    placeholder-api: true
+    vault: true
+```
+
+### Testing Requirements
+
+- **Write integration tests** for all async operations
+- **Mock external dependencies** using RVNKCore's testing framework
+- **Test cross-plugin compatibility** when implementing shared features
+- **Validate performance** under concurrent load for database operations
+
+### Documentation Standards
+
+- **Document all public APIs** with complete JavaDoc including since tags
+- **Provide configuration examples** in README files
+- **Create integration guides** for server administrators
+- **Maintain changelog** with version compatibility information
+
+## Legacy Support and Migration
+
+### Backward Compatibility
+
+- **Maintain compatibility** for at least 2 major versions
+- **Provide deprecation warnings** with clear migration paths
+- **Support legacy configuration formats** during transition periods
+- **Test with existing server setups** before releasing breaking changes
+
+### Data Migration
+
+- **Implement automatic data migration** from legacy formats
+- **Provide manual migration tools** for complex scenarios
+- **Backup data** before performing migrations
+- **Validate data integrity** after migration completion
+
+```java
+public class DataMigrationService {
+    public CompletableFuture<MigrationResult> migrateFromLegacy() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // 1. Backup existing data
+                backupService.createBackup("pre-migration");
+                
+                // 2. Migrate data to new format
+                List<LegacyData> legacyData = legacyRepository.findAll();
+                List<NewData> migratedData = convertToNewFormat(legacyData);
+                
+                // 3. Validate migration
+                validateMigration(legacyData, migratedData);
+                
+                // 4. Save migrated data
+                newRepository.saveAll(migratedData);
+                
+                return MigrationResult.success(migratedData.size());
+            } catch (Exception e) {
+                logger.error("Migration failed", e);
+                return MigrationResult.failure(e.getMessage());
+            }
+        });
+    }
+}
+```
+
+This comprehensive set of standards ensures consistency, performance, and maintainability across the entire RVNK plugin ecosystem while emphasizing asynchronous operations and proper data layer abstraction.
 
 ## Commenting Guidelines
 

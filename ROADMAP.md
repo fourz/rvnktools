@@ -16,7 +16,38 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ PlaceholderAPI integration
 - ✅ Multiverse integration
 - ✅ SQLite database support
-- ✅ **New**: Centralized `CommandManager` framework for consistent command handling.
+- ✅ Centralized `CommandManager` framework for consistent command handling
+
+### RVNKCore Implementation Status
+
+**Branch**: `derek/dev-core` | **Target**: Q3-Q4 2025
+
+#### Foundation Infrastructure
+
+**Completed** ✅
+- [x] Project architecture planning and documentation
+- [x] Complete directory structure creation (`org.fourz.rvnkcore.*`)
+- [x] Base exception hierarchy (`RVNKException`, `ServiceException`, `DatabaseException`)
+- [x] Core interfaces defined (`ConnectionProvider`, `QueryBuilder`, `ServiceRegistry`)
+- [x] Example DTO implementation (`PlayerDTO` with builder pattern)
+- [x] Main RVNKCore class with lifecycle management
+- [x] Package structure with api/, database/, service/, util/ directories
+- [x] Foundation documentation and implementation guidelines
+
+**In Progress** 🔄
+- [x] Player core example design (seen, name history, location, rank/groups)
+- [ ] SQLite ConnectionProvider implementation with HikariCP integration
+- [ ] QueryBuilder concrete implementation for SQL dialects
+- [ ] BaseRepository abstract class with CRUD operations
+- [ ] ServiceRegistry implementation for dependency injection
+- [ ] Player service implementation with async operations
+
+**Planned** 📋
+- [ ] Schema management with auto-creation
+- [ ] Event system for cross-plugin communication
+- [ ] Configuration management with versioning
+- [ ] Performance monitoring and logging integration
+- [ ] REST API framework for external access
 
 ## Major Architectural Refactor: RVNKCore Integration
 
