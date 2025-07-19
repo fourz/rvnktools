@@ -1,8 +1,8 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: July 12, 2025
+**Last Updated**: July 19, 2025
 
-This document outlines the planned features and improvements for the RVNKTools plugin.
+This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
 ## Current Status
 
@@ -18,46 +18,104 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ SQLite database support
 - ✅ **New**: Centralized `CommandManager` framework for consistent command handling.
 
-## Q3 2025 Priorities
+## Major Architectural Refactor: RVNKCore Integration
 
-### Core Infrastructure Improvements
+**Branch**: `derek/dev-core`
 
-The next phase of development focuses on improving the foundation of RVNKTools to ensure scalability and maintainability.
+The primary focus for Q3-Q4 2025 is the extraction of core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem.
 
-#### Feature Set
+### Phase 1: RVNKCore Foundation (Q3 2025) - **CURRENT PRIORITY**
 
-- [ ] **Logging System Refactoring** *(High Priority)*
-  - Create and implement an optionally used DebugLogger for performance-critical sections.  
-    - DebugLogger should share the same interface as LogManager, allowing for easy switching between normal and debug logging.
-  - Implement LogManager pattern for as-needed logging across codebase
-    - Establish and implement LogManager as centralized logging configuration.
-  - Add configurable log levels
+#### Core Database Framework *(High Priority)*
 
-- [ ] **Database Architecture Enhancement** *(High Priority)*
-  - Create QueryBuilder interface for database dialect abstraction
-  - Add DTO pattern for clean data transfer between layers
-  - Support for MySQL in addition to SQLite
-  - Add connection pooling for improved performance using HikariCP
+- [ ] **Connection Management**
+  - Implement ConnectionProvider interface with MySQL and SQLite implementations
+  - Add connection pooling with HikariCP
+  - Integrate with LogManager for database operations
 
-- [ ] **Configuration System Upgrade** *(Medium Priority)*
-  - Implement automatic config versioning and migration
-  - Add configuration validation
-  - Improve error handling for malformed configs
-  - Create admin commands for config reload
+- [ ] **Query Building Framework**
+  - Create QueryBuilder interface for database dialect independence
+  - Implement dialect-specific implementations
+  - Add performance tracking with DebugLogger
 
-- [✅] **Command Framework Modernization** *(Complete)*
-  - ✅ Standardize command structure and execution flow
-  - ✅ Improve tab completion support
-  - ✅ Add command aliases support
-  - ✅ Implement better permission checking and messaging
+- [ ] **Repository Base**
+  - Implement BaseRepository abstract class
+  - Create DTO-based data transfer
+  - Add CRUD operation templates
 
-## Q4 2025 Priorities
+#### Service Framework *(High Priority)*
 
-### Feature Extensions
+- [ ] **Service Registry**
+  - Implement ServiceRegistry singleton
+  - Add service registration and discovery
+  - Build dependency resolution
 
-Building on the infrastructure improvements, these features will extend the functionality of RVNKTools.
+- [ ] **Logging Framework**
+  - Implement LogManager with RVNKLogger interface
+  - Create DebugLogger for performance monitoring
+  - Add log level configuration
 
-#### Feature Set
+- [ ] **Basic Command Support** *(Low Priority)*
+  - Implement essential administrative commands
+  - Add basic permission checks
+  - Support simple tab completion
+
+- [ ] **Event System** *(Medium Priority)*
+  - Design event interfaces
+  - Implement event dispatcher
+  - Create priority-based execution
+
+- [ ] **Configuration Management** *(Medium Priority)*
+  - Implement ConfigurationManager
+  - Add configuration versioning
+  - Build validation framework
+
+### Phase 2: Service Implementation (Q4 2025)
+
+This phase focuses on implementing the core services that will be provided by RVNKCore.
+
+#### Player Services *(High Priority)*
+
+- [ ] **Player Registry**
+  - Implement centralized player tracking
+  - Add player metadata storage
+  - Create player events
+
+- [ ] **Permission Management** *(Medium Priority)*
+  - Implement permission caching
+  - Add LuckPerms integration
+  - Create permission evaluation
+
+#### Data Services *(High Priority)*
+
+- [ ] **Announcement Service**
+  - Extract from RVNKTools announcement system
+  - Implement service interface
+  - Build scheduling framework
+
+- [ ] **Link Service** *(Medium Priority)*
+  - Extract from RVNKTools link system
+  - Add tracking and analytics
+
+- [ ] **API Framework** *(High Priority)*
+  - Design API interfaces
+  - Build example implementations
+
+### Phase 3: Separation & Legacy Maintenance (Q1-Q2 2026)
+
+- [ ] **Plugin Separation** *(Critical Priority)*
+  - Create separate Maven project for RVNKCore
+  - Build compatibility layer
+  - Test with existing plugins
+
+- [ ] **Legacy Feature Maintenance** *(Medium Priority)*
+  - Continue support for existing RVNKTools features
+  - Implement migration tools
+  - Maintain backward compatibility
+
+## Q4 2025 Priorities (Post-RVNKCore Foundation)
+
+### Enhanced Features
 
 - [ ] **Enhanced Announcement System** *(High Priority)*
   - Add support for scheduled announcements with cron expressions

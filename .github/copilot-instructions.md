@@ -7,6 +7,35 @@ These guidelines should be followed when modifying or creating code to maintain 
 - **Use the CommandManager framework for all commands. Do not create standalone command executors.**
 - **Follow SOLID principles when adding new features or refactoring existing code.**
 - **Ensure proper resource cleanup in all managers and services.**
+- **Implement RVNKCore patterns when working on core functionality extraction.**
+
+## RVNKCore Integration Guidelines
+
+As RVNKTools undergoes refactoring to integrate with RVNKCore, follow these additional guidelines:
+
+### Service Pattern
+
+- Use service interfaces for all business logic
+- Implement services through the ServiceRegistry pattern
+- Keep services focused on single responsibilities
+
+### Database Access
+
+- Use the Repository pattern for all data access
+- Implement async operations with CompletableFuture
+- Use DTOs for data transfer between layers
+
+### API Design
+
+- Create clean, versioned API interfaces
+- Document all public APIs with complete JavaDoc
+- Use event-driven integration points
+
+### Migration Strategy
+
+- Maintain backward compatibility during transition
+- Create migration utilities for existing data
+- Test all changes with both old and new systems
 
 ## Commenting Guidelines
 

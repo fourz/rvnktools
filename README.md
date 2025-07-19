@@ -2,6 +2,8 @@
 
 RVNKTools is a comprehensive Minecraft server plugin that provides a wide array of features to enhance server administration. It includes tools for managing announcements, permissions, events, and much more, tailored for ease of use and scalability.
 
+**Note**: RVNKTools is currently undergoing a major architectural refactor to extract core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem. This refactor is happening on the `derek/dev-core` branch and will provide better modularity, shared services, and cross-plugin integration capabilities.
+
 ## Features
 
 - **Announcements Management**:
@@ -26,7 +28,19 @@ RVNKTools is a comprehensive Minecraft server plugin that provides a wide array 
 
 - **Database Compatibility**:
   - Supports SQLite for lightweight installations
+  - MySQL support (planned with RVNKCore integration)
+  - Connection pooling with HikariCP for optimal performance
   - Configurable through application.properties
+
+## RVNKCore Integration (In Development)
+
+RVNKTools is being refactored to utilize RVNKCore, a centralized data and service layer that will provide:
+
+- **Centralized Database Management**: Shared database layer across all RVNK plugins
+- **Service Framework**: Common services for player data, permissions, and configuration
+- **Cross-Plugin Communication**: Event system for plugin interactions
+- **API Framework**: Clean, versioned APIs for third-party integration
+- **Performance Optimization**: Connection pooling, caching, and async operations
 
 ## Installation
 
