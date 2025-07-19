@@ -3,6 +3,11 @@ package org.fourz.rvnktools.core;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.registry.ServiceRegistryImpl;
 import org.fourz.rvnkcore.api.exception.ServiceException;
+import org.fourz.rvnkcore.api.service.IPlayerService;
+import org.fourz.rvnkcore.database.connection.SQLiteConnectionProvider;
+import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
+import org.fourz.rvnkcore.database.repository.PlayerRepository;
+import org.fourz.rvnkcore.service.player.PlayerService;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.log.LogManager;
 
@@ -58,7 +63,8 @@ public class RVNKCoreBootstrap {
     
     private void registerBridgeServices() {
         try {
-            // Register service bridges
+            // Register core services
+            registerPlayerService();
             registerAnnouncementBridge();
             registerLinkMakerBridge();
             registerPermissionBridge();
@@ -66,6 +72,30 @@ public class RVNKCoreBootstrap {
             logger.info("Bridge services registered successfully");
         } catch (ServiceException e) {
             logger.error("Failed to register bridge services", e);
+        }
+    }
+    
+    private void registerPlayerService() throws ServiceException {
+        try {
+            // Create dependencies
+            SQLiteConnectionProvider connectionProvider = 
+                new SQLiteConnectionProvider(plugin, "rvnkcore.db");
+            
+            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
+            
+            PlayerRepository playerRepository = 
+                new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            
+            PlayerService playerService = 
+                new PlayerService(playerRepository, plugin);
+            
+            // Register the service
+            serviceRegistry.registerService(IPlayerService.class, playerService);
+            
+            logger.info("PlayerService registered successfully");
+        } catch (Exception e) {
+            logger.error("Failed to register PlayerService", e);
+            throw new ServiceException("PlayerService registration failed", e);
         }
     }
     
