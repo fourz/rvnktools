@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.core;
 
-import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
+import org.fourz.rvnkcore.service.registry.ServiceRegistryImpl;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -48,8 +48,7 @@ public class RVNKCoreBootstrap {
     
     private void initServiceRegistry() {
         try {
-            // TODO: Replace with actual ServiceRegistryImpl once implemented
-            serviceRegistry = new TemporaryServiceRegistryImpl();
+            serviceRegistry = new ServiceRegistryImpl(plugin);
             logger.info("ServiceRegistry initialized");
         } catch (Exception e) {
             logger.error("Failed to initialize ServiceRegistry", e);
@@ -106,10 +105,37 @@ public class RVNKCoreBootstrap {
         return serviceRegistry;
     }
     
-    // Temporary implementation until the real one is ready
-    // TODO: Remove once real implementation is complete
-    private class TemporaryServiceRegistryImpl implements ServiceRegistry {
-        // Simple implementation of the ServiceRegistry interface
-        // This will be replaced with the actual implementation
+    /**
+     * Gets a service from the registry.
+     * 
+     * @param <T> The service type
+     * @param serviceClass The service interface class
+     * @return The service instance
+     * @throws ServiceException If the service is not found
+     */
+    public <T> T getService(Class<T> serviceClass) throws ServiceException {
+        if (serviceRegistry == null) {
+            throw new ServiceException("ServiceRegistry not initialized");
+        }
+        return serviceRegistry.getService(serviceClass);
+    }
+    
+    /**
+     * Checks if a service is available.
+     * 
+     * @param serviceClass The service interface class
+     * @return true if the service is available
+     */
+    public boolean hasService(Class<?> serviceClass) {
+        return serviceRegistry != null && serviceRegistry.hasService(serviceClass);
+    }
+    
+    /**
+     * Checks if RVNKCore bootstrap is initialized.
+     * 
+     * @return true if initialized and ready
+     */
+    public boolean isInitialized() {
+        return serviceRegistry != null;
     }
 }

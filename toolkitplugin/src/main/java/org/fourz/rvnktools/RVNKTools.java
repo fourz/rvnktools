@@ -6,11 +6,14 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
+import org.fourz.rvnktools.core.RVNKCoreBootstrap;
+import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.api.RVNKToolsAPI;
+import org.fourz.rvnktools.util.log.LogManager;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -26,9 +29,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public PermissionService permissionService;
     private RVNKToolsAPI api;
     private CommandManager commandManager;
-
+    // Add RVNKCore bootstrap component
+    private RVNKCoreBootstrap coreBootstrap;
+    private LogManager logger;
+    
     @Override
     public void onEnable() {
+        this.logger = LogManager.getInstance(this, getClass());
+        
+        // Initialize RVNKCore first
+        initializeRVNKCore();
+        
+        // Continue with normal initialization
         initializePermissions();
         initializeEconomy();
         initializeLinkMaker();
@@ -37,7 +49,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
         checkPlaceholderAPI();
         registerEventListeners();
         initializeCommandFramework();
-        getLogger().info("RVNK Toolkit has been enabled.");
+        logger.info("RVNK Toolkit has been enabled.");
     }
 
     @Override
@@ -45,9 +57,45 @@ public class RVNKTools extends JavaPlugin implements Listener {
         shutdownAPI();
         shutdownAnnounceManager();
         cleanupResources();
-        getLogger().info("RVNK Toolkit has been disabled.");
+        
+        // Shutdown RVNKCore last
+        shutdownRVNKCore();
+        
+        logger.info("RVNK Toolkit has been disabled.");
     }
 
+    /**
+     * Initializes the RVNKCore framework.
+     * 
+     * TODO: This will eventually become the primary initialization method,
+     * with other services migrated to use RVNKCore.
+     */
+    private void initializeRVNKCore() {
+        logger.info("Initializing RVNKCore components...");
+        try {
+            coreBootstrap = RVNKCoreBootstrap.getInstance(this);
+            coreBootstrap.initialize();
+        } catch (Exception e) {
+            logger.error("Failed to initialize RVNKCore components", e);
+            logger.warning("Continuing with legacy initialization...");
+        }
+    }
+
+    /**
+     * Shuts down the RVNKCore framework.
+     */
+    private void shutdownRVNKCore() {
+        if (coreBootstrap != null) {
+            logger.info("Shutting down RVNKCore components...");
+            try {
+                coreBootstrap.shutdown();
+            } catch (Exception e) {
+                logger.error("Error shutting down RVNKCore components", e);
+            }
+            coreBootstrap = null;
+        }
+    }
+    
     private void initializePermissions() {
         LuckPermsManager.init();
         permissionService = new PermissionService();
@@ -85,6 +133,17 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private void registerEventListeners() {
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
+        
+        // Register RVNKCore listeners if bootstrap is available
+        if (coreBootstrap != null && coreBootstrap.isInitialized()) {
+            try {
+                PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, coreBootstrap);
+                getServer().getPluginManager().registerEvents(playerTracker, this);
+                logger.info("RVNKCore PlayerTrackingListener registered");
+            } catch (Exception e) {
+                logger.error("Failed to register PlayerTrackingListener", e);
+            }
+        }
     }
 
     private void initializeCommandFramework() {

@@ -1,0 +1,222 @@
+package org.fourz.rvnktools.listener;
+
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.fourz.rvnkcore.api.service.IPlayerService;
+import org.fourz.rvnkcore.api.exception.ServiceException;
+import org.fourz.rvnktools.core.RVNKCoreBootstrap;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.RVNKTools;
+
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Event listener for tracking player activity using RVNKCore services.
+ * 
+ * This listener captures player join/quit events and location changes to
+ * maintain comprehensive player tracking data in the RVNKCore system.
+ * 
+ * TODO: This will eventually replace individual tracking in other listeners
+ * once full migration to RVNKCore is complete.
+ * 
+ * @since 1.0.0
+ */
+public class PlayerTrackingListener implements Listener {
+    
+    private final RVNKTools plugin;
+    private final LogManager logger;
+    private final RVNKCoreBootstrap coreBootstrap;
+    
+    /**
+     * Constructor for PlayerTrackingListener.
+     * 
+     * @param plugin The RVNKTools plugin instance
+     * @param coreBootstrap The RVNKCore bootstrap instance
+     */
+    public PlayerTrackingListener(RVNKTools plugin, RVNKCoreBootstrap coreBootstrap) {
+        this.plugin = plugin;
+        this.coreBootstrap = coreBootstrap;
+        this.logger = LogManager.getInstance(plugin);
+    }
+    
+    /**
+     * Handles player join events to create or update player records.
+     * 
+     * @param event The player join event
+     */
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        
+        try {
+            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            
+            // Check if player exists, if not create new record
+            playerService.playerExists(player.getUniqueId())
+                .thenCompose(exists -> {
+                    if (!exists) {
+                        // Create new player record
+                        return playerService.createPlayer(
+                            player.getUniqueId(),
+                            player.getName(),
+                            player.getWorld().getName(),
+                            player.getLocation().getX(),
+                            player.getLocation().getY(),
+                            player.getLocation().getZ()
+                        ).thenApply(dto -> {
+                            logger.info("Created new player record: " + player.getName());
+                            return null;
+                        });
+                    } else {
+                        // Update existing player's last seen and location
+                        CompletableFuture<Void> nameUpdate = playerService.updatePlayerName(
+                            player.getUniqueId(), 
+                            player.getName()
+                        );
+                        
+                        CompletableFuture<Void> locationUpdate = playerService.updatePlayerLocation(
+                            player.getUniqueId(),
+                            player.getWorld().getName(),
+                            player.getLocation().getX(),
+                            player.getLocation().getY(),
+                            player.getLocation().getZ()
+                        );
+                        
+                        return CompletableFuture.allOf(nameUpdate, locationUpdate);
+                    }
+                })
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Failed to update player data for: " + player.getName(), throwable);
+                    } else {
+                        logger.debug("Successfully updated player data for: " + player.getName());
+                    }
+                });
+                
+        } catch (ServiceException e) {
+            logger.error("Failed to get PlayerService for join event", e);
+        }
+    }
+    
+    /**
+     * Handles player quit events to update last seen time and location.
+     * 
+     * @param event The player quit event
+     */
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        
+        try {
+            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            
+            // Update player's last location before they quit
+            playerService.updatePlayerLocation(
+                player.getUniqueId(),
+                player.getWorld().getName(),
+                player.getLocation().getX(),
+                player.getLocation().getY(),
+                player.getLocation().getZ()
+            ).whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to update player location on quit: " + player.getName(), throwable);
+                } else {
+                    logger.debug("Updated player location on quit: " + player.getName());
+                }
+            });
+            
+        } catch (ServiceException e) {
+            logger.error("Failed to get PlayerService for quit event", e);
+        }
+    }
+    
+    /**
+     * Handles player world change events to update location tracking.
+     * 
+     * @param event The player changed world event
+     */
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        
+        try {
+            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            
+            // Update player's location in the new world
+            playerService.updatePlayerLocation(
+                player.getUniqueId(),
+                player.getWorld().getName(),
+                player.getLocation().getX(),
+                player.getLocation().getY(),
+                player.getLocation().getZ()
+            ).whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to update player location on world change: " + player.getName(), throwable);
+                } else {
+                    logger.debug("Updated player location on world change: " + player.getName() + 
+                               " to " + player.getWorld().getName());
+                }
+            });
+            
+        } catch (ServiceException e) {
+            logger.error("Failed to get PlayerService for world change event", e);
+        }
+    }
+    
+    /**
+     * Handles significant player movement to periodically update location.
+     * 
+     * This only updates on significant movement to avoid database spam.
+     * 
+     * @param event The player move event
+     */
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        // Only track significant movement (crossing block boundaries)
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX() &&
+            event.getFrom().getBlockY() == event.getTo().getBlockY() &&
+            event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            return;
+        }
+        
+        Player player = event.getPlayer();
+        
+        // Rate limit location updates to every 30 seconds per player
+        String playerKey = "location_update_" + player.getUniqueId();
+        long lastUpdate = plugin.getConfig().getLong(playerKey, 0);
+        long currentTime = System.currentTimeMillis();
+        
+        if (currentTime - lastUpdate < 30000) { // 30 seconds
+            return;
+        }
+        
+        try {
+            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            
+            // Update player's current location
+            playerService.updatePlayerLocation(
+                player.getUniqueId(),
+                player.getWorld().getName(),
+                event.getTo().getX(),
+                event.getTo().getY(),
+                event.getTo().getZ()
+            ).whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to update player location on move: " + player.getName(), throwable);
+                } else {
+                    // Update the last update timestamp
+                    plugin.getConfig().set(playerKey, currentTime);
+                    logger.debug("Updated player location on move: " + player.getName());
+                }
+            });
+            
+        } catch (ServiceException e) {
+            logger.error("Failed to get PlayerService for move event", e);
+        }
+    }
+}
