@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.util.logging;
+package org.fourz.rvnktools.util.log;
 
 import org.bukkit.plugin.Plugin;
 import java.util.logging.Level;

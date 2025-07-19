@@ -3,8 +3,8 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.log.RVNKLogger;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

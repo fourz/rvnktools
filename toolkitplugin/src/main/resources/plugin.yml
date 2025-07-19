@@ -6,8 +6,8 @@ description: RVNK Admin Toolkit
 api: "1.0"
 website: http://www.fourz.org
 api-version: 1.16
-depend: [PlaceholderAPI]
-softdepend: [Multiverse-Core]
+depend: []
+softdepend: [Multiverse-Core,PlaceholderAPI]
 
 commands:
   rvnktools:

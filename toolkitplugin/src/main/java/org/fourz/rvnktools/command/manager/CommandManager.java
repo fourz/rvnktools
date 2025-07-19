@@ -7,10 +7,10 @@ import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.log.RVNKLogger;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
-import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
 
 import java.util.HashMap;
 import java.util.Map;

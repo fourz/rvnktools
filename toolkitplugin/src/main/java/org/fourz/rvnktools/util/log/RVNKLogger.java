@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.util.logging;
+package org.fourz.rvnktools.util.log;
 
 /**
  * Common interface for all logging implementations in RVNKTools.

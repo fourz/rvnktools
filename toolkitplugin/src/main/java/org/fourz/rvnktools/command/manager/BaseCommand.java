@@ -7,8 +7,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.RVNKTools;
-import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.log.RVNKLogger;
 
 import java.util.*;
 

@@ -29,17 +29,15 @@ The next phase of development focuses on improving the foundation of RVNKTools t
 - [ ] **Logging System Refactoring** *(High Priority)*
   - Create and implement an optionally used DebugLogger for performance-critical sections.  
     - DebugLogger should share the same interface as LogManager, allowing for easy switching between normal and debug logging.
-  - Implement LogManager pattern for consistent logging across all classes
+  - Implement LogManager pattern for as-needed logging across codebase
     - Establish and implement LogManager as centralized logging configuration.
   - Add configurable log levels
-  - Create log rotation and archiving
-  - Add performance metrics logging
 
 - [ ] **Database Architecture Enhancement** *(High Priority)*
   - Create QueryBuilder interface for database dialect abstraction
   - Add DTO pattern for clean data transfer between layers
   - Support for MySQL in addition to SQLite
-  - Add connection pooling for improved performance
+  - Add connection pooling for improved performance using HikariCP
 
 - [ ] **Configuration System Upgrade** *(Medium Priority)*
   - Implement automatic config versioning and migration
@@ -75,16 +73,13 @@ Building on the infrastructure improvements, these features will extend the func
   - Economy integration for premium features
 
 - [ ] **Admin Tools Expansion** *(Medium Priority)*
-  - Add server performance monitoring tools
+  - Add server performance reporting tools
+  - Utilize the DebugLogger and SparkLogger for performance-critical debugging
   - Create player management utilities
-  - Implement backup and restore functionality
   - Add report generation for server statistics
 
 - [ ] **User Interface Improvements** *(Medium Priority)*
-  - Create comprehensive in-game GUI for all features
-  - Implement chat-based menus for server navigation
-  - Add customizable themes for all interfaces
-  - Create actionbar and bossbar announcement options
+  - Add GUI for hat management
 
 ## Q1-Q2 2026 Priorities
 
@@ -101,7 +96,7 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
   - Create plugin hook system for extensibility
 
 - [ ] **Modular Architecture** *(High Priority)*
-  - Refactor codebase into separate modules
+  - Refactor RVNK plugin ecosystem/codebase to extract database and api components into the core module, centralizing shared functionality for plugin data with yaml fallback for each plugin.
   - Enable feature toggles for all components
   - Create module dependency management
   - Implement dynamic module loading/unloading
@@ -112,7 +107,7 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
   - Implement cross-plugin communication
   - Develop migration path from integrated to standalone
 
-- [ ] **Multi-Server Support** *(Medium Priority)*
+- [ ] **Multi-Server Support** *(Low Priority)*
   - Add BungeeCord/Velocity integration
   - Implement cross-server announcement synchronization
   - Create shared database for multi-server setups

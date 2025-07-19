@@ -8,9 +8,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.ChatServiceInterface;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.log.RVNKLogger;
 import org.fourz.rvnktools.util.ChatService;
-import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
 
 import net.md_5.bungee.api.ChatMessageType;
 

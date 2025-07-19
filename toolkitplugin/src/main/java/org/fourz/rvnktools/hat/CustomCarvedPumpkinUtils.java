@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.hatManager;
+package org.fourz.rvnktools.hat;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;

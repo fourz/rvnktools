@@ -3,8 +3,8 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.util.ChatFormat;
-import org.fourz.rvnktools.util.logging.LogManager;
-import org.fourz.rvnktools.util.logging.RVNKLogger;
+import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.log.RVNKLogger;
 
 import java.util.ArrayList;
 import java.util.List;

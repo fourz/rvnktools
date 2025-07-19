@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.hatManager;
+package org.fourz.rvnktools.hat;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
