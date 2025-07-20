@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
  * 
  * @since 1.0.0
  */
-public interface IPlayerService {
+public interface PlayerService {
     
     /**
      * Retrieves a player by their UUID.

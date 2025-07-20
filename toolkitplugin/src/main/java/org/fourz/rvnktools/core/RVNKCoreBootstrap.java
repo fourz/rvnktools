@@ -1,13 +1,14 @@
 package org.fourz.rvnktools.core;
 
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
-import org.fourz.rvnkcore.service.registry.ServiceRegistryImpl;
+import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.api.exception.ServiceException;
-import org.fourz.rvnkcore.api.service.IPlayerService;
+import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.database.connection.SQLiteConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
-import org.fourz.rvnkcore.service.player.PlayerService;
+import org.fourz.rvnkcore.database.schema.DatabaseSetup;
+import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.log.LogManager;
 
@@ -44,6 +45,7 @@ public class RVNKCoreBootstrap {
         try {
             // Initialize RVNKCore components
             initServiceRegistry();
+            setupDatabase();
             registerBridgeServices();
             logger.info("RVNKCore bootstrap completed successfully");
         } catch (Exception e) {
@@ -53,11 +55,29 @@ public class RVNKCoreBootstrap {
     
     private void initServiceRegistry() {
         try {
-            serviceRegistry = new ServiceRegistryImpl(plugin);
+            serviceRegistry = new DefaultServiceRegistry(plugin);
             logger.info("ServiceRegistry initialized");
         } catch (Exception e) {
             logger.error("Failed to initialize ServiceRegistry", e);
             throw e;
+        }
+    }
+    
+    private void setupDatabase() {
+        try {
+            // Create connection provider and database setup
+            SQLiteConnectionProvider connectionProvider = 
+                new SQLiteConnectionProvider(plugin, "rvnkcore.db");
+            
+            DatabaseSetup databaseSetup = new DatabaseSetup(connectionProvider, plugin);
+            
+            // Perform one-time database initialization
+            databaseSetup.initializeDatabase();
+            
+            logger.info("Database setup completed successfully");
+        } catch (Exception e) {
+            logger.error("Failed to setup database", e);
+            throw new RuntimeException("Database setup failed", e);
         }
     }
     
@@ -86,11 +106,11 @@ public class RVNKCoreBootstrap {
             PlayerRepository playerRepository = 
                 new PlayerRepository(connectionProvider, queryBuilder, plugin);
             
-            PlayerService playerService = 
-                new PlayerService(playerRepository, plugin);
+            DefaultPlayerService playerService = 
+                new DefaultPlayerService(playerRepository, plugin);
             
             // Register the service
-            serviceRegistry.registerService(IPlayerService.class, playerService);
+            serviceRegistry.registerService(PlayerService.class, playerService);
             
             logger.info("PlayerService registered successfully");
         } catch (Exception e) {

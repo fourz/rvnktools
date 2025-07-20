@@ -7,7 +7,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.fourz.rvnkcore.api.service.IPlayerService;
+import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -54,7 +54,7 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
             
             // Check if player exists, if not create new record
             playerService.playerExists(player.getUniqueId())
@@ -113,7 +113,7 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
             
             // Update player's last location before they quit
             playerService.updatePlayerLocation(
@@ -145,7 +145,7 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
             
             // Update player's location in the new world
             playerService.updatePlayerLocation(
@@ -196,7 +196,7 @@ public class PlayerTrackingListener implements Listener {
         }
         
         try {
-            IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
             
             // Update player's current location
             playerService.updatePlayerLocation(

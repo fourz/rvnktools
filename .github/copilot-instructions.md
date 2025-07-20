@@ -76,14 +76,14 @@ As all RVNK plugins integrate with RVNKCore, follow these additional guidelines:
 
 ```java
 // Service interface in RVNKCore API
-public interface IPlayerService {
+public interface PlayerService {
     CompletableFuture<Optional<PlayerDTO>> getPlayer(UUID playerId);
     CompletableFuture<PlayerDTO> savePlayer(PlayerDTO player);
     CompletableFuture<List<PlayerDTO>> getOnlinePlayers();
 }
 
 // Service implementation
-public class PlayerService implements IPlayerService {
+public class DefaultPlayerService implements PlayerService {
     private final PlayerRepository repository;
     private final LogManager logger;
     

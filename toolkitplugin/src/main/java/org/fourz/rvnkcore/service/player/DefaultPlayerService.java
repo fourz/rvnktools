@@ -1,7 +1,7 @@
 package org.fourz.rvnkcore.service.player;
 
 import org.fourz.rvnkcore.api.model.PlayerDTO;
-import org.fourz.rvnkcore.api.service.IPlayerService;
+import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -14,7 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Implementation of IPlayerService providing comprehensive player data management.
+ * Implementation of PlayerService providing comprehensive player data management.
  * 
  * This service handles all player-related operations including tracking activity,
  * managing location data, maintaining name history, and handling permission groups.
@@ -22,18 +22,18 @@ import java.util.concurrent.CompletableFuture;
  * 
  * @since 1.0.0
  */
-public class PlayerService implements IPlayerService {
+public class DefaultPlayerService implements PlayerService {
     
     private final PlayerRepository playerRepository;
     private final LogManager logger;
     
     /**
-     * Constructor for PlayerService.
+     * Constructor for DefaultPlayerService.
      * 
      * @param playerRepository The repository for player data operations
      * @param plugin The plugin instance for logging
      */
-    public PlayerService(PlayerRepository playerRepository, Plugin plugin) {
+    public DefaultPlayerService(PlayerRepository playerRepository, Plugin plugin) {
         this.playerRepository = playerRepository;
         this.logger = LogManager.getInstance(plugin);
     }

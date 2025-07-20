@@ -34,7 +34,7 @@ RVNKTools has established a solid foundation with core functionality in place:
 - [x] Package structure with api/, database/, service/, util/ directories
 - [x] Foundation documentation and implementation guidelines
 - [x] Enhanced PlayerDTO with comprehensive tracking (seen, name history, location, rank/groups)
-- [x] IPlayerService interface with async operations
+- [x] PlayerService interface with async operations
 - [x] BaseRepository abstract class with CRUD operations
 - [x] PlayerRepository implementation with player-specific queries
 - [x] PlayerService implementation with full business logic
@@ -97,7 +97,7 @@ The primary focus for Q3-Q4 2025 is the extraction of core functionality into RV
   - Location: `org.fourz.rvnkcore.service.registry.*`
 
 - [x] **Player Services**
-  - ✅ IPlayerService interface with comprehensive async operations
+  - ✅ PlayerService interface with comprehensive async operations
   - ✅ PlayerService implementation with caching and rate limiting
   - ✅ Player activity tracking, location updates, name history
   - ✅ Search functionality and recent players queries

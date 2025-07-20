@@ -38,7 +38,10 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
             plugin.getDataFolder().mkdirs();
         }
         
-        logger.info("SQLite database path: " + this.databasePath);
+        // Only log database path during initial setup in debug mode
+        if (logger.isDebugEnabled()) {
+            logger.info("SQLite database path: " + this.databasePath);
+        }
     }
     
     @Override
@@ -62,10 +65,10 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
                     stmt.execute("PRAGMA synchronous = NORMAL");
                 }
                 
-                logger.info("Successfully connected to SQLite database");
-                
-                // Create tables if they don't exist
-                createTablesIfNotExists();
+                // Only log connection establishment during initial setup, not on every operation
+                if (logger.isDebugEnabled()) {
+                    logger.info("SQLite database connection established");
+                }
                 
             } catch (ClassNotFoundException e) {
                 logger.error("SQLite JDBC driver not found", e);
@@ -118,7 +121,10 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
             try {
                 if (!connection.isClosed()) {
                     connection.close();
-                    logger.info("SQLite database connection closed");
+                    // Only log closure in debug mode to reduce verbosity
+                    if (logger.isDebugEnabled()) {
+                        logger.info("SQLite database connection closed");
+                    }
                 }
             } catch (SQLException e) {
                 logger.error("Error closing SQLite connection", e);
@@ -131,59 +137,6 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
     @Override
     public String getDatabaseType() {
         return "SQLite";
-    }
-    
-    /**
-     * Creates the required database tables if they don't exist.
-     * 
-     * @throws SQLException if table creation fails
-     */
-    private void createTablesIfNotExists() throws SQLException {
-        String createPlayersTable = """
-            CREATE TABLE IF NOT EXISTS rvnk_players (
-                id TEXT PRIMARY KEY,
-                current_name TEXT NOT NULL,
-                name_history TEXT DEFAULT '',
-                first_join TIMESTAMP NOT NULL,
-                last_seen TIMESTAMP NOT NULL,
-                last_world TEXT,
-                last_x REAL DEFAULT 0,
-                last_y REAL DEFAULT 0,
-                last_z REAL DEFAULT 0,
-                primary_group TEXT DEFAULT 'default',
-                groups TEXT DEFAULT '',
-                banned BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """;
-        
-        String createNameHistoryIndex = """
-            CREATE INDEX IF NOT EXISTS idx_players_name_history 
-            ON rvnk_players(current_name, name_history)
-            """;
-        
-        String createLastSeenIndex = """
-            CREATE INDEX IF NOT EXISTS idx_players_last_seen 
-            ON rvnk_players(last_seen)
-            """;
-        
-        String createGroupIndex = """
-            CREATE INDEX IF NOT EXISTS idx_players_primary_group 
-            ON rvnk_players(primary_group)
-            """;
-        
-        try (var stmt = connection.createStatement()) {
-            stmt.execute(createPlayersTable);
-            stmt.execute(createNameHistoryIndex);
-            stmt.execute(createLastSeenIndex);
-            stmt.execute(createGroupIndex);
-            
-            logger.info("Database schema created/verified successfully");
-        } catch (SQLException e) {
-            logger.error("Failed to create database schema", e);
-            throw e;
-        }
     }
     
     /**
