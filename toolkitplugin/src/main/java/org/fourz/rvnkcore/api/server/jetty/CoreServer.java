@@ -84,16 +84,13 @@ public class CoreServer {
         try {
             // Create server instance
             server = new Server();
-            logger.info("Jetty server instance created");
             
             // Setup connectors (HTTP/HTTPS)
             connectorFactory.setupConnectors(server);
-            logger.info("Connectors setup completed");
             
             // Setup servlet context and controllers
             ServletContextHandler context = servletFactory.createServletContext();
             server.setHandler(context);
-            logger.info("Servlet context setup completed");
             
             // Start the server
             serverLifecycle.startServer(server);

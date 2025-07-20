@@ -55,20 +55,15 @@ public class ServerSSLFactory {
      */
     public ServerConnector createHttpsConnector(Server server, HttpConfiguration httpConfig) {
         if (!config.isHttpsEnabled()) {
-            logger.info("HTTPS is disabled in configuration");
             return null;
         }
 
         if (config.getKeystorePath().isEmpty()) {
-            logger.warning("HTTPS is enabled but keystore path is empty - HTTPS will not be available");
-            logger.warning("To enable HTTPS, configure 'api.https.keystore-path' in your configuration");
+            logger.warning("HTTPS enabled but keystore path is empty - HTTPS unavailable");
             return null;
         }
 
         try {
-            logger.info("Creating HTTPS connector on port " + config.getHttpsPort());
-            logSSLConfiguration();
-
             // Ensure keystore exists
             File keystoreFile = ensureKeystoreExists();
             if (keystoreFile == null) {
@@ -90,9 +85,6 @@ public class ServerSSLFactory {
             httpsConnector.setPort(config.getHttpsPort());
             httpsConnector.setIdleTimeout(config.getIdleTimeout());
             httpsConnector.setName("https-connector");
-
-            logger.info("HTTPS connector successfully created");
-            logger.info("HTTPS endpoint will be available at: https://localhost:" + config.getHttpsPort() + config.getContextPath());
 
             return httpsConnector;
 
@@ -154,17 +146,6 @@ public class ServerSSLFactory {
         sslContextFactory.setIncludeProtocols("TLSv1.2", "TLSv1.3");
         
         return sslContextFactory;
-    }
-
-    /**
-     * Logs SSL configuration details for debugging and diagnostics.
-     */
-    private void logSSLConfiguration() {
-        logger.info("HTTPS Configuration:");
-        logger.info("  - Port: " + config.getHttpsPort());
-        logger.info("  - Keystore Path: " + config.getKeystorePath());
-        logger.info("  - Keystore Password: " + (config.getKeystorePassword().isEmpty() ? "Not Set" : "********"));
-        logger.info("  - Idle Timeout: " + config.getIdleTimeout() + "ms");
     }
 
     /**

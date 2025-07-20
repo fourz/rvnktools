@@ -32,32 +32,30 @@ public class ServerConnectorFactory {
 
     /**
      * Sets up all connectors (HTTP and HTTPS) for the given server.
+     * If HTTPS is enabled, HTTP will be disabled for security.
      *
      * @param server The Jetty server instance to configure
-     * @throws RuntimeException if HTTP connector setup fails
+     * @throws RuntimeException if connector setup fails
      */
     public void setupConnectors(Server server) {
-        logger.info("Setting up HTTP/HTTPS connectors...");
-        logConnectorConfiguration();
-
         HttpConfiguration httpConfig = createBaseHttpConfiguration();
 
-        // Create and add HTTP connector
-        ServerConnector httpConnector = createHttpConnector(server, httpConfig);
-        server.addConnector(httpConnector);
-
-        // Create and add HTTPS connector if enabled
+        // If HTTPS is enabled, disable HTTP for security
         if (config.isHttpsEnabled()) {
-            logger.info("HTTPS is enabled, setting up HTTPS connector...");
+            logger.info("HTTPS enabled - setting up secure connector (HTTP disabled)");
             ServerConnector httpsConnector = sslFactory.createHttpsConnector(server, httpConfig);
             if (httpsConnector != null) {
                 server.addConnector(httpsConnector);
+                logger.info("HTTPS connector active on port " + config.getHttpsPort());
+            } else {
+                logger.error("HTTPS setup failed, falling back to HTTP");
+                createAndAddHttpConnector(server, httpConfig);
             }
         } else {
-            logger.info("HTTPS is disabled in configuration");
+            // HTTP only mode
+            logger.info("HTTP mode - setting up HTTP connector");
+            createAndAddHttpConnector(server, httpConfig);
         }
-
-        logger.info("Connectors setup completed");
     }
 
     /**
@@ -76,16 +74,13 @@ public class ServerConnectorFactory {
     }
 
     /**
-     * Creates and configures the HTTP connector.
+     * Creates and adds an HTTP connector to the server.
      *
      * @param server The Jetty server instance
      * @param httpConfig Base HTTP configuration
-     * @return Configured HTTP ServerConnector
      * @throws RuntimeException if HTTP connector creation fails
      */
-    private ServerConnector createHttpConnector(Server server, HttpConfiguration httpConfig) {
-        logger.info("Creating HTTP connector on port " + config.getHttpPort());
-        
+    private void createAndAddHttpConnector(Server server, HttpConfiguration httpConfig) {
         try {
             ServerConnector httpConnector = new ServerConnector(server, 
                     new HttpConnectionFactory(httpConfig));
@@ -93,30 +88,13 @@ public class ServerConnectorFactory {
             httpConnector.setIdleTimeout(config.getIdleTimeout());
             httpConnector.setName("http-connector");
             
-            logger.info("HTTP connector successfully created");
-            logger.info("HTTP endpoint will be available at: http://localhost:" + config.getHttpPort() + config.getContextPath());
-            
-            return httpConnector;
+            server.addConnector(httpConnector);
+            logger.info("HTTP connector active on port " + config.getHttpPort());
             
         } catch (Exception e) {
             logger.error("Failed to create HTTP connector on port " + config.getHttpPort(), e);
-            logger.error("HTTP connector error details: " + e.getMessage());
             throw new RuntimeException("HTTP connector setup failed", e);
         }
-    }
-
-    /**
-     * Logs connector configuration details for debugging.
-     */
-    private void logConnectorConfiguration() {
-        logger.info("Connector Configuration:");
-        logger.info("  - HTTP Port: " + config.getHttpPort());
-        logger.info("  - HTTPS Enabled: " + config.isHttpsEnabled());
-        if (config.isHttpsEnabled()) {
-            logger.info("  - HTTPS Port: " + config.getHttpsPort());
-        }
-        logger.info("  - Idle Timeout: " + config.getIdleTimeout() + "ms");
-        logger.info("  - Send Server Version: " + config.isSendServerVersion());
     }
 
     /**

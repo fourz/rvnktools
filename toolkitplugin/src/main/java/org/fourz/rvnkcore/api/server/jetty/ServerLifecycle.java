@@ -37,12 +37,9 @@ public class ServerLifecycle {
         }
 
         logger.info("Starting RVNKCore REST API server...");
-        logServerConfiguration();
 
         try {
-            logger.info("Initiating Jetty server startup...");
             server.start();
-            
             logSuccessfulStartup();
             
         } catch (Exception e) {
@@ -118,36 +115,17 @@ public class ServerLifecycle {
     }
 
     /**
-     * Logs detailed server configuration information.
-     */
-    private void logServerConfiguration() {
-        logger.info("Server Configuration Details:");
-        logger.info("  - HTTP Port: " + config.getHttpPort());
-        logger.info("  - HTTPS Enabled: " + config.isHttpsEnabled());
-        if (config.isHttpsEnabled()) {
-            logger.info("  - HTTPS Port: " + config.getHttpsPort());
-        }
-        logger.info("  - Context Path: " + config.getContextPath());
-        logger.info("  - API Key Required: " + (config.getApiKey() != null && !config.getApiKey().isEmpty()));
-        logger.info("  - IP Restrictions: " + (config.getAllowedIPs().length == 0 ? "None" : config.getAllowedIPs().length + " allowed IPs"));
-        logger.info("  - CORS Enabled: " + config.isCorsEnabled());
-        logger.info("  - Max Threads: " + config.getMaxThreads());
-        logger.info("  - Idle Timeout: " + config.getIdleTimeout() + "ms");
-    }
-
-    /**
      * Logs successful startup information.
      */
     private void logSuccessfulStartup() {
-        logger.info("=== RVNKCore REST API Server Successfully Started ===");
-        logger.info("HTTP Endpoint: http://localhost:" + config.getHttpPort() + config.getContextPath());
+        String protocol = config.isHttpsEnabled() ? "HTTPS" : "HTTP";
+        int port = config.isHttpsEnabled() ? config.getHttpsPort() : config.getHttpPort();
+        String endpoint = (config.isHttpsEnabled() ? "https" : "http") + "://localhost:" + port + config.getContextPath();
         
-        if (config.isHttpsEnabled() && !config.getKeystorePath().isEmpty()) {
-            logger.info("HTTPS Endpoint: https://localhost:" + config.getHttpsPort() + config.getContextPath());
-        }
-        
-        logger.info("Server Status: RUNNING");
-        logger.info("======================================================");
+        logger.info("=== RVNKCore REST API Server Started ===");
+        logger.info(protocol + " Endpoint: " + endpoint);
+        logger.info("Authentication: " + (config.getApiKey() != null && !config.getApiKey().isEmpty() ? "API Key Required" : "Open Access"));
+        logger.info("==========================================");
     }
 
     /**

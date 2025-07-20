@@ -61,7 +61,6 @@ public class ServletFactory {
         // Register additional handlers (CORS, error handling, etc.)
         registerAdditionalHandlers(context);
 
-        logger.info("Servlet context configuration completed");
         return context;
     }
 
@@ -83,8 +82,6 @@ public class ServletFactory {
             logger.info("Registering CORS filter for /* endpoints");
             registerCorsFilter(context);
         }
-
-        logger.info("Security filters registration completed");
     }
 
     /**
@@ -104,8 +101,6 @@ public class ServletFactory {
         // registerAnnouncementController(context);
         // registerShopController(context);
         // registerLoreController(context);
-
-        logger.info("API controllers registration completed");
     }
 
     /**
@@ -121,8 +116,6 @@ public class ServletFactory {
 
         // Health check endpoint
         registerHealthCheckEndpoint(context);
-
-        logger.info("Additional handlers registration completed");
     }
 
     /**
@@ -157,8 +150,6 @@ public class ServletFactory {
      */
     private void registerErrorPages(ServletContextHandler context) {
         // Future implementation for custom error pages
-        logger.info("Error pages would be configured here");
-        
         // context.addErrorPage(404, "/error/404");
         // context.addErrorPage(500, "/error/500");
         // context.addErrorPage(401, "/error/401");
@@ -171,8 +162,6 @@ public class ServletFactory {
      */
     private void registerHealthCheckEndpoint(ServletContextHandler context) {
         // Future implementation for health check
-        logger.info("Health check endpoint would be registered here at /health");
-        
         // HealthCheckServlet healthServlet = new HealthCheckServlet();
         // context.addServlet(new ServletHolder(healthServlet), "/health");
     }
