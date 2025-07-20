@@ -4,6 +4,8 @@ import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.server.jetty.RVNKCoreServer;
 import org.fourz.rvnkcore.database.connection.SQLiteConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
@@ -22,6 +24,7 @@ public class RVNKCoreBootstrap {
     private final RVNKTools plugin;
     private final LogManager logger;
     private ServiceRegistry serviceRegistry;
+    private RVNKCoreServer apiServer;
     private static RVNKCoreBootstrap instance;
     
     private RVNKCoreBootstrap(RVNKTools plugin) {
@@ -47,6 +50,7 @@ public class RVNKCoreBootstrap {
             initServiceRegistry();
             setupDatabase();
             registerBridgeServices();
+            startApiServer();
             logger.info("RVNKCore bootstrap completed successfully");
         } catch (Exception e) {
             logger.error("Failed to initialize RVNKCore", e);
@@ -130,12 +134,36 @@ public class RVNKCoreBootstrap {
     private void registerPermissionBridge() throws ServiceException {
         // TODO: Implement and register the permission bridge service
     }
+
+    /**
+     * Starts the REST API server if enabled.
+     */
+    private void startApiServer() {
+        try {
+            ApiConfig apiConfig = new ApiConfig(plugin);
+            if (apiConfig.isEnabled()) {
+                PlayerService playerService = getService(PlayerService.class);
+                apiServer = new RVNKCoreServer(apiConfig, playerService, plugin);
+                apiServer.start();
+                logger.info("RVNKCore REST API server started");
+            } else {
+                logger.info("RVNKCore REST API is disabled");
+            }
+        } catch (Exception e) {
+            logger.error("Failed to start REST API server", e);
+        }
+    }
     
     /**
      * Shuts down RVNKCore components.
      */
     public void shutdown() {
         logger.info("Shutting down RVNKCore bootstrap...");
+        
+        if (apiServer != null && apiServer.isRunning()) {
+            apiServer.stop();
+            apiServer = null;
+        }
         
         if (serviceRegistry != null) {
             serviceRegistry.shutdown();
