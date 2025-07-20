@@ -139,7 +139,6 @@ public class RVNKTools extends JavaPlugin implements Listener {
             try {
                 PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, coreBootstrap);
                 getServer().getPluginManager().registerEvents(playerTracker, this);
-                logger.info("RVNKCore PlayerTrackingListener registered");
             } catch (Exception e) {
                 logger.error("Failed to register PlayerTrackingListener", e);
             }

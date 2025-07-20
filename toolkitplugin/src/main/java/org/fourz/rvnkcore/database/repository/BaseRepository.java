@@ -180,7 +180,7 @@ public abstract class BaseRepository<T, ID> {
                     throw new DatabaseException("Update failed, no rows affected");
                 }
                 
-                logger.info("Successfully updated " + getEntityTypeName() + " in " + tableName);
+                logger.info("Updated " + getEntityTypeName() + " in " + tableName);
                 return entity;
             } catch (SQLException e) {
                 logger.error("Failed to update entity in " + tableName, e);

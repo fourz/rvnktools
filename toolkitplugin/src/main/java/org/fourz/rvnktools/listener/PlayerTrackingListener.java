@@ -41,7 +41,10 @@ public class PlayerTrackingListener implements Listener {
     public PlayerTrackingListener(RVNKTools plugin, RVNKCoreBootstrap coreBootstrap) {
         this.plugin = plugin;
         this.coreBootstrap = coreBootstrap;
-        this.logger = LogManager.getInstance(plugin);
+        this.logger = LogManager.getInstance(plugin, getClass());
+        
+        // Log initialization with proper class prefix
+        logger.info("Player listener initialized");
     }
     
     /**
@@ -73,21 +76,27 @@ public class PlayerTrackingListener implements Listener {
                             return null;
                         });
                     } else {
-                        // Update existing player's last seen and location
-                        CompletableFuture<Void> nameUpdate = playerService.updatePlayerName(
-                            player.getUniqueId(), 
-                            player.getName()
-                        );
-                        
-                        CompletableFuture<Void> locationUpdate = playerService.updatePlayerLocation(
-                            player.getUniqueId(),
-                            player.getWorld().getName(),
-                            player.getLocation().getX(),
-                            player.getLocation().getY(),
-                            player.getLocation().getZ()
-                        );
-                        
-                        return CompletableFuture.allOf(nameUpdate, locationUpdate);
+                        // Update existing player's data in a single operation
+                        return playerService.getPlayer(player.getUniqueId())
+                            .thenCompose(playerOpt -> {
+                                if (playerOpt.isPresent()) {
+                                    var playerDTO = playerOpt.get();
+                                    // Update all player data in the DTO
+                                    playerDTO.updateName(player.getName());
+                                    playerDTO.updateLastLocation(
+                                        player.getWorld().getName(),
+                                        player.getLocation().getX(),
+                                        player.getLocation().getY(),
+                                        player.getLocation().getZ()
+                                    );
+                                    // Single save operation
+                                    return playerService.savePlayer(playerDTO).thenApply(saved -> null);
+                                } else {
+                                    CompletableFuture<Void> future = new CompletableFuture<>();
+                                    future.completeExceptionally(new IllegalArgumentException("Player not found: " + player.getUniqueId()));
+                                    return future;
+                                }
+                            });
                     }
                 })
                 .whenComplete((result, throwable) -> {

@@ -35,7 +35,7 @@ public class DefaultPlayerService implements PlayerService {
      */
     public DefaultPlayerService(PlayerRepository playerRepository, Plugin plugin) {
         this.playerRepository = playerRepository;
-        this.logger = LogManager.getInstance(plugin);
+        this.logger = LogManager.getInstance(plugin, getClass());
     }
     
     @Override
