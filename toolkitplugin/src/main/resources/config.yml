@@ -1,18 +1,21 @@
 api:
   enabled: false
-  port: 8080
   key: changeme
   context-path: /api
+
+  http:
+    port: 8080
+
+  https:
+    enabled: false
+    port: 8081
+    keystore-path: "keystore.jks"
+    keystore-password: "changeme"
 
   cors:
     enabled: false
     allowed-origins: "*"
     allowed-methods: "GET,POST,DELETE,PUT,OPTIONS"
-
-  https:
-    enabled: false
-    keystore-path: "keystore.jks"
-    keystore-password: "changeme"
 
   server:
     min-threads: 2

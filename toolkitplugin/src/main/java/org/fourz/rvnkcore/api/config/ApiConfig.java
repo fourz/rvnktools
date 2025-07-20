@@ -10,7 +10,8 @@ import org.fourz.rvnktools.util.log.LogManager;
  * and runtime configuration updates.
  */
 public class ApiConfig {
-    private final int port;
+    private final int httpPort;
+    private final int httpsPort;
     private final String apiKey;
     private final boolean enabled;
     private final boolean corsEnabled;
@@ -42,7 +43,8 @@ public class ApiConfig {
         FileConfiguration config = plugin.getConfig();
         
         this.enabled = config.getBoolean("api.enabled", false);
-        this.port = config.getInt("api.port", 8080);
+        this.httpPort = config.getInt("api.http.port", 8080);
+        this.httpsPort = config.getInt("api.https.port", 8081);
         this.apiKey = config.getString("api.key", "default-api-key");
         this.corsEnabled = config.getBoolean("api.cors.enabled", true);
         this.corsAllowedOrigins = config.getString("api.cors.allowed-origins", "*");
@@ -62,12 +64,13 @@ public class ApiConfig {
         String allowedIPsStr = config.getString("api.security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
         
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + ", Port: " + port);
+        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + ", HTTP Port: " + httpPort + ", HTTPS Port: " + httpsPort);
     }
 
     // Getters
     public boolean isEnabled() { return enabled; }
-    public int getPort() { return port; }
+    public int getHttpPort() { return httpPort; }
+    public int getHttpsPort() { return httpsPort; }
     public String getApiKey() { return apiKey; }
     public boolean isCorsEnabled() { return corsEnabled; }
     public String getCorsAllowedOrigins() { return corsAllowedOrigins; }
@@ -93,8 +96,18 @@ public class ApiConfig {
         boolean isValid = true;
         
         if (enabled) {
-            if (port <= 0 || port > 65535) {
-                logger.error("Invalid API port: " + port);
+            if (httpPort <= 0 || httpPort > 65535) {
+                logger.error("Invalid HTTP port: " + httpPort);
+                isValid = false;
+            }
+            
+            if (httpsEnabled && (httpsPort <= 0 || httpsPort > 65535)) {
+                logger.error("Invalid HTTPS port: " + httpsPort);
+                isValid = false;
+            }
+            
+            if (httpPort == httpsPort && httpsEnabled) {
+                logger.error("HTTP and HTTPS ports cannot be the same: " + httpPort);
                 isValid = false;
             }
             

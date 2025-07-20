@@ -42,6 +42,12 @@ commands:
     permissions: 
       - rvnktools.command.broadcast    
     default: op      
+  pstest:
+    description: Test PlayerService functionality (Debug Command)
+    usage: /pstest <recent|groups|syncgroups> [args...]
+    permissions: 
+      - rvnktools.admin.pstest
+    default: op
   cyclegamemode:
     description: Cycle through gamemodes.
     usage: /cyclegamemode

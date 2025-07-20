@@ -5,6 +5,7 @@ import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
+import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -52,10 +53,13 @@ public class CommandManager {
         registerAlias("tps", "ping");
         
         // Register utility framework commands
-        registerCommand(new BroadcastCommand(plugin));
         registerCommand(new DiscordCommand(plugin));
         registerCommand(new EventsCommand(plugin));
         registerCommand(new TrainsCommand(plugin));
+        
+        // Register debugging and testing commands
+        registerCommand(new PlayerServiceTestCommand(plugin));
+        
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
 

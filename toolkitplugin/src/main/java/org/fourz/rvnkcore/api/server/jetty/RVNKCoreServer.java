@@ -49,7 +49,7 @@ public class RVNKCoreServer {
         this.config = config;
         this.playerService = playerService;
         this.plugin = plugin;
-        this.logger = LogManager.getInstance(plugin);
+        this.logger = LogManager.getInstance(plugin, getClass());
         this.gson = createGson();
     }
 
@@ -68,12 +68,17 @@ public class RVNKCoreServer {
      */
     public void start() {
         if (!config.isEnabled()) {
-            logger.info("RVNKCore API is disabled");
+            logger.info("RVNKCore API is disabled in configuration");
             return;
         }
 
+        logger.info("Starting RVNKCore API server...");
+        logger.info("Configuration: HTTP Port=" + config.getHttpPort() + 
+                   ", HTTPS Enabled=" + config.isHttpsEnabled() + 
+                   (config.isHttpsEnabled() ? ", HTTPS Port=" + config.getHttpsPort() : ""));
+
         if (!config.validate()) {
-            logger.error("RVNKCore API configuration is invalid");
+            logger.error("RVNKCore API configuration validation failed");
             return;
         }
 
@@ -83,9 +88,15 @@ public class RVNKCoreServer {
             setupServlets();
             
             server.start();
-            logger.info("RVNKCore API server started on port " + config.getPort());
+            logger.info("RVNKCore API server successfully started on HTTP port " + config.getHttpPort() + 
+                       (config.isHttpsEnabled() ? " and HTTPS port " + config.getHttpsPort() : ""));
+            logger.info("API endpoints available at " + config.getContextPath() + "/v1/*");
         } catch (Exception e) {
-            logger.error("Failed to start RVNKCore API server", e);
+            logger.error("Failed to start RVNKCore API server on port " + config.getHttpPort(), e);
+            logger.error("Server startup error details: " + e.getMessage());
+            if (e.getCause() != null) {
+                logger.error("Root cause: " + e.getCause().getMessage());
+            }
         }
     }
 
@@ -99,7 +110,7 @@ public class RVNKCoreServer {
         // HTTP connector
         ServerConnector httpConnector = new ServerConnector(server, 
                 new HttpConnectionFactory(httpConfig));
-        httpConnector.setPort(config.getPort());
+        httpConnector.setPort(config.getHttpPort());
         httpConnector.setIdleTimeout(config.getIdleTimeout());
         server.addConnector(httpConnector);
 
@@ -124,11 +135,11 @@ public class RVNKCoreServer {
             ServerConnector httpsConnector = new ServerConnector(server,
                     new SslConnectionFactory(sslContextFactory, "http/1.1"),
                     new HttpConnectionFactory(httpsConfig));
-            httpsConnector.setPort(config.getPort() + 1); // HTTPS on port + 1
+            httpsConnector.setPort(config.getHttpsPort());
             httpsConnector.setIdleTimeout(config.getIdleTimeout());
 
             server.addConnector(httpsConnector);
-            logger.info("HTTPS connector enabled on port " + (config.getPort() + 1));
+            logger.info("HTTPS connector enabled on port " + config.getHttpsPort());
         } catch (Exception e) {
             logger.error("Failed to setup HTTPS connector", e);
         }
