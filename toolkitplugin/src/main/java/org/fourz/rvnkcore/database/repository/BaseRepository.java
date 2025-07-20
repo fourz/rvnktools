@@ -32,6 +32,7 @@ public abstract class BaseRepository<T, ID> {
     protected final QueryBuilder queryBuilder;
     protected final LogManager logger;
     protected final String tableName;
+    protected final Class<T> entityType;
     
     /**
      * Constructor for BaseRepository.
@@ -39,15 +40,18 @@ public abstract class BaseRepository<T, ID> {
      * @param connectionProvider The database connection provider
      * @param queryBuilder The query builder for database operations
      * @param tableName The name of the database table
+     * @param entityType The class of the entity type
      * @param plugin The plugin instance for logging
      */
     protected BaseRepository(ConnectionProvider connectionProvider, 
                            QueryBuilder queryBuilder, 
                            String tableName,
+                           Class<T> entityType,
                            Plugin plugin) {
         this.connectionProvider = connectionProvider;
         this.queryBuilder = queryBuilder;
         this.tableName = tableName;
+        this.entityType = entityType;
         this.logger = LogManager.getInstance(plugin);
     }
     
@@ -147,7 +151,7 @@ public abstract class BaseRepository<T, ID> {
                     throw new DatabaseException("Insert failed, no rows affected");
                 }
                 
-                logger.info("Successfully inserted entity into " + tableName);
+                logger.info("Successfully inserted " + getEntityTypeName() + " into " + tableName);
                 return entity;
             } catch (SQLException e) {
                 logger.error("Failed to insert entity into " + tableName, e);
@@ -176,7 +180,7 @@ public abstract class BaseRepository<T, ID> {
                     throw new DatabaseException("Update failed, no rows affected");
                 }
                 
-                logger.info("Successfully updated entity in " + tableName);
+                logger.info("Successfully updated " + getEntityTypeName() + " in " + tableName);
                 return entity;
             } catch (SQLException e) {
                 logger.error("Failed to update entity in " + tableName, e);
@@ -222,6 +226,16 @@ public abstract class BaseRepository<T, ID> {
      * @param id The primary key value
      * @return CompletableFuture containing true if the entity exists
      */
+    /**
+     * Gets the name of the entity type being managed by this repository.
+     * Used for logging and error messages.
+     * 
+     * @return The simple name of the entity class
+     */
+    protected String getEntityTypeName() {
+        return entityType.getSimpleName();
+    }
+
     public CompletableFuture<Boolean> existsById(ID id) {
         return CompletableFuture.supplyAsync(() -> {
             String query = queryBuilder.select("COUNT(*)")

@@ -39,7 +39,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     public PlayerRepository(ConnectionProvider connectionProvider, 
                           QueryBuilder queryBuilder, 
                           Plugin plugin) {
-        super(connectionProvider, queryBuilder, TABLE_NAME, plugin);
+        super(connectionProvider, queryBuilder, TABLE_NAME, PlayerDTO.class, plugin);
     }
     
     /**

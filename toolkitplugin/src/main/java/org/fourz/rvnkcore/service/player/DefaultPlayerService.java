@@ -70,20 +70,22 @@ public class DefaultPlayerService implements PlayerService {
     
     @Override
     public CompletableFuture<PlayerDTO> savePlayer(PlayerDTO player) {
-        logger.debug("Saving player data for: " + player.getCurrentName());
+        String operation = player.getId() == null ? "Creating new" : "Updating existing";
+        logger.debug(operation + " player data for: " + player.getCurrentName());
         return playerRepository.save(player)
             .whenComplete((result, throwable) -> {
                 if (throwable != null) {
                     logger.error("Failed to save player " + player.getCurrentName(), throwable);
                 } else {
-                    logger.debug("Successfully saved player: " + result.getCurrentName());
+                    String successOperation = player.getId() == null ? "Created new" : "Updated existing";
+                    logger.debug(successOperation + " player: " + result.getCurrentName());
                 }
             });
     }
     
     @Override
     public CompletableFuture<Void> updatePlayerLocation(UUID playerId, String world, double x, double y, double z) {
-        logger.debug("Updating location for player: " + playerId + " to " + world + " (" + x + "," + y + "," + z + ")");
+        logger.debug("Updating location in PlayerDTO for player: " + playerId + " to " + world + " (" + x + "," + y + "," + z + ")");
         
         return getPlayer(playerId)
             .thenCompose(playerOpt -> {
@@ -101,14 +103,14 @@ public class DefaultPlayerService implements PlayerService {
                 if (throwable != null) {
                     logger.error("Failed to update location for player " + playerId, throwable);
                 } else {
-                    logger.debug("Successfully updated location for player: " + playerId);
+                    logger.debug("Successfully stored new location for player: " + playerId);
                 }
             });
     }
     
     @Override
     public CompletableFuture<Void> updatePlayerName(UUID playerId, String newName) {
-        logger.debug("Updating name for player: " + playerId + " to " + newName);
+        logger.debug("Updating name in PlayerDTO for player: " + playerId + " to " + newName);
         
         return getPlayer(playerId)
             .thenCompose(playerOpt -> {
@@ -126,14 +128,14 @@ public class DefaultPlayerService implements PlayerService {
                 if (throwable != null) {
                     logger.error("Failed to update name for player " + playerId, throwable);
                 } else {
-                    logger.debug("Successfully updated name for player: " + playerId);
+                    logger.debug("Successfully stored name change for player: " + playerId);
                 }
             });
     }
     
     @Override
     public CompletableFuture<Void> updatePlayerGroups(UUID playerId, String primaryGroup, List<String> allGroups) {
-        logger.debug("Updating groups for player: " + playerId + " primary: " + primaryGroup);
+        logger.debug("Updating groups in PlayerDTO for player: " + playerId + " primary: " + primaryGroup);
         
         return getPlayer(playerId)
             .thenCompose(playerOpt -> {
@@ -151,7 +153,7 @@ public class DefaultPlayerService implements PlayerService {
                 if (throwable != null) {
                     logger.error("Failed to update groups for player " + playerId, throwable);
                 } else {
-                    logger.debug("Successfully updated groups for player: " + playerId);
+                    logger.debug("Successfully stored group changes for player: " + playerId);
                 }
             });
     }

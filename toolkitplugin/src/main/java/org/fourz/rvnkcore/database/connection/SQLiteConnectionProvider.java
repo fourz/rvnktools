@@ -8,6 +8,7 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * SQLite implementation of ConnectionProvider.
@@ -15,13 +16,17 @@ import java.sql.SQLException;
  * Provides database connections to a local SQLite database file,
  * with automatic database file creation and connection validation.
  * 
+ * This implementation creates fresh connections for each request to avoid
+ * connection sharing issues with SQLite in multi-threaded environments.
+ * 
  * @since 1.0.0
  */
 public class SQLiteConnectionProvider implements ConnectionProvider {
     
     private final String databasePath;
     private final LogManager logger;
-    private Connection connection;
+    private final ReentrantLock connectionLock = new ReentrantLock();
+    private volatile boolean driverLoaded = false;
     
     /**
      * Constructor for SQLiteConnectionProvider.
@@ -46,50 +51,52 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
     
     @Override
     public Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed() || !isValid(connection)) {
+        // Ensure driver is loaded (thread-safe one-time initialization)
+        if (!driverLoaded) {
+            connectionLock.lock();
             try {
-                // Load SQLite JDBC driver
-                Class.forName("org.sqlite.JDBC");
-                
-                // Create connection URL for SQLite
-                String url = "jdbc:sqlite:" + databasePath;
-                
-                // Create connection with SQLite-specific settings
-                connection = DriverManager.getConnection(url);
-                connection.setAutoCommit(true);
-                
-                // Enable foreign key constraints
-                try (var stmt = connection.createStatement()) {
-                    stmt.execute("PRAGMA foreign_keys = ON");
-                    stmt.execute("PRAGMA journal_mode = WAL");
-                    stmt.execute("PRAGMA synchronous = NORMAL");
+                if (!driverLoaded) {
+                    Class.forName("org.sqlite.JDBC");
+                    driverLoaded = true;
+                    if (logger.isDebugEnabled()) {
+                        logger.info("SQLite JDBC driver loaded");
+                    }
                 }
-                
-                // Only log connection establishment during initial setup, not on every operation
-                if (logger.isDebugEnabled()) {
-                    logger.info("SQLite database connection established");
-                }
-                
             } catch (ClassNotFoundException e) {
                 logger.error("SQLite JDBC driver not found", e);
                 throw new DatabaseException("SQLite driver not available", e);
-            } catch (SQLException e) {
-                logger.error("Failed to connect to SQLite database", e);
-                throw new DatabaseException("Database connection failed", e);
+            } finally {
+                connectionLock.unlock();
             }
         }
         
-        return connection;
+        try {
+            // Create a fresh connection for each request
+            String url = "jdbc:sqlite:" + databasePath;
+            Connection conn = DriverManager.getConnection(url);
+            conn.setAutoCommit(true);
+            
+            // Configure SQLite-specific settings
+            try (var stmt = conn.createStatement()) {
+                stmt.execute("PRAGMA foreign_keys = ON");
+                stmt.execute("PRAGMA journal_mode = WAL");
+                stmt.execute("PRAGMA synchronous = NORMAL");
+                stmt.execute("PRAGMA busy_timeout = 30000"); // 30 second timeout
+            }
+            
+            return conn;
+            
+        } catch (SQLException e) {
+            logger.error("Failed to create SQLite database connection", e);
+            throw new DatabaseException("Database connection failed", e);
+        }
     }
     
     @Override
     public boolean isValid() {
-        if (connection == null) {
-            return false;
-        }
-        
-        try {
-            return !connection.isClosed() && connection.isValid(5);
+        // For fresh connection approach, always attempt to create a test connection
+        try (Connection testConn = getConnection()) {
+            return testConn.isValid(5);
         } catch (SQLException e) {
             logger.warning("Connection validation failed: " + e.getMessage());
             return false;
@@ -117,20 +124,10 @@ public class SQLiteConnectionProvider implements ConnectionProvider {
     
     @Override
     public void close() {
-        if (connection != null) {
-            try {
-                if (!connection.isClosed()) {
-                    connection.close();
-                    // Only log closure in debug mode to reduce verbosity
-                    if (logger.isDebugEnabled()) {
-                        logger.info("SQLite database connection closed");
-                    }
-                }
-            } catch (SQLException e) {
-                logger.error("Error closing SQLite connection", e);
-            } finally {
-                connection = null;
-            }
+        // With fresh connection approach, no persistent connection to close
+        // Individual connections are closed by the calling code using try-with-resources
+        if (logger.isDebugEnabled()) {
+            logger.info("SQLiteConnectionProvider shutdown completed");
         }
     }
     

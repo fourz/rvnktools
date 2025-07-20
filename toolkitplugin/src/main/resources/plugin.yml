@@ -1,5 +1,5 @@
 name: RVNKTools
-version: ${project.version}
+version: 1.1-alpha
 author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
