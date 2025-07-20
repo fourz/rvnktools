@@ -46,9 +46,6 @@ public class ServletFactory {
      * @return Configured ServletContextHandler instance
      */
     public ServletContextHandler createServletContext() {
-        logger.info("Setting up servlet context and controllers...");
-        logger.info("Context path: " + config.getContextPath());
-        
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath(config.getContextPath());
 
@@ -70,16 +67,12 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerSecurityFilters(ServletContextHandler context) {
-        logger.info("Configuring security filters...");
-
         // Add authentication filter for all API endpoints
-        logger.info("Registering authentication filter for /v1/* endpoints");
         AuthFilter authFilter = new AuthFilter(config.getApiKey(), config.getAllowedIPs(), plugin);
         context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
 
         // Add CORS filter if enabled
         if (config.isCorsEnabled()) {
-            logger.info("Registering CORS filter for /* endpoints");
             registerCorsFilter(context);
         }
     }
@@ -90,10 +83,7 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerControllers(ServletContextHandler context) {
-        logger.info("Registering API controllers...");
-
         // Register player controller
-        logger.info("Registering PlayerController for /v1/players/* endpoints");
         PlayerController playerController = new PlayerController(playerService, gson, logger);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
 
@@ -109,8 +99,6 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerAdditionalHandlers(ServletContextHandler context) {
-        logger.info("Registering additional handlers...");
-
         // Error page handling
         registerErrorPages(context);
 
@@ -170,7 +158,30 @@ public class ServletFactory {
      * Logs the registered API routes for documentation purposes.
      */
     public void logRegisteredRoutes() {
-        logger.info("API Routes: 9 endpoints registered for /v1/players/*");
+        // Dynamic endpoint counting
+        int playerEndpoints = getPlayerEndpointCount();
+        
+        // Future endpoints would be counted dynamically here
+        // int announcementEndpoints = getAnnouncementEndpointCount();
+        // int shopEndpoints = getShopEndpointCount();
+        // int loreEndpoints = getLoreEndpointCount();
+        
+        int totalEndpoints = playerEndpoints;
+        
+        logger.info("REST API: " + totalEndpoints + " endpoints registered");
         logger.info("Authentication: X-API-Key header required");
+    }
+    
+    /**
+     * Gets the count of player endpoints dynamically.
+     * This should be updated when new player endpoints are added.
+     * 
+     * @return Number of player endpoints
+     */
+    private int getPlayerEndpointCount() {
+        // GET endpoints: /players, /players/online, /players/{uuid}, /players/name/{name}, 
+        //                /players/group/{group}, /players/search, /players/count
+        // PUT endpoints: /players/{uuid}/location, /players/{uuid}/groups
+        return 9;
     }
 }

@@ -15,10 +15,31 @@ import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.log.LogManager;
 
 /**
- * Bootstrap class for RVNKCore integration.
- * This acts as a bridge between RVNKTools and RVNKCore during the transition period.
+ * RVNKCore Integration Bootstrap
  * 
- * TODO: This class will be removed once full migration to RVNKCore is complete.
+ * This class serves as a temporary bridge between RVNKTools and the RVNKCore framework
+ * during the architectural transition period (Q3 2025 - Q1 2026).
+ * 
+ * MIGRATION STATUS:
+ * - Current Phase: Foundation Implementation (RVNKCore embedded in RVNKTools)
+ * - Target Phase: Separated Plugin Architecture (Q1 2026)
+ * 
+ * RESPONSIBILITIES:
+ * 1. Initialize RVNKCore services within RVNKTools context
+ * 2. Provide service discovery and dependency injection
+ * 3. Manage database connections and schema initialization
+ * 4. Bridge legacy RVNKTools features with new RVNKCore APIs
+ * 5. Handle graceful shutdown and resource cleanup
+ * 
+ * FUTURE MIGRATION:
+ * When RVNKCore becomes a separate plugin, this bootstrap class will be replaced by:
+ * - Direct RVNKCore plugin dependency in plugin.yml
+ * - Service discovery through Bukkit's ServiceManager
+ * - Event-driven integration instead of direct method calls
+ * 
+ * @deprecated This class will be removed when RVNKCore becomes a separate plugin (Q1 2026)
+ * @see org.fourz.rvnkcore.service.registry.ServiceRegistry
+ * @see org.fourz.rvnkcore.api.server.jetty.CoreServer
  */
 public class RVNKCoreBootstrap {
     private final RVNKTools plugin;
@@ -40,31 +61,60 @@ public class RVNKCoreBootstrap {
     }
     
     /**
-     * Initializes RVNKCore and registers bridge services.
+     * Initializes RVNKCore framework and registers essential services.
+     * 
+     * INITIALIZATION ORDER:
+     * 1. Service Registry - Central dependency injection container
+     * 2. Database Setup - Schema creation and connection management
+     * 3. Core Services - PlayerService, AnnouncementService (future)
+     * 4. Bridge Services - Legacy compatibility adapters
+     * 5. REST API Server - External integration endpoints
      */
     public void initialize() {
-        logger.info("Initializing RVNKCore bootstrap...");
+        logger.info("RVNKCore bootstrap initializing...");
         
         try {
-            // Initialize RVNKCore components
+            // Phase 0: Configure logging for clean output
+            configureSystemLogging();
+            
+            // Phase 1: Core infrastructure
             initServiceRegistry();
             setupDatabase();
+            
+            // Phase 2: Business services
             registerBridgeServices();
+            
+            // Phase 3: External APIs
             startApiServer();
+            
             logger.info("RVNKCore bootstrap completed successfully");
         } catch (Exception e) {
-            logger.error("Failed to initialize RVNKCore", e);
+            logger.error("RVNKCore bootstrap initialization failed", e);
+            // Re-throw as runtime exception since this is a critical initialization failure
+            throw new RuntimeException("RVNKCore bootstrap failed", e);
         }
     }
     
+    /**
+     * Configures system-wide logging settings for cleaner console output.
+     * This must be called early in the initialization process.
+     */
+    private void configureSystemLogging() {
+        // Configure Jetty logging to be quiet (before any Jetty classes are loaded)
+        System.setProperty("org.eclipse.jetty.util.log.class", "org.eclipse.jetty.util.log.StdErrLog");
+        System.setProperty("org.eclipse.jetty.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.server.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.server.handler.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.util.ssl.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.server.AbstractConnector.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.server.handler.ContextHandler.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.server.Server.LEVEL", "WARN");
+        System.setProperty("org.eclipse.jetty.util.ssl.SslContextFactory.LEVEL", "WARN");
+    }
+    
     private void initServiceRegistry() {
-        try {
-            serviceRegistry = new DefaultServiceRegistry(plugin);
-            logger.info("ServiceRegistry initialized");
-        } catch (Exception e) {
-            logger.error("Failed to initialize ServiceRegistry", e);
-            throw e;
-        }
+        serviceRegistry = new DefaultServiceRegistry(plugin);
+        logger.info("ServiceRegistry initialized");
     }
     
     private void setupDatabase() {
@@ -85,10 +135,19 @@ public class RVNKCoreBootstrap {
         }
     }
     
+    /**
+     * Registers bridge services to provide compatibility between RVNKTools and RVNKCore.
+     * 
+     * MIGRATION NOTE: These bridge services will be replaced by direct service access
+     * when RVNKCore becomes a separate plugin. The bridge pattern allows gradual migration
+     * without breaking existing RVNKTools functionality.
+     */
     private void registerBridgeServices() {
         try {
-            // Register core services
+            // Core data services
             registerPlayerService();
+            
+            // Legacy compatibility bridges (future implementation)
             registerAnnouncementBridge();
             registerLinkMakerBridge();
             registerPermissionBridge();
@@ -99,6 +158,10 @@ public class RVNKCoreBootstrap {
         }
     }
     
+    /**
+     * Registers the PlayerService as the primary data access service.
+     * This replaces direct database access in legacy code.
+     */
     private void registerPlayerService() throws ServiceException {
         try {
             // Create dependencies
@@ -136,7 +199,10 @@ public class RVNKCoreBootstrap {
     }
 
     /**
-     * Starts the REST API server if enabled.
+     * Initializes and starts the REST API server for external integrations.
+     * 
+     * MIGRATION NOTE: In the separated plugin architecture, this will become
+     * part of the RVNKCore plugin's main initialization, not a bridge service.
      */
     private void startApiServer() {
         try {
@@ -155,7 +221,12 @@ public class RVNKCoreBootstrap {
     }
     
     /**
-     * Shuts down RVNKCore components.
+     * Gracefully shuts down RVNKCore components and cleans up resources.
+     * 
+     * SHUTDOWN ORDER:
+     * 1. REST API Server - Stop accepting new requests
+     * 2. Service Registry - Cleanup registered services  
+     * 3. Database Connections - Close all connections
      */
     public void shutdown() {
         logger.info("Shutting down RVNKCore bootstrap...");

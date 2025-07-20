@@ -50,10 +50,39 @@ public class CoreServer {
         this.logger = LogManager.getInstance(plugin, getClass());
         this.gson = createGson();
         
+        // Configure Jetty logging to be silent
+        configureJettyLogging();
+        
         // Initialize specialized factories
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
         this.servletFactory = new ServletFactory(config, plugin, logger, playerService, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
+    }
+
+    /**
+     * Configures Jetty's internal logging to suppress verbose console output.
+     * Uses system properties to set appropriate log levels for cleaner output.
+     */
+    private void configureJettyLogging() {
+        try {
+            // Set Jetty to use StdErrLog and configure it to be quiet
+            System.setProperty("org.eclipse.jetty.util.log.class", "org.eclipse.jetty.util.log.StdErrLog");
+            System.setProperty("org.eclipse.jetty.LEVEL", "WARN");
+            
+            // Suppress specific verbose components to WARN level
+            System.setProperty("org.eclipse.jetty.server.LEVEL", "WARN");
+            System.setProperty("org.eclipse.jetty.server.handler.LEVEL", "WARN");
+            System.setProperty("org.eclipse.jetty.util.ssl.LEVEL", "WARN");
+            System.setProperty("org.eclipse.jetty.server.AbstractConnector.LEVEL", "WARN");
+            System.setProperty("org.eclipse.jetty.server.handler.ContextHandler.LEVEL", "WARN");
+            
+            // Additional suppressions for completely silent startup
+            System.setProperty("org.eclipse.jetty.server.Server.LEVEL", "WARN");
+            System.setProperty("org.eclipse.jetty.util.ssl.SslContextFactory.LEVEL", "WARN");
+            
+        } catch (Exception e) {
+            logger.warning("Failed to configure Jetty logging: " + e.getMessage());
+        }
     }
 
     /**

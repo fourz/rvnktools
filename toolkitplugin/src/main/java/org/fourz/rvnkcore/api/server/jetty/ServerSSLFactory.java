@@ -105,7 +105,8 @@ public class ServerSSLFactory {
         File keystoreFile = new File(plugin.getDataFolder(), config.getKeystorePath());
         
         if (!keystoreFile.exists()) {
-            logger.info("Generating new SSL keystore...");
+            logger.info("Keystore file does not exist, generating new keystore...");
+            logger.info("Generating keystore at: " + keystoreFile.getAbsolutePath());
             
             try {
                 // Ensure parent directory exists
@@ -116,11 +117,14 @@ public class ServerSSLFactory {
                     config.getKeystorePassword(), 
                     "jetty"
                 );
-                logger.info("SSL keystore generated successfully");
+                logger.info("Keystore generated successfully at: " + keystoreFile.getAbsolutePath());
             } catch (Exception e) {
                 logger.error("Failed to generate keystore", e);
+                logger.error("HTTPS setup aborted due to keystore generation failure");
                 return null;
             }
+        } else {
+            logger.info("Using existing keystore: " + keystoreFile.getAbsolutePath());
         }
         
         return keystoreFile;

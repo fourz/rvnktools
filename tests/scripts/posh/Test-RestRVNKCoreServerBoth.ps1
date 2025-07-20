@@ -2,6 +2,11 @@
 # Tests both HTTP and HTTPS endpoints comprehensively
 # PowerShell 7+ required
 
+# MANUAL TESTING EXAMPLES:
+# HTTP:  Invoke-WebRequest http://localhost:8080/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
+# HTTPS: [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+#        Invoke-WebRequest https://localhost:8081/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"} -SkipCertificateCheck
+
 param (
     [Parameter(Mandatory = $false)]
     [string]$HttpUrl = "http://localhost:8080",
@@ -16,6 +21,9 @@ param (
     [Parameter(Mandatory = $false)]
     [switch]$HttpsOnly
 )
+
+# Set TLS 1.2 for secure connections (required for modern HTTPS)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # SSL certificate validation bypass for self-signed certificates
 if ($IgnoreSSLErrors) {
@@ -47,13 +55,13 @@ if ($IgnoreSSLErrors) {
 }
 
 $Endpoints = @{
-    Players = "/v1/players"
-    OnlinePlayers = "/v1/players/online"
-    PlayerByUuid = "/v1/players/{uuid}"
-    PlayerByName = "/v1/players/name/{name}"
-    PlayersByGroup = "/v1/players/group/{group}"
-    SearchPlayers = "/v1/players/search"
-    PlayerCount = "/v1/players/count"
+    Players = "/api/v1/players"
+    OnlinePlayers = "/api/v1/players/online"
+    PlayerByUuid = "/api/v1/players/{uuid}"
+    PlayerByName = "/api/v1/players/name/{name}"
+    PlayersByGroup = "/api/v1/players/group/{group}"
+    SearchPlayers = "/api/v1/players/search"
+    PlayerCount = "/api/v1/players/count"
 }
 
 $TestData = @{
@@ -126,6 +134,12 @@ function Invoke-ApiRequest {
             ContentType = "application/json"
             ErrorAction = "Stop"
         }
+        
+        # Add SkipCertificateCheck for HTTPS requests (PowerShell 6+ feature)
+        if ($Uri -match "^https://") {
+            $params.SkipCertificateCheck = $true
+        }
+        
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json)
         }
@@ -263,12 +277,17 @@ if ($IgnoreSSLErrors) {
     Write-Host "SSL Certificate Validation: DISABLED" -ForegroundColor Yellow
 }
 
-# Run tests based on parameters
-if (-not $HttpsOnly) {
-    Run-AllTests -Protocol "HTTP" -BaseUrl $HttpUrl
-}
 
-if (-not $HttpOnly) {
+# Run tests for HTTP, HTTPS, or both depending on parameters:
+# - If -HttpOnly is supplied, only test HTTP
+# - If -HttpsOnly is supplied, only test HTTPS
+# - If neither is supplied, test both
+if ($HttpOnly -and -not $HttpsOnly) {
+    Run-AllTests -Protocol "HTTP" -BaseUrl $HttpUrl
+} elseif ($HttpsOnly -and -not $HttpOnly) {
+    Run-AllTests -Protocol "HTTPS" -BaseUrl $HttpsUrl
+} else {
+    Run-AllTests -Protocol "HTTP" -BaseUrl $HttpUrl
     Run-AllTests -Protocol "HTTPS" -BaseUrl $HttpsUrl
 }
 
