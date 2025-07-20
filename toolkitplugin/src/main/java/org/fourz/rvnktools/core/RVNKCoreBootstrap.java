@@ -5,7 +5,7 @@ import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.config.ApiConfig;
-import org.fourz.rvnkcore.api.server.jetty.RVNKCoreServer;
+import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.database.connection.SQLiteConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
@@ -24,7 +24,7 @@ public class RVNKCoreBootstrap {
     private final RVNKTools plugin;
     private final LogManager logger;
     private ServiceRegistry serviceRegistry;
-    private RVNKCoreServer apiServer;
+    private CoreServer apiServer;
     private static RVNKCoreBootstrap instance;
     
     private RVNKCoreBootstrap(RVNKTools plugin) {
@@ -143,7 +143,7 @@ public class RVNKCoreBootstrap {
             ApiConfig apiConfig = new ApiConfig(plugin);
             if (apiConfig.isEnabled()) {
                 PlayerService playerService = getService(PlayerService.class);
-                apiServer = new RVNKCoreServer(apiConfig, playerService, plugin);
+                apiServer = new CoreServer(apiConfig, playerService, plugin);
                 apiServer.start();
                 logger.info("RVNKCore REST API server started");
             } else {

@@ -121,7 +121,9 @@ public class RVNKTools extends JavaPlugin implements Listener {
 
     private void initializeAPI() {
         api = new RVNKToolsAPI(this, announceManager);
-        api.start();
+        
+        //commented out as api is being moved to RVNKCore
+        //api.start();
     }
 
     private void checkPlaceholderAPI() {
