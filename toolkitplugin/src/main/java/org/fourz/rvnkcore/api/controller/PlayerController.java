@@ -40,6 +40,12 @@ public class PlayerController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
+        String clientIP = getClientIP(req);
+        String queryString = req.getQueryString();
+        
+        logger.info("PlayerController GET request: " + pathInfo + 
+                   (queryString != null ? "?" + queryString : "") + " from IP: " + clientIP);
+        
         resp.setContentType("application/json");
 
         try {
@@ -88,24 +94,30 @@ public class PlayerController extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error handling GET request", e);
-            sendError(resp, 500, "Internal server error");
+            logger.error("Error handling GET request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            sendError(resp, 500, "Internal server error: " + e.getMessage());
         }
     }
 
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
+        String clientIP = getClientIP(req);
+        
+        logger.info("PlayerController PUT request: " + pathInfo + " from IP: " + clientIP);
+        
         resp.setContentType("application/json");
 
         try {
             if (pathInfo == null) {
+                logger.warning("PUT request missing path info from IP: " + clientIP);
                 sendError(resp, 400, "Player UUID required");
                 return;
             }
 
             String[] parts = pathInfo.substring(1).split("/");
             if (parts.length < 2) {
+                logger.warning("PUT request with invalid path format: " + pathInfo + " from IP: " + clientIP);
                 sendError(resp, 400, "Invalid path format");
                 return;
             }
@@ -127,8 +139,8 @@ public class PlayerController extends HttpServlet {
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, "Invalid UUID format");
         } catch (Exception e) {
-            logger.error("Error handling PUT request", e);
-            sendError(resp, 500, "Internal server error");
+            logger.error("Error handling PUT request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            sendError(resp, 500, "Internal server error: " + e.getMessage());
         }
     }
 
@@ -384,6 +396,23 @@ public class PlayerController extends HttpServlet {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    /**
+     * Extracts client IP address, handling forwarded headers.
+     */
+    private String getClientIP(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        
+        String xRealIP = request.getHeader("X-Real-IP");
+        if (xRealIP != null && !xRealIP.isEmpty()) {
+            return xRealIP;
+        }
+        
+        return request.getRemoteAddr();
     }
 
     private String readRequestBody(HttpServletRequest req) throws IOException {

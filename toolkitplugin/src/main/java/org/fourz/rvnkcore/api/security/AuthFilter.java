@@ -42,23 +42,40 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         
+        String clientIP = getClientIP(httpRequest);
+        String method = httpRequest.getMethod();
+        String requestURI = httpRequest.getRequestURI();
+        
+        logger.info("API Request: " + method + " " + requestURI + " from IP: " + clientIP);
+        
         // Check IP whitelist if enabled
         if (ipWhitelistEnabled) {
-            String clientIP = getClientIP(httpRequest);
             if (!allowedIPs.contains(clientIP)) {
-                logger.warning("API access denied for IP: " + clientIP);
+                logger.warning("API access denied for IP: " + clientIP + " (not in whitelist: " + allowedIPs + ")");
                 sendUnauthorized(httpResponse, "IP not allowed");
                 return;
+            } else {
+                logger.info("IP whitelist check passed for: " + clientIP);
             }
+        } else {
+            logger.info("IP whitelist disabled - allowing all IPs");
         }
         
         // Check API key
         String providedKey = httpRequest.getHeader("X-API-Key");
-        if (providedKey == null || !apiKey.equals(providedKey)) {
-            logger.warning("API access denied - Invalid API key from IP: " + getClientIP(httpRequest));
+        if (providedKey == null) {
+            logger.warning("API access denied - No API key provided from IP: " + clientIP);
+            sendUnauthorized(httpResponse, "Missing API key");
+            return;
+        }
+        
+        if (!apiKey.equals(providedKey)) {
+            logger.warning("API access denied - Invalid API key '" + providedKey + "' from IP: " + clientIP);
             sendUnauthorized(httpResponse, "Invalid API key");
             return;
         }
+        
+        logger.info("API authentication successful for IP: " + clientIP);
         
         // Authentication successful, continue with request
         chain.doFilter(request, response);
