@@ -25,6 +25,18 @@ public class TeleportSubCommand extends BaseSubCommand {
         this.worldSwapSubCommand = new WorldSwapSubCommand(plugin, parent);
     }
     
+    /**
+     * Constructor with shared WorldSwapSubCommand instance to avoid duplicate instantiation.
+     */
+    public TeleportSubCommand(RVNKTools plugin, BaseCommand parent, WorldSwapSubCommand sharedWorldSwap) {
+        super(plugin, parent, "teleport", 
+              "Teleport management commands", 
+              "/rvnktools teleport <worldswap> [args]",
+              "rvnktools.command.teleport", false);
+        
+        this.worldSwapSubCommand = sharedWorldSwap;
+    }
+    
     @Override
     protected boolean executeSubCommand(CommandSender sender, String[] args) {
         if (args.length == 0) {

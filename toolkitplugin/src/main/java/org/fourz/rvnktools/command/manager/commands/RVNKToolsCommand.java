@@ -17,16 +17,19 @@ public class RVNKToolsCommand extends BaseCommand {
               "/rvnktools <subcommand> [args]",
               "rvnktools.command");
         
+        // Create shared world swap instance to avoid duplicate Multiverse warnings
+        WorldSwapSubCommand sharedWorldSwap = new WorldSwapSubCommand(plugin, this);
+        
         // Register all administrative subcommands
         registerSubCommand("links", new LinksSubCommand(plugin, this));
         registerSubCommand("cycle", new CycleSubCommand(plugin, this));
-        registerSubCommand("teleport", new TeleportSubCommand(plugin, this));
+        registerSubCommand("teleport", new TeleportSubCommand(plugin, this, sharedWorldSwap));
         registerSubCommand("reload", new ReloadSubCommand(plugin, this));
         registerSubCommand("debug", new DebugSubCommand(plugin, this));
         
-        // Register convenience aliases for teleport functionality
-        registerSubCommand("worldswap", new WorldSwapAliasSubCommand(plugin, this));
-        registerSubCommand("event", new WorldSwapAliasSubCommand(plugin, this));
+        // Register convenience aliases for teleport functionality (using shared instance)
+        registerSubCommand("worldswap", new WorldSwapAliasSubCommand(plugin, this, sharedWorldSwap));
+        registerSubCommand("event", new WorldSwapAliasSubCommand(plugin, this, sharedWorldSwap));
     }
     
     @Override

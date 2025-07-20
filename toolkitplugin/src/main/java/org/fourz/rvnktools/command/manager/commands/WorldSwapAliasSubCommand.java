@@ -23,6 +23,18 @@ public class WorldSwapAliasSubCommand extends BaseSubCommand {
         this.worldSwapSubCommand = new WorldSwapSubCommand(plugin, parent);
     }
     
+    /**
+     * Constructor with shared WorldSwapSubCommand instance to avoid duplicate instantiation.
+     */
+    public WorldSwapAliasSubCommand(RVNKTools plugin, BaseCommand parent, WorldSwapSubCommand sharedWorldSwap) {
+        super(plugin, parent, "worldswap", 
+              "Quick access to world swap functionality", 
+              "/rvnktools worldswap [world]",
+              "rvnktools.command.teleport.worldswap", true);
+        
+        this.worldSwapSubCommand = sharedWorldSwap;
+    }
+    
     @Override
     protected boolean executeSubCommand(CommandSender sender, String[] args) {
         // Directly delegate to the world swap subcommand
