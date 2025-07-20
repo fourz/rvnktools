@@ -170,23 +170,7 @@ public class ServletFactory {
      * Logs the registered API routes for documentation purposes.
      */
     public void logRegisteredRoutes() {
-        logger.info("Available API Routes:");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/online");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/{uuid}");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/name/{name}");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/group/{group}");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/search?name={pattern}");
-        logger.info("  - GET  " + config.getContextPath() + "/v1/players/count");
-        logger.info("  - PUT  " + config.getContextPath() + "/v1/players/{uuid}/location");
-        logger.info("  - PUT  " + config.getContextPath() + "/v1/players/{uuid}/groups");
-        
-        // Future routes would be logged here
-        // logger.info("  - GET  " + config.getContextPath() + "/v1/announcements");
-        // logger.info("  - GET  " + config.getContextPath() + "/v1/shops");
-        // logger.info("  - GET  " + config.getContextPath() + "/v1/lore");
-        // logger.info("  - GET  " + config.getContextPath() + "/health");
-        
+        logger.info("API Routes: 9 endpoints registered for /v1/players/*");
         logger.info("Authentication: X-API-Key header required");
     }
 }
