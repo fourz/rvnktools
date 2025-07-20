@@ -19,9 +19,11 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnktools.api.security.KeyStoreGenerator;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -199,11 +201,36 @@ public class RVNKCoreServer {
             logger.info("  - Keystore Password: " + (config.getKeystorePassword().isEmpty() ? "Not Set" : "********"));
             logger.info("  - Idle Timeout: " + config.getIdleTimeout() + "ms");
             
+            // Check if keystore exists, if not, generate it
+            File keystoreFile = new File(plugin.getDataFolder(), config.getKeystorePath());
+            if (!keystoreFile.exists()) {
+                logger.info("Keystore file does not exist, generating new keystore...");
+                logger.info("Generating keystore at: " + keystoreFile.getAbsolutePath());
+                
+                try {
+                    // Ensure parent directory exists
+                    keystoreFile.getParentFile().mkdirs();
+                    
+                    KeyStoreGenerator.generateKeyStore(
+                        keystoreFile.getAbsolutePath(), 
+                        config.getKeystorePassword(), 
+                        "jetty"
+                    );
+                    logger.info("Keystore generated successfully at: " + keystoreFile.getAbsolutePath());
+                } catch (Exception e) {
+                    logger.error("Failed to generate keystore", e);
+                    logger.error("HTTPS setup aborted due to keystore generation failure");
+                    return;
+                }
+            } else {
+                logger.info("Using existing keystore: " + keystoreFile.getAbsolutePath());
+            }
+            
             HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
             httpsConfig.addCustomizer(new SecureRequestCustomizer());
 
             SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
-            sslContextFactory.setKeyStorePath(config.getKeystorePath());
+            sslContextFactory.setKeyStorePath(keystoreFile.getAbsolutePath());
             sslContextFactory.setKeyStorePassword(config.getKeystorePassword());
 
             logger.info("Creating SSL context factory for HTTPS connector");
@@ -222,7 +249,10 @@ public class RVNKCoreServer {
             logger.error("HTTPS setup error details: " + e.getMessage());
             logger.error("HTTPS Configuration Issues:");
             logger.error("  - Keystore Path: " + config.getKeystorePath());
-            logger.error("  - Keystore Exists: " + java.nio.file.Files.exists(java.nio.file.Paths.get(config.getKeystorePath())));
+            
+            File keystoreFile = new File(plugin.getDataFolder(), config.getKeystorePath());
+            logger.error("  - Keystore Exists: " + keystoreFile.exists());
+            logger.error("  - Keystore Absolute Path: " + keystoreFile.getAbsolutePath());
             logger.error("  - Port Availability: Check if port " + config.getHttpsPort() + " is available");
             if (e.getCause() != null) {
                 logger.error("HTTPS root cause: " + e.getCause().getMessage());
