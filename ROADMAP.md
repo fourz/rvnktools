@@ -143,6 +143,56 @@ This phase focuses on implementing the core services that will be provided by RV
   - Extract from RVNKTools link system
   - Add tracking and analytics
 
+#### Web Integration & REST API Framework *(High Priority)*
+
+- [ ] **Plugin Categorization for Web Integration**
+  - **Web-Enabled Plugins** (require full REST API):
+    - RVNKShops: Product catalog, pricing, transactions
+    - RVNKTools: Announcement management, server statistics
+    - RVNKLore: Item galleries, player collections
+  - **Internal-Only Plugins** (Java-internal only):
+    - RVNKQuests: Quest progress, internal game mechanics
+    - RVNKWorlds: World management, internal server operations
+
+- [ ] **RVNKCore REST API Infrastructure Migration** *(Critical Priority)*
+  - **Core API Package Structure** (`org.fourz.rvnkcore.api.*`)
+    - Migrate Jetty server infrastructure from RVNKTools
+    - Create `org.fourz.rvnkcore.api.server.jetty` package
+    - Extract `RestConfig`, `ApiKeyAuthFilter`, security components
+    - Implement modular REST endpoint registration system
+  - **HTTP/HTTPS Server Foundation**
+    - Port Jetty server configuration and SSL/TLS support
+    - Implement centralized authentication and authorization
+    - Create request/response serialization framework
+    - Add comprehensive error handling and status codes
+  - **Player REST API Endpoints** (`/api/v1/players`)
+    - GET `/players` - List all players with pagination
+    - GET `/players/online` - Current online players
+    - GET `/players/recent?hours=X` - Recent players
+    - GET `/players/{uuid}` - Get player by UUID
+    - GET `/players/name/{name}` - Get player by name
+    - GET `/players/group/{group}` - Players by permission group
+    - GET `/players/search?name=pattern` - Search players
+    - PUT `/players/{uuid}/location` - Update player location
+    - PUT `/players/{uuid}/groups` - Update player groups
+  - **Service Integration Layer**
+    - Connect REST endpoints to PlayerService operations
+    - Implement async request handling with CompletableFuture
+    - Add comprehensive logging and performance monitoring
+    - Create consistent response format across all endpoints
+
+- [ ] **REST API Framework**
+  - Design RESTful endpoints for data access
+  - Implement authentication and authorization
+  - Create API versioning strategy
+  - Build comprehensive CRUD operations for web-enabled plugins
+
+- [ ] **Web Integration Infrastructure**
+  - Develop consistent data serialization
+  - Implement caching strategies for web requests
+  - Create rate limiting and security measures
+  - Build API documentation and examples
+
 - [ ] **API Framework** *(High Priority)*
   - Design API interfaces
   - Build example implementations

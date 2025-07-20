@@ -32,7 +32,113 @@ Implement comprehensive player tracking system with:
 - **Async operations**: All database operations using CompletableFuture
 - **Event-driven updates**: Real-time tracking via Bukkit event listeners
 
-### 4. Code Quality Requirements
+### 4. Web Integration & REST API Planning
+Consider web integration requirements for each plugin type when designing data structures:
+
+#### Plugins Requiring Web Integration (REST API Required)
+- **RVNKShops**: Full CRUD operations for shop management, pricing, inventory
+  - Shop listings, item catalogs, transaction history, pricing management
+  - Customer-facing web interface for browsing and purchasing
+- **RVNKTools**: Announcement management and server administration
+  - Web-based announcement creation, scheduling, and management
+  - Server statistics and monitoring dashboard
+- **RVNKLore**: Lore content management and discovery system
+  - Web-based lore browser, search, and content management
+  - Community-driven lore creation and sharing platform
+
+#### Plugins for Internal Use Only (Java API Only)
+- **RVNKQuests**: Quest system for in-game progression
+  - Complex state management, player progress tracking
+  - Real-time quest updates and completion handling
+- **RVNKWorlds**: World management and teleportation
+  - Server-side world generation and management
+  - Location-based operations and world state
+
+### 4. REST API Infrastructure Migration *(Critical Priority)*
+
+Migrate and refactor API components from RVNKTools to RVNKCore:
+
+#### Core API Package Structure
+
+- **Create `org.fourz.rvnkcore.api.server` package hierarchy**
+  - `org.fourz.rvnkcore.api.server.jetty` - Jetty server components
+  - `org.fourz.rvnkcore.api.config` - Configuration management
+  - `org.fourz.rvnkcore.api.security` - Authentication and security
+  - `org.fourz.rvnkcore.api.model.request` - Request DTOs
+  - `org.fourz.rvnkcore.api.model.response` - Response DTOs
+
+#### Migration Components *(Iterative Borrowing from RVNKTools)*
+
+- **Jetty Server Infrastructure**
+  - Migrate `JettyServer.java` → `org.fourz.rvnkcore.api.server.jetty.RVNKCoreServer`
+  - Port HTTP/HTTPS configuration and SSL/TLS support
+  - Extract reusable server lifecycle management
+- **Configuration Framework**
+  - Migrate `RestConfig.java` → `org.fourz.rvnkcore.api.config.ApiConfig`
+  - Implement centralized configuration with environment-specific overrides
+  - Add validation and runtime configuration updates
+- **Security Components**
+  - Migrate `ApiKeyAuthFilter.java` → `org.fourz.rvnkcore.api.security.AuthFilter`
+  - Port `KeyStoreGenerator.java` and `KeyStoreImporter.java`
+  - Implement role-based access control for different plugin types
+- **Player API Controller**
+  - Create `org.fourz.rvnkcore.api.controller.PlayerController`
+  - Implement comprehensive REST endpoints using PlayerService
+  - Add pagination, filtering, and search capabilities
+
+#### REST API Endpoint Implementation
+
+Design and implement REST endpoints that mirror internal service operations:
+
+```java
+// Player API endpoints in org.fourz.rvnkcore.api.controller.PlayerController
+@RestController
+@RequestMapping("/api/v1/players")
+public class PlayerController {
+    
+    private final PlayerService playerService;
+    
+    // Core CRUD operations
+    @GetMapping
+    public CompletableFuture<PagedResponse<PlayerResponse>> getAllPlayers(
+        @RequestParam(defaultValue = "0") int offset,
+        @RequestParam(defaultValue = "50") int limit);
+    
+    @GetMapping("/online")
+    public CompletableFuture<List<PlayerResponse>> getOnlinePlayers();
+    
+    @GetMapping("/recent")
+    public CompletableFuture<List<PlayerResponse>> getRecentPlayers(
+        @RequestParam(defaultValue = "24") int hours);
+    
+    @GetMapping("/{uuid}")
+    public CompletableFuture<PlayerResponse> getPlayer(@PathVariable UUID uuid);
+    
+    @GetMapping("/name/{name}")
+    public CompletableFuture<PlayerResponse> getPlayerByName(@PathVariable String name);
+    
+    @GetMapping("/group/{group}")
+    public CompletableFuture<List<PlayerResponse>> getPlayersByGroup(@PathVariable String group);
+    
+    @GetMapping("/search")
+    public CompletableFuture<List<PlayerResponse>> searchPlayers(@RequestParam String name);
+    
+    @GetMapping("/count")
+    public CompletableFuture<CountResponse> getPlayerCount();
+    
+    // Update operations
+    @PutMapping("/{uuid}/location")
+    public CompletableFuture<StatusResponse> updatePlayerLocation(
+        @PathVariable UUID uuid, @RequestBody LocationUpdateRequest request);
+    
+    @PutMapping("/{uuid}/groups")
+    public CompletableFuture<StatusResponse> updatePlayerGroups(
+        @PathVariable UUID uuid, @RequestBody GroupUpdateRequest request);
+}
+```
+
+### 5. Code Quality Requirements
+
 - Follow SOLID principles and service-oriented architecture
 - Use async programming patterns for all data operations
 - Implement proper error handling with ServiceException framework
@@ -61,8 +167,15 @@ Implement comprehensive player tracking system with:
 4. **Service registry system** with proper dependency injection
 5. **Database integration** with SQLite provider and query builder
 6. **Integration bridge** (RVNKCoreBootstrap) for legacy compatibility
-7. **Error-free compilation** and successful plugin build
-8. **Server restart capability** after resolving all implementation issues
+7. **REST API foundation** for web-enabled plugins (shops, tools, lore)
+8. **RVNKCore API Infrastructure** (`org.fourz.rvnkcore.api.*` package structure)
+   - Migrated Jetty server components from RVNKTools
+   - Configuration management with ApiConfig
+   - Security framework with AuthFilter and key management
+   - Player REST API controller with comprehensive endpoints
+9. **Web integration planning** with CRUD operation mapping for external access
+10. **Error-free compilation** and successful plugin build
+11. **Server restart capability** after resolving all implementation issues
 
 ## Implementation Guidelines
 
@@ -73,7 +186,7 @@ Implement comprehensive player tracking system with:
 - Follow DTO pattern for data transfer
 - Use Builder pattern for complex object construction
 
-### Async Programming Standards
+### Async Programming Standards-
 ```java
 // All database operations MUST use CompletableFuture
 public CompletableFuture<PlayerDTO> getPlayer(UUID playerId) {
@@ -90,6 +203,38 @@ public CompletableFuture<PlayerDTO> getPlayer(UUID playerId) {
 ```java
 // Services should be accessed through ServiceRegistry
 IPlayerService playerService = coreBootstrap.getService(IPlayerService.class);
+```
+
+### REST API Architecture Pattern
+```java
+// For plugins requiring web integration, mirror data structures to REST endpoints
+@RestController
+@RequestMapping("/api/v1/shops")
+public class ShopController {
+    
+    private final ShopService shopService;
+    
+    // CRUD operations mirroring internal service methods
+    @GetMapping
+    public CompletableFuture<List<ShopDTO>> getAllShops() {
+        return shopService.getAllShops();
+    }
+    
+    @PostMapping
+    public CompletableFuture<ShopDTO> createShop(@RequestBody ShopCreateRequest request) {
+        return shopService.createShop(request.toDTO());
+    }
+    
+    @PutMapping("/{id}")
+    public CompletableFuture<ShopDTO> updateShop(@PathVariable UUID id, @RequestBody ShopUpdateRequest request) {
+        return shopService.updateShop(id, request.toDTO());
+    }
+    
+    @DeleteMapping("/{id}")
+    public CompletableFuture<Void> deleteShop(@PathVariable UUID id) {
+        return shopService.deleteShop(id);
+    }
+}
 ```
 
 ### Event Handling Standards

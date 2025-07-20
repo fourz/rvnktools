@@ -10,6 +10,7 @@ import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.api.RVNKToolsAPI;
@@ -31,6 +32,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private CommandManager commandManager;
     // Add RVNKCore bootstrap component
     private RVNKCoreBootstrap coreBootstrap;
+    private LuckPermsIntegrationListener luckPermsListener;
     private LogManager logger;
     
     @Override
@@ -139,8 +141,16 @@ public class RVNKTools extends JavaPlugin implements Listener {
             try {
                 PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, coreBootstrap);
                 getServer().getPluginManager().registerEvents(playerTracker, this);
+                
+                // Register LuckPerms integration listener
+                try {
+                    luckPermsListener = new LuckPermsIntegrationListener(coreBootstrap, this);
+                    logger.info("LuckPerms integration enabled - permission group changes will be synchronized");
+                } catch (IllegalStateException e) {
+                    logger.warning("LuckPerms integration disabled: " + e.getMessage());
+                }
             } catch (Exception e) {
-                logger.error("Failed to register PlayerTrackingListener", e);
+                logger.error("Failed to register RVNKCore listeners", e);
             }
         }
     }
@@ -163,8 +173,30 @@ public class RVNKTools extends JavaPlugin implements Listener {
     }
 
     private void cleanupResources() {
+        if (luckPermsListener != null) {
+            luckPermsListener.shutdown();
+            luckPermsListener = null;
+        }
         commandCycler = null;
         linkMaker = null;
+    }
+    
+    /**
+     * Gets the RVNKCore bootstrap instance.
+     * 
+     * @return The RVNKCore bootstrap instance
+     */
+    public RVNKCoreBootstrap getCoreBootstrap() {
+        return coreBootstrap;
+    }
+    
+    /**
+     * Gets the LuckPerms integration listener.
+     * 
+     * @return The LuckPerms integration listener, or null if not available
+     */
+    public LuckPermsIntegrationListener getLuckPermsListener() {
+        return luckPermsListener;
     }
 
     public Economy getEconomy() {

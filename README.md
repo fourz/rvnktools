@@ -25,6 +25,7 @@ The core innovation of this refactor is the extraction of database operations, s
 - **Consistent APIs**: Standardized interfaces across all plugins in the ecosystem
 - **Reduced Complexity**: Plugins focus on features rather than infrastructure
 - **Better Testing**: Mockable services and repositories for comprehensive testing
+- **Web Integration Strategy**: REST API framework for web-enabled plugins (Shops, Tools, Lore) while maintaining internal-only access for game mechanics (Quests, Worlds)
 
 ## Features
 
@@ -94,6 +95,23 @@ The RVNKCore framework follows a simplified, performance-focused architecture:
 - **Performance-Focused**: Connection pooling, caching, and performance monitoring built-in
 - **Plugin Ecosystem**: Designed for multiple RVNK plugins to share data and services
 - **Easy Migration**: Gradual transition from existing systems with backward compatibility
+
+### Web Integration Architecture
+
+RVNKCore includes a comprehensive web integration strategy that categorizes plugins based on their external access requirements:
+
+#### Web-Enabled Plugins (Full REST API)
+
+- **RVNKShops**: Product catalog management, pricing, transaction history
+- **RVNKTools**: Announcement management, server statistics, admin dashboards
+- **RVNKLore**: Item galleries, player collections, community showcases
+
+#### Internal-Only Plugins (Java API Only)
+
+- **RVNKQuests**: Quest progress tracking, internal game mechanics
+- **RVNKWorlds**: World management, server operations
+
+This architecture ensures that plugins requiring external web access receive full REST API implementations while maintaining secure, performance-optimized internal access for game mechanics.
 
 ### Current Implementation Status
 
