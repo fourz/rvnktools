@@ -559,3 +559,14 @@ For detailed information, refer to:
 
 - [README.md](../README.md) - Project overview and features
 - [ROADMAP.md](../ROADMAP.md) - Development roadmap and priorities
+
+## Service Interface and Implementation Naming Conventions
+
+- **Do not use the `I` prefix for interfaces.**
+  - Example: Use `PlayerService` instead of `IPlayerService`.
+- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.**
+  - Example: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
+- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
+  - Example: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
+- **All references, imports, and documentation should reflect these conventions for consistency.**
+- **This applies to all plugin modules and shared RVNKCore services.**
