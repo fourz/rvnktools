@@ -67,8 +67,8 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerSecurityFilters(ServletContextHandler context) {
-        // Add authentication filter for all API endpoints
-        AuthFilter authFilter = new AuthFilter(config.getApiKey(), config.getAllowedIPs(), plugin);
+        // Add authentication filter for all API endpoints with debug logging configured
+        AuthFilter authFilter = new AuthFilter(config, plugin);
         context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
 
         // Add CORS filter if enabled
@@ -83,8 +83,12 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerControllers(ServletContextHandler context) {
-        // Register player controller
-        PlayerController playerController = new PlayerController(playerService, gson, logger);
+        // Register player controller with proper class-specific logger
+        // Debug logging is configured globally in RVNKCoreBootstrap
+        LogManager playerControllerLogger = LogManager.getInstance(plugin, 
+            org.fourz.rvnkcore.api.controller.PlayerController.class);
+        
+        PlayerController playerController = new PlayerController(playerService, gson, playerControllerLogger);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
 
         // Future controllers can be registered here

@@ -68,7 +68,7 @@ $TestData = @{
     PlayerUuid = "94c37976-5134-40b0-9e03-722ae6664fea"
     PlayerName = "wizardofire"
     GroupName = "default"
-    SearchQuery = "Test"
+    SearchQuery = "wizard"
 }
 
 $Headers = @{
@@ -120,11 +120,13 @@ function Invoke-ApiRequest {
     )
     $Uri = "$BaseUrl$Endpoint"
     if ($QueryParams.Count -gt 0) {
-        $QueryString = [System.Web.HttpUtility]::ParseQueryString("")
+        $queryPairs = @()
         foreach ($param in $QueryParams.GetEnumerator()) {
-            $QueryString[$param.Key] = $param.Value
+            $encodedKey = [System.Uri]::EscapeDataString($param.Key)
+            $encodedValue = [System.Uri]::EscapeDataString($param.Value)
+            $queryPairs += "$encodedKey=$encodedValue"
         }
-        $Uri += "?$QueryString"
+        $Uri += "?" + ($queryPairs -join "&")
     }
     try {
         $params = @{

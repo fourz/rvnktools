@@ -52,7 +52,7 @@ public abstract class BaseRepository<T, ID> {
         this.queryBuilder = queryBuilder;
         this.tableName = tableName;
         this.entityType = entityType;
-        this.logger = LogManager.getInstance(plugin);
+        this.logger = LogManager.getInstance(plugin, getClass());
     }
     
     /**
@@ -180,7 +180,8 @@ public abstract class BaseRepository<T, ID> {
                     throw new DatabaseException("Update failed, no rows affected");
                 }
                 
-                logger.info("Updated " + getEntityTypeName() + " in " + tableName);
+                // Move database update logging to debug level to reduce verbosity
+                logger.debug("Updated " + getEntityTypeName() + " in " + tableName);
                 return entity;
             } catch (SQLException e) {
                 logger.error("Failed to update entity in " + tableName, e);

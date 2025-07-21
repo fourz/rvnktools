@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.api.security;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -24,15 +25,23 @@ public class AuthFilter implements Filter {
     /**
      * Creates an AuthFilter with API key authentication.
      *
-     * @param apiKey The required API key for authentication
-     * @param allowedIPs Array of allowed IP addresses (empty for no IP filtering)
+     * @param config API configuration containing security settings
      * @param plugin Plugin instance for logging
      */
-    public AuthFilter(String apiKey, String[] allowedIPs, Plugin plugin) {
-        this.apiKey = apiKey;
-        this.allowedIPs = allowedIPs != null ? new HashSet<>(Arrays.asList(allowedIPs)) : new HashSet<>();
+    public AuthFilter(ApiConfig config, Plugin plugin) {
+        this.apiKey = config.getApiKey();
+        this.allowedIPs = config.getAllowedIPs() != null ? new HashSet<>(Arrays.asList(config.getAllowedIPs())) : new HashSet<>();
         this.ipWhitelistEnabled = !this.allowedIPs.isEmpty();
-        this.logger = LogManager.getInstance(plugin);
+        this.logger = LogManager.getInstance(plugin, getClass());
+        
+        // Debug logging is configured globally in RVNKCoreBootstrap
+        
+        // Log whitelist configuration once during initialization
+        if (ipWhitelistEnabled) {
+            logger.info("IP whitelist enabled with " + this.allowedIPs.size() + " allowed IPs");
+        } else {
+            logger.info("IP whitelist disabled - allowing all IPs");
+        }
     }
 
     @Override
@@ -46,20 +55,20 @@ public class AuthFilter implements Filter {
         String method = httpRequest.getMethod();
         String requestURI = httpRequest.getRequestURI();
         
-        logger.info("API Request: " + method + " " + requestURI + " from IP: " + clientIP);
+        // Move API request logging to debug level to reduce verbosity
+        logger.debug("API Request: " + method + " " + requestURI + " from IP: " + clientIP);
         
         // Check IP whitelist if enabled
         if (ipWhitelistEnabled) {
             if (!allowedIPs.contains(clientIP)) {
-                logger.warning("API access denied for IP: " + clientIP + " (not in whitelist: " + allowedIPs + ")");
+                logger.warning("API access denied for IP: " + clientIP + " (not in whitelist)");
                 sendUnauthorized(httpResponse, "IP not allowed");
                 return;
-            } else {
-                logger.info("IP whitelist check passed for: " + clientIP);
             }
-        } else {
-            logger.info("IP whitelist disabled - allowing all IPs");
+            // Only log successful IP whitelist check in debug mode
+            logger.debug("IP whitelist check passed for: " + clientIP);
         }
+        // Remove the repetitive "IP whitelist disabled" message since it's logged once during init
         
         // Check API key
         String providedKey = httpRequest.getHeader("X-API-Key");
@@ -75,7 +84,8 @@ public class AuthFilter implements Filter {
             return;
         }
         
-        logger.info("API authentication successful for IP: " + clientIP);
+        // Move successful authentication to debug level
+        logger.debug("API authentication successful for IP: " + clientIP);
         
         // Authentication successful, continue with request
         chain.doFilter(request, response);

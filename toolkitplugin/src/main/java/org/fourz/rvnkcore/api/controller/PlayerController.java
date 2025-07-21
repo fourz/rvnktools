@@ -43,7 +43,8 @@ public class PlayerController extends HttpServlet {
         String clientIP = getClientIP(req);
         String queryString = req.getQueryString();
         
-        logger.info("PlayerController GET request: " + pathInfo + 
+        // Move request logging to debug level to reduce verbosity
+        logger.debug("PlayerController GET request: " + pathInfo + 
                    (queryString != null ? "?" + queryString : "") + " from IP: " + clientIP);
         
         resp.setContentType("application/json");
@@ -104,7 +105,8 @@ public class PlayerController extends HttpServlet {
         String pathInfo = req.getPathInfo();
         String clientIP = getClientIP(req);
         
-        logger.info("PlayerController PUT request: " + pathInfo + " from IP: " + clientIP);
+        // Move request logging to debug level to reduce verbosity
+        logger.debug("PlayerController PUT request: " + pathInfo + " from IP: " + clientIP);
         
         resp.setContentType("application/json");
 

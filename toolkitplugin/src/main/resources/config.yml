@@ -1,3 +1,8 @@
+# RVNKTools Configuration
+# Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
+logging:
+  level: INFO
+
 api:
   enabled: false
   key: changeme
@@ -30,6 +35,8 @@ api:
     allowed-ips: ""
 
   logging:
-    enabled: false
+    # Optional: Override global logging level for API operations
+    # If not specified, uses global logging.level setting
+    # level: DEBUG
     retain-days: 1
     filename: "api-access-%d{yyyy-MM-dd}.log"

@@ -208,6 +208,9 @@ public class RVNKCoreBootstrap {
         try {
             ApiConfig apiConfig = new ApiConfig(plugin);
             if (apiConfig.isEnabled()) {
+                // Configure all loggers with the global log level
+                configureGlobalLogging(apiConfig);
+                
                 PlayerService playerService = getService(PlayerService.class);
                 apiServer = new CoreServer(apiConfig, playerService, plugin);
                 apiServer.start();
@@ -218,6 +221,39 @@ public class RVNKCoreBootstrap {
         } catch (Exception e) {
             logger.error("Failed to start REST API server", e);
         }
+    }
+    
+    /**
+     * Configures global logging levels for all RVNKCore components.
+     * 
+     * @param apiConfig The API configuration containing log level settings
+     */
+    private void configureGlobalLogging(ApiConfig apiConfig) {
+        java.util.logging.Level globalLevel = apiConfig.getGlobalLogLevel();
+        java.util.logging.Level apiLevel = apiConfig.getApiLogLevel();
+        
+        boolean isGlobalDebugEnabled = (globalLevel == java.util.logging.Level.FINE);
+        boolean isApiDebugEnabled = (apiLevel == java.util.logging.Level.FINE);
+        
+        // Configure debug logging for core components using global level
+        LogManager.getInstance(plugin, org.fourz.rvnkcore.database.repository.BaseRepository.class)
+                .setDebugEnabled(isGlobalDebugEnabled);
+        LogManager.getInstance(plugin, org.fourz.rvnkcore.database.repository.PlayerRepository.class)
+                .setDebugEnabled(isGlobalDebugEnabled);
+        LogManager.getInstance(plugin, org.fourz.rvnktools.listener.PlayerTrackingListener.class)
+                .setDebugEnabled(isGlobalDebugEnabled);
+        
+        // Configure debug logging for API components using API-specific level
+        LogManager.getInstance(plugin, org.fourz.rvnkcore.api.security.AuthFilter.class)
+                .setDebugEnabled(isApiDebugEnabled);
+        LogManager.getInstance(plugin, org.fourz.rvnkcore.api.controller.PlayerController.class)
+                .setDebugEnabled(isApiDebugEnabled);
+        
+        String apiLogInfo = apiLevel.equals(globalLevel) ? "inherits global" : apiLevel.toString();
+        logger.info("Logging configured - Global Level: " + globalLevel + 
+                   ", API Level: " + apiLogInfo + 
+                   ", Global Debug: " + isGlobalDebugEnabled + 
+                   ", API Debug: " + isApiDebugEnabled);
     }
     
     /**

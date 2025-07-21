@@ -3,6 +3,9 @@ package org.fourz.rvnkcore.api.config;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnktools.util.Debug;
+
+import java.util.logging.Level;
 
 /**
  * Configuration management for RVNKCore REST API services.
@@ -23,11 +26,12 @@ public class ApiConfig {
     private final String keystorePath;
     private final String keystorePassword;
     private final boolean sendServerVersion;
-    private final boolean loggingEnabled;
     private final String contextPath;
     private final int connectionTimeout;
     private final boolean useForwardedHeaders;
     private final String[] allowedIPs;
+    private final Level apiLogLevel;
+    private final Level globalLogLevel;
     
     private final LogManager logger;
 
@@ -42,6 +46,10 @@ public class ApiConfig {
         // Load configuration with defaults
         FileConfiguration config = plugin.getConfig();
         
+        // Read global log level first and apply it
+        String logLevelStr = config.getString("logging.level", "INFO");
+        this.globalLogLevel = Debug.getLevel(logLevelStr);
+        
         this.enabled = config.getBoolean("api.enabled", false);
         this.httpPort = config.getInt("api.http.port", 8080);
         this.httpsPort = config.getInt("api.https.port", 8081);
@@ -55,7 +63,11 @@ public class ApiConfig {
         this.keystorePath = config.getString("api.https.keystore-path", "");
         this.keystorePassword = config.getString("api.https.keystore-password", "");
         this.sendServerVersion = config.getBoolean("api.server.send-version", false);
-        this.loggingEnabled = config.getBoolean("api.logging.enabled", true);
+        
+        // Read API-specific log level, defaulting to global log level
+        String apiLogLevelStr = config.getString("api.logging.level", logLevelStr);
+        this.apiLogLevel = Debug.getLevel(apiLogLevelStr);
+        
         this.contextPath = config.getString("api.context-path", "/api");
         this.connectionTimeout = config.getInt("api.server.connection-timeout", 60000);
         this.useForwardedHeaders = config.getBoolean("api.server.use-forwarded-headers", true);
@@ -64,7 +76,13 @@ public class ApiConfig {
         String allowedIPsStr = config.getString("api.security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
         
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + ", HTTP Port: " + httpPort + ", HTTPS Port: " + httpsPort);
+        // Log configuration summary
+        String apiLogStr = apiLogLevelStr.equals(logLevelStr) ? "inherits global" : apiLogLevelStr;
+        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + 
+                   ", Global Log Level: " + logLevelStr + 
+                   ", API Log Level: " + apiLogStr + 
+                   ", HTTP Port: " + httpPort + 
+                   ", HTTPS Port: " + httpsPort);
     }
 
     // Getters
@@ -81,7 +99,9 @@ public class ApiConfig {
     public String getKeystorePath() { return keystorePath; }
     public String getKeystorePassword() { return keystorePassword; }
     public boolean isSendServerVersion() { return sendServerVersion; }
-    public boolean isLoggingEnabled() { return loggingEnabled; }
+    public Level getApiLogLevel() { return apiLogLevel; }
+    public boolean isApiDebugLogging() { return apiLogLevel == Level.FINE; }
+    public Level getGlobalLogLevel() { return globalLogLevel; }
     public String getContextPath() { return contextPath; }
     public int getConnectionTimeout() { return connectionTimeout; }
     public boolean isUseForwardedHeaders() { return useForwardedHeaders; }
