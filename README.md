@@ -43,6 +43,15 @@ The core innovation of this refactor is the extraction of database operations, s
   - Link Maker for creating and sharing clickable links in-game
   - Cycle Commands for routine server maintenance tasks
   - Join Message customization for player welcome messages
+  - **DH Log Filter**: Advanced console log filtering to reduce spam from Distant Horizons server plugin
+
+- **DH Log Filter System**:
+  - Configurable log level filtering (DEBUG, INFO, WARN, ERROR)
+  - Keyword-based message filtering with regex support
+  - Rate limiting for repetitive messages (configurable time windows)
+  - Real-time statistics and performance monitoring
+  - Administrative commands for filter management (`/dhfilter`)
+  - Asynchronous configuration loading and management
 
 - **Integration Support**:
   - Seamless integration with PlaceholderAPI for dynamic messages and content

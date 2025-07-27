@@ -66,4 +66,9 @@ public class ChatFormat {
         message = message.replace("\\n", "\n");
         return colorize(message);
     }
+
+    // Format method for convenience (alias for colorize)
+    public static String format(String message) {
+        return colorize(message);
+    }
 }

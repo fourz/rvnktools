@@ -17,6 +17,7 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ Multiverse integration
 - ✅ SQLite database support
 - ✅ Centralized `CommandManager` framework for consistent command handling
+- ✅ **DH Log Filter System**: Advanced console log filtering to reduce Distant Horizons server plugin spam
 
 ### RVNKCore Implementation Status
 
@@ -233,6 +234,15 @@ This phase focuses on implementing the core services that will be provided by RV
 ## Q4 2025 Priorities (Post-RVNKCore Foundation)
 
 ### Enhanced Features
+
+- [x] **DH Log Filter System** *(Completed)* ✅
+  - Configurable log level filtering (DEBUG, INFO, WARN, ERROR)
+  - Keyword-based message filtering with regex support
+  - Rate limiting for repetitive messages with configurable time windows
+  - Real-time statistics and performance monitoring
+  - Administrative commands for filter management (`/dhfilter`)
+  - Asynchronous configuration loading following RVNK patterns
+  - Integration with Java Logging API for console message interception
 
 - [ ] **Enhanced Announcement System** *(High Priority)*
   - Add support for scheduled announcements with cron expressions
