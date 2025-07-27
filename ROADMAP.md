@@ -51,6 +51,8 @@ RVNKTools has established a solid foundation with core functionality in place:
 - [x] Player event listeners for activity tracking ✅ COMPLETED
 - [x] Integration with RVNKTools main class ✅ COMPLETED
 - [x] REST API server refactoring with modular architecture ✅ COMPLETED
+- [ ] Fully tested REST API endpoints for player management 
+- [ ] Integration with PlayerService for REST operations?
 
 **Planned** 📋
 
