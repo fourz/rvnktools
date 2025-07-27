@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
+import org.fourz.rvnktools.dhlogfilter.DHLogFilterManager;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
@@ -34,6 +35,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private RVNKCoreBootstrap coreBootstrap;
     private LuckPermsIntegrationListener luckPermsListener;
     private LogManager logger;
+    private DHLogFilterManager dhLogFilterManager;
     
     @Override
     public void onEnable() {
@@ -51,11 +53,13 @@ public class RVNKTools extends JavaPlugin implements Listener {
         checkPlaceholderAPI();
         registerEventListeners();
         initializeCommandFramework();
+        initializeDHLogFilter();
         logger.info("RVNK Toolkit has been enabled.");
     }
 
     @Override
     public void onDisable() {
+        shutdownDHLogFilter();
         shutdownAPI();
         shutdownAnnounceManager();
         cleanupResources();
@@ -162,6 +166,17 @@ public class RVNKTools extends JavaPlugin implements Listener {
         commandManager.initializeCommands();
     }
 
+    private void initializeDHLogFilter() {
+        logger.info("Initializing DH log filter system...");
+        try {
+            dhLogFilterManager = new DHLogFilterManager(this);
+            dhLogFilterManager.initialize();
+        } catch (Exception e) {
+            logger.error("Failed to initialize DH log filter system", e);
+            logger.warning("DH log filtering will be unavailable");
+        }
+    }
+
     private void shutdownAPI() {
         if (api != null) api.stop();
         api = null;
@@ -172,6 +187,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
             announceManager.shutdown();
         }
         announceManager = null;
+    }
+
+    private void shutdownDHLogFilter() {
+        if (dhLogFilterManager != null) {
+            logger.info("Shutting down DH log filter system...");
+            try {
+                dhLogFilterManager.shutdown();
+            } catch (Exception e) {
+                logger.error("Error shutting down DH log filter system", e);
+            }
+            dhLogFilterManager = null;
+        }
     }
 
     private void cleanupResources() {
@@ -199,6 +226,15 @@ public class RVNKTools extends JavaPlugin implements Listener {
      */
     public LuckPermsIntegrationListener getLuckPermsListener() {
         return luckPermsListener;
+    }
+
+    /**
+     * Gets the DH log filter manager.
+     * 
+     * @return The DH log filter manager, or null if not available
+     */
+    public DHLogFilterManager getDHLogFilterManager() {
+        return dhLogFilterManager;
     }
 
     public Economy getEconomy() {

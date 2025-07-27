@@ -79,6 +79,11 @@ commands:
     description: Manage TrainCarts settings and view help pages
     usage: /trains [enable|disable|modes|examples|links]
     aliases: [train-help]
+  dhfilter:
+    description: Manage DH log filtering to reduce console spam
+    usage: /dhfilter <reload|status|level> [args]
+    aliases: [dhlogfilter]
+    permission: rvnktools.command.dhfilter
 
 permissions:
   rvnktools.command:
@@ -134,3 +139,15 @@ permissions:
     default: op
   rvnktools.command.example:
     description: Allows using the example command
+  rvnktools.command.dhfilter:
+    description: Allows managing DH log filtering system
+    default: op
+  rvnktools.command.dhfilter.reload:
+    description: Allows reloading DH log filter configuration
+    default: op
+  rvnktools.command.dhfilter.status:
+    description: Allows viewing DH log filter status
+    default: op
+  rvnktools.command.dhfilter.level:
+    description: Allows changing DH log filter level temporarily
+    default: op

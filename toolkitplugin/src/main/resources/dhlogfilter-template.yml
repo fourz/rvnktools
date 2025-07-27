@@ -1,0 +1,45 @@
+# DH Log Filter Configuration
+# Reduces console spam from repetitive Distant Horizons messages
+
+logging:
+  # Log level filter: DEBUG (most verbose), INFO (default), WARN, ERROR (most restrictive)
+  level: INFO
+  
+  # Enable or disable the log filtering system
+  enabled: true
+  
+  # Keywords to filter from log messages
+  # Messages containing these keywords will be filtered based on rate limiting
+  keywords:
+    - "[DHS] Received"
+    - "[DHS] Player config"
+    - "[DHS] Chunk data"
+  
+  # Rate limiting cache duration in seconds for repetitive messages
+  # Messages with the same content will be filtered if they occur within this timeframe
+  rateLimitSeconds: 30
+  
+  # Treat keywords as regular expression patterns instead of simple text matching
+  # WARNING: Regex patterns may impact performance. Use with caution.
+  useRegexPatterns: false
+
+# Example configurations:
+#
+# For maximum filtering (only errors):
+# logging:
+#   level: ERROR
+#   enabled: true
+#   keywords: []
+#
+# For verbose debugging:
+# logging:
+#   level: DEBUG
+#   enabled: false
+#
+# For custom keyword patterns with regex:
+# logging:
+#   level: INFO
+#   keywords:
+#     - "\[DHS\] Received.*"
+#     - "\[DHS\] Player \w+ in \w+"
+#   useRegexPatterns: true
