@@ -11,6 +11,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Iterator;
 
+/**
+ * Executor for cycle commands. Handles the execution of cycle commands with their
+ * different instruction sets.
+ */
 public class CycleCommandExecutor implements CommandExecutor {
     private final String commandKey;
     private final ConfigurationSection commandConfig;

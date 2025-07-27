@@ -1,13 +1,26 @@
+# RVNKTools Configuration
+# Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
+logging:
+  level: INFO
+
 api:
   enabled: false
-  port: 8080
   key: changeme
   context-path: /api
+
+  http:
+    port: 8080
+
+  https:
+    enabled: false
+    port: 8081
+    keystore-path: "keystore.jks"
+    keystore-password: "changeme"
 
   cors:
     enabled: false
     allowed-origins: "*"
-    allowed-methods: "GET,POST,DELETE"
+    allowed-methods: "GET,POST,DELETE,PUT,OPTIONS"
 
   server:
     min-threads: 2
@@ -15,35 +28,15 @@ api:
     queue-size: 100
     idle-timeout: 30000
     connection-timeout: 5000
-
-  tls:
-    # if enabled, the server will use https and disable http
-    enabled: false
-    port: 8443
-    # if set to true, the server will use the provided cert and key
-    # if set to false, the server will generate a self-signed cert
-    import-cert: false    
-    import-cert-path: "cert.pem"
-    import-key-path: "key.pem"
-    import-chain-path: "chain.pem"
-    keystore-path: "keystore.jks"
-    keystore-password: "changeme"
-    keymanager-password: "changeme"
+    send-version: false
+    use-forwarded-headers: true
 
   security:
-    use-forwarded-headers: false
-    allowed-ips: []
-    rate-limit:
-      requests: 30
-      period: 60
-    request-header-size: 8192
-    response-header-size: 8192
-
-  performance:
-    compression: true
-    compression-min-size: 2048
+    allowed-ips: ""
 
   logging:
-    enabled: false
+    # Optional: Override global logging level for API operations
+    # If not specified, uses global logging.level setting
+    # level: DEBUG
     retain-days: 1
     filename: "api-access-%d{yyyy-MM-dd}.log"

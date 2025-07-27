@@ -12,9 +12,9 @@
     <url>http://www.example.com</url>
 
     <properties>
-        <java.version>21</java.version>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <java.version>22</java.version> <!-- Align with compiler plugin -->
+        <maven.compiler.source>22</maven.compiler.source>
+        <maven.compiler.target>22</maven.compiler.target>
     </properties>
     <repositories>
         <repository>
@@ -34,6 +34,11 @@
 		    <id>jitpack.io</id>
 		    <url>https://jitpack.io</url>
 		</repository>
+        <!-- Multiverse Repository -->
+        <repository>
+            <id>onarandombox-repo</id>
+            <url>https://repo.onarandombox.com/content/groups/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -80,37 +85,44 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.36.0.3</version>
+            <version>3.44.1.0</version> <!-- Updated for security fixes -->
         </dependency>
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.15</version>
+            <version>1.16.0</version> <!-- Latest stable version -->
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>11.0.15</version>
+            <version>11.0.17</version> <!-- Latest Jetty 11.x -->
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlet</artifactId>
-            <version>11.0.15</version>
+            <version>11.0.17</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlets</artifactId>
-            <version>11.0.15</version>
+            <version>11.0.17</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.70</version>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.77</version> <!-- Updated to current artifact ID -->
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk15on</artifactId>
-            <version>1.70</version>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.77</version>
+        </dependency>
+        <!-- Multiverse Core Dependency -->
+        <dependency>
+            <groupId>com.onarandombox.multiversecore</groupId>
+            <artifactId>Multiverse-Core</artifactId>
+            <version>4.3.1</version>
+            <scope>provided</scope>
         </dependency>
 
     </dependencies>
@@ -125,22 +137,6 @@
                     <target>21</target>                    
                 </configuration>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                    </execution>
-                </executions>
-
-            </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

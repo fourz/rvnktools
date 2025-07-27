@@ -4,96 +4,201 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.command.DiscordCommand;
-import org.fourz.rvnktools.command.EventsCommand;
-import org.fourz.rvnktools.command.PingCommand;
-import org.fourz.rvnktools.command.TPSCommand;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
+import org.fourz.rvnktools.command.manager.CommandManager;
+import org.fourz.rvnktools.core.RVNKCoreBootstrap;
+import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
+import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.api.RVNKToolsAPI;
+import org.fourz.rvnktools.util.log.LogManager;
 
 import net.milkbowl.vault.economy.Economy;
 
 import org.fourz.rvnktools.announceManager.AnnounceManager;
-import org.fourz.rvnktools.command.BroadcastCommand;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.hatManager.PutHatCommand;
-import org.fourz.rvnktools.command.RVNKToolsCommand;
 
 public class RVNKTools extends JavaPlugin implements Listener {
 
     private AnnounceManager announceManager;
     private Economy economy;    
-    private CycleCommands cycleCommands;
+    private CycleCommands commandCycler;
     public LinkMaker linkMaker;
     public PermissionService permissionService;
-    private int gcTaskId = -1;
     private RVNKToolsAPI api;
-
+    private CommandManager commandManager;
+    // Add RVNKCore bootstrap component
+    private RVNKCoreBootstrap coreBootstrap;
+    private LuckPermsIntegrationListener luckPermsListener;
+    private LogManager logger;
+    
     @Override
     public void onEnable() {
-
-        // Initialize LuckPermsManager and PermissionService used for permission integration
-        LuckPermsManager.init();
-        permissionService = new PermissionService();
+        this.logger = LogManager.getInstance(this, getClass());
         
-        // Initialize Economy if available        
-        if (setupEconomy()) {  
-            getLogger().info("Economy integration enabled.");
-        } else {
-            getLogger().info("Economy not found. Economy features will be disabled.");   
-        }
-
-        // Initialize LinkMaker
-        linkMaker = new LinkMaker(this);        
+        // Initialize RVNKCore first
+        initializeRVNKCore();
         
-        // Initialize AnnounceManager
-        announceManager = new AnnounceManager(this);
-
-        // Initialize RVNKToolsAPI (AnnounceManager, ...)
-        api = new RVNKToolsAPI(this, announceManager);
-        api.start();
-
-        // Register PlaceholderAPI integration or flag as unavailable
-        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
-            getLogger().warning("PlaceholderAPI not found, PlaceholderAPI integration will be unavailable.");
-        } else {
-            getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
-        } 
-
-        // Register Events
-        getServer().getPluginManager().registerEvents(new JoinListener(this), this);
-        getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
-
-        // Register Commands
-        this.getCommand("ping").setExecutor(new PingCommand());
-        this.getCommand("tps").setExecutor(new TPSCommand());
-        this.getCommand("events").setExecutor(new EventsCommand());
-        this.getCommand("discord").setExecutor(new DiscordCommand(this));        
-        this.getCommand("broadcast").setExecutor(new BroadcastCommand(this));
-        this.getCommand("puthat").setExecutor(new PutHatCommand(this));
-        getCommand("rvnktools").setExecutor(new RVNKToolsCommand(this));
-
-        // Initialize and register CycleCommands
-        cycleCommands = new CycleCommands(this);
-
-        getLogger().info("RVNK Toolkit has been enabled.");                
+        // Continue with normal initialization
+        initializePermissions();
+        initializeEconomy();
+        initializeLinkMaker();
+        initializeAnnounceManager();
+        initializeAPI();
+        checkPlaceholderAPI();
+        registerEventListeners();
+        initializeCommandFramework();
+        logger.info("RVNK Toolkit has been enabled.");
     }
 
     @Override
     public void onDisable() {
-        if (api != null) api.stop();
-        if (announceManager != null) {
-            announceManager.shutdown(); 
+        shutdownAPI();
+        shutdownAnnounceManager();
+        cleanupResources();
+        
+        // Shutdown RVNKCore last
+        shutdownRVNKCore();
+        
+        logger.info("RVNK Toolkit has been disabled.");
+    }
+
+    /**
+     * Initializes the RVNKCore framework.
+     * 
+     * TODO: This will eventually become the primary initialization method,
+     * with other services migrated to use RVNKCore.
+     */
+    private void initializeRVNKCore() {
+        logger.info("Initializing RVNKCore components...");
+        try {
+            coreBootstrap = RVNKCoreBootstrap.getInstance(this);
+            coreBootstrap.initialize();
+        } catch (Exception e) {
+            logger.error("Failed to initialize RVNKCore components", e);
+            logger.warning("Continuing with legacy initialization...");
         }
-        api = null;        
+    }
+
+    /**
+     * Shuts down the RVNKCore framework.
+     */
+    private void shutdownRVNKCore() {
+        if (coreBootstrap != null) {
+            logger.info("Shutting down RVNKCore components...");
+            try {
+                coreBootstrap.shutdown();
+            } catch (Exception e) {
+                logger.error("Error shutting down RVNKCore components", e);
+            }
+            coreBootstrap = null;
+        }
+    }
+    
+    private void initializePermissions() {
+        LuckPermsManager.init();
+        permissionService = new PermissionService();
+    }
+
+    private void initializeEconomy() {
+        if (setupEconomy()) {
+            getLogger().info("Economy integration enabled.");
+        } else {
+            getLogger().info("Economy not found. Economy features will be disabled.");
+        }
+    }
+
+    private void initializeLinkMaker() {
+        linkMaker = new LinkMaker(this);
+    }
+
+    private void initializeAnnounceManager() {
+        announceManager = new AnnounceManager(this);
+    }
+
+    private void initializeAPI() {
+        api = new RVNKToolsAPI(this, announceManager);
+        
+        //commented out as api is being moved to RVNKCore
+        //api.start();
+    }
+
+    private void checkPlaceholderAPI() {
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
+            getLogger().warning("PlaceholderAPI not found, PlaceholderAPI integration will be unavailable.");
+        } else {
+            getLogger().info("PlaceholderAPI found, PlaceholderAPI integration enabled.");
+        }
+    }
+
+    private void registerEventListeners() {
+        getServer().getPluginManager().registerEvents(new JoinListener(this), this);
+        getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
+        
+        // Register RVNKCore listeners if bootstrap is available
+        if (coreBootstrap != null && coreBootstrap.isInitialized()) {
+            try {
+                PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, coreBootstrap);
+                getServer().getPluginManager().registerEvents(playerTracker, this);
+                
+                // Register LuckPerms integration listener
+                try {
+                    luckPermsListener = new LuckPermsIntegrationListener(coreBootstrap, this);
+                    logger.info("LuckPerms integration enabled - permission group changes will be synchronized");
+                } catch (IllegalStateException e) {
+                    logger.warning("LuckPerms integration disabled: " + e.getMessage());
+                }
+            } catch (Exception e) {
+                logger.error("Failed to register RVNKCore listeners", e);
+            }
+        }
+    }
+
+    private void initializeCommandFramework() {
+        commandManager = CommandManager.getInstance(this);
+        commandManager.initializeCommands();
+    }
+
+    private void shutdownAPI() {
+        if (api != null) api.stop();
+        api = null;
+    }
+
+    private void shutdownAnnounceManager() {
+        if (announceManager != null) {
+            announceManager.shutdown();
+        }
         announceManager = null;
-        cycleCommands = null;
-        linkMaker = null;        
-        getLogger().info("RVNK Toolkit has been disabled.");
+    }
+
+    private void cleanupResources() {
+        if (luckPermsListener != null) {
+            luckPermsListener.shutdown();
+            luckPermsListener = null;
+        }
+        commandCycler = null;
+        linkMaker = null;
+    }
+    
+    /**
+     * Gets the RVNKCore bootstrap instance.
+     * 
+     * @return The RVNKCore bootstrap instance
+     */
+    public RVNKCoreBootstrap getCoreBootstrap() {
+        return coreBootstrap;
+    }
+    
+    /**
+     * Gets the LuckPerms integration listener.
+     * 
+     * @return The LuckPerms integration listener, or null if not available
+     */
+    public LuckPermsIntegrationListener getLuckPermsListener() {
+        return luckPermsListener;
     }
 
     public Economy getEconomy() {
@@ -101,7 +206,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     }
 
     public CycleCommands getCycleCommands() {
-        return cycleCommands;
+        return commandCycler;
     }
 
     private boolean setupEconomy() {
