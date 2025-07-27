@@ -8,6 +8,7 @@ import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.dhlogfilter.command.DHLogFilterCommand;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
@@ -62,6 +63,13 @@ public class CommandManager {
         
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
+
+        // Register DH Log Filter command if available
+        if (plugin.getDHLogFilterManager() != null && plugin.getDHLogFilterManager().isInitialized()) {
+            registerCommand(new DHLogFilterCommand(plugin, plugin.getDHLogFilterManager()));
+        } else {
+            logger.warning("DHLogFilterManager not available - dhfilter command will not be registered");
+        }
 
         // Register cycle commands
         cycleCommands.registerCommands();

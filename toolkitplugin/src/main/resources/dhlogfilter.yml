@@ -1,0 +1,29 @@
+# DH Log Filter Configuration
+# ===========================
+#
+# This configuration controls the filtering of repetitive Distant Horizons server plugin messages.
+#
+# Settings:
+#   level: Log level threshold (DEBUG, INFO, WARN, ERROR)
+#     - DEBUG: Show all messages (most verbose)
+#     - INFO: Show info, warnings, and errors (default)
+#     - WARN: Show only warnings and errors
+#     - ERROR: Show only errors
+#
+#   keywords: List of message keywords to filter
+#     - Messages containing these keywords will be filtered based on rate limiting
+#     - Use regex patterns if useRegexPatterns is enabled
+#
+#   enabled: Enable/disable the log filter (true/false)
+#   rateLimitSeconds: Time window for rate limiting duplicate messages (seconds)
+#   maxCacheSize: Maximum number of messages to keep in rate limiting cache
+#   useRegexPatterns: Enable regex pattern matching for keywords (true/false)
+
+logging:
+  level: INFO
+  keywords:
+    - "[DHS] Received"
+  enabled: true
+  rateLimitSeconds: 30
+  maxCacheSize: 1000
+  useRegexPatterns: false
