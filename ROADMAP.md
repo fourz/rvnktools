@@ -17,6 +17,7 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ Multiverse integration
 - ✅ SQLite database support
 - ✅ Centralized `CommandManager` framework for consistent command handling
+- ✅ **DH Log Filter System** - Configurable log filtering for Distant Horizons spam reduction
 
 ### RVNKCore Implementation Status
 
@@ -336,4 +337,47 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
 
 | Date | Version | Notes |
 |------|---------|-------|
+| July 27, 2025 | 1.1 | Added DH Log Filter system implementation |
 | July 12, 2025 | 1.0 | Initial roadmap draft |
+
+
+### DH Log Filter System ✅ *(Completed July 27, 2025)*
+
+**Purpose**: Reduce console spam from repetitive Distant Horizons server plugin messages while maintaining visibility of important warnings and errors.
+
+**Implementation**: `org.fourz.rvnktools.dhlogfilter.*`
+
+**Key Features**:
+- ✅ **Hierarchical Log Level Filtering**: DEBUG → INFO → WARN → ERROR filtering
+- ✅ **Keyword-based Message Filtering**: Configurable patterns with regex support
+- ✅ **Rate Limiting**: 30-second cache for repetitive message suppression
+- ✅ **Asynchronous Operations**: CompletableFuture-based I/O to prevent server lag
+- ✅ **Performance Monitoring**: Built-in statistics and processing time metrics
+- ✅ **Live Configuration Reloading**: Hot-reload without server restart
+- ✅ **CommandManager Integration**: `/dhfilter` command with reload, status, level subcommands
+
+**Architecture Compliance**:
+- ✅ **Service Layer**: `DHLogFilterService` with async patterns
+- ✅ **Repository Pattern**: `DHLogFilterConfigRepository` for YAML persistence
+- ✅ **Command Framework**: `DHLogFilterCommand` extending BaseCommand
+- ✅ **Lifecycle Management**: `DHLogFilterManager` for proper initialization/cleanup
+- ✅ **SOLID Principles**: Single responsibility, dependency injection, interface segregation
+
+**Configuration Example**:
+```yaml
+logging:
+  level: INFO                    # DEBUG, INFO, WARN, ERROR
+  enabled: true
+  keywords:                      # Filter these message patterns
+    - "[DHS] Received"
+    - "[DHS] Player config"
+  rateLimitSeconds: 30           # Cache window for repetitive messages
+  useRegexPatterns: false        # Enable regex pattern matching
+```
+
+**Commands**:
+- `/dhfilter reload` - Reload configuration
+- `/dhfilter status` - Show statistics and performance metrics  
+- `/dhfilter level <debug|info|warn|error>` - Temporarily change log level
+
+**Integration**: Fully integrated with RVNKTools lifecycle, CommandManager framework, and LogManager patterns following RVNK ecosystem standards.
