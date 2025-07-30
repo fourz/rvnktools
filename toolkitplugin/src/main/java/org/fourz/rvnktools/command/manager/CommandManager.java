@@ -8,6 +8,7 @@ import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
@@ -62,6 +63,9 @@ public class CommandManager {
         
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
+        
+        // Register DH log filter command
+        registerCommand(new LogFilterCommand(plugin));
 
         // Register cycle commands
         cycleCommands.registerCommands();

@@ -71,6 +71,11 @@ commands:
     usage: /countdown 
     permissions: 
       - rvnktools.command.countdown
+    default: op
+  logfilter:
+    description: Manage log filtering for server plugins
+    usage: /logfilter <status|reload|enable|disable|level|add|remove|list> [args]
+    permission: rvnktools.command.logfilter
     default: op      
   announcer:
     description: Enable or disable announcements feature.
@@ -134,3 +139,6 @@ permissions:
     default: op
   rvnktools.command.example:
     description: Allows using the example command
+  rvnktools.command.logfilter:
+    description: Allows managing log filtering for server plugins
+    default: op

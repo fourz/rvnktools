@@ -8,6 +8,7 @@ import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
+import org.fourz.rvnktools.logfilter.LogFilter;
 import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
@@ -32,6 +33,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private CommandManager commandManager;
     // Add RVNKCore bootstrap component
     private RVNKCoreBootstrap coreBootstrap;
+    private LogFilter logFilter;
     private LuckPermsIntegrationListener luckPermsListener;
     private LogManager logger;
     
@@ -51,6 +53,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
         checkPlaceholderAPI();
         registerEventListeners();
         initializeCommandFramework();
+        initializeLogFilter();
         logger.info("RVNK Toolkit has been enabled.");
     }
 
@@ -58,6 +61,7 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public void onDisable() {
         shutdownAPI();
         shutdownAnnounceManager();
+        shutdownLogFilter();
         cleanupResources();
         
         // Shutdown RVNKCore last
@@ -161,6 +165,15 @@ public class RVNKTools extends JavaPlugin implements Listener {
         commandManager = CommandManager.getInstance(this);
         commandManager.initializeCommands();
     }
+    
+    private void initializeLogFilter() {
+        try {
+            logFilter = new LogFilter(this);
+            logger.info("Log Filter initialized");
+        } catch (Exception e) {
+            logger.error("Failed to initialize Log Filter", e);
+        }
+    }
 
     private void shutdownAPI() {
         if (api != null) api.stop();
@@ -172,6 +185,13 @@ public class RVNKTools extends JavaPlugin implements Listener {
             announceManager.shutdown();
         }
         announceManager = null;
+    }
+    
+    private void shutdownLogFilter() {
+        if (logFilter != null) {
+            logFilter.shutdown();
+            logFilter = null;
+        }
     }
 
     private void cleanupResources() {
@@ -199,6 +219,15 @@ public class RVNKTools extends JavaPlugin implements Listener {
      */
     public LuckPermsIntegrationListener getLuckPermsListener() {
         return luckPermsListener;
+    }
+    
+    /**
+     * Gets the Log Filter instance.
+     * 
+     * @return The Log Filter instance, or null if not initialized
+     */
+    public LogFilter getLogFilter() {
+        return logFilter;
     }
 
     public Economy getEconomy() {

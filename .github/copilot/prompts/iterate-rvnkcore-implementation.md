@@ -4,7 +4,7 @@
 Continue iterating on the RVNKCore architectural refactor, focusing on completing the player core example and resolving any implementation issues while following the project roadmap.
 
 ## Current Context
-- **Branch**: `derek/dev-core`
+- **Branch**: `derek/dev`
 - **Phase**: RVNKCore Foundation Implementation
 - **Target**: Working player core example for comprehensive tracking
 - **Date**: July 19, 2025
