@@ -14,10 +14,10 @@ import java.util.logging.Logger;
  * Log filter for server plugins to reduce console verbosity.
  * 
  * This filter intercepts log messages from configured server plugins
- * and applies configurable filters based on log levels and keyword patterns.
+ * and applies configurable filters based on keyword patterns.
  * 
  * Features:
- * - Configurable log levels (DEBUG, INFO, WARN, ERROR)
+ * - Configurable target plugins
  * - Keyword-based filtering with pattern matching
  * - Dynamic configuration reloading
  * - Performance-optimized filtering
@@ -31,7 +31,7 @@ public class LogFilter extends Handler {
     private final LogManager logger;
     private LogFilterConfig config;
     private boolean filterEnabled = false;
-    private Logger dhsLogger;
+    private Logger targetLogger;
     
     public LogFilter(RVNKTools plugin) {
         this.plugin = plugin;
@@ -49,15 +49,15 @@ public class LogFilter extends Handler {
             // Load configuration
             config.loadConfig();
             
-            // Find the Distant Horizons plugin
-            Plugin dhsPlugin = findDistantHorizonsPlugin();
-            if (dhsPlugin == null) {
-                logger.info("Distant Horizons Server plugin not found - filter will activate when plugin loads");
+            // Find the target plugin
+            Plugin targetPlugin = findTargetPlugin();
+            if (targetPlugin == null) {
+                logger.info("Target plugin not found - filter will activate when plugin loads");
                 return;
             }
             
-            // Attach to the DHS logger
-            attachToDistantHorizonsLogger(dhsPlugin);
+            // Attach to the target logger
+            attachToTargetLogger(targetPlugin);
             
             logger.info("Log Filter initialized successfully");
             
@@ -67,20 +67,18 @@ public class LogFilter extends Handler {
     }
     
     /**
-     * Finds the Distant Horizons Server plugin instance.
+     * Finds the target plugin instance based on configuration.
      * 
-     * @return The DHS plugin instance, or null if not found
+     * @return The target plugin instance, or null if not found
      */
-    private Plugin findDistantHorizonsPlugin() {
-        // Common names for Distant Horizons server plugin
-        String[] possibleNames = {
-            "DHSupport"
-        };
+    private Plugin findTargetPlugin() {
+        // Get target plugins from configuration
+        List<String> targetPlugins = config.getTargetPlugins();
         
-        for (String name : possibleNames) {
+        for (String name : targetPlugins) {
             Plugin plugin = Bukkit.getPluginManager().getPlugin(name);
             if (plugin != null) {
-                logger.info("Found Distant Horizons plugin: " + plugin.getName() + " v" + plugin.getDescription().getVersion());
+                logger.info("Found target plugin: " + plugin.getName() + " v" + plugin.getDescription().getVersion());
                 return plugin;
             }
         }
@@ -89,27 +87,27 @@ public class LogFilter extends Handler {
     }
     
     /**
-     * Attaches this filter to the Distant Horizons plugin logger.
+     * Attaches this filter to the target plugin logger.
      * 
-     * @param dhsPlugin The DHS plugin instance
+     * @param targetPlugin The target plugin instance
      */
-    private void attachToDistantHorizonsLogger(Plugin dhsPlugin) {
+    private void attachToTargetLogger(Plugin targetPlugin) {
         try {
-            dhsLogger = dhsPlugin.getLogger();
+            targetLogger = targetPlugin.getLogger();
             
             // Remove existing handlers to prevent duplicate logging
-            Handler[] handlers = dhsLogger.getHandlers();
+            Handler[] handlers = targetLogger.getHandlers();
             for (Handler handler : handlers) {
                 if (handler instanceof LogFilter) {
-                    dhsLogger.removeHandler(handler);
+                    targetLogger.removeHandler(handler);
                 }
             }
             
             // Add our filter
-            dhsLogger.addHandler(this);
+            targetLogger.addHandler(this);
             filterEnabled = true;
             
-            logger.info("Attached Log Filter to " + dhsPlugin.getName() + " logger");
+            logger.info("Attached Log Filter to " + targetPlugin.getName() + " logger");
             
         } catch (Exception e) {
             logger.error("Failed to attach to target plugin logger", e);
@@ -117,7 +115,7 @@ public class LogFilter extends Handler {
     }
     
     /**
-     * Processes log records from the DHS plugin and applies filtering.
+     * Processes log records from target plugins and applies filtering.
      * 
      * @param record The log record to process
      */
@@ -175,11 +173,11 @@ public class LogFilter extends Handler {
      * Attempts to dynamically attach to target plugin if it loads after RVNKTools.
      * Should be called from plugin enable/load events.
      */
-    public void tryAttachToDHS() {
+    public void tryAttachToTargetPlugins() {
         if (!filterEnabled) {
-            Plugin dhsPlugin = findDistantHorizonsPlugin();
-            if (dhsPlugin != null) {
-                attachToDistantHorizonsLogger(dhsPlugin);
+            Plugin targetPlugin = findTargetPlugin();
+            if (targetPlugin != null) {
+                attachToTargetLogger(targetPlugin);
             }
         }
     }
@@ -219,8 +217,8 @@ public class LogFilter extends Handler {
      */
     public void shutdown() {
         try {
-            if (dhsLogger != null && filterEnabled) {
-                dhsLogger.removeHandler(this);
+            if (targetLogger != null && filterEnabled) {
+                targetLogger.removeHandler(this);
                 filterEnabled = false;
                 logger.info("Log Filter detached and shut down");
             }

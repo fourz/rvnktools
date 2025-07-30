@@ -3,6 +3,27 @@
 logging:
   level: INFO
 
+# Log Filter Configuration
+# Filters log messages from specified plugins based on keyword patterns
+logfilter:
+  enabled: true
+  debug-enabled: false
+  
+  # List of target plugins to filter logs from
+  # Add or remove plugin names as needed
+  target-plugins:
+    - "DHSupport"
+    # - "AnotherPlugin"
+    # - "ThirdPlugin"
+  
+  # Keywords to filter out from target plugin logs
+  # Messages containing these keywords will be suppressed
+  keywords:
+    - "Loading chunk"
+    - "Unloading chunk" 
+    - "Saving chunk"
+    # Add more keywords as needed
+
 api:
   enabled: false
   key: changeme

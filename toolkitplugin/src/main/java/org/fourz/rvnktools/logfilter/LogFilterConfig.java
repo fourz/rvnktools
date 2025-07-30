@@ -18,6 +18,9 @@ import java.util.List;
  * log-filter:
  *   enabled: true
  *   debug: false            # Enable debug logging for filter itself
+ *   target-plugins:         # List of plugin names to filter
+ *     - "DHSupport"         # Example: Distant Horizons plugin
+ *     - "SomeOtherPlugin"   # Example: Another plugin
  *   keywords:               # List of keywords to filter
  *     - "[DHS] Received"    # Example: filter plugin messages
  *     - "LOD data"          # Example: filter LOD-related messages
@@ -34,6 +37,7 @@ public class LogFilterConfig {
     private boolean enabled = true;
     private boolean debugEnabled = false;
     private List<String> filterKeywords = new ArrayList<>();
+    private List<String> targetPlugins = new ArrayList<>();
     
     // Configuration section name
     private static final String CONFIG_SECTION = "log-filter";
@@ -69,6 +73,12 @@ public class LogFilterConfig {
                 filterKeywords = new ArrayList<>();
             }
             
+            // Load target plugins
+            targetPlugins = section.getStringList("target-plugins");
+            if (targetPlugins == null) {
+                targetPlugins = new ArrayList<>();
+            }
+            
             // Validate and log configuration
             validateConfiguration();
             logConfigurationStatus();
@@ -89,6 +99,11 @@ public class LogFilterConfig {
         section.set("enabled", true);
         section.set("debug", false);
         
+        // Create default target plugins
+        List<String> defaultTargetPlugins = new ArrayList<>();
+        defaultTargetPlugins.add("DHSupport");
+        section.set("target-plugins", defaultTargetPlugins);
+        
         // Create example keyword filters
         List<String> exampleKeywords = new ArrayList<>();
         exampleKeywords.add("[DHS] Received");
@@ -100,6 +115,7 @@ public class LogFilterConfig {
         // Load the values we just created
         enabled = true;
         debugEnabled = false;
+        targetPlugins = new ArrayList<>(defaultTargetPlugins);
         filterKeywords = new ArrayList<>(exampleKeywords);
     }
     
@@ -110,6 +126,7 @@ public class LogFilterConfig {
         enabled = true;
         debugEnabled = false;
         filterKeywords = new ArrayList<>();
+        targetPlugins = new ArrayList<>();
         logger.warning("Using default Log Filter configuration due to load error");
     }
     
@@ -143,6 +160,14 @@ public class LogFilterConfig {
     }
     
     
+    /**
+     * Get the list of target plugins to filter
+     * @return List of plugin names to target for filtering
+     */
+    public List<String> getTargetPlugins() {
+        return new ArrayList<>(targetPlugins);
+    }
+
     /**
      * Checks if the filter is enabled.
      * 
