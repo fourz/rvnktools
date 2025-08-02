@@ -11,9 +11,10 @@ import java.util.UUID;
 /**
  * Data Transfer Object for comprehensive player information tracking.
  * 
- * This class represents player data as stored and transferred within
- * the RVNKCore system, including activity tracking, location history,
- * name changes, and permission group information.
+ * This class represents global player data as stored and transferred within
+ * the RVNKCore system, including activity tracking, name changes, and 
+ * permission group information. For world-specific data like locations
+ * and playtime, see PlayerWorldDataDTO.
  * 
  * @since 1.0.0
  */
@@ -23,10 +24,9 @@ public class PlayerDTO {
     private List<String> nameHistory;
     private Timestamp firstJoin;
     private Timestamp lastSeen;
-    private String lastWorld;
-    private double lastX;
-    private double lastY;
-    private double lastZ;
+    private String currentWorld;
+    private int timesJoined;
+    private long totalPlaytimeSeconds;
     private String primaryGroup;
     private List<String> groups;
     private boolean banned;
@@ -40,6 +40,8 @@ public class PlayerDTO {
         this.nameHistory = new ArrayList<>();
         this.groups = new ArrayList<>();
         this.banned = false;
+        this.timesJoined = 0;
+        this.totalPlaytimeSeconds = 0L;
     }
     
     /**
@@ -106,54 +108,51 @@ public class PlayerDTO {
         this.lastSeen = lastSeen;
     }
     
-    // Location tracking
+    // Current world and activity tracking
     
-    public String getLastWorld() {
-        return lastWorld;
+    public String getCurrentWorld() {
+        return currentWorld;
     }
     
-    public void setLastWorld(String lastWorld) {
-        this.lastWorld = lastWorld;
+    public void setCurrentWorld(String currentWorld) {
+        this.currentWorld = currentWorld;
     }
     
-    public double getLastX() {
-        return lastX;
+    public int getTimesJoined() {
+        return timesJoined;
     }
     
-    public void setLastX(double lastX) {
-        this.lastX = lastX;
-    }
-    
-    public double getLastY() {
-        return lastY;
-    }
-    
-    public void setLastY(double lastY) {
-        this.lastY = lastY;
-    }
-    
-    public double getLastZ() {
-        return lastZ;
-    }
-    
-    public void setLastZ(double lastZ) {
-        this.lastZ = lastZ;
+    public void setTimesJoined(int timesJoined) {
+        this.timesJoined = timesJoined;
     }
     
     /**
-     * Updates the player's last location.
-     * 
-     * @param world The world name
-     * @param x X coordinate
-     * @param y Y coordinate
-     * @param z Z coordinate
+     * Records a new login/join event.
      */
-    public void updateLastLocation(String world, double x, double y, double z) {
-        this.lastWorld = world;
-        this.lastX = x;
-        this.lastY = y;
-        this.lastZ = z;
+    public void recordJoin() {
+        this.timesJoined++;
         this.lastSeen = Timestamp.valueOf(LocalDateTime.now());
+        
+        if (this.firstJoin == null) {
+            this.firstJoin = this.lastSeen;
+        }
+    }
+    
+    public long getTotalPlaytimeSeconds() {
+        return totalPlaytimeSeconds;
+    }
+    
+    public void setTotalPlaytimeSeconds(long totalPlaytimeSeconds) {
+        this.totalPlaytimeSeconds = totalPlaytimeSeconds;
+    }
+    
+    /**
+     * Adds playtime to the total.
+     * 
+     * @param seconds Additional seconds of playtime
+     */
+    public void addTotalPlaytime(long seconds) {
+        this.totalPlaytimeSeconds += seconds;
     }
     
     // Permission group tracking
@@ -252,11 +251,18 @@ public class PlayerDTO {
             return this;
         }
         
-        public Builder lastLocation(String world, double x, double y, double z) {
-            dto.lastWorld = world;
-            dto.lastX = x;
-            dto.lastY = y;
-            dto.lastZ = z;
+        public Builder currentWorld(String currentWorld) {
+            dto.currentWorld = currentWorld;
+            return this;
+        }
+        
+        public Builder timesJoined(int timesJoined) {
+            dto.timesJoined = timesJoined;
+            return this;
+        }
+        
+        public Builder totalPlaytimeSeconds(long totalPlaytimeSeconds) {
+            dto.totalPlaytimeSeconds = totalPlaytimeSeconds;
             return this;
         }
         
@@ -291,7 +297,8 @@ public class PlayerDTO {
                 "id=" + id +
                 ", currentName='" + currentName + '\'' +
                 ", lastSeen=" + lastSeen +
-                ", lastWorld='" + lastWorld + '\'' +
+                ", currentWorld='" + currentWorld + '\'' +
+                ", timesJoined=" + timesJoined +
                 ", primaryGroup='" + primaryGroup + '\'' +
                 ", banned=" + banned +
                 '}';

@@ -6,7 +6,8 @@ import java.util.UUID;
 
 /**
  * Response DTO for player information in REST API.
- * Contains comprehensive player data for external consumption.
+ * Contains comprehensive global player data for external consumption.
+ * For world-specific data, see PlayerWorldDataResponse.
  */
 public class PlayerResponse {
     private UUID uuid;
@@ -15,13 +16,11 @@ public class PlayerResponse {
     private LocalDateTime firstSeen;
     private LocalDateTime lastSeen;
     private int timesJoined;
-    private String lastWorld;
-    private double lastX;
-    private double lastY;
-    private double lastZ;
+    private String currentWorld;
+    private long totalPlaytimeMinutes;
     private List<String> groups;
     private List<String> nameHistory;
-    private long playtimeMinutes;
+    private List<String> visitedWorlds;
 
     // Default constructor for JSON deserialization
     public PlayerResponse() {}
@@ -38,13 +37,11 @@ public class PlayerResponse {
     public LocalDateTime getFirstSeen() { return firstSeen; }
     public LocalDateTime getLastSeen() { return lastSeen; }
     public int getTimesJoined() { return timesJoined; }
-    public String getLastWorld() { return lastWorld; }
-    public double getLastX() { return lastX; }
-    public double getLastY() { return lastY; }
-    public double getLastZ() { return lastZ; }
+    public String getCurrentWorld() { return currentWorld; }
+    public long getTotalPlaytimeMinutes() { return totalPlaytimeMinutes; }
     public List<String> getGroups() { return groups; }
     public List<String> getNameHistory() { return nameHistory; }
-    public long getPlaytimeMinutes() { return playtimeMinutes; }
+    public List<String> getVisitedWorlds() { return visitedWorlds; }
 
     // Builder class
     public static class Builder {
@@ -80,23 +77,13 @@ public class PlayerResponse {
             return this;
         }
 
-        public Builder lastWorld(String lastWorld) {
-            response.lastWorld = lastWorld;
+        public Builder currentWorld(String currentWorld) {
+            response.currentWorld = currentWorld;
             return this;
         }
 
-        public Builder lastX(double lastX) {
-            response.lastX = lastX;
-            return this;
-        }
-
-        public Builder lastY(double lastY) {
-            response.lastY = lastY;
-            return this;
-        }
-
-        public Builder lastZ(double lastZ) {
-            response.lastZ = lastZ;
+        public Builder totalPlaytimeMinutes(long totalPlaytimeMinutes) {
+            response.totalPlaytimeMinutes = totalPlaytimeMinutes;
             return this;
         }
 
@@ -110,8 +97,8 @@ public class PlayerResponse {
             return this;
         }
 
-        public Builder playtimeMinutes(long playtimeMinutes) {
-            response.playtimeMinutes = playtimeMinutes;
+        public Builder visitedWorlds(List<String> visitedWorlds) {
+            response.visitedWorlds = visitedWorlds;
             return this;
         }
 

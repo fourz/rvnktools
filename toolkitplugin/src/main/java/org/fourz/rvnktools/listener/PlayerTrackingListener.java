@@ -8,11 +8,13 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.RVNKTools;
 
+import java.sql.Timestamp;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -60,43 +62,32 @@ public class PlayerTrackingListener implements Listener {
             PlayerService playerService = coreBootstrap.getService(PlayerService.class);
             
             // Check if player exists, if not create new record
-            playerService.playerExists(player.getUniqueId())
-                .thenCompose(exists -> {
-                    if (!exists) {
-                        // Create new player record
-                        return playerService.createPlayer(
-                            player.getUniqueId(),
-                            player.getName(),
-                            player.getWorld().getName(),
-                            player.getLocation().getX(),
-                            player.getLocation().getY(),
-                            player.getLocation().getZ()
-                        ).thenApply(dto -> {
+            playerService.getPlayer(player.getUniqueId())
+                .thenCompose((playerOpt) -> {
+                    if (playerOpt.isEmpty()) {
+                        // Create new player record - just create the basic player data
+                        PlayerDTO newPlayer = new PlayerDTO.Builder()
+                            .id(player.getUniqueId())
+                            .currentName(player.getName())
+                            .firstJoin(new Timestamp(System.currentTimeMillis()))
+                            .lastSeen(new Timestamp(System.currentTimeMillis()))
+                            .currentWorld(player.getWorld().getName())
+                            .timesJoined(1)
+                            .totalPlaytimeSeconds(0L)
+                            .build();
+                        
+                        return playerService.savePlayer(newPlayer).thenApply((dto) -> {
                             logger.info("Created new player record: " + player.getName());
-                            return null;
+                            return (Void) null;
                         });
                     } else {
-                        // Update existing player's data in a single operation
-                        return playerService.getPlayer(player.getUniqueId())
-                            .thenCompose(playerOpt -> {
-                                if (playerOpt.isPresent()) {
-                                    var playerDTO = playerOpt.get();
-                                    // Update all player data in the DTO
-                                    playerDTO.updateName(player.getName());
-                                    playerDTO.updateLastLocation(
-                                        player.getWorld().getName(),
-                                        player.getLocation().getX(),
-                                        player.getLocation().getY(),
-                                        player.getLocation().getZ()
-                                    );
-                                    // Single save operation
-                                    return playerService.savePlayer(playerDTO).thenApply(saved -> null);
-                                } else {
-                                    CompletableFuture<Void> future = new CompletableFuture<>();
-                                    future.completeExceptionally(new IllegalArgumentException("Player not found: " + player.getUniqueId()));
-                                    return future;
-                                }
-                            });
+                        // Update existing player's data
+                        PlayerDTO playerDTO = playerOpt.get();
+                        playerDTO.updateName(player.getName());
+                        playerDTO.setCurrentWorld(player.getWorld().getName());
+                        playerDTO.recordJoin();
+                        
+                        return playerService.savePlayer(playerDTO).thenApply((saved) -> (Void) null);
                     }
                 })
                 .whenComplete((result, throwable) -> {

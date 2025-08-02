@@ -85,13 +85,14 @@ public class DefaultPlayerService implements PlayerService {
     
     @Override
     public CompletableFuture<Void> updatePlayerLocation(UUID playerId, String world, double x, double y, double z) {
-        logger.debug("Updating location in PlayerDTO for player: " + playerId + " to " + world + " (" + x + "," + y + "," + z + ")");
+        logger.debug("Updating current world for player: " + playerId + " to " + world);
         
         return getPlayer(playerId)
             .thenCompose(playerOpt -> {
                 if (playerOpt.isPresent()) {
                     PlayerDTO player = playerOpt.get();
-                    player.updateLastLocation(world, x, y, z);
+                    player.setCurrentWorld(world);
+                    player.setLastSeen(Timestamp.valueOf(LocalDateTime.now()));
                     return savePlayer(player).thenApply(savedPlayer -> null);
                 } else {
                     CompletableFuture<Void> future = new CompletableFuture<>();
@@ -221,7 +222,7 @@ public class DefaultPlayerService implements PlayerService {
             .currentName(playerName)
             .firstJoin(now)
             .lastSeen(now)
-            .lastLocation(world, x, y, z)
+            .currentWorld(world)
             .banned(false)
             .build();
         

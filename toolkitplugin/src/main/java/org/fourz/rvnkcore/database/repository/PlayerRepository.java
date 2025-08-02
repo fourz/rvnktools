@@ -182,12 +182,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             .currentName(rs.getString("current_name"))
             .firstJoin(rs.getTimestamp("first_join"))
             .lastSeen(rs.getTimestamp("last_seen"))
-            .lastLocation(
-                rs.getString("last_world"),
-                rs.getDouble("last_x"),
-                rs.getDouble("last_y"),
-                rs.getDouble("last_z")
-            )
+            .currentWorld(rs.getString("current_world"))
+            .timesJoined(rs.getInt("times_joined"))
+            .totalPlaytimeSeconds(rs.getLong("total_playtime_seconds"))
             .primaryGroup(rs.getString("primary_group"))
             .banned(rs.getBoolean("banned"));
         
@@ -227,8 +224,8 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     protected String buildInsertQuery() {
         return queryBuilder.insert(tableName)
             .columns("id", "current_name", "name_history", "first_join", "last_seen", 
-                    "last_world", "last_x", "last_y", "last_z", "primary_group", "groups", "banned")
-            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
+                    "current_world", "times_joined", "total_playtime_seconds", "primary_group", "groups", "banned")
+            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
     
@@ -238,10 +235,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         builder.set("current_name", "?")
                .set("name_history", "?")
                .set("last_seen", "?")
-               .set("last_world", "?")
-               .set("last_x", "?")
-               .set("last_y", "?")
-               .set("last_z", "?")
+               .set("current_world", "?")
+               .set("times_joined", "?")
+               .set("total_playtime_seconds", "?")
                .set("primary_group", "?")
                .set("groups", "?")
                .set("banned", "?")
@@ -256,13 +252,12 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setString(3, String.join(",", entity.getNameHistory()));
         stmt.setTimestamp(4, entity.getFirstJoin());
         stmt.setTimestamp(5, entity.getLastSeen());
-        stmt.setString(6, entity.getLastWorld());
-        stmt.setDouble(7, entity.getLastX());
-        stmt.setDouble(8, entity.getLastY());
-        stmt.setDouble(9, entity.getLastZ());
-        stmt.setString(10, entity.getPrimaryGroup());
-        stmt.setString(11, String.join(",", entity.getGroups()));
-        stmt.setBoolean(12, entity.isBanned());
+        stmt.setString(6, entity.getCurrentWorld());
+        stmt.setInt(7, entity.getTimesJoined());
+        stmt.setLong(8, entity.getTotalPlaytimeSeconds());
+        stmt.setString(9, entity.getPrimaryGroup());
+        stmt.setString(10, String.join(",", entity.getGroups()));
+        stmt.setBoolean(11, entity.isBanned());
     }
     
     @Override
@@ -270,13 +265,12 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setString(1, entity.getCurrentName());
         stmt.setString(2, String.join(",", entity.getNameHistory()));
         stmt.setTimestamp(3, entity.getLastSeen());
-        stmt.setString(4, entity.getLastWorld());
-        stmt.setDouble(5, entity.getLastX());
-        stmt.setDouble(6, entity.getLastY());
-        stmt.setDouble(7, entity.getLastZ());
-        stmt.setString(8, entity.getPrimaryGroup());
-        stmt.setString(9, String.join(",", entity.getGroups()));
-        stmt.setBoolean(10, entity.isBanned());
-        stmt.setString(11, entity.getId().toString()); // WHERE clause
+        stmt.setString(4, entity.getCurrentWorld());
+        stmt.setInt(5, entity.getTimesJoined());
+        stmt.setLong(6, entity.getTotalPlaytimeSeconds());
+        stmt.setString(7, entity.getPrimaryGroup());
+        stmt.setString(8, String.join(",", entity.getGroups()));
+        stmt.setBoolean(9, entity.isBanned());
+        stmt.setString(10, entity.getId().toString()); // WHERE clause
     }
 }

@@ -348,14 +348,11 @@ public class PlayerController extends HttpServlet {
                 .online(Bukkit.getPlayer(player.getId()) != null)
                 .firstSeen(firstSeen)
                 .lastSeen(lastSeen)
-                .timesJoined(0) // TODO: Add timesJoined to PlayerDTO
-                .lastWorld(player.getLastWorld())
-                .lastX(player.getLastX())
-                .lastY(player.getLastY())
-                .lastZ(player.getLastZ())
+                .timesJoined(player.getTimesJoined())
+                .currentWorld(player.getCurrentWorld())
+                .totalPlaytimeMinutes(player.getTotalPlaytimeSeconds() / 60)
                 .groups(player.getGroups())
                 .nameHistory(player.getNameHistory())
-                .playtimeMinutes(0L) // TODO: Implement playtime tracking
                 .build();
     }
 
@@ -364,10 +361,9 @@ public class PlayerController extends HttpServlet {
                 .uuid(player.getUniqueId())
                 .name(player.getName())
                 .online(true)
-                .lastWorld(player.getWorld().getName())
-                .lastX(player.getLocation().getX())
-                .lastY(player.getLocation().getY())
-                .lastZ(player.getLocation().getZ())
+                .currentWorld(player.getWorld().getName())
+                .timesJoined(1) // Online players have at least joined once
+                .totalPlaytimeMinutes(0L) // Real-time calculation would require session tracking
                 .build();
     }
 

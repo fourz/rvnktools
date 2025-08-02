@@ -94,15 +94,35 @@ public class DatabaseSetup {
                 name_history TEXT DEFAULT '',
                 first_join TIMESTAMP NOT NULL,
                 last_seen TIMESTAMP NOT NULL,
-                last_world TEXT,
-                last_x REAL DEFAULT 0,
-                last_y REAL DEFAULT 0,
-                last_z REAL DEFAULT 0,
+                current_world TEXT,
+                times_joined INTEGER DEFAULT 1,
+                total_playtime_seconds BIGINT DEFAULT 0,
                 primary_group TEXT DEFAULT 'default',
                 groups TEXT DEFAULT '',
                 banned BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """;
+        
+        String createPlayerWorldDataTable = """
+            CREATE TABLE IF NOT EXISTS rvnk_player_world_data (
+                player_id TEXT NOT NULL,
+                world_name TEXT NOT NULL,
+                first_visit TIMESTAMP NOT NULL,
+                last_visit TIMESTAMP NOT NULL,
+                visit_count INTEGER DEFAULT 1,
+                playtime_seconds BIGINT DEFAULT 0,
+                last_x REAL DEFAULT 0,
+                last_y REAL DEFAULT 0,
+                last_z REAL DEFAULT 0,
+                last_yaw REAL DEFAULT 0,
+                last_pitch REAL DEFAULT 0,
+                last_biome TEXT,
+                death_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (player_id, world_name)
             )
             """;
         
@@ -122,6 +142,7 @@ public class DatabaseSetup {
         
         try (var stmt = connection.createStatement()) {
             stmt.execute(createPlayersTable);
+            stmt.execute(createPlayerWorldDataTable);
             stmt.execute(createAnnouncementsTable);
         }
     }
@@ -131,6 +152,11 @@ public class DatabaseSetup {
             "CREATE INDEX IF NOT EXISTS idx_players_name_history ON rvnk_players(current_name, name_history)",
             "CREATE INDEX IF NOT EXISTS idx_players_last_seen ON rvnk_players(last_seen)",
             "CREATE INDEX IF NOT EXISTS idx_players_primary_group ON rvnk_players(primary_group)",
+            "CREATE INDEX IF NOT EXISTS idx_players_current_world ON rvnk_players(current_world)",
+            "CREATE INDEX IF NOT EXISTS idx_player_world_data_player ON rvnk_player_world_data(player_id)",
+            "CREATE INDEX IF NOT EXISTS idx_player_world_data_world ON rvnk_player_world_data(world_name)",
+            "CREATE INDEX IF NOT EXISTS idx_player_world_data_last_visit ON rvnk_player_world_data(last_visit)",
+            "CREATE INDEX IF NOT EXISTS idx_player_world_data_playtime ON rvnk_player_world_data(playtime_seconds)",
             "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)"
         };
         
@@ -143,7 +169,7 @@ public class DatabaseSetup {
     
     private void verifySchema(Connection connection) throws SQLException {
         // Verify critical tables exist
-        String[] requiredTables = {"rvnk_players", "rvnk_announcements"};
+        String[] requiredTables = {"rvnk_players", "rvnk_player_world_data", "rvnk_announcements"};
         
         try (var stmt = connection.createStatement()) {
             for (String table : requiredTables) {
