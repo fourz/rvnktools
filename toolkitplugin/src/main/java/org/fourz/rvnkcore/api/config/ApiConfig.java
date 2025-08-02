@@ -17,6 +17,7 @@ public class ApiConfig {
     private final int httpsPort;
     private final String apiKey;
     private final boolean enabled;
+    private final String host;
     private final boolean corsEnabled;
     private final String corsAllowedOrigins;
     private final String corsAllowedMethods;
@@ -51,9 +52,10 @@ public class ApiConfig {
         this.globalLogLevel = Debug.getLevel(logLevelStr);
         
         this.enabled = config.getBoolean("api.enabled", false);
+        this.host = config.getString("api.host", "localhost");
         this.httpPort = config.getInt("api.http.port", 8080);
         this.httpsPort = config.getInt("api.https.port", 8081);
-        this.apiKey = config.getString("api.key", "default-api-key");
+        this.apiKey = config.getString("api.auth.key", "changeme");
         this.corsEnabled = config.getBoolean("api.cors.enabled", true);
         this.corsAllowedOrigins = config.getString("api.cors.allowed-origins", "*");
         this.corsAllowedMethods = config.getString("api.cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -87,6 +89,7 @@ public class ApiConfig {
 
     // Getters
     public boolean isEnabled() { return enabled; }
+    public String getHost() { return host; }
     public int getHttpPort() { return httpPort; }
     public int getHttpsPort() { return httpsPort; }
     public String getApiKey() { return apiKey; }

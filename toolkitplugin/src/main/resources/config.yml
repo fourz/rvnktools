@@ -3,6 +3,34 @@
 logging:
   level: INFO
 
+# Database Configuration
+# Supported types: sqlite, mysql
+database:
+  type: sqlite
+  
+  # SQLite Configuration (default)
+  sqlite:
+    file: rvnkcore.db
+  
+  # MySQL Configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: rvnktools
+    username: rvnkuser
+    password: secure_password
+    useSSL: true
+    connectionParameters: allowPublicKeyRetrieval=true
+    
+    # Connection Pool Configuration
+    pool:
+      maxConnections: 20
+      minIdleConnections: 5
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 60000
+
 # Log Filter Configuration
 # Filters log messages from specified plugins based on keyword patterns
 logfilter:
@@ -26,7 +54,7 @@ logfilter:
 
 api:
   enabled: false
-  key: changeme
+  host: localhost
   context-path: /api
 
   http:
@@ -42,6 +70,10 @@ api:
     enabled: false
     allowed-origins: "*"
     allowed-methods: "GET,POST,DELETE,PUT,OPTIONS"
+
+  auth:
+    enabled: true
+    key: "changeme"
 
   server:
     min-threads: 2

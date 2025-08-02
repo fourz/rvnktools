@@ -87,6 +87,17 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.44.1.0</version> <!-- Updated for security fixes -->
         </dependency>
+        <!-- MySQL Database Dependencies -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
+        </dependency>
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>

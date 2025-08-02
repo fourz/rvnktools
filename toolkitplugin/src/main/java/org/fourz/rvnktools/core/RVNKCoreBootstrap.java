@@ -6,7 +6,8 @@ import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
-import org.fourz.rvnkcore.database.connection.SQLiteConnectionProvider;
+import org.fourz.rvnkcore.database.connection.ConnectionProvider;
+import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
@@ -119,16 +120,17 @@ public class RVNKCoreBootstrap {
     
     private void setupDatabase() {
         try {
-            // Create connection provider and database setup
-            SQLiteConnectionProvider connectionProvider = 
-                new SQLiteConnectionProvider(plugin, "rvnkcore.db");
+            // Create connection provider based on configuration
+            ConnectionProviderFactory factory = new ConnectionProviderFactory(plugin);
+            ConnectionProvider connectionProvider = factory.createConnectionProvider();
             
             DatabaseSetup databaseSetup = new DatabaseSetup(connectionProvider, plugin);
             
             // Perform one-time database initialization
             databaseSetup.initializeDatabase();
             
-            logger.info("Database setup completed successfully");
+            logger.info("Database setup completed successfully using " + 
+                       connectionProvider.getClass().getSimpleName());
         } catch (Exception e) {
             logger.error("Failed to setup database", e);
             throw new RuntimeException("Database setup failed", e);
@@ -165,8 +167,8 @@ public class RVNKCoreBootstrap {
     private void registerPlayerService() throws ServiceException {
         try {
             // Create dependencies
-            SQLiteConnectionProvider connectionProvider = 
-                new SQLiteConnectionProvider(plugin, "rvnkcore.db");
+            ConnectionProviderFactory factory = new ConnectionProviderFactory(plugin);
+            ConnectionProvider connectionProvider = factory.createConnectionProvider();
             
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
             
@@ -179,7 +181,8 @@ public class RVNKCoreBootstrap {
             // Register the service
             serviceRegistry.registerService(PlayerService.class, playerService);
             
-            logger.info("PlayerService registered successfully");
+            logger.info("PlayerService registered successfully using " + 
+                       connectionProvider.getClass().getSimpleName());
         } catch (Exception e) {
             logger.error("Failed to register PlayerService", e);
             throw new ServiceException("PlayerService registration failed", e);
