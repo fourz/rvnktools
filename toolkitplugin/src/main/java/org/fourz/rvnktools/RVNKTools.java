@@ -6,6 +6,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
+import org.fourz.rvnktools.commands.WorldSwapCommand;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
@@ -164,6 +165,18 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private void initializeCommandFramework() {
         commandManager = CommandManager.getInstance(this);
         commandManager.initializeCommands();
+        
+        // Register RVNKCore commands that require the bootstrap
+        if (coreBootstrap != null && coreBootstrap.isInitialized()) {
+            try {
+                // Register WorldSwap command that uses PlayerWorldService
+                WorldSwapCommand worldSwapCmd = new WorldSwapCommand(this, coreBootstrap);
+                this.getCommand("worldswap").setExecutor(worldSwapCmd);
+                logger.info("WorldSwap command registered successfully");
+            } catch (Exception e) {
+                logger.error("Failed to register WorldSwap command", e);
+            }
+        }
     }
     
     private void initializeLogFilter() {

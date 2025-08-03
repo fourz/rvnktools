@@ -48,6 +48,11 @@ commands:
     permissions: 
       - rvnktools.admin.pstest
     default: op
+  worldswap:
+    description: Teleport to your last known location in a specific world
+    usage: /worldswap <world_name>
+    aliases: [ws]
+    permission: rvnktools.command.worldswap
   cyclegamemode:
     description: Cycle through gamemodes.
     usage: /cyclegamemode

@@ -8,6 +8,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
@@ -60,12 +61,13 @@ public class PlayerTrackingListener implements Listener {
         
         try {
             PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
             
-            // Check if player exists, if not create new record
-            playerService.getPlayer(player.getUniqueId())
+            // Track both global and world-specific data
+            CompletableFuture<Void> globalUpdate = playerService.getPlayer(player.getUniqueId())
                 .thenCompose((playerOpt) -> {
                     if (playerOpt.isEmpty()) {
-                        // Create new player record - just create the basic player data
+                        // Create new player record
                         PlayerDTO newPlayer = new PlayerDTO.Builder()
                             .id(player.getUniqueId())
                             .currentName(player.getName())
@@ -89,7 +91,22 @@ public class PlayerTrackingListener implements Listener {
                         
                         return playerService.savePlayer(playerDTO).thenApply((saved) -> (Void) null);
                     }
-                })
+                });
+                
+            // Track per-world data separately
+            CompletableFuture<Void> worldUpdate = playerWorldService.updatePlayerLocation(
+                player.getUniqueId(),
+                player.getWorld().getName(),
+                player.getLocation().getX(),
+                player.getLocation().getY(),
+                player.getLocation().getZ(),
+                player.getLocation().getYaw(),
+                player.getLocation().getPitch(),
+                player.getLocation().getBlock().getBiome().name()
+            );
+            
+            // Wait for both global and world tracking to complete
+            CompletableFuture.allOf(globalUpdate, worldUpdate)
                 .whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         logger.error("Failed to update player data for: " + player.getName(), throwable);
@@ -145,26 +162,29 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
             
-            // Update player's location in the new world
-            playerService.updatePlayerLocation(
+            // Record world change with comprehensive tracking
+            playerWorldService.recordWorldChange(
                 player.getUniqueId(),
+                event.getFrom().getName(),
                 player.getWorld().getName(),
                 player.getLocation().getX(),
                 player.getLocation().getY(),
-                player.getLocation().getZ()
+                player.getLocation().getZ(),
+                player.getLocation().getYaw(),
+                player.getLocation().getPitch()
             ).whenComplete((result, throwable) -> {
                 if (throwable != null) {
                     logger.error("Failed to update player location on world change: " + player.getName(), throwable);
                 } else {
                     logger.debug("Updated player location on world change: " + player.getName() + 
-                               " to " + player.getWorld().getName());
+                               " from " + event.getFrom().getName() + " to " + player.getWorld().getName());
                 }
             });
             
         } catch (ServiceException e) {
-            logger.error("Failed to get PlayerService for world change event", e);
+            logger.error("Failed to get PlayerWorldService for world change event", e);
         }
     }
     
@@ -196,15 +216,18 @@ public class PlayerTrackingListener implements Listener {
         }
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
             
-            // Update player's current location
-            playerService.updatePlayerLocation(
+            // Update player's current location with comprehensive world data
+            playerWorldService.updatePlayerLocation(
                 player.getUniqueId(),
                 player.getWorld().getName(),
                 event.getTo().getX(),
                 event.getTo().getY(),
-                event.getTo().getZ()
+                event.getTo().getZ(),
+                event.getTo().getYaw(),
+                event.getTo().getPitch(),
+                event.getTo().getBlock().getBiome().name()
             ).whenComplete((result, throwable) -> {
                 if (throwable != null) {
                     logger.error("Failed to update player location on move: " + player.getName(), throwable);
@@ -216,7 +239,7 @@ public class PlayerTrackingListener implements Listener {
             });
             
         } catch (ServiceException e) {
-            logger.error("Failed to get PlayerService for move event", e);
+            logger.error("Failed to get PlayerWorldService for move event", e);
         }
     }
 }

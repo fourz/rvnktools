@@ -4,14 +4,17 @@ import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
+import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
+import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.util.log.LogManager;
 
@@ -148,6 +151,7 @@ public class RVNKCoreBootstrap {
         try {
             // Core data services
             registerPlayerService();
+            registerPlayerWorldService();
             
             // Legacy compatibility bridges (future implementation)
             registerAnnouncementBridge();
@@ -186,6 +190,37 @@ public class RVNKCoreBootstrap {
         } catch (Exception e) {
             logger.error("Failed to register PlayerService", e);
             throw new ServiceException("PlayerService registration failed", e);
+        }
+    }
+    
+    /**
+     * Registers the PlayerWorldService for per-world player data tracking.
+     * This enables worldswap teleport functionality and comprehensive location tracking.
+     */
+    private void registerPlayerWorldService() throws ServiceException {
+        try {
+            // Retrieve already created dependencies from PlayerService registration
+            ConnectionProviderFactory factory = new ConnectionProviderFactory(plugin);
+            ConnectionProvider connectionProvider = factory.createConnectionProvider();
+            
+            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
+            
+            // Create repositories
+            PlayerRepository playerRepository = 
+                new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            PlayerWorldDataRepository worldDataRepository = 
+                new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
+            
+            DefaultPlayerWorldService playerWorldService = 
+                new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
+            
+            // Register the service
+            serviceRegistry.registerService(PlayerWorldService.class, playerWorldService);
+            
+            logger.info("PlayerWorldService registered successfully for per-world tracking");
+        } catch (Exception e) {
+            logger.error("Failed to register PlayerWorldService", e);
+            throw new ServiceException("PlayerWorldService registration failed", e);
         }
     }
     
