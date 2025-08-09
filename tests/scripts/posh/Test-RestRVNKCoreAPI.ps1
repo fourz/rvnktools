@@ -5,7 +5,7 @@
 # MANUAL TESTING EXAMPLES:
 # HTTP:  Invoke-WebRequest http://localhost:8080/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
 # HTTPS: [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-#        Invoke-WebRequest https://localhost:8081/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"} -SkipCertificateCheck
+#        Invoke-WebRequest https://localhost:8081/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
 
 param (
     [Parameter(Mandatory = $false)]
@@ -137,9 +137,9 @@ function Invoke-ApiRequest {
             ErrorAction = "Stop"
         }
         
-        # Add SkipCertificateCheck for HTTPS requests (PowerShell 6+ feature)
+    # (Removed: SkipCertificateCheck for compatibility)
         if ($Uri -match "^https://") {
-            $params.SkipCertificateCheck = $true
+            # (Removed: $params.SkipCertificateCheck)
         }
         
         if ($Body) {

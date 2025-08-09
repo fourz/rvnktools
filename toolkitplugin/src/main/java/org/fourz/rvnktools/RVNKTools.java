@@ -16,6 +16,9 @@ import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.api.RVNKToolsAPI;
 import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.api.config.ApiConfigLoader;
+import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.ApiConfigValidator;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -41,7 +44,10 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public void onEnable() {
         this.logger = LogManager.getInstance(this, getClass());
         
-        // Initialize RVNKCore first
+        // Initialize configuration first
+        initializeConfiguration();
+        
+        // Initialize RVNKCore next
         initializeRVNKCore();
         
         // Continue with normal initialization
@@ -68,6 +74,33 @@ public class RVNKTools extends JavaPlugin implements Listener {
         shutdownRVNKCore();
         
         logger.info("RVNK Toolkit has been disabled.");
+    }
+
+    /**
+     * Initializes configuration using Bukkit/Spigot methodology.
+     * Ensures config.yml exists and is properly loaded from resources.
+     */
+    private void initializeConfiguration() {
+        logger.info("Initializing configuration...");
+        try {
+            // Ensure config.yml exists using Bukkit methodology
+            ApiConfigLoader configLoader = new ApiConfigLoader(this);
+            configLoader.ensureConfigExists();
+            
+            // Load and validate API configuration
+            ApiConfig apiConfig = configLoader.loadApiConfig();
+            ApiConfigValidator.ValidationResult validationResult = ApiConfigValidator.validateConfig(apiConfig);
+            validationResult.logResults(logger);
+            
+            if (!validationResult.isValid()) {
+                logger.warning("Configuration validation failed - plugin may not function correctly");
+            }
+            
+            logger.info("Configuration initialization complete");
+        } catch (Exception e) {
+            logger.error("Failed to initialize configuration", e);
+            throw new RuntimeException("Configuration initialization failed", e);
+        }
     }
 
     /**

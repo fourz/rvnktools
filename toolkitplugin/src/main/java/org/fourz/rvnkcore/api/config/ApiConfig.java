@@ -134,13 +134,27 @@ public class ApiConfig {
                 isValid = false;
             }
             
-            if (apiKey == null || apiKey.trim().isEmpty()) {
-                logger.error("API key cannot be empty");
-                isValid = false;
+            if (apiKey == null || apiKey.trim().isEmpty() || "changeme".equals(apiKey.trim())) {
+                logger.warning("API key is set to default value 'changeme' - please change for security");
             }
             
             if (httpsEnabled && (keystorePath == null || keystorePath.trim().isEmpty())) {
                 logger.error("HTTPS enabled but keystore path not specified");
+                isValid = false;
+            }
+            
+            if (maxThreads <= 0) {
+                logger.error("Invalid max threads value: " + maxThreads);
+                isValid = false;
+            }
+            
+            if (connectionTimeout <= 0) {
+                logger.error("Invalid connection timeout: " + connectionTimeout);
+                isValid = false;
+            }
+            
+            if (idleTimeout <= 0) {
+                logger.error("Invalid idle timeout: " + idleTimeout);
                 isValid = false;
             }
         }
