@@ -17,14 +17,14 @@ public class LegacyWorldSwapCommand extends BaseCommand {
     
     private final WorldSwapSubCommand worldSwapImplementation;
     
-    public LegacyWorldSwapCommand(RVNKTools plugin) {
+    public LegacyWorldSwapCommand(RVNKTools plugin, WorldSwapSubCommand sharedWorldSwap) {
         super(plugin, "worldswap", 
               "Teleport to your last known location in a specific world", 
               "/worldswap <world_name>",
               "rvnktools.command.worldswap");
         
-        // Create the actual implementation using the subcommand framework
-        this.worldSwapImplementation = new WorldSwapSubCommand(plugin, this);
+        // Use the shared world swap instance
+        this.worldSwapImplementation = sharedWorldSwap;
     }
     
     @Override

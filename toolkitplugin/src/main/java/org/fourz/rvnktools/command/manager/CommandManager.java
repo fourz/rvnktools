@@ -10,6 +10,7 @@ import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
@@ -60,15 +61,16 @@ public class CommandManager {
         registerCommand(new EventsCommand(plugin));
         registerCommand(new TrainsCommand(plugin));
         
-        // Register teleportation commands
-        registerCommand(new TeleportCommand(plugin));
+        // Create a single shared WorldSwapSubCommand instance to prevent duplicate initialization
+        WorldSwapSubCommand sharedWorldSwap = new WorldSwapSubCommand(plugin, null);
         
-        // Register legacy WorldSwap command for backward compatibility
-        // This provides the standalone /worldswap command that uses the same functionality
-        // as the new /teleport worldswap command structure
+        // Register teleportation commands with shared instance
+        registerCommand(new TeleportCommand(plugin, sharedWorldSwap));
+        
+        // Register legacy WorldSwap command for backward compatibility with shared instance
         try {
             @SuppressWarnings("removal")
-            LegacyWorldSwapCommand legacyWorldSwap = new LegacyWorldSwapCommand(plugin);
+            LegacyWorldSwapCommand legacyWorldSwap = new LegacyWorldSwapCommand(plugin, sharedWorldSwap);
             registerCommand(legacyWorldSwap);
             logger.info("Legacy WorldSwap command registered for backward compatibility");
         } catch (Exception e) {

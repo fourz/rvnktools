@@ -17,10 +17,18 @@ public class TeleportCommand extends BaseCommand {
               "/teleport <subcommand> [args]",
               "rvnktools.command.teleport");
         
-        // Create shared world swap instance to avoid duplicate Multiverse warnings
-        WorldSwapSubCommand sharedWorldSwap = new WorldSwapSubCommand(plugin, this);
+        // Create default world swap instance if not provided
+        WorldSwapSubCommand worldSwap = new WorldSwapSubCommand(plugin, this);
+        registerSubCommand("worldswap", new TeleportWorldSwapSubCommand(plugin, this, worldSwap));
+    }
+    
+    public TeleportCommand(RVNKTools plugin, WorldSwapSubCommand sharedWorldSwap) {
+        super(plugin, "teleport", 
+              "Teleportation utilities and world management", 
+              "/teleport <subcommand> [args]",
+              "rvnktools.command.teleport");
         
-        // Register teleport subcommands
+        // Register teleport subcommands using the provided shared instance
         registerSubCommand("worldswap", new TeleportWorldSwapSubCommand(plugin, this, sharedWorldSwap));
     }
     
