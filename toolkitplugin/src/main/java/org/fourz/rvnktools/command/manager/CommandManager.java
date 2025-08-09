@@ -3,13 +3,14 @@ package org.fourz.rvnktools.command.manager;
 import org.bukkit.command.PluginCommand;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
+import org.fourz.rvnktools.command.manager.commands.EventCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
-import org.fourz.rvnktools.command.manager.commands.LegacyWorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
+import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -67,15 +68,9 @@ public class CommandManager {
         // Register teleportation commands with shared instance
         registerCommand(new TeleportCommand(plugin, sharedWorldSwap));
         
-        // Register legacy WorldSwap command for backward compatibility with shared instance
-        try {
-            @SuppressWarnings("removal")
-            LegacyWorldSwapCommand legacyWorldSwap = new LegacyWorldSwapCommand(plugin, sharedWorldSwap);
-            registerCommand(legacyWorldSwap);
-            logger.info("Legacy WorldSwap command registered for backward compatibility");
-        } catch (Exception e) {
-            logger.warning("Failed to register legacy WorldSwap command: " + e.getMessage());
-        }
+        // Register standalone worldswap and event commands that directly use the shared instance
+        registerCommand(new WorldSwapCommand(plugin, sharedWorldSwap));
+        registerCommand(new EventCommand(plugin, sharedWorldSwap));
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));

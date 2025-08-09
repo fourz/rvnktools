@@ -45,9 +45,9 @@ public class RVNKToolsCommand extends BaseCommand {
         sender.sendMessage("§f/rvnktools reload §7- Reload plugin configuration");
         sender.sendMessage("§f/rvnktools debug §7- Show debug information");
         sender.sendMessage("");
-        sender.sendMessage("§e⚠ §7Convenience aliases:");
-        sender.sendMessage("§f/rvnktools worldswap [world] §7- Direct world swap");
-        sender.sendMessage("§f/rvnktools event [world] §7- Event world shortcut");
+        sender.sendMessage("§e⚠ §7Quick access commands:");
+        sender.sendMessage("§f/worldswap [world] §7- Direct world swap command");
+        sender.sendMessage("§f/event [world] §7- Event world shortcut command");
     }
     
     @Override

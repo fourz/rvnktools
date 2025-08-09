@@ -11,25 +11,14 @@ import java.util.List;
  */
 public class TeleportCommand extends BaseCommand {
     
-    public TeleportCommand(RVNKTools plugin) {
-        super(plugin, "teleport", 
-              "Teleportation utilities and world management", 
-              "/teleport <subcommand> [args]",
-              "rvnktools.command.teleport");
-        
-        // Create default world swap instance if not provided
-        WorldSwapSubCommand worldSwap = new WorldSwapSubCommand(plugin, this);
-        registerSubCommand("worldswap", new TeleportWorldSwapSubCommand(plugin, this, worldSwap));
-    }
-    
     public TeleportCommand(RVNKTools plugin, WorldSwapSubCommand sharedWorldSwap) {
         super(plugin, "teleport", 
               "Teleportation utilities and world management", 
               "/teleport <subcommand> [args]",
               "rvnktools.command.teleport");
         
-        // Register teleport subcommands using the provided shared instance
-        registerSubCommand("worldswap", new TeleportWorldSwapSubCommand(plugin, this, sharedWorldSwap));
+        // Register teleport subcommands using the shared instance directly
+        registerSubCommand("worldswap", sharedWorldSwap);
     }
     
     @Override

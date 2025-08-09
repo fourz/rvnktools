@@ -10,11 +10,9 @@ import java.util.List;
 
 /**
  * Subcommand for teleport-related functionality.
- * Currently supports world swapping features through Multiverse integration.
+ * Provides information about teleport commands and directs users to standalone commands.
  */
 public class TeleportSubCommand extends BaseSubCommand {
-    
-    private final WorldSwapSubCommand worldSwapSubCommand;
     
     public TeleportSubCommand(RVNKTools plugin, BaseCommand parent) {
         super(plugin, parent, "teleport", 
@@ -22,19 +20,7 @@ public class TeleportSubCommand extends BaseSubCommand {
               "/rvnktools teleport <worldswap> [args]",
               "rvnktools.command.teleport", false);
         
-        this.worldSwapSubCommand = new WorldSwapSubCommand(plugin, parent);
-    }
-    
-    /**
-     * Constructor with shared WorldSwapSubCommand instance to avoid duplicate instantiation.
-     */
-    public TeleportSubCommand(RVNKTools plugin, BaseCommand parent, WorldSwapSubCommand sharedWorldSwap) {
-        super(plugin, parent, "teleport", 
-              "Teleport management commands", 
-              "/rvnktools teleport <worldswap> [args]",
-              "rvnktools.command.teleport", false);
-        
-        this.worldSwapSubCommand = sharedWorldSwap;
+        // Note: This subcommand now only handles help - actual worldswap is done through standalone commands
     }
     
     @Override
@@ -45,9 +31,10 @@ public class TeleportSubCommand extends BaseSubCommand {
         }
         
         if (args[0].equalsIgnoreCase("worldswap")) {
-            // Pass remaining arguments to the worldswap subcommand
-            String[] worldSwapArgs = Arrays.copyOfRange(args, 1, args.length);
-            return worldSwapSubCommand.execute(sender, worldSwapArgs);
+            // Inform user about the standalone command
+            sender.sendMessage("§e⚠ Use /worldswap [world] or /teleport worldswap [world] for world swapping.");
+            sender.sendMessage("§7Example: /worldswap event or /teleport worldswap survival");
+            return true;
         }
         
         showHelp(sender);
@@ -56,7 +43,9 @@ public class TeleportSubCommand extends BaseSubCommand {
     
     private void showHelp(CommandSender sender) {
         sender.sendMessage("§c▶ §6Teleport Commands");
-        sender.sendMessage("§f/rvnktools teleport worldswap [world] §7- Teleport between worlds preserving locations");
+        sender.sendMessage("§f/worldswap [world] §7- Teleport between worlds preserving locations");
+        sender.sendMessage("§f/teleport worldswap [world] §7- Same as above with full command path");
+        sender.sendMessage("§f/event [world] §7- Quick shortcut for event world");
         sender.sendMessage("§7   Use specific world name or default to 'event' world");
         sender.sendMessage("§7   Your location in the current world will be saved");
     }
@@ -67,10 +56,6 @@ public class TeleportSubCommand extends BaseSubCommand {
             if (sender.hasPermission("rvnktools.command.teleport.worldswap")) {
                 return Arrays.asList("worldswap");
             }
-        } else if (args.length > 1 && args[0].equalsIgnoreCase("worldswap")) {
-            // Delegate tab completion to worldswap subcommand
-            String[] worldSwapArgs = Arrays.copyOfRange(args, 1, args.length);
-            return worldSwapSubCommand.tabComplete(sender, worldSwapArgs);
         }
         return Collections.emptyList();
     }
