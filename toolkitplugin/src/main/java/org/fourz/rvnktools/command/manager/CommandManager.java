@@ -4,6 +4,7 @@ import org.bukkit.command.PluginCommand;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
+import org.fourz.rvnktools.command.manager.commands.LegacyWorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
@@ -61,6 +62,18 @@ public class CommandManager {
         
         // Register teleportation commands
         registerCommand(new TeleportCommand(plugin));
+        
+        // Register legacy WorldSwap command for backward compatibility
+        // This provides the standalone /worldswap command that uses the same functionality
+        // as the new /teleport worldswap command structure
+        try {
+            @SuppressWarnings("removal")
+            LegacyWorldSwapCommand legacyWorldSwap = new LegacyWorldSwapCommand(plugin);
+            registerCommand(legacyWorldSwap);
+            logger.info("Legacy WorldSwap command registered for backward compatibility");
+        } catch (Exception e) {
+            logger.warning("Failed to register legacy WorldSwap command: " + e.getMessage());
+        }
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));
