@@ -1,6 +1,6 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: July 19, 2025
+**Last Updated**: August 9, 2025
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
@@ -17,69 +17,91 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ Multiverse integration
 - ✅ SQLite database support
 - ✅ Centralized `CommandManager` framework for consistent command handling
+- ✅ **WorldSwap command integration with per-world location tracking**
+- ✅ **Comprehensive player and world-specific data services**
 
 ### RVNKCore Implementation Status
 
-**Branch**: `derek/dev-core` | **Target**: Q3-Q4 2025
+**Branch**: `derek/dev-core` | **Status**: **Phase 1 Complete (95%)**
 
-#### Foundation Infrastructure
+#### Foundation Infrastructure - ✅ **COMPLETED**
 
-**Completed** ✅
+**Core Database & Service Framework** ✅
 - [x] Project architecture planning and documentation
 - [x] Complete directory structure creation (`org.fourz.rvnkcore.*`)
 - [x] Base exception hierarchy (`RVNKException`, `ServiceException`, `DatabaseException`)
 - [x] Core interfaces defined (`ConnectionProvider`, `QueryBuilder`, `ServiceRegistry`)
-- [x] Example DTO implementation (`PlayerDTO` with builder pattern)
+- [x] Enhanced PlayerDTO with comprehensive tracking (seen, name history, location, rank/groups)
+- [x] PlayerWorldDataDTO for per-world location and statistics tracking
 - [x] Main RVNKCore class with lifecycle management
 - [x] Package structure with api/, database/, service/, util/ directories
 - [x] Foundation documentation and implementation guidelines
-- [x] Enhanced PlayerDTO with comprehensive tracking (seen, name history, location, rank/groups)
+
+**Service Layer Implementation** ✅
 - [x] PlayerService interface with async operations
+- [x] DefaultPlayerService implementation with full business logic
+- [x] PlayerWorldService interface for per-world tracking
+- [x] DefaultPlayerWorldService with rate limiting and session management
+- [x] ServiceRegistry implementation for dependency injection
+- [x] RVNKCoreBootstrap for legacy integration
+- [x] PlayerTrackingListener for event-driven updates
+
+**Database Layer Implementation** ✅
 - [x] BaseRepository abstract class with CRUD operations
 - [x] PlayerRepository implementation with player-specific queries
-- [x] PlayerService implementation with full business logic
+- [x] PlayerWorldDataRepository for world-specific data operations
 - [x] SQLiteConnectionProvider with auto-schema creation
 - [x] BasicSQLQueryBuilder implementation
-- [x] AnnouncementService interface for bridge integration
+- [x] Connection pooling and error recovery
 
-**In Progress** 🔄
+**REST API Framework** ✅
+- [x] PlayerController with full CRUD endpoints
+- [x] Jetty server infrastructure with SSL/TLS support
+- [x] Authentication and authorization framework
+- [x] Request/response serialization with comprehensive error handling
+- [x] Modular server architecture for future extensibility
 
-- [x] Player core example design (seen, name history, location, rank/groups) ✅ COMPLETED
-- [x] ServiceRegistry implementation for dependency injection ✅ COMPLETED
-- [x] RVNKCoreBootstrap for legacy integration ✅ COMPLETED
-- [x] Bridge services for gradual migration ✅ COMPLETED
-- [x] Player event listeners for activity tracking ✅ COMPLETED
-- [x] Integration with RVNKTools main class ✅ COMPLETED
-- [x] REST API server refactoring with modular architecture ✅ COMPLETED
-- [ ] Fully tested REST API endpoints for player management 
-- [ ] Integration with PlayerService for REST operations?
+**Command Integration** ✅
+- [x] WorldSwap command using RVNKCore PlayerWorldService
+- [x] Legacy command support with deprecation warnings
+- [x] Command framework integration (TeleportCommand structure)
+- [x] Multiverse-Core integration for world validation
 
-**Planned** 📋
+**Phase 1 Critical Gaps** ⚠️
 
-- [ ] Schema management with auto-creation
+- [ ] MySQL ConnectionProvider implementation with HikariCP
+- [ ] Schema migration system with version tracking
+- [ ] Comprehensive test suite for all components
+- [ ] PlayerWorld REST API endpoints for web integration
+
+**Planned for Phase 2** 📋
+
 - [ ] Event system for cross-plugin communication
 - [ ] Configuration management with versioning
 - [ ] Performance monitoring and logging integration
-- [x] REST API framework for external access ✅ COMPLETED
+- [ ] Cross-plugin data sharing capabilities
 
 ## Major Architectural Refactor: RVNKCore Integration
 
 **Branch**: `derek/dev-core`
 
-The primary focus for Q3-Q4 2025 is the extraction of core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem.
+RVNKCore Phase 1 foundation is **95% complete** with all core functionality operational. The focus now shifts to gap resolution and Phase 2 implementation.
 
-### Phase 1: RVNKCore Foundation (Q3 2025) - ✅ **COMPLETED**
+### Phase 1: RVNKCore Foundation (Q3 2025) - ✅ **95% COMPLETE**
 
-#### Core Database Framework ✅ *(High Priority - COMPLETED)*
+#### Core Database Framework ✅ *(High Priority - COMPLETE)*
 
 - [x] **Connection Management**
-  - ✅ Implemented ConnectionProvider interface with SQLite implementation
-  - ✅ Integrated with LogManager for database operations
-  - Location: `org.fourz.rvnkcore.database.provider.SQLiteConnectionProvider`
+  - ✅ SQLite ConnectionProvider with auto-schema creation
+  - ⚠️ MySQL ConnectionProvider (skeleton implementation only)
+  - ✅ Connection pooling and error recovery
+  - Location: `org.fourz.rvnkcore.database.connection.*`
 
 - [x] **Query Building Framework**
-  - ✅ Created QueryBuilder interface for database operations
-  - ✅ Implemented BasicSQLQueryBuilder with comprehensive SQL generation
+  - ✅ QueryBuilder interface for database-agnostic operations
+  - ✅ BasicSQLQueryBuilder with comprehensive SQL generation
+  - ✅ DDL support for schema creation
+  - Location: `org.fourz.rvnkcore.database.query.*`
   - ✅ Added DDL support for schema creation
   - Location: `org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder`
 
@@ -101,7 +123,9 @@ The primary focus for Q3-Q4 2025 is the extraction of core functionality into RV
 
 - [x] **Player Services**
   - ✅ PlayerService interface with comprehensive async operations
-  - ✅ PlayerService implementation with caching and rate limiting
+  - ✅ DefaultPlayerService implementation with caching and rate limiting
+  - ✅ PlayerWorldService interface for per-world tracking
+  - ✅ DefaultPlayerWorldService with session management and performance optimization
   - ✅ Player activity tracking, location updates, name history
   - ✅ Search functionality and recent players queries
   - Location: `org.fourz.rvnkcore.service.player.*`
@@ -115,17 +139,24 @@ The primary focus for Q3-Q4 2025 is the extraction of core functionality into RV
 
 - [x] **Supporting Components**
   - ✅ Exception framework with ServiceException
-  - ✅ AnnouncementDTO model with builder pattern
-  - ✅ Working player core example for tracking
-  - Status: All foundation components complete and tested
+  - ✅ PlayerDTO and PlayerWorldDataDTO models with builder pattern
+  - ✅ Working player and world tracking example
+  - Status: All foundation components complete and operational
 
 ### Phase 2: Service Implementation (Q4 2025)
 
 This phase focuses on implementing the core services that will be provided by RVNKCore.
 
-#### Player Services *(High Priority)*
+#### Data Services *(High Priority)*
 
-- [ ] **Player Registry**
+- [ ] **Announcement Service**
+  - Extract from RVNKTools announcement system
+  - Implement service interface
+  - Build scheduling framework
+
+- [ ] **Link Service** *(Medium Priority)*
+  - Extract from RVNKTools link system
+  - Add tracking and analytics
   - Implement centralized player tracking
   - Add player metadata storage
   - Create player events
