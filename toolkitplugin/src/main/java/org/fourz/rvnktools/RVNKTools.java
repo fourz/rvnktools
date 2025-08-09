@@ -6,7 +6,8 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
-import org.fourz.rvnktools.commands.WorldSwapCommand;
+import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
+import org.fourz.rvnktools.commands.LegacyWorldSwapCommand;  // Deprecated - will be removed in 2.0
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
@@ -166,15 +167,27 @@ public class RVNKTools extends JavaPlugin implements Listener {
         commandManager = CommandManager.getInstance(this);
         commandManager.initializeCommands();
         
-        // Register RVNKCore commands that require the bootstrap
+        // Register TeleportCommand for teleportation utilities
         if (coreBootstrap != null && coreBootstrap.isInitialized()) {
             try {
-                // Register WorldSwap command that uses PlayerWorldService
-                WorldSwapCommand worldSwapCmd = new WorldSwapCommand(this, coreBootstrap);
-                this.getCommand("worldswap").setExecutor(worldSwapCmd);
-                logger.info("WorldSwap command registered successfully");
+                // Register new TeleportCommand through command manager
+                TeleportCommand teleportCmd = new TeleportCommand(this);
+                commandManager.registerCommand(teleportCmd);
+                logger.info("TeleportCommand registered successfully - use '/teleport worldswap' for world teleportation");
+
+                // DEPRECATED: Legacy WorldSwap command registration - this will be removed in a future version
+                // Use '/teleport worldswap' or '/rvnktools teleport worldswap' instead
+                try {
+                    @SuppressWarnings("removal")
+                    LegacyWorldSwapCommand worldSwapCmd = new LegacyWorldSwapCommand(this, coreBootstrap);
+                    this.getCommand("worldswap").setExecutor(worldSwapCmd);
+                    logger.warning("Legacy WorldSwap command registered - this command is deprecated");
+                    logger.warning("Please use '/teleport worldswap' or '/rvnktools teleport worldswap' instead");
+                } catch (Exception e) {
+                    logger.error("Failed to register legacy WorldSwap command", e);
+                }
             } catch (Exception e) {
-                logger.error("Failed to register WorldSwap command", e);
+                logger.error("Failed to register teleport commands", e);
             }
         }
     }

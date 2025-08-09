@@ -14,26 +14,22 @@ import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.RVNKTools;
 
-import java.util.Optional;
-
 /**
- * WorldSwap command implementation using RVNKCore per-world tracking.
+ * DEPRECATED: This is a legacy command for backward compatibility.
+ * Please use '/teleport worldswap' or '/rvnktools teleport worldswap' instead.
+ * This command will be removed in a future version.
  * 
- * This command allows players to teleport back to their last known location
- * in a specified world, demonstrating the per-world location tracking
- * capabilities of the PlayerWorldService.
- * 
- * Usage: /worldswap <world_name>
- * 
+ * @deprecated Use new command framework instead
  * @since 1.0.0
  */
-public class WorldSwapCommand implements CommandExecutor {
+@Deprecated(since = "1.1", forRemoval = true)
+public class LegacyWorldSwapCommand implements CommandExecutor {
     
     private final RVNKTools plugin;
     private final RVNKCoreBootstrap coreBootstrap;
     private final LogManager logger;
     
-    public WorldSwapCommand(RVNKTools plugin, RVNKCoreBootstrap coreBootstrap) {
+    public LegacyWorldSwapCommand(RVNKTools plugin, RVNKCoreBootstrap coreBootstrap) {
         this.plugin = plugin;
         this.coreBootstrap = coreBootstrap;
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -49,6 +45,10 @@ public class WorldSwapCommand implements CommandExecutor {
         
         Player player = (Player) sender;
         
+        // Show deprecation warning
+        player.sendMessage("§e⚠ This command is deprecated and will be removed in a future version.");
+        player.sendMessage("§7Please use '/teleport worldswap' or '/rvnktools teleport worldswap' instead.");
+        
         // Check for correct usage
         if (args.length != 1) {
             player.sendMessage("§cUsage: /worldswap <world_name>");
@@ -60,13 +60,13 @@ public class WorldSwapCommand implements CommandExecutor {
         // Validate that the target world exists
         World targetWorld = Bukkit.getWorld(targetWorldName);
         if (targetWorld == null) {
-            player.sendMessage("§cWorld '" + targetWorldName + "' does not exist.");
+            player.sendMessage("§c✖ World '" + targetWorldName + "' does not exist.");
             return true;
         }
         
         // Check if player is already in the target world
         if (player.getWorld().getName().equals(targetWorldName)) {
-            player.sendMessage("§cYou are already in world '" + targetWorldName + "'.");
+            player.sendMessage("§c✖ You are already in world '" + targetWorldName + "'.");
             return true;
         }
         
@@ -117,7 +117,7 @@ public class WorldSwapCommand implements CommandExecutor {
                 })
                 .exceptionally(throwable -> {
                     // Handle errors gracefully
-                    player.sendMessage("§cFailed to retrieve location data. Teleporting to world spawn.");
+                    player.sendMessage("§c✖ Failed to retrieve location data. Teleporting to world spawn.");
                     logger.error("Failed to get last known location for " + player.getName() + 
                                " in world " + targetWorldName, throwable);
                     
@@ -130,7 +130,7 @@ public class WorldSwapCommand implements CommandExecutor {
                 });
                 
         } catch (ServiceException e) {
-            player.sendMessage("§cFailed to access world tracking service. Please try again.");
+            player.sendMessage("§c✖ Failed to access world tracking service. Please try again.");
             logger.error("Failed to get PlayerWorldService for worldswap command", e);
         }
         

@@ -5,26 +5,30 @@ import com.onarandombox.MultiverseCore.api.MultiverseWorld;
 import com.onarandombox.MultiverseCore.MultiverseCore;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
+import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.Collections;
 
 /**
  * World swap subcommand that allows players to teleport between worlds
- * while preserving their locations in each world.
+ * while preserving their locations in each world using RVNKCore tracking.
  */
 public class WorldSwapSubCommand extends BaseSubCommand {
     
     private final MultiverseCore multiverseCore;
-    private final HashMap<UUID, HashMap<String, Location>> playerLocations;
+    private final RVNKCoreBootstrap coreBootstrap;
     private static final String DEFAULT_EVENT_WORLD = "event";
     
     public WorldSwapSubCommand(RVNKTools plugin, BaseCommand parent) {
@@ -33,7 +37,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
               "/rvnktools teleport worldswap [world]",
               "rvnktools.command.teleport.worldswap", true);
         
-        this.playerLocations = new HashMap<>();
+        this.coreBootstrap = ((RVNKTools) plugin).getCoreBootstrap();
         
         Plugin mvPlugin = Bukkit.getPluginManager().getPlugin("Multiverse-Core");
         if (mvPlugin == null || !mvPlugin.isEnabled()) {
@@ -74,28 +78,81 @@ public class WorldSwapSubCommand extends BaseSubCommand {
             return true;
         }
         
-        // Initialize player's location map if it doesn't exist
-        playerLocations.computeIfAbsent(playerId, id -> new HashMap<>());
-        
-        // Store current location in the map
-        playerLocations.get(playerId).put(currentWorld, player.getLocation());
-        
-        // Determine where to teleport
-        Location targetLocation;
-        
-        // Check if we have a stored location for the target world
-        if (playerLocations.get(playerId).containsKey(targetWorld)) {
-            targetLocation = playerLocations.get(playerId).get(targetWorld);
-            sender.sendMessage("§6⚙ Returning to your previous location in " + targetWorld + "...");
-        } else {
-            targetLocation = mvWorld.getSpawnLocation();
-            sender.sendMessage("§6⚙ Teleporting to " + targetWorld + " spawn...");
+        // Check if player is already in the target world
+        if (currentWorld.equals(targetWorld)) {
+            sender.sendMessage("§c✖ You are already in world '" + targetWorld + "'.");
+            return true;
         }
         
-        // Perform the teleport
-        player.teleport(targetLocation);
-        sender.sendMessage("§a✓ Successfully teleported to " + targetWorld);
-        logger.info(player.getName() + " used worldswap to teleport from " + currentWorld + " to " + targetWorld);
+        try {
+            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
+            
+            // Get player's last known location in the target world
+            playerWorldService.getLastKnownLocation(playerId, targetWorld)
+                .thenAccept(locationOpt -> {
+                    if (locationOpt.isPresent()) {
+                        // Player has been to this world before - teleport to last location
+                        PlayerWorldDataDTO worldData = locationOpt.get();
+                        World bukkitWorld = Bukkit.getWorld(targetWorld);
+                        
+                        if (bukkitWorld == null) {
+                            sender.sendMessage("§c✖ Failed to find world '" + targetWorld + "'.");
+                            return;
+                        }
+                        
+                        Location targetLocation = new Location(
+                            bukkitWorld,
+                            worldData.getLastX(),
+                            worldData.getLastY(), 
+                            worldData.getLastZ(),
+                            worldData.getLastYaw(),
+                            worldData.getLastPitch()
+                        );
+                        
+                        // Perform teleportation on main thread
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            player.teleport(targetLocation);
+                            sender.sendMessage("§a✓ Welcome back to " + targetWorld + "! " +
+                                             "You have visited this world " + worldData.getVisitCount() + " times.");
+                            
+                            // Log the successful teleport
+                            logger.info(player.getName() + " used worldswap to teleport to last location in " + 
+                                       targetWorld + " (" + worldData.getLastX() + ", " + 
+                                       worldData.getLastY() + ", " + worldData.getLastZ() + ")");
+                        });
+                        
+                    } else {
+                        // Player has never been to this world - teleport to spawn
+                        Location spawnLocation = mvWorld.getSpawnLocation();
+                        
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            player.teleport(spawnLocation);
+                            sender.sendMessage("§a✓ Welcome to " + targetWorld + " for the first time! " +
+                                             "Teleported to world spawn.");
+                            
+                            // Log the first-time teleport
+                            logger.info(player.getName() + " used worldswap to teleport to " + targetWorld + 
+                                       " for the first time (spawn location)");
+                        });
+                    }
+                })
+                .exceptionally(throwable -> {
+                    // Handle errors gracefully - fallback to spawn
+                    sender.sendMessage("§c✖ Failed to retrieve location data. Teleporting to world spawn.");
+                    logger.error("Failed to get last known location for " + player.getName() + 
+                               " in world " + targetWorld, throwable);
+                    
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        player.teleport(mvWorld.getSpawnLocation());
+                    });
+                    
+                    return null;
+                });
+                
+        } catch (ServiceException e) {
+            sender.sendMessage("§c✖ Failed to access world tracking service. Please try again.");
+            logger.error("Failed to get PlayerWorldService for worldswap command", e);
+        }
         
         return true;
     }
@@ -119,14 +176,5 @@ public class WorldSwapSubCommand extends BaseSubCommand {
             return worlds;
         }
         return Collections.emptyList();
-    }
-    
-    /**
-     * Get stored locations for debugging or administrative purposes.
-     * 
-     * @return Map of player locations by world
-     */
-    public HashMap<UUID, HashMap<String, Location>> getPlayerLocations() {
-        return playerLocations;
     }
 }

@@ -53,6 +53,11 @@ commands:
     usage: /worldswap <world_name>
     aliases: [ws]
     permission: rvnktools.command.worldswap
+  teleport:
+    description: Teleportation utilities and world management
+    usage: /teleport <subcommand> [args]
+    aliases: [tp]
+    permission: rvnktools.command.teleport
   cyclegamemode:
     description: Cycle through gamemodes.
     usage: /cyclegamemode
@@ -141,6 +146,12 @@ permissions:
     default: op
   rvnktools.command.worldswap:
     description: Allows swapping between worlds while maintaining location history
+    default: op
+  rvnktools.command.teleport:
+    description: Allows access to teleportation utilities
+    default: op
+  rvnktools.command.teleport.worldswap:
+    description: Allows teleporting between worlds while preserving locations
     default: op
   rvnktools.command.example:
     description: Allows using the example command

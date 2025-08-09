@@ -7,6 +7,7 @@ import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
+import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -57,6 +58,9 @@ public class CommandManager {
         registerCommand(new DiscordCommand(plugin));
         registerCommand(new EventsCommand(plugin));
         registerCommand(new TrainsCommand(plugin));
+        
+        // Register teleportation commands
+        registerCommand(new TeleportCommand(plugin));
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));
