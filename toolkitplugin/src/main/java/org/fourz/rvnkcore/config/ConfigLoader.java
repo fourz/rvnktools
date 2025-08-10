@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.config;
 
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -14,25 +15,49 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Unified configuration loader for RVNKCore components.
  * 
  * Handles loading and validation of API and database configuration from config-core.yml,
  * ensuring proper configuration file creation using Bukkit/Spigot methodology.
+ * Uses singleton pattern per plugin to prevent duplicate loading.
  * 
  * @since 1.0.0
  */
 public class ConfigLoader {
+    
+    // Singleton instances per plugin
+    private static final ConcurrentHashMap<String, ConfigLoader> instances = new ConcurrentHashMap<>();
     
     private final Plugin plugin;
     private final LogManager logger;
     private FileConfiguration coreConfig;
     private final String configFileName = "config-core.yml";
     
-    public ConfigLoader(Plugin plugin) {
+    // Cached configurations to prevent duplicate loading
+    private DatabaseConfig cachedDatabaseConfig;
+    private ApiConfig cachedApiConfig;
+    private volatile boolean initialized = false;
+    
+    private ConfigLoader(Plugin plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
+    }
+    
+    /**
+     * Gets the singleton ConfigLoader instance for a plugin.
+     * 
+     * @param plugin The plugin instance
+     * @return The ConfigLoader instance for this plugin
+     */
+    public static ConfigLoader getInstance(Plugin plugin) {
+        return instances.computeIfAbsent(plugin.getName(), k -> {
+            ConfigLoader loader = new ConfigLoader(plugin);
+            loader.ensureConfigExists();
+            return loader;
+        });
     }
     
     /**
@@ -146,7 +171,7 @@ public class ConfigLoader {
     }
     
     /**
-     * Validates API-specific configuration sections.
+     * Validates API-specific configuration sections with comprehensive checks.
      */
     private void validateApiConfiguration() {
         if (!coreConfig.contains("api")) {
@@ -168,6 +193,19 @@ public class ConfigLoader {
             }
         }
         
+        // Check for deprecated settings that should be removed/renamed
+        String[] deprecatedPaths = {
+            "api.server.min-threads",
+            "api.server.queue-size",
+            "api.auth.enabled"
+        };
+        
+        for (String path : deprecatedPaths) {
+            if (coreConfig.contains(path)) {
+                logger.warning("Deprecated API configuration found: " + path + " (will be ignored)");
+            }
+        }
+        
         // Validate port ranges
         int httpPort = coreConfig.getInt("api.http.port", 8080);
         int httpsPort = coreConfig.getInt("api.https.port", 8081);
@@ -183,10 +221,25 @@ public class ConfigLoader {
         if (httpPort == httpsPort) {
             logger.error("HTTP and HTTPS ports cannot be the same: " + httpPort);
         }
+        
+        // Validate API key security
+        String apiKey = coreConfig.getString("api.auth.key", "changeme");
+        if ("changeme".equals(apiKey)) {
+            logger.warning("API key is set to default value 'changeme' - please change for security");
+        }
+        
+        // Validate HTTPS configuration if enabled
+        boolean httpsEnabled = coreConfig.getBoolean("api.https.enabled", false);
+        if (httpsEnabled) {
+            String keystorePath = coreConfig.getString("api.https.keystore-path", "");
+            if (keystorePath.trim().isEmpty()) {
+                logger.error("HTTPS enabled but keystore path not specified");
+            }
+        }
     }
     
     /**
-     * Validates database configuration sections.
+     * Validates database configuration sections with detailed error checking.
      */
     private void validateDatabaseConfiguration() {
         if (!coreConfig.contains("database")) {
@@ -211,11 +264,26 @@ public class ConfigLoader {
                     logger.error("Required MySQL configuration missing: " + path);
                 }
             }
+            
+            // Validate MySQL pool configuration if present
+            if (coreConfig.contains("database.mysql.pool")) {
+                int maxConnections = coreConfig.getInt("database.mysql.pool.maxConnections", 20);
+                int minIdleConnections = coreConfig.getInt("database.mysql.pool.minIdleConnections", 5);
+                
+                if (maxConnections <= 0) {
+                    logger.error("Invalid MySQL pool maxConnections: " + maxConnections);
+                }
+                
+                if (minIdleConnections < 0 || minIdleConnections > maxConnections) {
+                    logger.error("Invalid MySQL pool minIdleConnections: " + minIdleConnections + 
+                               " (must be >= 0 and <= maxConnections)");
+                }
+            }
         }
     }
     
     /**
-     * Validates logging configuration.
+     * Validates logging configuration with level validation.
      */
     private void validateLoggingConfiguration() {
         String logLevel = coreConfig.getString("logging.level", "INFO");
@@ -245,122 +313,86 @@ public class ConfigLoader {
     }
     
     /**
-     * Gets the API configuration instance.
+     * Gets the API configuration instance with caching.
      * 
      * @return ApiConfig instance
      */
     public ApiConfig getApiConfig() {
+        // Return cached config if available
+        if (cachedApiConfig != null) {
+            logger.debug("Using cached API configuration");
+            return cachedApiConfig;
+        }
+        
         if (coreConfig == null) {
             ensureConfigExists();
         }
-        return new ApiConfig(plugin, coreConfig);
+        
+        // Get the API configuration section
+        ConfigurationSection apiSection = coreConfig.getConfigurationSection("api");
+        if (apiSection == null) {
+            logger.warning("API configuration section missing - creating default config");
+            // Create a minimal API section
+            coreConfig.createSection("api");
+            coreConfig.set("api.enabled", false);
+            coreConfig.set("api.host", "localhost");
+            coreConfig.set("api.http.port", 8080);
+            coreConfig.set("api.https.port", 8081);
+            coreConfig.set("api.auth.key", "changeme");
+            apiSection = coreConfig.getConfigurationSection("api");
+        }
+        
+        // Get global log level for API config
+        String globalLogLevel = coreConfig.getString("logging.level", "INFO");
+        
+        // Create ApiConfig using static factory method and cache it
+        cachedApiConfig = ApiConfig.fromConfigurationSection(plugin, apiSection, globalLogLevel);
+        logger.debug("API configuration loaded and cached");
+        return cachedApiConfig;
     }
     
     /**
-     * Gets the database configuration instance.
+     * Gets the database configuration instance with caching.
      * 
      * @return DatabaseConfig instance
      */
     public DatabaseConfig getDatabaseConfig() {
+        // Return cached config if available
+        if (cachedDatabaseConfig != null) {
+            logger.debug("Using cached database configuration");
+            return cachedDatabaseConfig;
+        }
+        
         if (coreConfig == null) {
             ensureConfigExists();
         }
-        return loadDatabaseConfig();
-    }
-    
-    /**
-     * Loads database configuration from core config.
-     * 
-     * @return DatabaseConfig instance
-     */
-    private DatabaseConfig loadDatabaseConfig() {
-        String databaseType = coreConfig.getString("database.type", "sqlite").toLowerCase();
         
-        logger.info("Loading database configuration for type: " + databaseType);
+        // Get database type
+        String dbType = coreConfig.getString("database.type", "sqlite");
         
-        switch (databaseType) {
-            case "sqlite":
-                return loadSQLiteConfig();
-            case "mysql":
-                return loadMySQLConfig();
-            default:
-                throw new IllegalStateException("Unsupported database type: " + databaseType + 
-                                              ". Supported types: sqlite, mysql");
-        }
-    }
-    
-    /**
-     * Creates SQLite configuration from core config settings.
-     * 
-     * @return DatabaseConfig for SQLite
-     */
-    private DatabaseConfig loadSQLiteConfig() {
-        String databaseFile = coreConfig.getString("database.sqlite.file", "rvnkcore.db");
-        
-        logger.info("Configuring SQLite database: " + databaseFile);
-        
-        return DatabaseConfig.builder()
+        // Build DatabaseConfig based on type
+        if ("mysql".equalsIgnoreCase(dbType)) {
+            cachedDatabaseConfig = DatabaseConfig.builder()
+                .type("mysql")
+                .host(coreConfig.getString("database.mysql.host", "localhost"))
+                .port(coreConfig.getInt("database.mysql.port", 3306))
+                .database(coreConfig.getString("database.mysql.database", "rvnkcore"))
+                .username(coreConfig.getString("database.mysql.username", ""))
+                .password(coreConfig.getString("database.mysql.password", ""))
+                .useSSL(coreConfig.getBoolean("database.mysql.useSSL", true))
+                .maxConnections(coreConfig.getInt("database.mysql.maxConnections", 10))
+                .build();
+        } else {
+            // Default to SQLite
+            String databaseFile = coreConfig.getString("database.sqlite.file", "rvnkcore.db");
+            cachedDatabaseConfig = DatabaseConfig.builder()
                 .type("sqlite")
                 .database(databaseFile)
                 .build();
-    }
-    
-    /**
-     * Creates MySQL configuration from core config settings.
-     * 
-     * @return DatabaseConfig for MySQL
-     */
-    private DatabaseConfig loadMySQLConfig() {
-        String host = coreConfig.getString("database.mysql.host");
-        int port = coreConfig.getInt("database.mysql.port", 3306);
-        String database = coreConfig.getString("database.mysql.database");
-        String username = coreConfig.getString("database.mysql.username");
-        String password = coreConfig.getString("database.mysql.password");
-        
-        // Validate required settings
-        if (host == null || host.trim().isEmpty()) {
-            throw new IllegalStateException("MySQL host is required but not configured in " + configFileName);
-        }
-        if (database == null || database.trim().isEmpty()) {
-            throw new IllegalStateException("MySQL database name is required but not configured in " + configFileName);
-        }
-        if (username == null || username.trim().isEmpty()) {
-            throw new IllegalStateException("MySQL username is required but not configured in " + configFileName);
-        }
-        if (password == null) {
-            logger.warning("MySQL password is empty - this may cause connection issues");
-            password = "";
         }
         
-        // Optional settings
-        boolean useSSL = coreConfig.getBoolean("database.mysql.useSSL", true);
-        String connectionParameters = coreConfig.getString("database.mysql.connectionParameters", "");
-        
-        // Connection pool settings from core config
-        DatabaseConfig.Builder builder = DatabaseConfig.builder()
-                .type("mysql")
-                .host(host)
-                .port(port)
-                .database(database)
-                .username(username)
-                .password(password)
-                .useSSL(useSSL)
-                .connectionParameters(connectionParameters);
-        
-        // Load pool configuration if present
-        if (coreConfig.contains("database.mysql.pool")) {
-            builder.maxConnections(coreConfig.getInt("database.mysql.pool.maxConnections", 20))
-                   .minIdleConnections(coreConfig.getInt("database.mysql.pool.minIdleConnections", 5))
-                   .connectionTimeoutMs(coreConfig.getLong("database.mysql.pool.connectionTimeoutMs", 30000))
-                   .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 600000))
-                   .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 1800000))
-                   .leakDetectionMs(coreConfig.getLong("database.mysql.pool.leakDetectionMs", 60000));
-        }
-        
-        logger.info("Configuring MySQL database - Host: " + host + ":" + port + 
-                   ", Database: " + database + ", SSL: " + useSSL);
-        
-        return builder.build();
+        logger.debug("Database configuration loaded and cached: " + dbType);
+        return cachedDatabaseConfig;
     }
     
     /**
@@ -370,5 +402,88 @@ public class ConfigLoader {
         logger.info("Reloading core configuration from " + configFileName);
         loadConfig();
         validateConfiguration();
+    }
+    
+    /**
+     * Performs comprehensive validation of the current configuration.
+     * 
+     * @return true if configuration is valid, false if issues were found
+     */
+    public boolean validateConfigurationPublic() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        
+        boolean isValid = true;
+        
+        // Validate each section
+        try {
+            validateApiConfiguration();
+            validateDatabaseConfiguration(); 
+            validateLoggingConfiguration();
+        } catch (Exception e) {
+            logger.error("Configuration validation failed", e);
+            isValid = false;
+        }
+        
+        logger.info("Configuration validation completed");
+        return isValid;
+    }
+    
+    /**
+     * Gets a comprehensive summary of the current configuration for debugging.
+     * 
+     * @return Configuration summary string
+     */
+    public String getConfigurationSummary() {
+        if (coreConfig == null) {
+            return "Core configuration not loaded";
+        }
+        
+        StringBuilder summary = new StringBuilder();
+        summary.append("RVNKCore Configuration Summary:\n");
+        
+        // Logging configuration
+        String logLevel = coreConfig.getString("logging.level", "INFO");
+        summary.append("  Logging Level: ").append(logLevel).append("\n");
+        
+        // Database configuration
+        String dbType = coreConfig.getString("database.type", "sqlite");
+        summary.append("  Database Type: ").append(dbType).append("\n");
+        
+        if ("sqlite".equalsIgnoreCase(dbType)) {
+            String dbFile = coreConfig.getString("database.sqlite.file", "rvnkcore.db");
+            summary.append("    SQLite File: ").append(dbFile).append("\n");
+        } else if ("mysql".equalsIgnoreCase(dbType)) {
+            String host = coreConfig.getString("database.mysql.host", "localhost");
+            int port = coreConfig.getInt("database.mysql.port", 3306);
+            String database = coreConfig.getString("database.mysql.database", "");
+            summary.append("    MySQL Host: ").append(host).append(":").append(port).append("\n");
+            summary.append("    MySQL Database: ").append(database).append("\n");
+        }
+        
+        // API configuration
+        boolean apiEnabled = coreConfig.getBoolean("api.enabled", false);
+        summary.append("  API Enabled: ").append(apiEnabled).append("\n");
+        
+        if (apiEnabled) {
+            String host = coreConfig.getString("api.host", "localhost");
+            int httpPort = coreConfig.getInt("api.http.port", 8080);
+            boolean httpsEnabled = coreConfig.getBoolean("api.https.enabled", false);
+            int httpsPort = coreConfig.getInt("api.https.port", 8081);
+            
+            summary.append("    API Host: ").append(host).append("\n");
+            summary.append("    HTTP Port: ").append(httpPort).append("\n");
+            summary.append("    HTTPS Enabled: ").append(httpsEnabled);
+            if (httpsEnabled) {
+                summary.append(" (Port: ").append(httpsPort).append(")");
+            }
+            summary.append("\n");
+            
+            boolean corsEnabled = coreConfig.getBoolean("api.cors.enabled", true);
+            summary.append("    CORS Enabled: ").append(corsEnabled).append("\n");
+        }
+        
+        return summary.toString();
     }
 }

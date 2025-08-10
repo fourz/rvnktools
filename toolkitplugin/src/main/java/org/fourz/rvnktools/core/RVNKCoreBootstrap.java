@@ -7,6 +7,7 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
+import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
@@ -244,7 +245,10 @@ public class RVNKCoreBootstrap {
      */
     private void startApiServer() {
         try {
-            ApiConfig apiConfig = new ApiConfig(plugin);
+            // Use ConfigLoader to get API configuration from config-core.yml
+            ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+            ApiConfig apiConfig = configLoader.getApiConfig();
+            
             if (apiConfig.isEnabled()) {
                 // Configure all loggers with the global log level
                 configureGlobalLogging(apiConfig);

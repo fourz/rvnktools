@@ -108,8 +108,8 @@ public class RVNKTools extends JavaPlugin implements Listener {
     private void initializeRVNKCore() {
         logger.info("Initializing RVNKCore components...");
         try {
-            // Initialize RVNKCore configuration
-            org.fourz.rvnkcore.config.ConfigLoader coreConfigLoader = new org.fourz.rvnkcore.config.ConfigLoader(this);
+            // Initialize RVNKCore configuration using singleton pattern
+            org.fourz.rvnkcore.config.ConfigLoader coreConfigLoader = org.fourz.rvnkcore.config.ConfigLoader.getInstance(this);
             coreConfigLoader.ensureConfigExists();
             
             logger.info("RVNKCore configuration loaded successfully");

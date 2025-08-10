@@ -1,7 +1,7 @@
 package org.fourz.rvnkcore.database.connection;
 
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
-import org.fourz.rvnkcore.database.config.DatabaseConfigLoader;
+import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -35,8 +35,8 @@ public class ConnectionProviderFactory {
      * @throws IllegalStateException If configuration is invalid
      */
     public ConnectionProvider createConnectionProvider() {
-        DatabaseConfigLoader configLoader = new DatabaseConfigLoader(plugin);
-        DatabaseConfig config = configLoader.loadDatabaseConfig();
+        ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+        DatabaseConfig config = configLoader.getDatabaseConfig();
         
         return createConnectionProvider(config);
     }

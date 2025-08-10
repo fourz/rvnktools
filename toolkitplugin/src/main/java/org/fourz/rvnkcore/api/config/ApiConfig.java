@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.api.config;
 
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -89,6 +90,68 @@ public class ApiConfig {
         String apiLogStr = apiLogLevelStr.equals(logLevelStr) ? "inherits global" : apiLogLevelStr;
         logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + 
                    ", Global Log Level: " + logLevelStr + 
+                   ", API Log Level: " + apiLogStr + 
+                   ", HTTP Port: " + httpPort + 
+                   ", HTTPS Port: " + httpsPort);
+    }
+
+    /**
+     * Creates ApiConfig from ConfigurationSection with plugin context.
+     * This method is used by ConfigLoader to create ApiConfig from the API section.
+     *
+     * @param plugin The plugin instance for logging context
+     * @param apiSection The API configuration section from the core config
+     * @param globalLogLevel The global log level string from the core config
+     * @return ApiConfig instance
+     */
+    public static ApiConfig fromConfigurationSection(Plugin plugin, ConfigurationSection apiSection, String globalLogLevel) {
+        LogManager logger = LogManager.getInstance(plugin);
+        
+        // Parse global log level
+        Level parsedGlobalLogLevel = Debug.getLevel(globalLogLevel);
+        
+        // Create a private constructor call
+        return new ApiConfig(plugin, apiSection, parsedGlobalLogLevel, logger);
+    }
+    
+    /**
+     * Private constructor used by the static factory method.
+     */
+    private ApiConfig(Plugin plugin, ConfigurationSection apiSection, Level globalLogLevel, LogManager logger) {
+        this.logger = logger;
+        this.globalLogLevel = globalLogLevel;
+        
+        this.enabled = apiSection.getBoolean("enabled", false);
+        this.host = apiSection.getString("host", "localhost");
+        this.httpPort = apiSection.getInt("http.port", 8080);
+        this.httpsPort = apiSection.getInt("https.port", 8081);
+        this.apiKey = apiSection.getString("auth.key", "changeme");
+        this.corsEnabled = apiSection.getBoolean("cors.enabled", true);
+        this.corsAllowedOrigins = apiSection.getString("cors.allowed-origins", "*");
+        this.corsAllowedMethods = apiSection.getString("cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS");
+        this.maxThreads = apiSection.getInt("server.max-threads", 50);
+        this.idleTimeout = apiSection.getInt("server.idle-timeout", 30000);
+        this.httpsEnabled = apiSection.getBoolean("https.enabled", false);
+        this.keystorePath = apiSection.getString("https.keystore-path", "");
+        this.keystorePassword = apiSection.getString("https.keystore-password", "");
+        this.sendServerVersion = apiSection.getBoolean("server.send-version", false);
+        
+        // Read API-specific log level, defaulting to global log level
+        String apiLogLevelStr = apiSection.getString("logging.level", globalLogLevel.getName());
+        this.apiLogLevel = Debug.getLevel(apiLogLevelStr);
+        
+        this.contextPath = apiSection.getString("context-path", "/api");
+        this.connectionTimeout = apiSection.getInt("server.connection-timeout", 60000);
+        this.useForwardedHeaders = apiSection.getBoolean("server.use-forwarded-headers", true);
+        
+        // Parse allowed IPs
+        String allowedIPsStr = apiSection.getString("security.allowed-ips", "");
+        this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
+        
+        // Log configuration summary
+        String apiLogStr = apiLogLevelStr.equals(globalLogLevel.getName()) ? "inherits global" : apiLogLevelStr;
+        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + 
+                   ", Global Log Level: " + globalLogLevel.getName() + 
                    ", API Log Level: " + apiLogStr + 
                    ", HTTP Port: " + httpPort + 
                    ", HTTPS Port: " + httpsPort);
