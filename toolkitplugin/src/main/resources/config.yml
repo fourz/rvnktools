@@ -1,90 +1,25 @@
 # RVNKTools Configuration
+# Main configuration for RVNKTools features
+
 # Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
 logging:
   level: INFO
 
-# Database Configuration
-# Supported types: sqlite, mysql
-database:
-  type: sqlite
-  
-  # SQLite Configuration (default)
-  sqlite:
-    file: rvnkcore.db
-  
-  # MySQL Configuration
-  mysql:
-    host: localhost
-    port: 3306
-    database: rvnktools
-    username: rvnkuser
-    password: secure_password
-    useSSL: true
-    connectionParameters: allowPublicKeyRetrieval=true
-    
-    # Connection Pool Configuration
-    pool:
-      maxConnections: 20
-      minIdleConnections: 5
-      connectionTimeoutMs: 30000
-      idleTimeoutMs: 600000
-      maxLifetimeMs: 1800000
-      leakDetectionMs: 60000
-
 # Log Filter Configuration
-# Filters log messages from specified plugins based on keyword patterns
+# Controls which types of server messages are displayed in console
 logfilter:
   enabled: true
-  debug-enabled: false
-  
-  # List of target plugins to filter logs from
-  # Add or remove plugin names as needed
-  target-plugins:
-    - "DHSupport"
-    # - "AnotherPlugin"
-    # - "ThirdPlugin"
-  
-  # Keywords to filter out from target plugin logs
-  # Messages containing these keywords will be suppressed
-  keywords:
-    - "Loading chunk"
-    - "Unloading chunk" 
-    - "Saving chunk"
-    # Add more keywords as needed
+  show:
+    spigot: false        # Show Spigot framework messages
+    bukkit: false        # Show Bukkit framework messages
+    craftbukkit: false   # Show CraftBukkit implementation messages  
+    paper: false         # Show Paper-specific messages
+    plugins: true        # Show plugin messages
 
-api:
-  enabled: false
-  host: localhost
-  context-path: /api
-
-  http:
-    port: 8080
-
-  https:
-    enabled: false
-    port: 8081
-    keystore-path: "keystore.jks"
-    keystore-password: "changeme"
-
-  cors:
-    enabled: true
-    allowed-origins: "*"
-    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
-
-  auth:
-    key: "changeme"
-
-  server:
-    max-threads: 50
-    idle-timeout: 30000
-    connection-timeout: 60000
-    send-version: false
-    use-forwarded-headers: true
-
-  security:
-    allowed-ips: ""
-
-  logging:
-    # Optional: Override global logging level for API operations
-    # If not specified, uses global logging.level setting
-    # level: DEBUG
+# Feature Configuration
+# Enable or disable specific RVNKTools features
+features:
+  announcements: true    # Announcement system
+  hat-command: true      # /hat command for cosmetic items
+  link-command: true     # /link command for clickable links
+  world-swap: true       # World switching with location tracking

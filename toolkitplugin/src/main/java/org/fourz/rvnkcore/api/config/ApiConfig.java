@@ -42,10 +42,17 @@ public class ApiConfig {
      * @param plugin The plugin instance for configuration access
      */
     public ApiConfig(Plugin plugin) {
+        this(plugin, plugin.getConfig());
+    }
+    
+    /**
+     * Creates ApiConfig from specific FileConfiguration with plugin context.
+     *
+     * @param plugin The plugin instance for logging context
+     * @param config The configuration to read from
+     */
+    public ApiConfig(Plugin plugin, FileConfiguration config) {
         this.logger = LogManager.getInstance(plugin);
-        
-        // Load configuration with defaults
-        FileConfiguration config = plugin.getConfig();
         
         // Read global log level first and apply it
         String logLevelStr = config.getString("logging.level", "INFO");

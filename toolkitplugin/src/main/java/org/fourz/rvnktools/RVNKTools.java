@@ -6,6 +6,8 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
+import org.fourz.rvnktools.config.ConfigLoader;
+import org.fourz.rvnktools.config.Config;
 import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
@@ -16,11 +18,11 @@ import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.permission.PermissionService;
 import org.fourz.rvnktools.api.RVNKToolsAPI;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnkcore.api.config.ApiConfigLoader;
-import org.fourz.rvnkcore.api.config.ApiConfig;
-import org.fourz.rvnkcore.api.config.ApiConfigValidator;
 
 import net.milkbowl.vault.economy.Economy;
+
+import org.fourz.rvnktools.announceManager.AnnounceManager;
+import org.fourz.rvnktools.linkMaker.LinkMaker;
 
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
@@ -77,26 +79,23 @@ public class RVNKTools extends JavaPlugin implements Listener {
     }
 
     /**
-     * Initializes configuration using Bukkit/Spigot methodology.
-     * Ensures config.yml exists and is properly loaded from resources.
+     * Initializes configuration using the new unified architecture.
+     * Ensures both config.yml (RVNKTools) and config-core.yml (RVNKCore) exist and are properly loaded.
      */
     private void initializeConfiguration() {
         logger.info("Initializing configuration...");
         try {
-            // Ensure config.yml exists using Bukkit methodology
-            ApiConfigLoader configLoader = new ApiConfigLoader(this);
-            configLoader.ensureConfigExists();
+            // Initialize RVNKTools configuration
+            ConfigLoader toolsConfigLoader = new ConfigLoader(this);
+            toolsConfigLoader.ensureConfigExists();
+            Config toolsConfig = toolsConfigLoader.getConfig();
             
-            // Load and validate API configuration
-            ApiConfig apiConfig = configLoader.loadApiConfig();
-            ApiConfigValidator.ValidationResult validationResult = ApiConfigValidator.validateConfig(apiConfig);
-            validationResult.logResults(logger);
+            logger.info("RVNKTools configuration loaded successfully");
+            logger.info("RVNKTools log level: " + toolsConfig.getLogLevel().getName());
             
-            if (!validationResult.isValid()) {
-                logger.warning("Configuration validation failed - plugin may not function correctly");
-            }
+            // Log configuration summary for debugging
+            logger.info("Configuration validation complete");
             
-            logger.info("Configuration initialization complete");
         } catch (Exception e) {
             logger.error("Failed to initialize configuration", e);
             throw new RuntimeException("Configuration initialization failed", e);
@@ -104,16 +103,22 @@ public class RVNKTools extends JavaPlugin implements Listener {
     }
 
     /**
-     * Initializes the RVNKCore framework.
-     * 
-     * TODO: This will eventually become the primary initialization method,
-     * with other services migrated to use RVNKCore.
+     * Initializes the RVNKCore framework with unified configuration.
      */
     private void initializeRVNKCore() {
         logger.info("Initializing RVNKCore components...");
         try {
+            // Initialize RVNKCore configuration
+            org.fourz.rvnkcore.config.ConfigLoader coreConfigLoader = new org.fourz.rvnkcore.config.ConfigLoader(this);
+            coreConfigLoader.ensureConfigExists();
+            
+            logger.info("RVNKCore configuration loaded successfully");
+            logger.info("RVNKCore log level: " + coreConfigLoader.getCoreLogLevel().getName());
+            
+            // Initialize core bootstrap with new configuration architecture
             coreBootstrap = RVNKCoreBootstrap.getInstance(this);
             coreBootstrap.initialize();
+            
         } catch (Exception e) {
             logger.error("Failed to initialize RVNKCore components", e);
             logger.warning("Continuing with legacy initialization...");

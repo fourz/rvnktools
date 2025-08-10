@@ -1,0 +1,71 @@
+# RVNKCore Configuration
+
+# Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
+logging:
+  level: INFO
+
+# Database Configuration
+# Supported types: sqlite, mysql
+database:
+  type: sqlite
+  
+  # SQLite Configuration (default)
+  sqlite:
+    file: rvnkcore.db
+  
+  # MySQL Configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: rvnktools
+    username: rvnkuser
+    password: secure_password
+    useSSL: true
+    connectionParameters: allowPublicKeyRetrieval=true
+    
+    # Connection Pool Configuration
+    pool:
+      maxConnections: 20
+      minIdleConnections: 5
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 60000
+
+# API Configuration
+api:
+  enabled: false
+  host: localhost
+  context-path: /api
+
+  http:
+    port: 8080
+
+  https:
+    enabled: false
+    port: 8081
+    keystore-path: "keystore.jks"
+    keystore-password: "changeme"
+
+  cors:
+    enabled: true
+    allowed-origins: "*"
+    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+
+  auth:
+    key: "changeme"
+
+  server:
+    max-threads: 50
+    idle-timeout: 30000
+    connection-timeout: 60000
+    send-version: false
+    use-forwarded-headers: true
+
+  security:
+    allowed-ips: ""
+
+  logging:
+    # Optional: Override global logging level for API operations
+    # If not specified, uses rvnkcore.logging.level setting
+    # level: DEBUG
