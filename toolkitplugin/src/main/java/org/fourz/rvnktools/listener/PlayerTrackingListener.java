@@ -7,11 +7,10 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
-import org.fourz.rvnkcore.api.exception.ServiceException;
-import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.RVNKTools;
 
@@ -33,17 +32,17 @@ public class PlayerTrackingListener implements Listener {
     
     private final RVNKTools plugin;
     private final LogManager logger;
-    private final RVNKCoreBootstrap coreBootstrap;
+    private final RVNKCore rvnkCore;
     
     /**
      * Constructor for PlayerTrackingListener.
      * 
      * @param plugin The RVNKTools plugin instance
-     * @param coreBootstrap The RVNKCore bootstrap instance
+     * @param rvnkCore The RVNKCore instance
      */
-    public PlayerTrackingListener(RVNKTools plugin, RVNKCoreBootstrap coreBootstrap) {
+    public PlayerTrackingListener(RVNKTools plugin, RVNKCore rvnkCore) {
         this.plugin = plugin;
-        this.coreBootstrap = coreBootstrap;
+        this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
         
         // Log initialization with proper class prefix
@@ -60,8 +59,8 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
-            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
+            PlayerService playerService = rvnkCore.getService(PlayerService.class);
+            PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
             
             // Track both global and world-specific data
             CompletableFuture<Void> globalUpdate = playerService.getPlayer(player.getUniqueId())
@@ -115,7 +114,7 @@ public class PlayerTrackingListener implements Listener {
                     }
                 });
                 
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             logger.error("Failed to get PlayerService for join event", e);
         }
     }
@@ -130,7 +129,7 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerService playerService = rvnkCore.getService(PlayerService.class);
             
             // Update player's last location before they quit
             playerService.updatePlayerLocation(
@@ -147,7 +146,7 @@ public class PlayerTrackingListener implements Listener {
                 }
             });
             
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             logger.error("Failed to get PlayerService for quit event", e);
         }
     }
@@ -162,7 +161,7 @@ public class PlayerTrackingListener implements Listener {
         Player player = event.getPlayer();
         
         try {
-            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
+            PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
             
             // Record world change with comprehensive tracking
             playerWorldService.recordWorldChange(
@@ -183,7 +182,7 @@ public class PlayerTrackingListener implements Listener {
                 }
             });
             
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             logger.error("Failed to get PlayerWorldService for world change event", e);
         }
     }
@@ -216,7 +215,7 @@ public class PlayerTrackingListener implements Listener {
         }
         
         try {
-            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
+            PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
             
             // Update player's current location with comprehensive world data
             playerWorldService.updatePlayerLocation(
@@ -238,7 +237,7 @@ public class PlayerTrackingListener implements Listener {
                 }
             });
             
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             logger.error("Failed to get PlayerWorldService for move event", e);
         }
     }

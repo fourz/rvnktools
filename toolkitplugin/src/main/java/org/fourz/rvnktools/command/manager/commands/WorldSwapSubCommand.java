@@ -9,13 +9,12 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
-import org.fourz.rvnkcore.api.exception.ServiceException;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
-import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -28,7 +27,7 @@ import java.util.Collections;
 public class WorldSwapSubCommand extends BaseSubCommand {
     
     private final MultiverseCore multiverseCore;
-    private final RVNKCoreBootstrap coreBootstrap;
+    private final RVNKCore rvnkCore;
     private static final String DEFAULT_EVENT_WORLD = "event";
     
     public WorldSwapSubCommand(RVNKTools plugin, BaseCommand parent) {
@@ -37,7 +36,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
               "/rvnktools teleport worldswap [world]",
               "rvnktools.command.teleport.worldswap", true);
         
-        this.coreBootstrap = ((RVNKTools) plugin).getCoreBootstrap();
+        this.rvnkCore = ((RVNKTools) plugin).getRVNKCore();
         
         Plugin mvPlugin = Bukkit.getPluginManager().getPlugin("Multiverse-Core");
         if (mvPlugin == null || !mvPlugin.isEnabled()) {
@@ -85,7 +84,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
         }
         
         try {
-            PlayerWorldService playerWorldService = coreBootstrap.getService(PlayerWorldService.class);
+            PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
             
             // Get player's last known location in the target world
             playerWorldService.getLastKnownLocation(playerId, targetWorld)
@@ -149,7 +148,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
                     return null;
                 });
                 
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             sender.sendMessage("§c✖ Failed to access world tracking service. Please try again.");
             logger.error("Failed to get PlayerWorldService for worldswap command", e);
         }

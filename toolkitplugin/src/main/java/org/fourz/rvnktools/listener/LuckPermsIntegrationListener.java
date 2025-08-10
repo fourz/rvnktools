@@ -6,9 +6,8 @@ import net.luckperms.api.event.group.GroupDataRecalculateEvent;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
-import org.fourz.rvnkcore.api.exception.ServiceException;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.PlayerService;
-import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -28,7 +27,7 @@ import java.util.stream.Collectors;
  */
 public class LuckPermsIntegrationListener {
     
-    private final RVNKCoreBootstrap coreBootstrap;
+    private final RVNKCore rvnkCore;
     private final LogManager logger;
     private final LuckPerms luckPerms;
     private final EventBus eventBus;
@@ -36,11 +35,11 @@ public class LuckPermsIntegrationListener {
     /**
      * Constructor for LuckPermsIntegrationListener.
      * 
-     * @param coreBootstrap The RVNKCore bootstrap instance
+     * @param rvnkCore The RVNKCore instance
      * @param plugin The plugin instance for logging
      */
-    public LuckPermsIntegrationListener(RVNKCoreBootstrap coreBootstrap, Plugin plugin) {
-        this.coreBootstrap = coreBootstrap;
+    public LuckPermsIntegrationListener(RVNKCore rvnkCore, Plugin plugin) {
+        this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
         
         try {
@@ -80,7 +79,7 @@ public class LuckPermsIntegrationListener {
         logger.debug("Processing LuckPerms user data recalculation for: " + user.getFriendlyName() + " (" + playerId + ")");
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerService playerService = rvnkCore.getService(PlayerService.class);
             
             // Check if player exists in RVNKCore first
             playerService.playerExists(playerId)
@@ -111,7 +110,7 @@ public class LuckPermsIntegrationListener {
                     return null;
                 });
                 
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             logger.error("Failed to get PlayerService for LuckPerms group update", e);
         }
     }
@@ -142,7 +141,7 @@ public class LuckPermsIntegrationListener {
                 }
                 
                 try {
-                    PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+                    PlayerService playerService = rvnkCore.getService(PlayerService.class);
                     
                     String primaryGroup = user.getPrimaryGroup();
                     List<String> allGroups = user.getInheritedGroups(user.getQueryOptions())
@@ -151,7 +150,7 @@ public class LuckPermsIntegrationListener {
                         .collect(Collectors.toList());
                     
                     return playerService.updatePlayerGroups(playerId, primaryGroup, allGroups);
-                } catch (ServiceException e) {
+                } catch (Exception e) {
                     CompletableFuture<Void> future = new CompletableFuture<>();
                     future.completeExceptionally(e);
                     return future;

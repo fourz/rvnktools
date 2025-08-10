@@ -4,11 +4,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.config.ConfigLoader;
 import org.fourz.rvnktools.config.Config;
-import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.PlayerTrackingListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
 import org.fourz.rvnktools.listener.JoinListener;
@@ -36,8 +36,8 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public PermissionService permissionService;
     private RVNKToolsAPI api;
     private CommandManager commandManager;
-    // Add RVNKCore bootstrap component
-    private RVNKCoreBootstrap coreBootstrap;
+    // Add RVNKCore as separate plugin object
+    private RVNKCore rvnkCore;
     private LogFilter logFilter;
     private LuckPermsIntegrationListener luckPermsListener;
     private LogManager logger;
@@ -103,22 +103,16 @@ public class RVNKTools extends JavaPlugin implements Listener {
     }
 
     /**
-     * Initializes the RVNKCore framework with unified configuration.
+     * Initializes the RVNKCore framework as a separate plugin object.
      */
     private void initializeRVNKCore() {
         logger.info("Initializing RVNKCore components...");
         try {
-            // Initialize RVNKCore configuration using singleton pattern
-            org.fourz.rvnkcore.config.ConfigLoader coreConfigLoader = org.fourz.rvnkcore.config.ConfigLoader.getInstance(this);
-            coreConfigLoader.ensureConfigExists();
+            // Initialize RVNKCore as a separate plugin object
+            rvnkCore = new RVNKCore(this);
+            rvnkCore.initialize();
             
-            logger.info("RVNKCore configuration loaded successfully");
-            logger.info("RVNKCore log level: " + coreConfigLoader.getCoreLogLevel().getName());
-            
-            // Initialize core bootstrap with new configuration architecture
-            coreBootstrap = RVNKCoreBootstrap.getInstance(this);
-            coreBootstrap.initialize();
-            
+            logger.info("RVNKCore initialization completed successfully");
         } catch (Exception e) {
             logger.error("Failed to initialize RVNKCore components", e);
             logger.warning("Continuing with legacy initialization...");
@@ -129,14 +123,14 @@ public class RVNKTools extends JavaPlugin implements Listener {
      * Shuts down the RVNKCore framework.
      */
     private void shutdownRVNKCore() {
-        if (coreBootstrap != null) {
+        if (rvnkCore != null) {
             logger.info("Shutting down RVNKCore components...");
             try {
-                coreBootstrap.shutdown();
+                rvnkCore.shutdown();
             } catch (Exception e) {
                 logger.error("Error shutting down RVNKCore components", e);
             }
-            coreBootstrap = null;
+            rvnkCore = null;
         }
     }
     
@@ -180,15 +174,15 @@ public class RVNKTools extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
         getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), this);
         
-        // Register RVNKCore listeners if bootstrap is available
-        if (coreBootstrap != null && coreBootstrap.isInitialized()) {
+        // Register RVNKCore listeners if available
+        if (rvnkCore != null && rvnkCore.isInitialized()) {
             try {
-                PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, coreBootstrap);
+                PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, rvnkCore);
                 getServer().getPluginManager().registerEvents(playerTracker, this);
                 
                 // Register LuckPerms integration listener
                 try {
-                    luckPermsListener = new LuckPermsIntegrationListener(coreBootstrap, this);
+                    luckPermsListener = new LuckPermsIntegrationListener(rvnkCore, this);
                     logger.info("LuckPerms integration enabled - permission group changes will be synchronized");
                 } catch (IllegalStateException e) {
                     logger.warning("LuckPerms integration disabled: " + e.getMessage());
@@ -247,8 +241,14 @@ public class RVNKTools extends JavaPlugin implements Listener {
      * 
      * @return The RVNKCore bootstrap instance
      */
-    public RVNKCoreBootstrap getCoreBootstrap() {
-        return coreBootstrap;
+    /**
+     * Gets the RVNKCore instance for cross-plugin communication.
+     * Public API method that will be used when plugins are separate.
+     * 
+     * @return RVNKCore instance
+     */
+    public RVNKCore getRVNKCore() {
+        return rvnkCore;
     }
     
     /**

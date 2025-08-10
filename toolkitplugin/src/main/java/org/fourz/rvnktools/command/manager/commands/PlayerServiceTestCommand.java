@@ -3,12 +3,11 @@ package org.fourz.rvnktools.command.manager.commands;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnkcore.api.exception.ServiceException;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.BaseCommand;
-import org.fourz.rvnktools.core.RVNKCoreBootstrap;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.util.ChatFormat;
 
@@ -26,19 +25,19 @@ import java.util.UUID;
  */
 public class PlayerServiceTestCommand extends BaseCommand {
     
-    private final RVNKCoreBootstrap coreBootstrap;
+    private final RVNKCore rvnkCore;
     
     public PlayerServiceTestCommand(RVNKTools plugin) {
         super(plugin, "pstest", 
               "Test PlayerService functionality", 
               "/pstest <recent|groups|syncgroups> [args...]",
               "rvnktools.admin.pstest");
-        this.coreBootstrap = plugin.getCoreBootstrap();
+        this.rvnkCore = plugin.getRVNKCore();
     }
     
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
-        if (!coreBootstrap.isInitialized()) {
+        if (!rvnkCore.isInitialized()) {
             sender.sendMessage(ChatFormat.colorize("&c✖ RVNKCore is not initialized"));
             return true;
         }
@@ -91,7 +90,7 @@ public class PlayerServiceTestCommand extends BaseCommand {
         sender.sendMessage(ChatFormat.colorize("&6⚙ Retrieving players active in the last " + finalHours + " hours..."));
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerService playerService = rvnkCore.getService(PlayerService.class);
             
             playerService.getRecentPlayers(finalHours)
                 .thenAccept(recentPlayers -> {
@@ -113,7 +112,7 @@ public class PlayerServiceTestCommand extends BaseCommand {
                     return null;
                 });
                 
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             sender.sendMessage(ChatFormat.colorize("&c✖ Failed to get PlayerService: " + e.getMessage()));
         }
     }
@@ -128,7 +127,7 @@ public class PlayerServiceTestCommand extends BaseCommand {
         sender.sendMessage(ChatFormat.colorize("&6⚙ Retrieving players in group: " + groupName + "..."));
         
         try {
-            PlayerService playerService = coreBootstrap.getService(PlayerService.class);
+            PlayerService playerService = rvnkCore.getService(PlayerService.class);
             
             playerService.getPlayersByGroup(groupName)
                 .thenAccept(groupPlayers -> {
@@ -150,7 +149,7 @@ public class PlayerServiceTestCommand extends BaseCommand {
                     return null;
                 });
                 
-        } catch (ServiceException e) {
+        } catch (Exception e) {
             sender.sendMessage(ChatFormat.colorize("&c✖ Failed to get PlayerService: " + e.getMessage()));
         }
     }
