@@ -29,8 +29,10 @@ public class LogManager implements RVNKLogger {
      * @return A LogManager instance
      */
     public static LogManager getInstance(Plugin plugin, Class<?> clazz) {
-        String key = plugin.getName() + ":" + clazz.getSimpleName();
-        return instances.computeIfAbsent(key, k -> new LogManager(plugin, "[" + clazz.getSimpleName() + "] "));
+        // Create scoped key to separate RVNKCore vs RVNKTools logging
+        String scope = clazz.getPackage().getName().contains("rvnkcore") ? "RVNKCore" : "RVNKTools";
+        String key = scope + ":" + plugin.getName() + ":" + clazz.getSimpleName();
+        return instances.computeIfAbsent(key, k -> new LogManager(plugin, "[" + scope + ":" + clazz.getSimpleName() + "] "));
     }
 
     /**
