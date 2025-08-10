@@ -19,7 +19,9 @@ param (
     [Parameter(Mandatory = $false)]
     [switch]$HttpOnly,
     [Parameter(Mandatory = $false)]
-    [switch]$HttpsOnly
+    [switch]$HttpsOnly,
+    [Parameter(Mandatory = $false)]
+    [switch]$Detail
 )
 
 # Set TLS 1.2 for secure connections (required for modern HTTPS)
@@ -88,7 +90,9 @@ function Write-TestResult {
         [string]$TestName,
         [bool]$Success,
         [string]$Message,
-        [object]$Err = $null
+        [object]$Err = $null,
+        [hashtable]$RequestInfo = $null,
+        [object]$ResponseInfo = $null
     )
     if ($Success) {
         $prefix = "[PASS]"
@@ -107,6 +111,25 @@ function Write-TestResult {
                 Message = $Message
             }
         }
+    }
+    if ($Detail -and $RequestInfo) {
+        Write-Host "    --- INPUT ---" -ForegroundColor DarkGray
+        Write-Host "    URI: $($RequestInfo.Uri)" -ForegroundColor Gray
+        Write-Host "    Method: $($RequestInfo.Method)" -ForegroundColor Gray
+        Write-Host "    Headers: $($RequestInfo.Headers | ConvertTo-Json -Compress)" -ForegroundColor Gray
+        if ($RequestInfo.Body) {
+            Write-Host "    Body: $($RequestInfo.Body | ConvertTo-Json -Compress)" -ForegroundColor Gray
+        }
+        if ($RequestInfo.QueryParams) {
+            Write-Host "    QueryParams: $($RequestInfo.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Gray
+        }
+    }
+    if ($Detail -and $ResponseInfo) {
+        Write-Host "    --- OUTPUT ---" -ForegroundColor DarkGray
+        Write-Host "    Response: $($ResponseInfo | ConvertTo-Json -Compress)" -ForegroundColor Gray
+    } elseif ($Detail -and $Err) {
+        Write-Host "    --- OUTPUT (Error) ---" -ForegroundColor DarkGray
+        Write-Host "    Error: $($Err | ConvertTo-Json -Compress)" -ForegroundColor Gray
     }
 }
 
@@ -136,19 +159,27 @@ function Invoke-ApiRequest {
             ContentType = "application/json"
             ErrorAction = "Stop"
         }
-        
-    # (Removed: SkipCertificateCheck for compatibility)
-        if ($Uri -match "^https://") {
-            # (Removed: $params.SkipCertificateCheck)
-        }
-        
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json)
         }
+        $requestInfo = @{
+            Uri = $Uri
+            Method = $Method
+            Headers = $Headers
+            Body = $Body
+            QueryParams = $QueryParams
+        }
         $response = Invoke-RestMethod @params
-        return @{ Success = $true; Data = $response }
+        return @{ Success = $true; Data = $response; RequestInfo = $requestInfo; ResponseInfo = $response }
     } catch {
-        return @{ Success = $false; Error = $_ }
+        $requestInfo = @{
+            Uri = $Uri
+            Method = $Method
+            Headers = $Headers
+            Body = $Body
+            QueryParams = $QueryParams
+        }
+        return @{ Success = $false; Error = $_; RequestInfo = $requestInfo }
     }
 }
 
@@ -156,7 +187,7 @@ function Test-Connection {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.Players
     $message = if ($result.Success) { "Connected successfully" } else { "Failed to connect" }
-    Write-TestResult -Protocol $Protocol -TestName "Connection" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Connection" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-Authentication {
@@ -167,21 +198,21 @@ function Test-Authentication {
     $Headers["X-API-Key"] = $originalApiKey
     $isAuthFail = (-not $result.Success -and $result.Error.Exception.Response.StatusCode -eq 401)
     $message = if ($isAuthFail) { "Rejected invalid API key" } else { "Failed to reject invalid API key" }
-    Write-TestResult -Protocol $Protocol -TestName "Authentication" -Success $isAuthFail -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Authentication" -Success $isAuthFail -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetAllPlayers {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.Players
     $message = if ($result.Success) { "Players list retrieved" } else { "Failed to retrieve players" }
-    Write-TestResult -Protocol $Protocol -TestName "Get All Players" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get All Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetOnlinePlayers {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.OnlinePlayers
     $message = if ($result.Success) { "Online players retrieved" } else { "Failed to retrieve online players" }
-    Write-TestResult -Protocol $Protocol -TestName "Get Online Players" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get Online Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetPlayerByUuid {
@@ -189,7 +220,7 @@ function Test-GetPlayerByUuid {
     $endpoint = $Endpoints.PlayerByUuid -replace "{uuid}", $TestData.PlayerUuid
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
     $message = if ($result.Success) { "Player by UUID retrieved" } else { "Failed to retrieve player by UUID" }
-    Write-TestResult -Protocol $Protocol -TestName "Get Player by UUID" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get Player by UUID" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetPlayerByName {
@@ -197,7 +228,7 @@ function Test-GetPlayerByName {
     $endpoint = $Endpoints.PlayerByName -replace "{name}", $TestData.PlayerName
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
     $message = if ($result.Success) { "Player by name retrieved" } else { "Failed to retrieve player by name" }
-    Write-TestResult -Protocol $Protocol -TestName "Get Player by Name" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get Player by Name" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetPlayersByGroup {
@@ -205,21 +236,21 @@ function Test-GetPlayersByGroup {
     $endpoint = $Endpoints.PlayersByGroup -replace "{group}", $TestData.GroupName
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
     $message = if ($result.Success) { "Players by group retrieved" } else { "Failed to retrieve players by group" }
-    Write-TestResult -Protocol $Protocol -TestName "Get Players by Group" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get Players by Group" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-SearchPlayers {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.SearchPlayers -QueryParams @{ name = $TestData.SearchQuery }
     $message = if ($result.Success) { "Players search succeeded" } else { "Failed to search players" }
-    Write-TestResult -Protocol $Protocol -TestName "Search Players" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Search Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-GetPlayerCount {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.PlayerCount
     $message = if ($result.Success) { "Player count retrieved" } else { "Failed to retrieve player count" }
-    Write-TestResult -Protocol $Protocol -TestName "Get Player Count" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Get Player Count" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-PutPlayerLocation {
@@ -233,7 +264,7 @@ function Test-PutPlayerLocation {
     }
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint -Method "PUT" -Body $locationData
     $message = if ($result.Success) { "Player location updated" } else { "Failed to update player location" }
-    Write-TestResult -Protocol $Protocol -TestName "Update Player Location" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Update Player Location" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Test-PutPlayerGroups {
@@ -245,7 +276,7 @@ function Test-PutPlayerGroups {
     }
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint -Method "PUT" -Body $groupData
     $message = if ($result.Success) { "Player groups updated" } else { "Failed to update player groups" }
-    Write-TestResult -Protocol $Protocol -TestName "Update Player Groups" -Success $result.Success -Message $message -Err $result.Error
+    Write-TestResult -Protocol $Protocol -TestName "Update Player Groups" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
 function Run-AllTests {

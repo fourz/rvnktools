@@ -80,6 +80,7 @@ public class AuthFilter implements Filter {
         
         if (!apiKey.equals(providedKey)) {
             logger.warning("API access denied - Invalid API key '" + providedKey + "' from IP: " + clientIP);
+            logger.debug("API key comparison: expected='" + apiKey + "', provided='" + providedKey + "'");
             sendUnauthorized(httpResponse, "Invalid API key");
             return;
         }
