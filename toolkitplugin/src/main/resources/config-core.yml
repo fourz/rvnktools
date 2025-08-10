@@ -34,7 +34,7 @@ database:
 
 # API Configuration
 api:
-  enabled: false
+  enabled: true
   host: localhost
   context-path: /api
 
@@ -42,7 +42,7 @@ api:
     port: 8080
 
   https:
-    enabled: false
+    enabled: true
     port: 8081
     keystore-path: "keystore.jks"
     keystore-password: "changeme"
@@ -53,7 +53,7 @@ api:
     allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
 
   auth:
-    key: "changeme"
+    key: "9067FFAetF34576893"
 
   server:
     max-threads: 50

@@ -159,6 +159,9 @@ function Invoke-ApiRequest {
             ContentType = "application/json"
             ErrorAction = "Stop"
         }
+        if ($IgnoreSSLErrors) {
+            $params.SkipCertificateCheck = $true
+        }
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json)
         }
