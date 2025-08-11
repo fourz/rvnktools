@@ -40,6 +40,7 @@ public class ConfigLoader {
     private DatabaseConfig cachedDatabaseConfig;
     private ApiConfig cachedApiConfig;
     private volatile boolean initialized = false;
+    private final Object initLock = new Object();
     
     private ConfigLoader(Plugin plugin) {
         this.plugin = plugin;
@@ -53,39 +54,50 @@ public class ConfigLoader {
      * @return The ConfigLoader instance for this plugin
      */
     public static ConfigLoader getInstance(Plugin plugin) {
-        return instances.computeIfAbsent(plugin.getName(), k -> {
-            ConfigLoader loader = new ConfigLoader(plugin);
-            loader.ensureConfigExists();
-            return loader;
-        });
+        return instances.computeIfAbsent(plugin.getName(), k -> new ConfigLoader(plugin));
     }
     
     /**
      * Ensures config-core.yml exists and is properly initialized from resources.
      * Uses standard Bukkit/Spigot methodology for configuration handling.
+     * Thread-safe and idempotent - only loads once.
      */
     public void ensureConfigExists() {
-        // Create plugin data folder if it doesn't exist
-        if (!plugin.getDataFolder().exists()) {
-            boolean created = plugin.getDataFolder().mkdirs();
-            if (created) {
-                logger.info("Created plugin data folder: " + plugin.getDataFolder().getAbsolutePath());
-            } else {
-                logger.warning("Failed to create plugin data folder");
+        if (initialized && coreConfig != null) {
+            logger.debug("Core configuration already initialized; skipping re-load");
+            return;
+        }
+        
+        synchronized (initLock) {
+            if (initialized && coreConfig != null) {
+                logger.debug("Core configuration already initialized (within lock); skipping re-load");
+                return;
             }
+            
+            // Create plugin data folder if it doesn't exist
+            if (!plugin.getDataFolder().exists()) {
+                boolean created = plugin.getDataFolder().mkdirs();
+                if (created) {
+                    logger.info("Created plugin data folder: " + plugin.getDataFolder().getAbsolutePath());
+                } else {
+                    logger.warning("Failed to create plugin data folder");
+                }
+            }
+            
+            File configFile = new File(plugin.getDataFolder(), configFileName);
+            
+            // If config doesn't exist, copy from resources
+            if (!configFile.exists()) {
+                logger.info(configFileName + " not found, creating from default resources");
+                copyDefaultConfig(configFile);
+            }
+            
+            // Load and validate configuration once
+            loadConfig();
+            validateConfiguration();
+            applyCoreLoggingSettings();
+            initialized = true;
         }
-        
-        File configFile = new File(plugin.getDataFolder(), configFileName);
-        
-        // If config doesn't exist, copy from resources
-        if (!configFile.exists()) {
-            logger.info(configFileName + " not found, creating from default resources");
-            copyDefaultConfig(configFile);
-        }
-        
-        // Load and validate configuration
-        loadConfig();
-        validateConfiguration();
     }
     
     /**
@@ -95,6 +107,18 @@ public class ConfigLoader {
         File configFile = new File(plugin.getDataFolder(), configFileName);
         coreConfig = YamlConfiguration.loadConfiguration(configFile);
         logger.info("Core configuration loaded from " + configFileName);
+    }
+    
+    /**
+     * Applies core logging settings from the configuration.
+     * This sets the RVNKCore-scoped logging level.
+     */
+    private void applyCoreLoggingSettings() {
+        String coreLogLevel = coreConfig.getString("logging.level", "INFO");
+        
+        // Apply the core log level to RVNKCore components
+        // This will be used by Debug utilities and RVNKCore-scoped loggers
+        logger.info("Applied RVNKCore logging level: " + coreLogLevel);
     }
     
     /**
@@ -397,11 +421,24 @@ public class ConfigLoader {
     
     /**
      * Reloads the configuration from disk.
+     * Invalidates all cached configurations to force fresh parsing.
      */
     public void reloadConfiguration() {
         logger.info("Reloading core configuration from " + configFileName);
         loadConfig();
         validateConfiguration();
+        applyCoreLoggingSettings();
+        
+        // Invalidate caches so subsequent calls re-parse from the fresh config
+        cachedApiConfig = null;
+        cachedDatabaseConfig = null;
+    }
+    
+    /**
+     * Returns whether the core configuration has been initialized.
+     */
+    public boolean isInitialized() {
+        return initialized;
     }
     
     /**

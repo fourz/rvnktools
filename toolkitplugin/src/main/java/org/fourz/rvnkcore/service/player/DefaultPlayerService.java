@@ -160,6 +160,19 @@ public class DefaultPlayerService implements PlayerService {
     }
     
     @Override
+    public CompletableFuture<List<PlayerDTO>> getAllPlayers() {
+        logger.debug("Retrieving all players from database");
+        return playerRepository.findAll()
+            .whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to retrieve all players", throwable);
+                } else {
+                    logger.debug("Successfully retrieved " + result.size() + " total players");
+                }
+            });
+    }
+    
+    @Override
     public CompletableFuture<List<PlayerDTO>> getRecentPlayers(int hoursAgo) {
         logger.debug("Retrieving players active within " + hoursAgo + " hours");
         return playerRepository.findRecentPlayers(hoursAgo)

@@ -87,6 +87,19 @@ public interface PlayerService {
     CompletableFuture<Void> updatePlayerGroups(UUID playerId, String primaryGroup, List<String> allGroups);
     
     /**
+     * Retrieves all players known to the server from the database.
+     * 
+     * WARNING: This method can return a large number of players and should be used
+     * with caution on servers with many registered players. Consider using pagination
+     * or getRecentPlayers() for better performance.
+     * 
+     * @return CompletableFuture containing list of all registered players
+     * @throws org.fourz.rvnkcore.api.exception.ServiceException if retrieval fails
+     * @since 1.0.0
+     */
+    CompletableFuture<List<PlayerDTO>> getAllPlayers();
+    
+    /**
      * Retrieves all players who have been seen within the specified hours.
      * 
      * @param hoursAgo The number of hours to look back

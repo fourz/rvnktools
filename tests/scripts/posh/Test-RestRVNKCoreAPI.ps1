@@ -207,7 +207,12 @@ function Test-Authentication {
 function Test-GetAllPlayers {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.Players
-    $message = if ($result.Success) { "Players list retrieved" } else { "Failed to retrieve players" }
+    if ($result.Success) {
+        $playerCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Players list retrieved ($playerCount players found)"
+    } else {
+        $message = "Failed to retrieve players"
+    }
     Write-TestResult -Protocol $Protocol -TestName "Get All Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 

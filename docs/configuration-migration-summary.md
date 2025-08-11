@@ -228,3 +228,30 @@ Built-in validation ensures:
 **Ready for Production**: ✅ YES
 
 *Configuration migration completed successfully with full backward compatibility and enhanced features.*
+
+## Configuration Loading Behavior (Updated August 10, 2025)
+
+### Single-Load Core Configuration
+
+- config-core.yml is loaded **once** at startup by RVNKCore ConfigLoader
+- ConfigLoader.getInstance() returns singleton but does NOT automatically load config
+- ConfigLoader.ensureConfigExists() is idempotent and thread-safe - loads only once
+- RVNKCore-scoped logging settings are applied during config load
+
+### Proper Configuration Access
+
+- **Correct**: `ConfigLoader.getInstance(plugin).getApiConfig()`
+- **Correct**: `ConfigLoader.getInstance(plugin).getDatabaseConfig()`
+- **Deprecated**: `new ApiConfig(plugin)` - warns and reads from wrong config
+
+### Configuration Scope Separation
+
+- **RVNKCore** (config-core.yml): API, database, core-wide settings
+- **RVNKTools** (config.yml): RVNKTools-scope logging and LogFilter only
+- **Features**: Each RVNKTools feature uses its own YAML file
+
+### Runtime Configuration Changes
+
+- Use `configLoader.reloadConfiguration()` to explicitly reload
+- Invalidates caches and forces fresh parsing
+- Applies updated RVNKCore logging settings

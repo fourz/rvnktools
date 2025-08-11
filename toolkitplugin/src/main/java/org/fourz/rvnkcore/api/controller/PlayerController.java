@@ -150,9 +150,8 @@ public class PlayerController extends HttpServlet {
         int offset = getIntParam(req, "offset", 0);
         int limit = getIntParam(req, "limit", 50);
 
-        // For now, return recent players as a substitute for paginated all players
-        // This can be enhanced with proper pagination in the repository layer
-        playerService.getRecentPlayers(24 * 30) // Last 30 days
+        // Get all players from the database
+        playerService.getAllPlayers()
                 .thenAccept(players -> {
                     List<PlayerResponse> responses = players.stream()
                             .skip(offset)
