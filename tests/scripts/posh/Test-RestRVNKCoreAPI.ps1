@@ -210,6 +210,11 @@ function Test-GetAllPlayers {
     if ($result.Success) {
         $playerCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
         $message = "Players list retrieved ($playerCount players found)"
+        
+        # Show detailed player data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+        }
     } else {
         $message = "Failed to retrieve players"
     }
@@ -219,7 +224,17 @@ function Test-GetAllPlayers {
 function Test-GetOnlinePlayers {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.OnlinePlayers
-    $message = if ($result.Success) { "Online players retrieved" } else { "Failed to retrieve online players" }
+    if ($result.Success) {
+        $playerCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Online players retrieved ($playerCount online players found)"
+        
+        # Show detailed player data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+        }
+    } else {
+        $message = "Failed to retrieve online players"
+    }
     Write-TestResult -Protocol $Protocol -TestName "Get Online Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
@@ -257,7 +272,17 @@ function Test-SearchPlayers {
 function Test-GetPlayerCount {
     param ([string]$Protocol, [string]$BaseUrl)
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.PlayerCount
-    $message = if ($result.Success) { "Player count retrieved" } else { "Failed to retrieve player count" }
+    if ($result.Success) {
+        $countValue = if ($result.Data -and $result.Data.count -ne $null) { $result.Data.count } else { "unknown" }
+        $message = "Player count retrieved (count: $countValue)"
+        
+        # Show detailed count data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+        }
+    } else {
+        $message = "Failed to retrieve player count"
+    }
     Write-TestResult -Protocol $Protocol -TestName "Get Player Count" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 

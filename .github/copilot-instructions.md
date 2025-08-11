@@ -545,6 +545,40 @@ Use VS Code tasks for development:
 - **Restart Server**: Build and full server restart on dev server
 - **Reload Server**: Build and plugin reload only via api call
 
+### Testing and Troubleshooting Tools
+
+#### MC Server Soft (MCSS) API Integration
+
+For comprehensive testing and debugging, utilize the MCSS API for real-time server interaction:
+
+- **Console Monitoring**: Use MCSS API to read server console output in real-time
+- **Command Execution**: Execute plugin commands remotely via REST API
+- **Performance Monitoring**: Track server performance during plugin operations
+- **Error Analysis**: Programmatically search console logs for errors and exceptions
+
+**Reference Documentation**: `docs/api-reference/mcss-dev-server.md`
+
+**Key MCSS API Endpoints**:
+- `GET /api/v2/servers/{serverId}/console` - Read console output
+- `POST /api/v2/servers/{serverId}/execute/command` - Execute single commands
+- `POST /api/v2/servers/{serverId}/execute/commands` - Execute multiple commands
+- `GET /api/v2/servers/{serverId}/stats` - Monitor server performance
+
+**Example Usage**:
+```bash
+# Test plugin reload via MCSS API
+curl -X POST http://localhost:25564/api/v2/servers/{serverId}/execute/command \
+  -H "apiKey: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "rvnktools reload"}'
+
+# Monitor console for errors
+curl -X GET "http://localhost:25564/api/v2/servers/{serverId}/console?AmountOfLines=20" \
+  -H "apiKey: YOUR_API_KEY" | grep -i "error\|exception"
+```
+
+This integration enables automated testing, continuous monitoring, and rapid troubleshooting during plugin development.
+
 ## Testing Guidelines
 
 - Test commands with various input combinations
