@@ -19,7 +19,10 @@ import org.bukkit.entity.Player;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -148,27 +151,19 @@ public class PlayerController extends HttpServlet {
 
     private void handleGetAllPlayers(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         int offset = getIntParam(req, "offset", 0);
-        int limit = getIntParam(req, "limit", 50);
+        int limit  = getIntParam(req, "limit", 50);
 
-        // Get all players from the database
-        playerService.getAllPlayers()
-                .thenAccept(players -> {
-                    List<PlayerResponse> responses = players.stream()
-                            .skip(offset)
-                            .limit(limit)
-                            .map(this::convertToResponse)
-                            .collect(Collectors.toList());
-                    
-                    PagedResponse<PlayerResponse> pagedResponse = 
-                            new PagedResponse<>(responses, offset, limit, players.size());
-                    
-                    sendResponse(resp, 200, pagedResponse);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving all players", ex);
-                    sendError(resp, 500, "Failed to retrieve players");
-                    return null;
-                });
+        try {
+            List<PlayerDTO> players = playerService.getAllPlayers().get(15, TimeUnit.SECONDS);
+            List<PlayerResponse> data = players.stream()
+                                           .skip(offset).limit(limit)
+                                           .map(this::convertToResponse)
+                                           .collect(Collectors.toList());
+            sendResponse(resp, 200, new PagedResponse<>(data, offset, limit, players.size()));
+        } catch (Exception ex) {
+            logger.error("Error retrieving all players", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve players");
+        }
     }
 
     private void handleGetOnlinePlayers(HttpServletResponse resp) throws IOException {
@@ -197,52 +192,44 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleGetPlayer(UUID uuid, HttpServletResponse resp) throws IOException {
-        playerService.getPlayer(uuid)
-                .thenAccept(optionalPlayer -> {
-                    if (optionalPlayer.isPresent()) {
-                        PlayerResponse response = convertToResponse(optionalPlayer.get());
-                        sendResponse(resp, 200, response);
-                    } else {
-                        sendError(resp, 404, "Player not found");
-                    }
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving player", ex);
-                    sendError(resp, 500, "Failed to retrieve player");
-                    return null;
-                });
+        try {
+            Optional<PlayerDTO> opt = playerService.getPlayer(uuid).get(15, TimeUnit.SECONDS);
+            if (opt.isPresent()) {
+                sendResponse(resp, 200, convertToResponse(opt.get()));
+            } else {
+                sendError(resp, 404, "Player not found");
+            }
+        } catch (Exception ex) {
+            logger.error("Error retrieving player", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player");
+        }
     }
 
     private void handleGetPlayerByName(String name, HttpServletResponse resp) throws IOException {
-        playerService.getPlayerByName(name)
-                .thenAccept(optionalPlayer -> {
-                    if (optionalPlayer.isPresent()) {
-                        PlayerResponse response = convertToResponse(optionalPlayer.get());
-                        sendResponse(resp, 200, response);
-                    } else {
-                        sendError(resp, 404, "Player not found");
-                    }
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving player by name", ex);
-                    sendError(resp, 500, "Failed to retrieve player");
-                    return null;
-                });
+        try {
+            Optional<PlayerDTO> opt = playerService.getPlayerByName(name).get(15, TimeUnit.SECONDS);
+            if (opt.isPresent()) {
+                sendResponse(resp, 200, convertToResponse(opt.get()));
+            } else {
+                sendError(resp, 404, "Player not found");
+            }
+        } catch (Exception ex) {
+            logger.error("Error retrieving player by name", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player");
+        }
     }
 
     private void handleGetPlayersByGroup(String group, HttpServletResponse resp) throws IOException {
-        playerService.getPlayersByGroup(group)
-                .thenAccept(players -> {
-                    List<PlayerResponse> responses = players.stream()
-                            .map(this::convertToResponse)
-                            .collect(Collectors.toList());
-                    sendResponse(resp, 200, responses);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving players by group", ex);
-                    sendError(resp, 500, "Failed to retrieve players by group");
-                    return null;
-                });
+        try {
+            List<PlayerDTO> players = playerService.getPlayersByGroup(group).get(15, TimeUnit.SECONDS);
+            List<PlayerResponse> responses = players.stream()
+                                                .map(this::convertToResponse)
+                                                .collect(Collectors.toList());
+            sendResponse(resp, 200, responses);
+        } catch (Exception ex) {
+            logger.error("Error retrieving players by group", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve players by group");
+        }
     }
 
     private void handleSearchPlayers(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -251,86 +238,53 @@ public class PlayerController extends HttpServlet {
             sendError(resp, 400, "Name parameter required");
             return;
         }
-
-        playerService.searchPlayersByName("%" + name + "%")
-                .thenAccept(players -> {
-                    List<PlayerResponse> responses = players.stream()
-                            .map(this::convertToResponse)
-                            .collect(Collectors.toList());
-                    sendResponse(resp, 200, responses);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error searching players", ex);
-                    sendError(resp, 500, "Failed to search players");
-                    return null;
-                });
+        try {
+            List<PlayerDTO> players = playerService.searchPlayersByName("%" + name + "%")
+                                               .get(15, TimeUnit.SECONDS);
+            List<PlayerResponse> responses = players.stream()
+                                                .map(this::convertToResponse)
+                                                .collect(Collectors.toList());
+            sendResponse(resp, 200, responses);
+        } catch (Exception ex) {
+            logger.error("Error searching players", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to search players");
+        }
     }
 
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
-        playerService.getPlayerCount()
-                .thenAccept(count -> {
-                    CountResponse response = new CountResponse(count, "Total registered players");
-                    sendResponse(resp, 200, response);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving player count", ex);
-                    sendError(resp, 500, "Failed to retrieve player count");
-                    return null;
-                });
+        try {
+            long count = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
+            sendResponse(resp, 200, new CountResponse(count, "Total registered players"));
+        } catch (Exception ex) {
+            logger.error("Error retrieving player count", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player count");
+        }
     }
 
     private void handleUpdateLocation(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        LocationUpdateRequest request = gson.fromJson(readRequestBody(req), LocationUpdateRequest.class);
+        if (!request.isValid()) { sendError(resp, 400, "Invalid location update request"); return; }
         try {
-            String body = readRequestBody(req);
-            LocationUpdateRequest request = gson.fromJson(body, LocationUpdateRequest.class);
-            
-            if (!request.isValid()) {
-                sendError(resp, 400, "Invalid location update request");
-                return;
-            }
-
-            playerService.updatePlayerLocation(uuid, request.getWorld(), 
-                    request.getX(), request.getY(), request.getZ())
-                    .thenAccept(v -> {
-                        StatusResponse response = StatusResponse.success("Location updated successfully");
-                        sendResponse(resp, 200, response);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error updating player location", ex);
-                        sendError(resp, 500, "Failed to update location");
-                        return null;
-                    });
-        } catch (Exception e) {
-            sendError(resp, 400, "Invalid request body");
+            playerService.updatePlayerLocation(uuid, request.getWorld(), request.getX(), request.getY(), request.getZ())
+                     .get(15, TimeUnit.SECONDS);
+            sendResponse(resp, 200, StatusResponse.success("Location updated successfully"));
+        } catch (Exception ex) {
+            logger.error("Error updating player location", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to update location");
         }
     }
 
     private void handleUpdateGroups(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        GroupUpdateRequest request = gson.fromJson(readRequestBody(req), GroupUpdateRequest.class);
+        if (!request.isValid()) { sendError(resp, 400, "Invalid group update request"); return; }
+        String primary = request.getGroups().isEmpty() ? "" : request.getGroups().get(0);
         try {
-            String body = readRequestBody(req);
-            GroupUpdateRequest request = gson.fromJson(body, GroupUpdateRequest.class);
-            
-            if (!request.isValid()) {
-                sendError(resp, 400, "Invalid group update request");
-                return;
-            }
-
-            // For simplicity, treating all actions as "set" for now
-            // This can be enhanced to support add/remove operations
-            String primaryGroup = request.getGroups().isEmpty() ? "" : request.getGroups().get(0);
-            
-            playerService.updatePlayerGroups(uuid, primaryGroup, request.getGroups())
-                    .thenAccept(v -> {
-                        StatusResponse response = StatusResponse.success("Groups updated successfully");
-                        sendResponse(resp, 200, response);
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error updating player groups", ex);
-                        sendError(resp, 500, "Failed to update groups");
-                        return null;
-                    });
-        } catch (Exception e) {
-            sendError(resp, 400, "Invalid request body");
+            playerService.updatePlayerGroups(uuid, primary, request.getGroups())
+                     .get(15, TimeUnit.SECONDS);
+            sendResponse(resp, 200, StatusResponse.success("Groups updated successfully"));
+        } catch (Exception ex) {
+            logger.error("Error updating player groups", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to update groups");
         }
     }
 

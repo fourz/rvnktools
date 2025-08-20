@@ -48,4 +48,5 @@ try {
     exit 1
 }
 
-Write-Host "`nNote: Using -SkipCertificateCheck for self-signed certificate" -ForegroundColor DarkGray
+
+Write-Host "Note: Using -SkipCertificateCheck for self-signed certificate" -ForegroundColor DarkGray
