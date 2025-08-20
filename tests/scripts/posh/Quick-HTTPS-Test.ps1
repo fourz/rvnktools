@@ -2,8 +2,8 @@
 # Automatically handles self-signed certificate issues
 
 param (
-    [Parameter(Mandatory = $false)]
-    [string]$ApiKey = "9067FFAetF34576893",
+    [Parameter(Mandatory = $true)]
+    [string]$ApiKey,
     [Parameter(Mandatory = $false)]
     [string]$BaseUrl = "https://localhost:8081"
 )
