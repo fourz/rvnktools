@@ -262,10 +262,15 @@
   - Expected: Complete player data response
   - Validate: All fields present, proper JSON structure
 
-- [ ] **Test: GET /api/v1/players/name/{name}**
+- [ ] **Test: GET /api/v1/player/name/{name}**
   - Input: Player name
   - Expected: Player data for matching name
   - Validate: Case sensitivity handling, exact match
+
+- [ ] **Test: GET /api/v1/player/name/{name}/history**
+  - Input: Player name
+  - Expected: Player name history data
+  - Validate: Complete history, current name identification
 
 - [ ] **Test: PUT /api/v1/players/{uuid}/location**
   - Input: Location update JSON

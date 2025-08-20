@@ -101,7 +101,8 @@
 - **Endpoints**:
   - GET `/players` - List all players with pagination ✅
   - GET `/players/{uuid}` - Get player by UUID ✅
-  - GET `/players/name/{name}` - Search by name ✅
+  - GET `/player/name/{name}` - Search by name ✅
+  - GET `/player/name/{name}/history` - Get name history ✅
   - PUT `/players/{uuid}/location` - Update location ✅
   - PUT `/players/{uuid}/groups` - Update groups ✅
 

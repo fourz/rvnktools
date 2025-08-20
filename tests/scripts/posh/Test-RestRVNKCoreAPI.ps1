@@ -3,9 +3,9 @@
 # PowerShell 7+ required
 
 # MANUAL TESTING EXAMPLES:
-# HTTP:  Invoke-WebRequest http://localhost:8080/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
+# HTTP:  Invoke-WebRequest http://localhost:8080/api/v1/player/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
 # HTTPS: [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-#        Invoke-WebRequest https://localhost:8081/api/v1/players/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
+#        Invoke-WebRequest https://localhost:8081/api/v1/player/name/wizardofire -Headers @{"X-API-Key"="your-api-key"}
 
 param (
     [Parameter(Mandatory = $false)]
@@ -60,7 +60,8 @@ $Endpoints = @{
     Players = "/api/v1/players"
     OnlinePlayers = "/api/v1/players/online"
     PlayerByUuid = "/api/v1/players/{uuid}"
-    PlayerByName = "/api/v1/players/name/{name}"
+    PlayerByName = "/api/v1/player/name/{name}"
+    PlayerNameHistory = "/api/v1/player/name/{name}/history"
     PlayersByGroup = "/api/v1/players/group/{group}"
     SearchPlayers = "/api/v1/players/search"
     PlayerCount = "/api/v1/players/count"
@@ -254,6 +255,24 @@ function Test-GetPlayerByName {
     Write-TestResult -Protocol $Protocol -TestName "Get Player by Name" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
 
+function Test-GetPlayerNameHistory {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerNameHistory -replace "{name}", $TestData.PlayerName
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    if ($result.Success) {
+        $historyCount = if ($result.Data.nameHistory -is [array]) { $result.Data.nameHistory.Count } else { if ($result.Data.nameHistory) { 1 } else { 0 } }
+        $message = "Player name history retrieved ($historyCount historical names found)"
+        
+        # Show detailed history data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+        }
+    } else {
+        $message = "Failed to retrieve player name history"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player Name History" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
 function Test-GetPlayersByGroup {
     param ([string]$Protocol, [string]$BaseUrl)
     $endpoint = $Endpoints.PlayersByGroup -replace "{group}", $TestData.GroupName
@@ -326,6 +345,7 @@ function Run-AllTests {
     Test-GetOnlinePlayers -Protocol $Protocol -BaseUrl $BaseUrl
     Test-GetPlayerByUuid -Protocol $Protocol -BaseUrl $BaseUrl
     Test-GetPlayerByName -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerNameHistory -Protocol $Protocol -BaseUrl $BaseUrl
     Test-GetPlayersByGroup -Protocol $Protocol -BaseUrl $BaseUrl
     Test-SearchPlayers -Protocol $Protocol -BaseUrl $BaseUrl
     Test-GetPlayerCount -Protocol $Protocol -BaseUrl $BaseUrl

@@ -204,7 +204,8 @@ This phase focuses on implementing the core services that will be provided by RV
     - ✅ GET `/players/online` - Current online players
     - ✅ GET `/players/recent?hours=X` - Recent players
     - ✅ GET `/players/{uuid}` - Get player by UUID
-    - ✅ GET `/players/name/{name}` - Get player by name
+    - ✅ GET `/player/name/{name}` - Get player by name
+    - ✅ GET `/player/name/{name}/history` - Get player name history
     - ✅ GET `/players/group/{group}` - Players by permission group
     - ✅ GET `/players/search?name=pattern` - Search players
     - ✅ PUT `/players/{uuid}/location` - Update player location

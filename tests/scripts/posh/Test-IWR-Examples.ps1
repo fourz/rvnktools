@@ -105,10 +105,27 @@ try {
 Write-Host "`n8. GET Player by Name" -ForegroundColor Yellow
 try {
     $testName = "wizardofire"
-    $response = iwr "$BaseUrl$ContextPath/v1/players/name/$testName" -Headers $Headers
+    $response = iwr "$BaseUrl$ContextPath/v1/player/name/$testName" -Headers $Headers
     Write-Host "✓ Player by name endpoint - Status: $($response.StatusCode)" -ForegroundColor Green
     $player = $response.Content | ConvertFrom-Json
     Write-Host "Player UUID: $($player.uuid)"
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 404) {
+        Write-Host "○ Player not found (404) - this is expected if player doesn't exist" -ForegroundColor Yellow
+    } else {
+        Write-Host "✗ Failed: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+# Get player name history
+Write-Host "`n8b. GET Player Name History" -ForegroundColor Yellow
+try {
+    $testName = "wizardofire"
+    $response = iwr "$BaseUrl$ContextPath/v1/player/name/$testName/history" -Headers $Headers
+    Write-Host "✓ Player name history endpoint - Status: $($response.StatusCode)" -ForegroundColor Green
+    $history = $response.Content | ConvertFrom-Json
+    Write-Host "Current name: $($history.currentName)"
+    Write-Host "Name history count: $($history.nameHistory.Count)"
 } catch {
     if ($_.Exception.Response.StatusCode -eq 404) {
         Write-Host "○ Player not found (404) - this is expected if player doesn't exist" -ForegroundColor Yellow

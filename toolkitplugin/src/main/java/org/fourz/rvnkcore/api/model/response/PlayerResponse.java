@@ -19,7 +19,6 @@ public class PlayerResponse {
     private String currentWorld;
     private long totalPlaytimeMinutes;
     private List<String> groups;
-    private List<String> nameHistory;
     private List<String> visitedWorlds;
 
     // Default constructor for JSON deserialization
@@ -40,7 +39,6 @@ public class PlayerResponse {
     public String getCurrentWorld() { return currentWorld; }
     public long getTotalPlaytimeMinutes() { return totalPlaytimeMinutes; }
     public List<String> getGroups() { return groups; }
-    public List<String> getNameHistory() { return nameHistory; }
     public List<String> getVisitedWorlds() { return visitedWorlds; }
 
     // Builder class
@@ -89,11 +87,6 @@ public class PlayerResponse {
 
         public Builder groups(List<String> groups) {
             response.groups = groups;
-            return this;
-        }
-
-        public Builder nameHistory(List<String> nameHistory) {
-            response.nameHistory = nameHistory;
             return this;
         }
 

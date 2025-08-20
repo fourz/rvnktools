@@ -85,7 +85,8 @@ RVNKCore Phase 1 has achieved **95% completion** with a robust, production-ready
 - **Endpoints Available**:
   - `GET /api/v1/players` - Paginated player list
   - `GET /api/v1/players/{uuid}` - Player by UUID
-  - `GET /api/v1/players/name/{name}` - Player by name
+  - `GET /api/v1/player/name/{name}` - Player by name
+  - `GET /api/v1/player/name/{name}/history` - Player name history
   - `PUT /api/v1/players/{uuid}/location` - Update location
   - `PUT /api/v1/players/{uuid}/groups` - Update groups
 

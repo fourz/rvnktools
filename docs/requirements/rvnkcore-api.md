@@ -399,7 +399,8 @@ GET    /api/v1/players                    # List all players with pagination
 GET    /api/v1/players/online             # Current online players
 GET    /api/v1/players/recent?hours=24    # Recent players
 GET    /api/v1/players/{uuid}             # Get player by UUID
-GET    /api/v1/players/name/{name}        # Get player by name
+GET    /api/v1/player/name/{name}        # Get player by name
+GET    /api/v1/player/name/{name}/history    # Get player name history
 GET    /api/v1/players/group/{group}      # Players by permission group
 GET    /api/v1/players/search?name=pattern # Search players
 

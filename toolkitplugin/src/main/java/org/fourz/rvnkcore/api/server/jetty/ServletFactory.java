@@ -90,6 +90,9 @@ public class ServletFactory {
         
         PlayerController playerController = new PlayerController(playerService, gson, playerControllerLogger);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
+        
+        // Also register player controller for singular player endpoints
+        context.addServlet(new ServletHolder(playerController), "/v1/player/*");
 
         // Future controllers can be registered here
         // registerAnnouncementController(context);
@@ -183,9 +186,9 @@ public class ServletFactory {
      * @return Number of player endpoints
      */
     private int getPlayerEndpointCount() {
-        // GET endpoints: /players, /players/online, /players/{uuid}, /players/name/{name}, 
-        //                /players/group/{group}, /players/search, /players/count
+        // GET endpoints: /players, /players/online, /players/{uuid}, /player/name/{name}, 
+        //                /player/name/{name}/history, /players/group/{group}, /players/search, /players/count
         // PUT endpoints: /players/{uuid}/location, /players/{uuid}/groups
-        return 9;
+        return 10;
     }
 }

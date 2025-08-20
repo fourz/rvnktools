@@ -9,6 +9,7 @@ import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
 import org.fourz.rvnkcore.api.model.response.CountResponse;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
+import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
 import org.fourz.rvnkcore.api.model.response.StatusResponse;
 import org.fourz.rvnkcore.api.service.PlayerService;
@@ -60,18 +61,15 @@ public class PlayerController extends HttpServlet {
                 String endpoint = parts[0].toLowerCase();
 
                 switch (endpoint) {
+                    case "name":
+                        // Handle direct /player/name/{name} or /player/name/{name}/history endpoints
+                        handleDirectPlayerNameEndpoint(parts, resp);
+                        break;
                     case "online":
                         handleGetOnlinePlayers(resp);
                         break;
                     case "recent":
                         handleGetRecentPlayers(req, resp);
-                        break;
-                    case "name":
-                        if (parts.length > 1) {
-                            handleGetPlayerByName(parts[1], resp);
-                        } else {
-                            sendError(resp, 400, "Player name required");
-                        }
                         break;
                     case "group":
                         if (parts.length > 1) {
@@ -85,6 +83,13 @@ public class PlayerController extends HttpServlet {
                         break;
                     case "count":
                         handleGetPlayerCount(resp);
+                        break;
+                    case "player":
+                        if (parts.length < 2) {
+                            sendError(resp, 400, "Player operation required");
+                            return;
+                        }
+                        handleSinglePlayerEndpoints(parts, resp);
                         break;
                     default:
                         // Try to parse as UUID for single player lookup
@@ -100,6 +105,52 @@ public class PlayerController extends HttpServlet {
         } catch (Exception e) {
             logger.error("Error handling GET request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
             sendError(resp, 500, "Internal server error: " + e.getMessage());
+        }
+    }
+
+    private void handleSinglePlayerEndpoints(String[] parts, HttpServletResponse resp) throws IOException {
+        if (parts.length < 3) {
+            sendError(resp, 400, "Player identifier required");
+            return;
+        }
+        
+        String operation = parts[1].toLowerCase();
+        String identifier = parts[2];
+        
+        switch (operation) {
+            case "name":
+                if (parts.length > 3 && "history".equals(parts[3].toLowerCase())) {
+                    // Handle /player/name/{name}/history
+                    handleGetPlayerNameHistory(identifier, resp);
+                } else {
+                    // Handle /player/name/{name}
+                    handleGetPlayerByName(identifier, resp);
+                }
+                break;
+            case "history":
+                // Keep backward compatibility for /player/history/{name}
+                handleGetPlayerNameHistory(identifier, resp);
+                break;
+            default:
+                sendError(resp, 404, "Unknown player operation: " + operation);
+                break;
+        }
+    }
+
+    private void handleDirectPlayerNameEndpoint(String[] parts, HttpServletResponse resp) throws IOException {
+        if (parts.length < 2) {
+            sendError(resp, 400, "Player name required");
+            return;
+        }
+        
+        String playerName = parts[1];
+        
+        if (parts.length > 2 && "history".equals(parts[2].toLowerCase())) {
+            // Handle /player/name/{name}/history
+            handleGetPlayerNameHistory(playerName, resp);
+        } else {
+            // Handle /player/name/{name}
+            handleGetPlayerByName(playerName, resp);
         }
     }
 
@@ -261,6 +312,26 @@ public class PlayerController extends HttpServlet {
         }
     }
 
+    private void handleGetPlayerNameHistory(String name, HttpServletResponse resp) throws IOException {
+        try {
+            Optional<PlayerDTO> opt = playerService.getPlayerByName(name).get(15, TimeUnit.SECONDS);
+            if (opt.isPresent()) {
+                PlayerDTO player = opt.get();
+                PlayerNameHistoryResponse response = PlayerNameHistoryResponse.builder()
+                        .uuid(player.getId())
+                        .currentName(player.getCurrentName())
+                        .nameHistory(player.getNameHistory())
+                        .build();
+                sendResponse(resp, 200, response);
+            } else {
+                sendError(resp, 404, "Player not found");
+            }
+        } catch (Exception ex) {
+            logger.error("Error retrieving player name history", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player name history");
+        }
+    }
+
     private void handleUpdateLocation(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
         LocationUpdateRequest request = gson.fromJson(readRequestBody(req), LocationUpdateRequest.class);
         if (!request.isValid()) { sendError(resp, 400, "Invalid location update request"); return; }
@@ -305,7 +376,6 @@ public class PlayerController extends HttpServlet {
                 .currentWorld(player.getCurrentWorld())
                 .totalPlaytimeMinutes(player.getTotalPlaytimeSeconds() / 60)
                 .groups(player.getGroups())
-                .nameHistory(player.getNameHistory())
                 .build();
     }
 
