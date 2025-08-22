@@ -2,6 +2,83 @@
 
 These guidelines should be followed when modifying or creating code to maintain consistency throughout the RVNK plugin ecosystem, including RVNKTools, RVNKCore, RVNKLore, RVNKQuests, and any other RVNK plugins.
 
+## Metamake Project Management Integration
+
+When the user explicitly requests metamake functionality using phrases like "use metamake to..." or "with metamake", activate the integrated project management capabilities:
+
+### Metamake Capabilities Available
+
+- **Project Planning and Organization**: Structure complex features, refactoring tasks, and development phases
+- **Document-Based Project Management**: Create structured project documentation with templates and validation checklists
+- **Implementation Roadmaps**: Break down large architectural changes (like RVNKCore integration) into manageable phases
+- **Quality Assurance Frameworks**: Generate validation checklists and testing procedures for plugin features
+- **Cross-Plugin Architecture Planning**: Coordinate development across RVNK ecosystem plugins
+
+### Metamake Project Structure
+
+Metamake projects are organized in the `metamake/projects/` directory with this structure:
+
+```text
+metamake/projects/XX-project-name/
+├── README.md              # Project overview and purpose
+├── ROADMAP.md             # Implementation status and timelines
+├── COPILOT-INSTRUCTIONS.md # Project-specific guidance
+├── project-details.md     # Context, workflow, and objectives
+├── features/              # Feature specifications
+├── implementation/        # Step-by-step implementation guides
+├── validation/           # Testing and quality assurance checklists
+└── docs/                 # Supporting documentation
+```
+
+### When to Use Metamake
+
+**Activate metamake capabilities for:**
+- Complex architectural refactoring (like RVNKCore integration)
+- Multi-plugin feature coordination
+- Large-scale development planning
+- Quality assurance and testing framework setup
+- Documentation standardization across the ecosystem
+- Migration planning (e.g., YAML to database transitions)
+
+### RVNK-Specific Metamake Context
+
+**Project Domain**: Minecraft Plugin Ecosystem Development
+**Technology Stack**: Java/Maven, Spigot/Paper API, MySQL/SQLite, Jetty REST API, YAML Configuration
+**Current Focus**: RVNKCore architectural refactor and plugin ecosystem consolidation
+
+**Key Project Areas for Metamake Integration:**
+- RVNKCore Phase 1/Phase 2 implementation planning
+- Announcement system migration (YAML → Database)
+- REST API framework expansion
+- Cross-plugin service integration
+- Database layer abstraction completion
+- Web integration strategy implementation
+
+**Documentation Integration:**
+- Main documentation: `docs/` (requirements, implementation, API references)
+- Project status: `README.md` and `ROADMAP.md` files
+- Architecture guides: `docs/implementation/` and `docs/requirements/`
+- API documentation: `docs/api/` for Java and REST endpoints
+
+**Infrastructure Elements:**
+- Maven multi-module build system
+- VS Code development environment with specialized tasks
+- MCSS API for development server integration
+- SQLite/MySQL database layer with HikariCP connection pooling
+- Jetty-based REST API framework with HTTPS/SSL support
+- Service-oriented architecture with dependency injection
+
+### Usage Examples
+
+```text
+"Use metamake to plan the Phase 2 RVNKCore implementation"
+"With metamake, create a validation checklist for the announcement service migration"
+"Use metamake to organize the cross-plugin REST API integration project"
+"With metamake, structure the MySQL ConnectionProvider implementation project"
+```
+
+When metamake is invoked, reference the `metamake/prompts/` directory for specialized prompts and use the `metamake/template/` directory for project structure templates.
+
 ## Core Directives
 
 - **Use the CommandManager framework for all commands. Do not create standalone command executors.**
