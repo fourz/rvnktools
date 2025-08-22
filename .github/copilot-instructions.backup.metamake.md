@@ -32,6 +32,13 @@ These guidelines should be followed when modifying or creating code to maintain 
 
 ### Service Interface Pattern
 
+**Naming Conventions:**
+- **Do not use the `I` prefix for interfaces.** Use `PlayerService` instead of `IPlayerService`.
+- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.** 
+  - Examples: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
+- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
+  - Examples: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
+
 *See examples: [Service Interface Pattern](copilot-instructions.examples.md#service-interface-pattern)*
 
 ### Command Framework Integration
@@ -41,13 +48,15 @@ These guidelines should be followed when modifying or creating code to maintain 
 - Provide immediate feedback to users
 - Handle async results with proper error messages
 
+**Important**: Command responses must be immediate to provide user feedback, but long-running database/API operations within commands should be wrapped in `CompletableFuture` to avoid blocking the main thread.
+
 *See examples: [Command Framework Integration](copilot-instructions.examples.md#command-framework-integration)*
 
 ### Performance Rules
 - Don't async operations that take <10ms
-- Use caching to reduce database calls
 - Batch operations instead of individual async calls
 - Consider thread pool limits
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
 
 ## Plugin Architecture
 
@@ -61,25 +70,32 @@ All RVNK plugins should follow a consistent architecture:
 - **Use ServiceRegistry** to obtain dependencies rather than direct instantiation
 - **Implement proper service lifecycle** with initialization and cleanup phases
 - **Handle missing dependencies gracefully** with appropriate fallback behavior
-- **Use YAML for all configuration files** with consistent naming conventions
-- **Use the RVNK exception hierarchy** for consistent error handling
-- **Implement caching strategies** for frequently accessed data
+- **For configuration management**: See [Configuration Standards](#configuration-standards) section
+- **For error handling**: See [Error Handling and Resilience](#error-handling-and-resilience) section
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
 
 *See examples: [Plugin Dependencies Configuration](copilot-instructions.examples.md#plugin-dependencies-configuration)*
 
 ### Error Handling and Resilience
 
-- **Use the RVNK exception hierarchy** for consistent error handling
+- **Use the RVNK exception hierarchy** for consistent error handling across all plugins
 - **Implement circuit breaker patterns** for external service calls
 - **Provide meaningful error messages** with actionable information for administrators
 - **Log errors with appropriate context** including player IDs, operation details, and stack traces
+- **Handle missing dependencies gracefully** with appropriate fallback behavior
+- **Implement proper exception chaining** to preserve stack trace information
+- **Use custom exception types** for domain-specific error conditions
 
 *See examples: [Error Handling and Resilience](copilot-instructions.examples.md#error-handling-and-resilience)*
 
 ### Performance and Monitoring
 
 - **Use DebugLogger as needed** for debugging only
-- **Implement caching strategies** for frequently accessed data
+- **Implement caching strategies** for frequently accessed data:
+  - Use caching to reduce database calls
+  - Implement proper cache invalidation strategies
+  - Consider memory usage vs. performance trade-offs
+  - Use connection pooling for external resources
 - **Monitor async operation completion** and log performance metrics
 - **Use connection pooling** through RVNKCore for database operations
 
@@ -169,8 +185,16 @@ This comprehensive set of standards ensures consistency, performance, and mainta
   - `&e⚠` for warnings
   - `&7␣␣␣` for additional information or tips (three spaces after)
 
-### Console and Debug Messages
+## Logging
 
+### LogManager Standard
+- Use `LogManager` for all info, warning, and error logging in plugin code
+- Declare as `private final LogManager logger;` and initialize with `LogManager.getInstance(plugin);`
+- Use `logger.info()`, `logger.warning()`, `logger.error(message, exception)` for all logging
+- Do not use `System.out.println()` or direct logger calls
+- Reserve `Debug` class for debug-level or trace logging only
+
+### Console and Debug Messages
 - Use the designated logging system for all console output
 - **Do not use emojis or symbols in console messages**
 - **Do not use color codes in console output**
@@ -180,21 +204,13 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 - For errors, include actionable information to help troubleshoot
 - Use appropriate log levels (INFO, WARNING, ERROR, DEBUG)
 
-## Logging Manager Standard
-
-- Use `LogManager` for all info, warning, and error logging in plugin code
-- Declare as `private final LogManager logger;` and initialize with `LogManager.getInstance(plugin);`
-- Use `logger.info()`, `logger.warning()`, `logger.error(message, exception)` for all logging
-- Do not use `System.out.println()` or direct logger calls
-- Reserve `Debug` class for debug-level or trace logging only
-
 *See examples: [LogManager Usage](copilot-instructions.examples.md#logmanager-usage)*
 
 ## Command Framework Guidelines
 
 Follow the CommandManager framework for all commands:
 
-1. **Extend BaseCommand** for new commands
+1. **Extend BaseCommand** (part of CommandManager framework) for new commands
 2. **Register through CommandManager**: `commandManager.registerCommand(new MyCommand(plugin));`
 3. **Use subcommands** where appropriate: `registerSubCommand("subcommand", new MySubCommand(plugin));`
 4. **Implement tab completion** with `getMatchingSubCommands(sender, args[0])`
@@ -230,17 +246,6 @@ For comprehensive testing and debugging, utilize the MCSS API for real-time serv
 - **Error Analysis**: Programmatically search console logs for errors and exceptions
 
 **Reference Documentation**: `docs/api-reference/mcss-dev-server.md`
-
-## Service Interface and Implementation Naming Conventions
-
-- **Do not use the `I` prefix for interfaces.**
-  - Example: Use `PlayerService` instead of `IPlayerService`.
-- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.**
-  - Example: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
-- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
-  - Example: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
-- **All references, imports, and documentation should reflect these conventions for consistency.**
-- **This applies to all plugin modules and shared RVNKCore services.**
 
 ## Documentation and Reference Structure
 
