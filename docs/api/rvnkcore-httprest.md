@@ -199,7 +199,7 @@ GET /api/v1/server/stats
     "maxPlayers": 100,
     "totalRegisteredPlayers": 2500,
     "serverVersion": "1.21",
-    "pluginVersion": "1.1-alpha",
+    "pluginVersion": "1.2.0-alpha",
     "uptime": 86400000,
     "worlds": ["world", "world_nether", "world_the_end", "event"],
     "performance": {

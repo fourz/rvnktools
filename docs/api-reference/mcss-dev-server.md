@@ -77,7 +77,7 @@ GET /api/v2/servers/{serverId}/console?AmountOfLines=50&Reversed=false
 **Response Example**:
 ```json
 [
-  "[21:24:12] [Server thread/INFO]: [RVNKTools] RVNKTools v1.1-alpha enabling...",
+  "[21:24:12] [Server thread/INFO]: [RVNKTools] RVNKTools v1.2.0-alpha enabling...",
   "[21:24:12] [Server thread/INFO]: [RVNKTools] Database connected successfully",
   "[21:24:12] [Server thread/INFO]: [RVNKTools] Commands registered: 5",
   "[21:24:12] [Server thread/INFO]: [RVNKTools] RVNKTools enabled successfully"
