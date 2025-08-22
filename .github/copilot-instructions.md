@@ -30,16 +30,6 @@ metamake/projects/XX-project-name/
 └── docs/                 # Supporting documentation
 ```
 
-### When to Use Metamake
-
-**Activate metamake capabilities for:**
-- Complex architectural refactoring (like RVNKCore integration)
-- Multi-plugin feature coordination
-- Large-scale development planning
-- Quality assurance and testing framework setup
-- Documentation standardization across the ecosystem
-- Migration planning (e.g., YAML to database transitions)
-
 ### RVNK-Specific Metamake Context
 
 **Project Domain**: Minecraft Plugin Ecosystem Development
@@ -59,14 +49,6 @@ metamake/projects/XX-project-name/
 - Project status: `README.md` and `ROADMAP.md` files
 - Architecture guides: `docs/implementation/` and `docs/requirements/`
 - API documentation: `docs/api/` for Java and REST endpoints
-
-**Infrastructure Elements:**
-- Maven multi-module build system
-- VS Code development environment with specialized tasks
-- MCSS API for development server integration
-- SQLite/MySQL database layer with HikariCP connection pooling
-- Jetty-based REST API framework with HTTPS/SSL support
-- Service-oriented architecture with dependency injection
 
 ### Usage Examples
 
