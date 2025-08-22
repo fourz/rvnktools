@@ -2,9 +2,32 @@
 
 This directory contains the RVNKCore implementation that is being extracted from RVNKTools to provide a centralized data and service layer for the RVNK plugin ecosystem.
 
+## Plugin Architecture Standards
+
+All RVNK plugins using RVNKCore follow a consistent architecture:
+
+```text
+Plugin Root/
+├── api/                    # Public plugin APIs
+├── service/               # Business logic services  
+├── repository/            # Data access layer
+├── command/              # Command implementations
+├── listener/             # Event listeners
+├── config/               # Configuration management
+└── integration/          # Third-party integrations
+```
+
+### Architectural Principles
+
+- **Service Registry Pattern**: All services obtained through centralized ServiceRegistry
+- **Repository Pattern**: Clean separation between business logic and data access
+- **Async-First Operations**: Database operations use CompletableFuture to prevent blocking
+- **Dependency Injection**: Services automatically resolved through RVNKCore infrastructure
+- **Cross-Plugin Compatibility**: Shared interfaces enable plugin ecosystem integration
+
 ## Directory Structure
 
-```
+```text
 org.fourz.rvnkcore/
 ├── api/                    # Public API interfaces
 │   ├── service/            # Service interfaces
@@ -30,44 +53,26 @@ org.fourz.rvnkcore/
 
 ## Implementation Status
 
-### Phase 1: Foundation (Q3 2025) - ✅ **COMPLETED**
+**Current Status**: RVNKCore Phase 1 foundation is **99% complete** with all core infrastructure operational. See the main project [ROADMAP.md](../../../../../../../ROADMAP.md) for detailed implementation status, timelines, and development priorities.
 
-#### Completed ✅
-- [x] Directory structure creation
-- [x] Basic RVNKCore class
-- [x] Exception hierarchy foundation
-- [x] ConnectionProvider interface
-- [x] QueryBuilder interface
-- [x] ServiceRegistry interface and implementation
-- [x] Enhanced PlayerDTO with comprehensive tracking (seen, name history, location, rank/groups)
-- [x] PlayerService interface with async operations
-- [x] BaseRepository abstract class with CRUD operations
-- [x] PlayerRepository implementation
-- [x] PlayerService implementation with full business logic
-- [x] SQLiteConnectionProvider with schema auto-creation
-- [x] BasicSQLQueryBuilder implementation
-- [x] RVNKCoreBootstrap integration bridge
-- [x] PlayerTrackingListener for event-driven updates
-- [x] Complete service registration and dependency injection
-- [x] Integration with RVNKTools main plugin class
+### Core Foundation Complete ✅
 
-#### Next Phase Ready 📋
-- [ ] MySQL ConnectionProvider implementation with HikariCP
-- [ ] Schema management and migrations
-- [ ] Performance monitoring integration
-- [ ] Configuration management
-- [ ] Event system
-- [ ] Basic command support
-- [ ] Integration testing framework
+- Complete service framework with dependency injection and lifecycle management
+- Database layer with MySQL/SQLite support and connection pooling  
+- Player services with comprehensive tracking and per-world data
+- REST API infrastructure with HTTPS, authentication, and 20+ endpoints
+- Announcement system infrastructure ready for migration implementation
 
-## Development Guidelines
+### Development Guidelines
 
-1. **Follow the RVNKCore Copilot Instructions** in `docs/plans/rvnkcore/rvnkcore-copilot-instructions.md`
-2. **Use LogManager** for all logging operations
-3. **Implement async patterns** with CompletableFuture for database operations
-4. **Keep commands simple** - no complex CommandManager framework needed
-5. **Document all public APIs** with comprehensive JavaDoc
-6. **Follow SOLID principles** for all component design
+1. **Follow the Plugin Architecture Standards** described above for all RVNKCore implementations
+2. **Use the RVNKCore Copilot Instructions** in `.github/copilot-instructions.md`
+3. **Use LogManager** for all logging operations
+4. **Implement async patterns** with CompletableFuture for database operations
+5. **Keep commands simple** - no complex CommandManager framework needed
+6. **Document all public APIs** with comprehensive JavaDoc
+7. **Follow SOLID principles** for all component design
+8. **Use ServiceRegistry pattern** for dependency injection across services
 
 ## Integration with RVNKTools
 
@@ -89,6 +94,7 @@ During the development phase, RVNKCore classes will coexist with RVNKTools class
 ## Testing
 
 All RVNKCore components should be thoroughly tested:
+
 - Unit tests for individual components
 - Integration tests for database operations
 - End-to-end tests for service interactions

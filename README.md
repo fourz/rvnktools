@@ -2,7 +2,7 @@
 
 RVNKTools is a comprehensive Minecraft server plugin that provides a wide array of features to enhance server administration. It includes tools for managing announcements, permissions, events, and much more, tailored for ease of use and scalability.
 
-**Note**: RVNKTools is currently undergoing a major architectural refactor to extract core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem. This refactor is happening on the `derek/dev-core` branch and will provide better modularity, shared services, and cross-plugin integration capabilities.
+**Current Status**: RVNKTools is undergoing a major architectural refactor to extract core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem. See [ROADMAP.md](ROADMAP.md) for detailed implementation status and timelines.
 
 ## RVNKCore Data Layer Abstraction
 
@@ -113,28 +113,34 @@ RVNKCore includes a comprehensive web integration strategy that categorizes plug
 
 This architecture ensures that plugins requiring external web access receive full REST API implementations while maintaining secure, performance-optimized internal access for game mechanics.
 
+## Plugin Architecture
+
+All RVNK plugins follow a consistent architecture to ensure maintainability and cross-plugin compatibility:
+
+```text
+Plugin Root/
+├── api/                    # Public plugin APIs
+├── service/               # Business logic services
+├── repository/            # Data access layer
+├── command/              # Command implementations
+├── listener/             # Event listeners
+├── config/               # Configuration management
+└── integration/          # Third-party integrations
+```
+
+### Architectural Standards
+
+- **Service-Oriented Design**: Business logic implemented through service interfaces
+- **Repository Pattern**: Clean separation between business logic and data access
+- **Dependency Injection**: Services obtained through ServiceRegistry pattern
+- **RVNKCore Integration**: All plugins declare RVNKCore as dependency for shared infrastructure
+- **Async Operations**: Database and I/O operations use CompletableFuture patterns
+- **Configuration Management**: YAML-based configuration with validation and hot-reloading
+- **Error Handling**: Consistent exception hierarchy and logging patterns
+
 ### Current Implementation Status
 
-**RVNKCore Phase 1** is **99% complete** with comprehensive announcement service infrastructure:
-
-#### ✅ **Announcement System (August 22, 2025)**
-
-- **AnnouncementService interface**: 17 comprehensive async methods for announcement management
-- **AnnouncementRepository**: Specialized database queries extending BaseRepository pattern
-- **DefaultAnnouncementService**: Caching, validation, and performance optimization
-- **AnnouncementController**: Complete REST API with 15+ endpoints for web integration
-- **Database Schema**: MySQL/SQLite compatible `rvnk_announcements` table with proper indexing
-- **Migration Ready**: Infrastructure prepared for AnnounceManager transition from YAML to database
-
-#### ✅ **Core Infrastructure Complete**
-
-- Database layer with MySQL/SQLite support and connection pooling
-- Service framework with dependency injection and lifecycle management
-- Player services with comprehensive tracking and per-world data
-- REST API infrastructure with HTTPS, authentication, and rate limiting
-- 20+ production-tested API endpoints for player and announcement management
-
-See the [ROADMAP.md](ROADMAP.md) for detailed implementation status and timelines.
+RVNKCore Phase 1 is **99% complete** with comprehensive announcement service infrastructure. See [ROADMAP.md](ROADMAP.md) for detailed implementation status, timelines, and current progress.
 
 ## Installation
 
