@@ -404,7 +404,14 @@ public class ConfigLoader {
                 .username(coreConfig.getString("database.mysql.username", ""))
                 .password(coreConfig.getString("database.mysql.password", ""))
                 .useSSL(coreConfig.getBoolean("database.mysql.useSSL", true))
-                .maxConnections(coreConfig.getInt("database.mysql.maxConnections", 10))
+                .connectionParameters(coreConfig.getString("database.mysql.connectionParameters", ""))
+                // Connection Pool Configuration
+                .maxConnections(coreConfig.getInt("database.mysql.pool.maxConnections", 20))
+                .minIdleConnections(coreConfig.getInt("database.mysql.pool.minIdleConnections", 5))
+                .connectionTimeoutMs(coreConfig.getLong("database.mysql.pool.connectionTimeoutMs", 30000L))
+                .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 600000L))
+                .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 1800000L))
+                .leakDetectionMs(coreConfig.getLong("database.mysql.pool.leakDetectionMs", 60000L))
                 .build();
         } else {
             // Default to SQLite
