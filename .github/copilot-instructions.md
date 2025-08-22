@@ -302,9 +302,15 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **Query Console - Recent**: Get last 25 console lines with color-coded formatting
 - **Query Console - Errors Only**: Filter only ERROR/WARN messages from last 50 lines
 - **Query Console - Plugin Messages**: Show only RVNKTools-related log entries from last 100 lines  
+- **Query Console - Extended**: Get last 300 console lines for comprehensive debugging context
 - **Query Server Status**: Get server running state, name, type, and memory info
 - **Query Server Statistics**: Get real-time CPU, memory usage, player count, uptime
 - **Query Server Info**: Get detailed server configuration and setup information
+- **Send Server Command**: Interactive command execution with custom input prompt
+- **RVNKTools Debug**: Execute `rvnktools debug` command for comprehensive plugin status
+- **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation prompt
+- **List MySQL Tables - DEV**: List all tables in development database without modifications
+- **Force Clean MySQL Database - DEV**: Database cleanup without confirmation (use with caution)
 
 #### PowerShell Query Script (`query-server-DEV.ps1`)
 
@@ -318,6 +324,28 @@ For advanced queries and copilot agentic usage, execute the PowerShell script di
 .\query-server-DEV.ps1 status    # Server state and basic info
 .\query-server-DEV.ps1 stats     # Performance metrics (CPU, memory, players, uptime)
 .\query-server-DEV.ps1 info      # Complete server configuration details
+
+# Server command execution
+.\query-server-DEV.ps1 command "rvnktools debug"    # Execute server commands remotely
+.\query-server-DEV.ps1 command "plugin list"        # List installed plugins
+```
+
+#### MySQL Database Management Script (`clean-mysqldb-DEV.ps1`)
+
+For development database management and schema reset scenarios:
+
+```powershell
+# List all tables in development database
+.\clean-mysqldb-DEV.ps1 -ListOnly
+
+# Interactive cleanup with confirmation prompt
+.\clean-mysqldb-DEV.ps1
+
+# Force cleanup without confirmation (use with caution)
+.\clean-mysqldb-DEV.ps1 -Force
+
+# Environment variable for password (optional)
+$env:RVNK_MYSQL_PASSWORD = "your_password"
 ```
 
 #### Query System Features for Copilot Agents
@@ -333,6 +361,9 @@ For advanced queries and copilot agentic usage, execute the PowerShell script di
 - **Color-Coded Output**: Green (INFO), Yellow (WARN), Red (ERROR), Gray (DEBUG)
 - **Real-Time Access**: 1-2 second response time for all query types
 - **Zero Context Switching**: Query server without leaving VS Code environment
+- **Server Command Execution**: Execute commands remotely via MCSS API
+- **MySQL Database Management**: Complete database cleanup and table listing capabilities
+- **Extended Console Access**: Up to 300 lines for comprehensive debugging context
 
 #### Usage Examples for Development Workflow
 
@@ -348,6 +379,15 @@ For advanced queries and copilot agentic usage, execute the PowerShell script di
 
 # Complete plugin startup sequence analysis
 .\query-server-DEV.ps1 console all -FilterText "RVNKTools" -NoTimestamp
+
+# Database management examples
+.\clean-mysqldb-DEV.ps1 -ListOnly                    # List all tables
+.\clean-mysqldb-DEV.ps1                              # Interactive cleanup
+.\clean-mysqldb-DEV.ps1 -Force                       # Force cleanup without prompt
+
+# Server command execution
+.\query-server-DEV.ps1 command "rvnktools reload"    # Reload plugin configuration
+.\query-server-DEV.ps1 command "plugin list"         # List all installed plugins
 ```
 
 **Location**: All query scripts located in `.vscode/` directory
