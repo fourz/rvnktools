@@ -6,6 +6,56 @@ These guidelines should be followed when modifying or creating code to maintain 
 
 When the user explicitly requests metamake functionality using phrases like "use metamake to..." or "with metamake", activate the integrated project management capabilities:
 
+## Core Directives
+
+- **Use the CommandManager framework for all commands. Do not create standalone command executors.**
+- **Follow SOLID principles when adding new features or refactoring existing code.**
+- **Ensure proper resource cleanup in all managers and services.**
+- **Implement RVNKCore patterns when working on core functionality extraction.**
+- **Use service interfaces for all business logic across all RVNK plugins**
+- **Implement services through the ServiceRegistry pattern for dependency injection**
+- **Use the Repository pattern for all data access across the ecosystem**
+- **Use DTOs for data transfer between layers and across plugin boundaries**
+- **Create clean, versioned API interfaces for all plugin interactions**
+- **Use RVNKCore's event system for cross-plugin communication**
+
+## Asynchronous Programming Guidelines
+
+### When to Use Async (CompletableFuture)
+- Database operations (SELECT, INSERT, UPDATE, DELETE)
+- External API calls and web requests
+- File I/O operations (reading/writing config files)
+- Long-running computations (>50ms)
+
+### When NOT to Use Async
+- In-memory operations (cache lookups, Map/List operations)
+- Simple validation (null checks, format validation)
+- Configuration access (already-loaded values)
+- Event handlers (already on appropriate threads)
+- Command responses (users expect immediate feedback)
+
+### Service Interface Pattern
+
+**Naming Conventions:**
+- **Do not use the `I` prefix for interfaces.** Use `PlayerService` instead of `IPlayerService`.
+- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.** 
+  - Examples: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
+- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
+  - Examples: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
+
+*See examples: [Service Interface Pattern](copilot-instructions.examples.md#service-interface-pattern)*
+
+### Command Framework Integration
+
+- Validate synchronously (permissions, args, format)
+- Use async for database/API operations
+- Provide immediate feedback to users
+- Handle async results with proper error messages
+
+**Important**: Command responses must be immediate to provide user feedback, but long-running database/API operations within commands should be wrapped in `CompletableFuture` to avoid blocking the main thread.
+
+*See examples: [Command Framework Integration](copilot-instructions.examples.md#command-framework-integration)*
+
 ### Metamake Capabilities Available
 
 - **Project Planning and Organization**: Structure complex features, refactoring tasks, and development phases
@@ -60,56 +110,6 @@ metamake/projects/XX-project-name/
 ```
 
 When metamake is invoked, reference the `metamake/prompts/` directory for specialized prompts and use the `metamake/template/` directory for project structure templates.
-
-## Core Directives
-
-- **Use the CommandManager framework for all commands. Do not create standalone command executors.**
-- **Follow SOLID principles when adding new features or refactoring existing code.**
-- **Ensure proper resource cleanup in all managers and services.**
-- **Implement RVNKCore patterns when working on core functionality extraction.**
-- **Use service interfaces for all business logic across all RVNK plugins**
-- **Implement services through the ServiceRegistry pattern for dependency injection**
-- **Use the Repository pattern for all data access across the ecosystem**
-- **Use DTOs for data transfer between layers and across plugin boundaries**
-- **Create clean, versioned API interfaces for all plugin interactions**
-- **Use RVNKCore's event system for cross-plugin communication**
-
-## Asynchronous Programming Guidelines
-
-### When to Use Async (CompletableFuture)
-- Database operations (SELECT, INSERT, UPDATE, DELETE)
-- External API calls and web requests
-- File I/O operations (reading/writing config files)
-- Long-running computations (>50ms)
-
-### When NOT to Use Async
-- In-memory operations (cache lookups, Map/List operations)
-- Simple validation (null checks, format validation)
-- Configuration access (already-loaded values)
-- Event handlers (already on appropriate threads)
-- Command responses (users expect immediate feedback)
-
-### Service Interface Pattern
-
-**Naming Conventions:**
-- **Do not use the `I` prefix for interfaces.** Use `PlayerService` instead of `IPlayerService`.
-- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.** 
-  - Examples: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
-- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
-  - Examples: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
-
-*See examples: [Service Interface Pattern](copilot-instructions.examples.md#service-interface-pattern)*
-
-### Command Framework Integration
-
-- Validate synchronously (permissions, args, format)
-- Use async for database/API operations
-- Provide immediate feedback to users
-- Handle async results with proper error messages
-
-**Important**: Command responses must be immediate to provide user feedback, but long-running database/API operations within commands should be wrapped in `CompletableFuture` to avoid blocking the main thread.
-
-*See examples: [Command Framework Integration](copilot-instructions.examples.md#command-framework-integration)*
 
 ### Performance Rules
 - Don't async operations that take <10ms
