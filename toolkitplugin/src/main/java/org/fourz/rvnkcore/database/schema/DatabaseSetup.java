@@ -146,14 +146,19 @@ public class DatabaseSetup {
             
             createAnnouncementsTable = """
                 CREATE TABLE IF NOT EXISTS rvnk_announcements (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
-                    title VARCHAR(500) NOT NULL,
-                    content TEXT NOT NULL,
-                    type VARCHAR(100) DEFAULT 'general',
+                    id VARCHAR(36) PRIMARY KEY,
+                    title VARCHAR(500),
+                    message TEXT NOT NULL,
+                    type VARCHAR(100) NOT NULL DEFAULT 'general',
                     active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    scheduled_for TIMESTAMP NULL,
                     expires_at TIMESTAMP NULL,
-                    created_by VARCHAR(255)
+                    interval_seconds INT DEFAULT 0,
+                    target_worlds TEXT,
+                    target_groups TEXT,
+                    metadata TEXT
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """;
         } else {
@@ -199,14 +204,19 @@ public class DatabaseSetup {
             
             createAnnouncementsTable = """
                 CREATE TABLE IF NOT EXISTS rvnk_announcements (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    type TEXT DEFAULT 'general',
+                    id TEXT PRIMARY KEY,
+                    title TEXT,
+                    message TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'general',
                     active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP,
-                    created_by TEXT
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    scheduled_for TIMESTAMP NULL,
+                    expires_at TIMESTAMP NULL,
+                    interval_seconds INTEGER DEFAULT 0,
+                    target_worlds TEXT,
+                    target_groups TEXT,
+                    metadata TEXT
                 )
                 """;
         }
@@ -238,7 +248,10 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_world ON rvnk_player_world_data(world_name(100))",
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_last_visit ON rvnk_player_world_data(last_visit)",
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_playtime ON rvnk_player_world_data(playtime_seconds)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)"
+                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_type ON rvnk_announcements(type(50))",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_scheduled ON rvnk_announcements(scheduled_for)",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON rvnk_announcements(created_at)"
             };
         } else {
             // SQLite indexes (original format)
@@ -251,7 +264,10 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_world ON rvnk_player_world_data(world_name)",
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_last_visit ON rvnk_player_world_data(last_visit)",
                 "CREATE INDEX IF NOT EXISTS idx_player_world_data_playtime ON rvnk_player_world_data(playtime_seconds)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)"
+                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_type ON rvnk_announcements(type)",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_scheduled ON rvnk_announcements(scheduled_for)",
+                "CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON rvnk_announcements(created_at)"
             };
         }
         

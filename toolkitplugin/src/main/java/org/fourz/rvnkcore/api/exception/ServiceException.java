@@ -4,9 +4,10 @@ package org.fourz.rvnkcore.api.exception;
  * Exception thrown when service-related operations fail.
  * 
  * This exception is used for service registration, lookup, initialization,
- * and other service lifecycle operations.
+ * and other service lifecycle operations. Extends RuntimeException to work
+ * seamlessly with CompletableFuture async operations.
  */
-public class ServiceException extends RVNKException {
+public class ServiceException extends RuntimeException {
     
     /**
      * Creates a new ServiceException with the specified message.
