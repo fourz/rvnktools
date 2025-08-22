@@ -291,7 +291,6 @@ Use VS Code tasks for development:
 - **Build Plugin**: `mvn clean package` (builds the plugin JAR)
 - **Copy to Server**: Copy JAR to dev server
 - **Restart Server**: Build and full server restart on dev server
-- **Reload Server**: Build and plugin reload only via api call
 
 ### Server Query System Integration
 
@@ -299,6 +298,7 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 
 #### VS Code Query Tasks (Available via Command Palette)
 
+**Server Query Tasks:**
 - **Query Console - Recent**: Get last 25 console lines with color-coded formatting
 - **Query Console - Errors Only**: Filter only ERROR/WARN messages from last 50 lines
 - **Query Console - Plugin Messages**: Show only RVNKTools-related log entries from last 100 lines  
@@ -308,9 +308,23 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **Query Server Info**: Get detailed server configuration and setup information
 - **Send Server Command**: Interactive command execution with custom input prompt
 - **RVNKTools Debug**: Execute `rvnktools debug` command for comprehensive plugin status
+
+**Build and Deployment Tasks (Sequential Control):**
+- **Build Plugin**: Compile and package plugin JAR using Maven
+- **Copy to Server**: Copy built JAR to development server plugins folder
+- **ServerCleanup**: Remove existing plugin files and folders from server
+- **Restart Server**: Full server restart via MCSS API
+- **Clean&Restart Server**: Combined cleanup and restart sequence
+Note: Tasks run independently for granular control in agentic debugging workflows. Call sequentially as needed.
+
+**Database Management Tasks:**
 - **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation prompt
 - **List MySQL Tables - DEV**: List all tables in development database without modifications
 - **Force Clean MySQL Database - DEV**: Database cleanup without confirmation (use with caution)
+- **Set MySQL Password**: Configure secure environment variable for database access
+- **Verify MySQL Password**: Check if database credentials are properly configured
+- **Clean SQLite Database - DEV**: Remove local SQLite database files
+- **List SQLite Files - DEV**: List SQLite database files without removal
 
 #### PowerShell Query Script (`query-server-DEV.ps1`)
 
