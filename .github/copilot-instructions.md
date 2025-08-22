@@ -293,6 +293,66 @@ Use VS Code tasks for development:
 - **Restart Server**: Build and full server restart on dev server
 - **Reload Server**: Build and plugin reload only via api call
 
+### Server Query System Integration
+
+The project includes a comprehensive MCSS API-based query system for seamless server interaction during development. Use these capabilities for debugging, monitoring, and development workflow optimization:
+
+#### VS Code Query Tasks (Available via Command Palette)
+
+- **Query Console - Recent**: Get last 25 console lines with color-coded formatting
+- **Query Console - Errors Only**: Filter only ERROR/WARN messages from last 50 lines
+- **Query Console - Plugin Messages**: Show only RVNKTools-related log entries from last 100 lines  
+- **Query Server Status**: Get server running state, name, type, and memory info
+- **Query Server Statistics**: Get real-time CPU, memory usage, player count, uptime
+- **Query Server Info**: Get detailed server configuration and setup information
+
+#### PowerShell Query Script (`query-server-DEV.ps1`)
+
+For advanced queries and copilot agentic usage, execute the PowerShell script directly:
+
+```powershell
+# Console queries with flexible parameters (1-300 lines or "all")
+.\query-server-DEV.ps1 console [1-300|all] [-ErrorsOnly] [-PluginOnly] [-FilterText "text"] [-Reversed] [-NoTimestamp] [-Raw]
+
+# Server information queries  
+.\query-server-DEV.ps1 status    # Server state and basic info
+.\query-server-DEV.ps1 stats     # Performance metrics (CPU, memory, players, uptime)
+.\query-server-DEV.ps1 info      # Complete server configuration details
+```
+
+#### Query System Features for Copilot Agents
+
+- **Flexible Line Counts**: Support for 1-300 lines or "all" for complete history
+- **Advanced Filtering**: 
+  - `-ErrorsOnly`: Show only ERROR and WARN level messages
+  - `-PluginOnly`: Show only plugin-related messages  
+  - `-FilterText "keyword"`: Filter logs containing specific text
+  - `-Reversed`: Show newest entries first
+  - `-NoTimestamp`: Remove timestamp formatting for parsing
+  - `-Raw`: Unformatted output for programmatic processing
+- **Color-Coded Output**: Green (INFO), Yellow (WARN), Red (ERROR), Gray (DEBUG)
+- **Real-Time Access**: 1-2 second response time for all query types
+- **Zero Context Switching**: Query server without leaving VS Code environment
+
+#### Usage Examples for Development Workflow
+
+```powershell
+# Post-deployment verification
+.\query-server-DEV.ps1 console 25 -PluginOnly
+
+# Error debugging after code changes  
+.\query-server-DEV.ps1 console 100 -ErrorsOnly -FilterText "database"
+
+# Performance monitoring during testing
+.\query-server-DEV.ps1 stats
+
+# Complete plugin startup sequence analysis
+.\query-server-DEV.ps1 console all -FilterText "RVNKTools" -NoTimestamp
+```
+
+**Location**: All query scripts located in `.vscode/` directory
+**Reference Documentation**: `.vscode/MCSS-Query-Tasks-Instructions.md` for complete usage guide
+
 ### Testing and Troubleshooting Tools
 
 #### MC Server Soft (MCSS) API Integration
