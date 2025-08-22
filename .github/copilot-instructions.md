@@ -604,3 +604,66 @@ For detailed information, refer to:
   - Example: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
 - **All references, imports, and documentation should reflect these conventions for consistency.**
 - **This applies to all plugin modules and shared RVNKCore services.**
+
+## Asynchronous Programming Guidelines
+
+### When to Use Async (CompletableFuture)
+- Database operations (SELECT, INSERT, UPDATE, DELETE)
+- External API calls and web requests
+- File I/O operations (reading/writing config files)
+- Long-running computations (>50ms)
+
+### When NOT to Use Async
+- In-memory operations (cache lookups, Map/List operations)
+- Simple validation (null checks, format validation)
+- Configuration access (already-loaded values)
+- Event handlers (already on appropriate threads)
+- Command responses (users expect immediate feedback)
+
+### Service Interface Pattern
+```java
+public interface PlayerService {
+    // Async: Database operations
+    CompletableFuture<Optional<PlayerDTO>> getPlayer(UUID playerId);
+    CompletableFuture<List<PlayerDTO>> searchPlayers(String namePattern);
+    
+    // Sync: Cache/memory operations
+    Optional<PlayerDTO> getCachedPlayer(UUID playerId);
+    boolean isPlayerOnline(UUID playerId);
+    
+    // Sync: Simple validation
+    boolean isValidPlayerName(String name);
+}
+```
+
+### Command Framework Integration
+- Validate synchronously (permissions, args, format)
+- Use async for database/API operations
+- Provide immediate feedback to users
+- Handle async results with proper error messages
+
+```java
+@Override
+protected void execute(CommandSender sender, String[] args) {
+    // Sync validation first
+    if (!hasPermission(sender, "permission")) {
+        sender.sendMessage("No permission");
+        return;
+    }
+    
+    // Then async work
+    service.doWork(args)
+        .thenAccept(result -> sender.sendMessage("Success: " + result))
+        .exceptionally(ex -> {
+            logger.error("Operation failed", ex);
+            sender.sendMessage("Operation failed");
+            return null;
+        });
+}
+```
+
+### Performance Rules
+- Don't async operations that take <10ms
+- Use caching to reduce database calls
+- Batch operations instead of individual async calls
+- Consider thread pool limits
