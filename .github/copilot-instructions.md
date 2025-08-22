@@ -45,9 +45,9 @@ These guidelines should be followed when modifying or creating code to maintain 
 
 ### Performance Rules
 - Don't async operations that take <10ms
-- Use caching to reduce database calls
 - Batch operations instead of individual async calls
 - Consider thread pool limits
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
 
 ## Plugin Architecture
 
@@ -61,25 +61,32 @@ All RVNK plugins should follow a consistent architecture:
 - **Use ServiceRegistry** to obtain dependencies rather than direct instantiation
 - **Implement proper service lifecycle** with initialization and cleanup phases
 - **Handle missing dependencies gracefully** with appropriate fallback behavior
-- **Use YAML for all configuration files** with consistent naming conventions
-- **Use the RVNK exception hierarchy** for consistent error handling
-- **Implement caching strategies** for frequently accessed data
+- **For configuration management**: See [Configuration Standards](#configuration-standards) section
+- **For error handling**: See [Error Handling and Resilience](#error-handling-and-resilience) section
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
 
 *See examples: [Plugin Dependencies Configuration](copilot-instructions.examples.md#plugin-dependencies-configuration)*
 
 ### Error Handling and Resilience
 
-- **Use the RVNK exception hierarchy** for consistent error handling
+- **Use the RVNK exception hierarchy** for consistent error handling across all plugins
 - **Implement circuit breaker patterns** for external service calls
 - **Provide meaningful error messages** with actionable information for administrators
 - **Log errors with appropriate context** including player IDs, operation details, and stack traces
+- **Handle missing dependencies gracefully** with appropriate fallback behavior
+- **Implement proper exception chaining** to preserve stack trace information
+- **Use custom exception types** for domain-specific error conditions
 
 *See examples: [Error Handling and Resilience](copilot-instructions.examples.md#error-handling-and-resilience)*
 
 ### Performance and Monitoring
 
 - **Use DebugLogger as needed** for debugging only
-- **Implement caching strategies** for frequently accessed data
+- **Implement caching strategies** for frequently accessed data:
+  - Use caching to reduce database calls
+  - Implement proper cache invalidation strategies
+  - Consider memory usage vs. performance trade-offs
+  - Use connection pooling for external resources
 - **Monitor async operation completion** and log performance metrics
 - **Use connection pooling** through RVNKCore for database operations
 
