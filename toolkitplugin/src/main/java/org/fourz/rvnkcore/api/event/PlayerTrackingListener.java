@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.RVNKTools;
@@ -61,6 +62,7 @@ public class PlayerTrackingListener implements Listener {
         try {
             PlayerService playerService = rvnkCore.getService(PlayerService.class);
             PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
+            WorldService worldService = rvnkCore.getService(WorldService.class);
             
             // Track both global and world-specific data
             CompletableFuture<Void> globalUpdate = playerService.getPlayer(player.getUniqueId())
@@ -104,8 +106,14 @@ public class PlayerTrackingListener implements Listener {
                 player.getLocation().getBlock().getBiome().name()
             );
             
-            // Wait for both global and world tracking to complete
-            CompletableFuture.allOf(globalUpdate, worldUpdate)
+            // Update world player count (including max_players_seen tracking)
+            CompletableFuture<Void> worldPlayerCountUpdate = worldService.updatePlayerCount(
+                player.getWorld().getName(),
+                player.getWorld().getPlayers().size()
+            );
+            
+            // Wait for all updates to complete
+            CompletableFuture.allOf(globalUpdate, worldUpdate, worldPlayerCountUpdate)
                 .whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         logger.error("Failed to update player data for: " + player.getName(), throwable);
@@ -130,24 +138,36 @@ public class PlayerTrackingListener implements Listener {
         
         try {
             PlayerService playerService = rvnkCore.getService(PlayerService.class);
+            WorldService worldService = rvnkCore.getService(WorldService.class);
             
             // Update player's last location before they quit
-            playerService.updatePlayerLocation(
+            CompletableFuture<Void> playerLocationUpdate = playerService.updatePlayerLocation(
                 player.getUniqueId(),
                 player.getWorld().getName(),
                 player.getLocation().getX(),
                 player.getLocation().getY(),
                 player.getLocation().getZ()
-            ).whenComplete((result, throwable) -> {
-                if (throwable != null) {
-                    logger.error("Failed to update player location on quit: " + player.getName(), throwable);
-                } else {
-                    logger.debug("Updated player location on quit: " + player.getName());
-                }
-            });
+            );
+            
+            // Update world player count (subtract 1 since player is leaving)
+            int newPlayerCount = Math.max(0, player.getWorld().getPlayers().size() - 1);
+            CompletableFuture<Void> worldPlayerCountUpdate = worldService.updatePlayerCount(
+                player.getWorld().getName(),
+                newPlayerCount
+            );
+            
+            // Wait for both updates to complete
+            CompletableFuture.allOf(playerLocationUpdate, worldPlayerCountUpdate)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Failed to update player data on quit: " + player.getName(), throwable);
+                    } else {
+                        logger.debug("Updated player data on quit: " + player.getName());
+                    }
+                });
             
         } catch (Exception e) {
-            logger.error("Failed to get PlayerService for quit event", e);
+            logger.error("Failed to get services for quit event", e);
         }
     }
     
@@ -162,9 +182,10 @@ public class PlayerTrackingListener implements Listener {
         
         try {
             PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
+            WorldService worldService = rvnkCore.getService(WorldService.class);
             
             // Record world change with comprehensive tracking
-            playerWorldService.recordWorldChange(
+            CompletableFuture<Void> worldChangeUpdate = playerWorldService.recordWorldChange(
                 player.getUniqueId(),
                 event.getFrom().getName(),
                 player.getWorld().getName(),
@@ -173,17 +194,34 @@ public class PlayerTrackingListener implements Listener {
                 player.getLocation().getZ(),
                 player.getLocation().getYaw(),
                 player.getLocation().getPitch()
-            ).whenComplete((result, throwable) -> {
-                if (throwable != null) {
-                    logger.error("Failed to update player location on world change: " + player.getName(), throwable);
-                } else {
-                    logger.debug("Updated player location on world change: " + player.getName() + 
-                               " from " + event.getFrom().getName() + " to " + player.getWorld().getName());
-                }
-            });
+            );
+            
+            // Update player counts for both worlds
+            // Old world: decrease count (player left)
+            CompletableFuture<Void> oldWorldUpdate = worldService.updatePlayerCount(
+                event.getFrom().getName(),
+                Math.max(0, event.getFrom().getPlayers().size())
+            );
+            
+            // New world: increase count (player entered)
+            CompletableFuture<Void> newWorldUpdate = worldService.updatePlayerCount(
+                player.getWorld().getName(),
+                player.getWorld().getPlayers().size()
+            );
+            
+            // Wait for all updates to complete
+            CompletableFuture.allOf(worldChangeUpdate, oldWorldUpdate, newWorldUpdate)
+                .whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Failed to update data on world change: " + player.getName(), throwable);
+                    } else {
+                        logger.debug("Updated data on world change: " + player.getName() + 
+                                   " from " + event.getFrom().getName() + " to " + player.getWorld().getName());
+                    }
+                });
             
         } catch (Exception e) {
-            logger.error("Failed to get PlayerWorldService for world change event", e);
+            logger.error("Failed to get services for world change event", e);
         }
     }
 }

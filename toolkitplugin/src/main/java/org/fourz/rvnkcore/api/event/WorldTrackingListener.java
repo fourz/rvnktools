@@ -125,10 +125,11 @@ public class WorldTrackingListener implements Listener {
                     if (throwable != null) {
                         logger.error("Failed to register world during " + context + ": " + world.getName(), throwable);
                     } else {
+                        int currentPlayers = world.getPlayers().size();
                         logger.info("Successfully registered world during " + context + ": " + 
                                   world.getName() + " [" + world.getEnvironment() + 
-                                  ", Seed: " + world.getSeed() + 
-                                  ", Players: " + world.getPlayers().size() + "]");
+                                  ", " + world.getDifficulty() + 
+                                  ", Players: " + currentPlayers + "/" + currentPlayers + " max]");
                     }
                 });
                 

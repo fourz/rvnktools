@@ -131,8 +131,10 @@ public class DefaultWorldService implements WorldService {
                             if (throwable != null) {
                                 logger.error("Failed to register world: " + world.getName(), throwable);
                             } else {
+                                int currentPlayers = world.getPlayers().size();
                                 logger.info("Successfully registered world: " + world.getName() + 
-                                          " [" + world.getEnvironment() + ", Seed: " + world.getSeed() + "]");
+                                          " [" + world.getEnvironment() + ", " + world.getDifficulty() + 
+                                          ", Players: " + currentPlayers + "/" + currentPlayers + " max]");
                             }
                         });
                     

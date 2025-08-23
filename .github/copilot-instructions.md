@@ -286,11 +286,18 @@ Follow the CommandManager framework for all commands:
 
 ## Development Workflow
 
-Use VS Code tasks for development:
+Use VS Code tasks for development. Most tasks are **granular** for precise control, except for the complete deployment sequence:
 
-- **Build Plugin**: `mvn clean package` (builds the plugin JAR)
-- **Copy to Server**: Copy JAR to dev server
-- **Restart Server**: Build and full server restart on dev server
+### Complete Deployment Sequence
+- **Build & Deploy**: Complete automated sequence - Build Plugin → Copy to Server → Restart Server → Wait for startup validation
+
+### Granular Development Tasks
+- **Build Plugin**: `mvn clean package` (builds the plugin JAR only)
+- **Copy to Server**: Copy JAR to dev server (requires build first)
+- **Restart Server**: Full server restart on dev server (independent action)
+- **Reload Server**: Plugin reload without full restart (faster alternative)
+
+**Usage Pattern**: Use granular tasks for targeted development workflows, use "Build & Deploy" for complete code-to-server deployment with validation.
 
 ### Server Query System Integration
 
@@ -309,13 +316,19 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **Send Server Command**: Interactive command execution with custom input prompt
 - **RVNKTools Debug**: Execute `rvnktools debug` command for comprehensive plugin status
 
-**Build and Deployment Tasks (Sequential Control):**
+**Build and Deployment Tasks (Granular Control):**
+- **Build & Deploy**: Complete automated sequence (Build → Copy → Restart → Validation)
 - **Build Plugin**: Compile and package plugin JAR using Maven
 - **Copy to Server**: Copy built JAR to development server plugins folder
 - **ServerCleanup**: Remove existing plugin files and folders from server as needed
 - **Restart Server**: Full server restart via MCSS API
+- **Reload Server**: Plugin reload without full restart (faster alternative)
 - **Clean&Restart Server**: Combined folder cleanup and restart sequence
-Note: Tasks run independently for granular control in agentic debugging workflows. Call sequentially as needed.
+
+**Usage Guidelines**: 
+- Use **Build & Deploy** for complete development cycle with automatic validation
+- Use individual tasks for targeted operations (build-only, copy-only, restart-only)
+- Tasks execute independently for precise workflow control in debugging scenarios
 
 **Database Management Tasks:**
 - **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation prompt

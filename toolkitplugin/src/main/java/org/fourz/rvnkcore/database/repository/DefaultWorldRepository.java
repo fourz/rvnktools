@@ -222,12 +222,13 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<Void> updatePlayerCount(String worldName, int playerCount) {
         return CompletableFuture.runAsync(() -> {
-            String query = "UPDATE rvnk_worlds SET player_count = ?, last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
+            String query = "UPDATE rvnk_worlds SET player_count = ?, max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
                 
                 stmt.setInt(1, playerCount);
-                stmt.setString(2, worldName);
+                stmt.setInt(2, playerCount);
+                stmt.setString(3, worldName);
                 stmt.executeUpdate();
             } catch (SQLException e) {
                 logger.error("Error updating player count for world: " + worldName, e);
