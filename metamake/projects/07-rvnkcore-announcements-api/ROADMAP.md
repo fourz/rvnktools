@@ -35,19 +35,19 @@
   - Design dependency injection framework for RVNKTools consumption
   - Create service lifecycle management for initialization and cleanup
 
-### Week 2: Database Configuration & Migration Framework  
+### Week 2: Database Configuration & API Transition
 
-- [ ] **Database Configuration Strategy** - MySQL/SQLite with YAML fallback ⚠️ **UPDATED REQUIREMENTS**
-  - Implement MySQL/SQLite primary storage with runtime detection
-  - Configure YAML fallback when database unavailable or misconfigured
-  - Create intelligent database selection and connection validation
-  - Establish configuration validation and error recovery procedures
+- [ ] **Database Configuration Strategy** - Direct database targeting without complex migration
+  - Configure RVNKTools to use RVNKCore database connection patterns directly
+  - Eliminate complex YAML-to-database migration helpers (same target database)
+  - Create simple configuration switch from YAML to database storage
+  - Focus on cutover strategy rather than parallel system support
 
-- [ ] **YAML Migration Framework** - Data transformation pipeline  
-  - Build YAML parser with robust error handling and validation
-  - Implement data transformation service (YAML → AnnouncementDTO)
-  - Create migration orchestrator with progress reporting and rollback
-  - Develop comprehensive migration testing framework with real data samples
+- [ ] **API Cutover Framework** - Simple transition from old to new API
+  - Maintain existing AnnounceManager API interface during transition
+  - Implement new database-backed methods behind existing API
+  - Create feature flag for switching between YAML and database storage
+  - Remove complex data transformation pipelines (unnecessary for identical databases)
 
 ### Week 3: AnnounceManager Hook Points & Legacy Compatibility
 

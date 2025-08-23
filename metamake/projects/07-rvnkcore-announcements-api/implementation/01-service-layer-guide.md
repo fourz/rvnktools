@@ -7,23 +7,35 @@
 
 ## Overview
 
-This guide provides step-by-step instructions for implementing the RVNKCore announcement service layer, establishing the service separation pattern that serves as the foundation for the entire RVNK plugin ecosystem.
+This guide provides step-by-step instructions for implementing the announcement service layer within RVNKTools codebase, using RVNKCore base classes and patterns while keeping announcement-specific logic in RVNKTools.
+
+## Code Location Strategy
+
+**RVNKCore Provides**:
+- Base service interfaces and abstract classes
+- Database connection patterns and repository base classes
+- REST API framework and base controller classes
+
+**RVNKTools Contains**:
+- AnnouncementService implementation (extends RVNKCore base)
+- Announcement-specific business logic
+- AnnounceManager integration and command handling
+- Domain-specific data models and processing
 
 ## Prerequisites
 
-### Required Infrastructure
-- RVNKCore plugin loaded and initialized
-- Database connection (MySQL or SQLite) configured
-- BaseRepository pattern implemented
+### Required RVNKCore Infrastructure
+- BaseService abstract class
+- BaseRepository pattern available
+- Database ConnectionProvider configured
 - ServiceRegistry framework operational
 
 ### Development Environment Setup
 ```bash
-# Verify RVNKCore is available
-# In VS Code, check that these classes exist:
-# - org.fourz.rvnkcore.api.service.AnnouncementService
-# - org.fourz.rvnkcore.database.repository.AnnouncementRepository
-# - org.fourz.rvnkcore.service.registry.ServiceRegistry
+# Verify RVNKCore base classes are available:
+# - org.fourz.rvnkcore.service.BaseService
+# - org.fourz.rvnkcore.database.repository.BaseRepository
+# - org.fourz.rvnkcore.database.ConnectionProvider
 ```
 
 ## Step 1: Review Existing Service Interface

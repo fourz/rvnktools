@@ -77,9 +77,16 @@ This project implements the announcements API as the first major example of the 
 - **Migration Goal**: Transition RVNKTools to consume RVNKCore services while preserving functionality
 
 ### Service Separation Pattern
-- **RVNKCore Role**: Provides base services, database access, REST API, business logic
-- **Consumer Plugin Role**: Uses RVNKCore services via dependency injection and service registry
-- **Benefits**: Performance, scalability, web integration, multi-server support, code reuse
+- **RVNKCore Role**: Provides base service interfaces, database connection patterns, REST API framework
+- **Consumer Plugin Role**: Contains domain-specific implementations using RVNKCore base classes
+- **Benefits**: Performance, scalability, web integration, multi-server support, code reuse without tight coupling
+
+**Code Architecture Strategy**:
+- Base interfaces and abstract classes live in RVNKCore
+- Announcement-specific implementations remain in RVNKTools
+- Database schema and connection management in RVNKCore
+- Business logic and domain-specific processing in RVNKTools
+- Simple cutover from old YAML API to new database-backed API without complex migration helpers
 
 ### Implementation Strategy
 - **Phase 1**: RVNKCore infrastructure (✅ Complete - August 22, 2025)

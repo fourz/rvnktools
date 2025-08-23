@@ -1,101 +1,60 @@
-# Feature: YAML to Database Migration Framework
+# Feature: Simple Configuration Cutover
 
-**Feature ID**: 04-yaml-migration  
+**Feature ID**: 04-simple-cutover  
 **Priority**: High  
 **Status**: Implementation Ready  
-**Estimated Effort**: 3-4 days
+**Estimated Effort**: 1-2 days
 
 ## Overview
 
-Implement a comprehensive migration framework to transform existing YAML-based announcements from RVNKTools into database records in RVNKCore, ensuring zero data loss and providing rollback capabilities.
+Implement a simple configuration-based cutover from YAML to database storage, eliminating complex migration frameworks since both systems target the same database schema.
 
 ## Requirements
 
-### Current YAML Structure Analysis
+### Configuration-Based Storage Switch
 
-**Existing RVNKTools announcements.yml format**:
+**Simple Storage Configuration**:
 ```yaml
-announcements:
-  announcement_1:
-    type: "general"
-    message: "&6[Server] &fWelcome to our server!"
-    worlds: ["world", "world_nether"]
-    groups: ["default", "premium"]
-    active: true
-    priority: 1
-    created: "2025-08-15T10:30:00"
-    listingFee: 100.0
-    author: "admin"
+# announcements.yml - Simple storage selection
+storage:
+  mode: "yaml"  # Options: "yaml" or "database"
   
-  shop_announcement_1:
-    type: "shop"
-    message: "&e[Shop] &bNew items available in the spawn shop!"
-    worlds: ["world"]
-    groups: ["all"]
-    active: true
-    priority: 5
-    created: "2025-08-20T14:45:00"
-    listingFee: 50.0
-    author: "shopkeeper"
+# When mode is "database", use RVNKCore connection
+# When mode is "yaml", use existing YAML files
+# No complex migration needed - same database, different access method
 ```
 
-### Migration Framework Components
+### Simplified Approach
 
-**YAMLAnnouncementParser** - Robust YAML parsing with validation
+Instead of complex data transformation pipelines, implement:
+
+1. **Configuration Flag**: Simple switch between storage modes
+2. **Direct Database Access**: Use RVNKCore database patterns directly
+3. **API Preservation**: Keep existing AnnounceManager interface
+4. **No Migration Helpers**: Eliminate unnecessary data transformation (same target database)
+
+### Implementation Components
+
+**StorageModeManager** - Simple storage selection
 ```java
-public class YAMLAnnouncementParser {
-    private final LogManager logger;
-    private final List<String> validationErrors;
+public class StorageModeManager {
+    private final StorageMode currentMode;
     
-    public ParseResult parseAnnouncementsFile(File yamlFile) {
-        // Parse YAML with comprehensive error handling
-        // Validate data structure and required fields
-        // Return structured result with success/failure status
+    public enum StorageMode {
+        YAML,           // Use existing YAML file storage
+        DATABASE        // Use RVNKCore database directly
     }
     
-    public List<YAMLAnnouncement> parseAnnouncementsSection(Map<String, Object> yamlData) {
-        // Extract individual announcements from YAML structure
-        // Handle missing or malformed fields gracefully
-        // Provide detailed validation error messages
+    public StorageMode detectStorageMode() {
+        // Read from configuration file
+        // Return appropriate mode based on settings
     }
     
-    public static class ParseResult {
-        private final boolean success;
-        private final List<YAMLAnnouncement> announcements;
-        private final List<String> errors;
-        private final List<String> warnings;
+    public boolean switchToDatabase() {
+        // Simple configuration update
+        // No data migration needed (same database target)
     }
 }
-```
-
-**YAMLAnnouncement** - Intermediate data model for YAML data
-```java
-public class YAMLAnnouncement {
-    private String id;              // Original YAML key
-    private String type;            // announcement type
-    private String message;         // announcement message
-    private List<String> worlds;    // target worlds
-    private List<String> groups;    // target groups
-    private boolean active;         // active status
-    private int priority;           // display priority
-    private String created;         // creation timestamp (string)
-    private Double listingFee;      // listing fee amount
-    private String author;          // announcement author
-    
-    // Validation methods
-    public List<String> validate() {
-        List<String> errors = new ArrayList<>();
-        if (message == null || message.trim().isEmpty()) {
-            errors.add("Message cannot be empty");
-        }
-        if (type == null || type.trim().isEmpty()) {
-            errors.add("Type cannot be empty");
-        }
-        // Additional validation logic...
-        return errors;
-    }
-}
-```
 
 ### Data Transformation Service
 

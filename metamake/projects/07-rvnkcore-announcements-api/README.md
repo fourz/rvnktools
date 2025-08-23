@@ -65,9 +65,16 @@ This project implements a comprehensive announcements API system in RVNKCore, mi
 
 This project establishes the **service separation pattern** for the RVNK plugin ecosystem:
 
-- **RVNKCore**: Provides base services, database access, and REST API infrastructure
-- **RVNKTools**: Consumes RVNKCore services via dependency injection and service registry
+- **RVNKCore**: Provides base service interfaces, database access patterns, and REST API infrastructure
+- **RVNKTools**: Contains announcement-specific implementation and business logic, uses RVNKCore base classes
 - **Other RVNK Plugins**: Follow the same pattern (RVNKLore, RVNKQuests, etc.)
+
+**Code Location Strategy**:
+
+- Base classes and interfaces: RVNKCore
+- Announcement-specific implementations: RVNKTools codebase
+- Database schema and connection management: RVNKCore
+- Business logic and announcement processing: RVNKTools
 
 ## Migration Benefits
 
