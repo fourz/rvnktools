@@ -43,11 +43,14 @@ sc**Branch**: `derek/dev-core` | **Status**: **Phase 1 Complete (100%)**
 - [x] DefaultPlayerService implementation with full business logic
 - [x] PlayerWorldService interface for per-world tracking
 - [x] DefaultPlayerWorldService with rate limiting and session management
+- [x] **WorldService interface for comprehensive world metadata tracking** ✅ **NEW**
+- [x] **DefaultWorldService with world registration and lifecycle management** ✅ **NEW**
 - [x] **AnnouncementService interface with 17 comprehensive async methods** ✅ **PRODUCTION READY**
 - [x] **DefaultAnnouncementService with caching, validation, and performance optimization** ✅ **OPERATIONAL**
 - [x] ServiceRegistry implementation for dependency injection
 - [x] RVNKCoreBootstrap for legacy integration
 - [x] PlayerTrackingListener for event-driven updates
+- [x] **WorldTrackingListener for automatic world registration** ✅ **NEW**
 
 **Database Layer Implementation** ✅
 - [x] BaseRepository abstract class with CRUD operations
@@ -96,6 +99,17 @@ sc**Branch**: `derek/dev-core` | **Status**: **Phase 1 Complete (100%)**
 - [x] `GET /api/v1/players/count` - Get total player count
 - [x] `PUT /api/v1/players/{uuid}/location` - Update player location
 - [x] `PUT /api/v1/players/{uuid}/groups` - Update player groups
+
+**World Management API:** ✅ **NEW**
+- [x] `GET /api/v1/worlds` - List all worlds with metadata
+- [x] `GET /api/v1/worlds/active` - Get active worlds only
+- [x] `GET /api/v1/worlds/with-players` - Get worlds with online players
+- [x] `GET /api/v1/worlds/statistics` - Get world statistics and metrics
+- [x] `GET /api/v1/worlds/environment/{env}` - Get worlds by environment type
+- [x] `GET /api/v1/worlds/player/{uuid}` - Get worlds for specific player
+- [x] `GET /api/v1/worlds/correlation/{uuid}` - Get world-player correlation data
+- [x] `GET /api/v1/worlds/recent` - Get recently accessed worlds
+- [x] `GET /api/v1/worlds/{worldName}` - Get specific world by name
 
 **Announcement Management API:** ✅ **PRODUCTION READY**
 - [x] `GET /api/v1/announcements` - List all announcements

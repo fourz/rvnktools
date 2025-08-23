@@ -154,20 +154,18 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<Void> save(WorldDTO worldDTO) {
         return CompletableFuture.runAsync(() -> {
-            String query = """
-                INSERT INTO rvnk_worlds (name, display_name, environment, world_type, difficulty, 
-                world_folder, seed_value, spawn_x, spawn_y, spawn_z, is_active, 
-                current_players, max_players_seen, total_playtime_seconds, created_date, last_accessed) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE 
-                display_name = VALUES(display_name), environment = VALUES(environment), 
-                world_type = VALUES(world_type), difficulty = VALUES(difficulty), 
-                is_active = VALUES(is_active), current_players = VALUES(current_players), 
-                max_players_seen = VALUES(max_players_seen), 
-                total_playtime_seconds = VALUES(total_playtime_seconds), last_accessed = VALUES(last_accessed)
-                """;
-            
-            try (Connection conn = connectionProvider.getConnection();
+        String query = """
+            INSERT INTO rvnk_worlds (name, display_name, environment, world_type, difficulty, 
+            world_folder, seed, spawn_x, spawn_y, spawn_z, is_active, 
+            player_count, max_players_seen, total_playtime_seconds, created_at, last_accessed) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE 
+            display_name = VALUES(display_name), environment = VALUES(environment), 
+            world_type = VALUES(world_type), difficulty = VALUES(difficulty), 
+            is_active = VALUES(is_active), player_count = VALUES(player_count), 
+            max_players_seen = VALUES(max_players_seen), 
+            total_playtime_seconds = VALUES(total_playtime_seconds), last_accessed = VALUES(last_accessed)
+            """;            try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
                 
                 stmt.setString(1, worldDTO.getName());
@@ -201,7 +199,7 @@ public class DefaultWorldRepository implements WorldRepository {
         return CompletableFuture.runAsync(() -> {
             String query = """
                 UPDATE rvnk_worlds 
-                SET total_playtime_seconds = ?, current_players = ?, 
+                SET total_playtime_seconds = ?, player_count = ?, 
                     max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP 
                 WHERE name = ?
                 """;
@@ -224,7 +222,7 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<Void> updatePlayerCount(String worldName, int playerCount) {
         return CompletableFuture.runAsync(() -> {
-            String query = "UPDATE rvnk_worlds SET current_players = ?, last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
+            String query = "UPDATE rvnk_worlds SET player_count = ?, last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
                 
@@ -328,16 +326,16 @@ public class DefaultWorldRepository implements WorldRepository {
         dto.setWorldType(rs.getString("world_type"));
         dto.setDifficulty(rs.getString("difficulty"));
         dto.setWorldFolder(rs.getString("world_folder"));
-        dto.setSeed(rs.getLong("seed_value"));
+        dto.setSeed(rs.getLong("seed"));
         dto.setSpawnX(rs.getDouble("spawn_x"));
         dto.setSpawnY(rs.getDouble("spawn_y"));
         dto.setSpawnZ(rs.getDouble("spawn_z"));
         dto.setIsActive(rs.getBoolean("is_active"));
-        dto.setPlayerCount(rs.getInt("current_players"));
+        dto.setPlayerCount(rs.getInt("player_count"));
         dto.setMaxPlayersSeen(rs.getInt("max_players_seen"));
         dto.setTotalPlaytimeSeconds(rs.getLong("total_playtime_seconds"));
         
-        Timestamp created = rs.getTimestamp("created_date");
+        Timestamp created = rs.getTimestamp("created_at");
         if (created != null) {
             dto.setCreatedAt(created.toLocalDateTime());
         }

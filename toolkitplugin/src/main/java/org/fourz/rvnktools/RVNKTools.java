@@ -6,6 +6,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
+import org.fourz.rvnkcore.api.event.WorldTrackingListener;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.config.ConfigLoader;
@@ -179,6 +180,12 @@ public class RVNKTools extends JavaPlugin implements Listener {
             try {
                 PlayerTrackingListener playerTracker = new PlayerTrackingListener(this, rvnkCore);
                 getServer().getPluginManager().registerEvents(playerTracker, this);
+                
+                WorldTrackingListener worldTracker = new WorldTrackingListener(this, rvnkCore);
+                getServer().getPluginManager().registerEvents(worldTracker, this);
+                
+                // Sync all currently loaded worlds at startup
+                worldTracker.syncAllLoadedWorlds();
                 
                 // Register LuckPerms integration listener
                 try {

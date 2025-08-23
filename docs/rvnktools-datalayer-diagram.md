@@ -94,6 +94,7 @@ rvnktools/toolkitplugin/
 │       │           │   │   │   ├── DefaultPlayerService.java ✅ (Full business logic)
 │       │           │   │   │   ├── DefaultPlayerWorldService.java ✅ (World tracking)
 │       │           │   │   │   └── PlayerTrackingListener.java ✅ (Event-driven updates)
+│       │           │   │   │   └── WorldTrackingListener.java ✅ (World lifecycle management)
 │       │           │   │   └── registry/ ✅ **DEPENDENCY INJECTION - COMPLETE**
 │       │           │   │       ├── ServiceRegistry.java (Interface)
 │       │           │   │       └── ServiceRegistryImpl.java ✅ (DI implementation)
@@ -777,6 +778,7 @@ RVNKCore Phase 1 implementation has exceeded all expectations with a comprehensi
 - PlayerService with comprehensive async operations
 - PlayerWorldService for per-world location tracking
 - Event-driven updates with PlayerTrackingListener
+- Automatic world registration with WorldTrackingListener
 
 **REST API Infrastructure** ✅
 - Full HTTP/HTTPS server with Jetty integration

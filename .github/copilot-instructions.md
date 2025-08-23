@@ -420,6 +420,52 @@ For comprehensive testing and debugging, utilize the MCSS API for real-time serv
 
 **Reference Documentation**: `docs/api-reference/mcss-dev-server.md`
 
+#### RVNKCore API Testing Infrastructure
+
+For comprehensive REST API testing and validation of RVNKCore endpoints, utilize the PowerShell-based testing framework:
+
+**Execute RVNKCore API Call Task:**
+- **Task Name**: "Execute RVNKCore API Call" (VS Code Command Palette → Tasks: Run Task)
+- **Purpose**: Interactive API testing with custom parameters for debugging and validation
+- **Usage**: Provides guided parameter input for testing specific API endpoints
+
+**PowerShell API Test Script:**
+- **Location**: `tests/scripts/posh/Test-RestRVNKCoreAPI.ps1`
+- **Configuration**: Auto-loads from `.vscode/project.json` for URLs and API keys
+- **Protocols**: Tests both HTTP (8080) and HTTPS (8081) endpoints
+
+**API Test Categories:**
+```powershell
+# Test all RVNKCore APIs
+.\Test-RestRVNKCoreAPI.ps1 -Tests all
+
+# Test specific API categories
+.\Test-RestRVNKCoreAPI.ps1 -Tests player        # Player management APIs
+.\Test-RestRVNKCoreAPI.ps1 -Tests playerworld   # Player-world correlation APIs
+.\Test-RestRVNKCoreAPI.ps1 -Tests world         # World management APIs  
+.\Test-RestRVNKCoreAPI.ps1 -Tests announcement  # Announcement system APIs
+
+# Advanced testing options
+.\Test-RestRVNKCoreAPI.ps1 -Tests world -HttpsOnly -Detail          # HTTPS only with detailed output
+.\Test-RestRVNKCoreAPI.ps1 -Tests all -IgnoreSSLErrors -Detail      # Full test suite with SSL bypass
+```
+
+**Key API Endpoints Tested:**
+- **Player APIs**: Player retrieval, search, location updates, group management
+- **World APIs**: World metadata, statistics, environment filtering, player correlation  
+- **Player-World APIs**: World visit tracking, location history, playtime statistics
+- **Announcement APIs**: CRUD operations, bulk management, filtering, metrics
+
+**Testing Features:**
+- **Comprehensive Coverage**: Tests 30+ API endpoints across 4 major categories
+- **Dual Protocol Support**: Validates both HTTP and HTTPS implementations
+- **Detailed Analysis**: Request/response logging with `-Detail` flag for debugging
+- **Error Handling**: Validates proper HTTP status codes and error responses
+- **Performance Metrics**: Response time analysis and success/failure reporting
+- **SSL Configuration**: Self-signed certificate support for development environments
+
+**Reference Documentation**: `.vscode/tasks-rvnkcore-api.md` for comprehensive usage guide and debugging workflows
+
 ## Documentation and Reference Structure
 
 ### Primary Documentation Files
