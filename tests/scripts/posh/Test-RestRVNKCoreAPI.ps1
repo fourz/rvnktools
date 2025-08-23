@@ -14,11 +14,11 @@
 
 param (
     [Parameter(Mandatory = $false)]
-    [string]$HttpUrl = "http://localhost:8080",
+    [string]$HttpUrl = "",
     [Parameter(Mandatory = $false)]
-    [string]$HttpsUrl = "https://localhost:8081",
+    [string]$HttpsUrl = "",
     [Parameter(Mandatory = $false)]
-    [string]$ApiKey = "test-api-key",
+    [string]$ApiKey = "",
     [Parameter(Mandatory = $false)]
     [switch]$IgnoreSSLErrors,
     [Parameter(Mandatory = $false)]
@@ -34,6 +34,43 @@ param (
 
 # Set TLS 1.2 for secure connections (required for modern HTTPS)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Load configuration from project.json
+$projectJsonPath = Join-Path $PSScriptRoot "..\..\..\.vscode\project.json"
+$config = $null
+if (Test-Path $projectJsonPath) {
+    try {
+        $config = Get-Content $projectJsonPath | ConvertFrom-Json
+        Write-Host "Configuration loaded from project.json" -ForegroundColor Green
+    } catch {
+        Write-Warning "Failed to load project.json configuration: $($_.Exception.Message)"
+    }
+} else {
+    Write-Warning "project.json not found at: $projectJsonPath"
+}
+
+# Use configuration values if not provided as parameters and config is available
+if (-not $HttpUrl -and $config -and $config.RVNKCoreAPI -and $config.RVNKCoreAPI.httpUrl) {
+    $HttpUrl = $config.RVNKCoreAPI.httpUrl
+} elseif (-not $HttpUrl) {
+    $HttpUrl = "http://localhost:8080"
+}
+
+if (-not $HttpsUrl -and $config -and $config.RVNKCoreAPI -and $config.RVNKCoreAPI.httpsUrl) {
+    $HttpsUrl = $config.RVNKCoreAPI.httpsUrl
+} elseif (-not $HttpsUrl) {
+    $HttpsUrl = "https://localhost:8081"
+}
+
+if (-not $ApiKey -and $config -and $config.RVNKCoreAPI -and $config.RVNKCoreAPI.apiKey) {
+    $ApiKey = $config.RVNKCoreAPI.apiKey
+    Write-Host "Using API key from project.json configuration" -ForegroundColor Green
+} elseif (-not $ApiKey) {
+    $ApiKey = "test-api-key"
+    Write-Warning "Using default API key - update project.json for production use"
+}
+
+Write-Host "Configuration: HTTP=$HttpUrl, HTTPS=$HttpsUrl, API Key=[REDACTED]" -ForegroundColor Cyan
 
 # SSL certificate validation bypass for self-signed certificates
 if ($IgnoreSSLErrors) {
