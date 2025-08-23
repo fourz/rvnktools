@@ -22,6 +22,7 @@ public class RVNKToolsCommand extends BaseCommand {
         registerSubCommand("cycle", new CycleSubCommand(plugin, this));
         registerSubCommand("reload", new ReloadSubCommand(plugin, this));
         registerSubCommand("debug", new DebugSubCommand(plugin, this));
+        registerSubCommand("createtestdata", new CreateTestDataSubCommand(plugin, this));
         
         // Create teleport subcommands without world swap - they will get it from CommandManager
         registerSubCommand("teleport", new TeleportSubCommand(plugin, this));
@@ -44,6 +45,7 @@ public class RVNKToolsCommand extends BaseCommand {
         sender.sendMessage("§f/rvnktools teleport worldswap [world] §7- Teleport between worlds");
         sender.sendMessage("§f/rvnktools reload §7- Reload plugin configuration");
         sender.sendMessage("§f/rvnktools debug §7- Show debug information");
+        sender.sendMessage("§f/rvnktools createtestdata [all|types|announcements] §7- Create test data for API");
         sender.sendMessage("");
         sender.sendMessage("§e⚠ §7Quick access commands:");
         sender.sendMessage("§f/worldswap [world] §7- Direct world swap command");

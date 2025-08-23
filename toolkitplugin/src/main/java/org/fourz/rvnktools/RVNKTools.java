@@ -283,6 +283,15 @@ public class RVNKTools extends JavaPlugin implements Listener {
     public CycleCommands getCycleCommands() {
         return commandCycler;
     }
+    
+    /**
+     * Gets the AnnounceManager instance.
+     * 
+     * @return The AnnounceManager instance, or null if not initialized
+     */
+    public AnnounceManager getAnnounceManager() {
+        return announceManager;
+    }
 
     private boolean setupEconomy() {
         if (getServer().getPluginManager().getPlugin("Vault") == null) {

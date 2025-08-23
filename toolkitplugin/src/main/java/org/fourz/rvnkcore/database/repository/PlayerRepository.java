@@ -50,7 +50,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      */
     public CompletableFuture<Optional<PlayerDTO>> findByCurrentName(String playerName) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .where("current_name = ?")
                 .build();
@@ -81,7 +83,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      */
     public CompletableFuture<List<PlayerDTO>> findRecentPlayers(int hoursAgo) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .where("last_seen > ?")
                 .orderBy("last_seen", false)
@@ -115,7 +119,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      */
     public CompletableFuture<List<PlayerDTO>> findByPrimaryGroup(String groupName) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .where("primary_group = ?")
                 .orderBy("current_name", true)
@@ -148,7 +154,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      */
     public CompletableFuture<List<PlayerDTO>> searchByNamePattern(String namePattern) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .where("current_name LIKE ? OR name_history LIKE ?")
                 .orderBy("current_name", true)
@@ -222,7 +230,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     
     @Override
     protected String buildInsertQuery() {
-        return queryBuilder.insert(tableName)
+        // Create a new QueryBuilder instance for thread safety
+        QueryBuilder builder = createQueryBuilder();
+        return builder.insert(tableName)
             .columns("id", "current_name", "name_history", "first_join", "last_seen", 
                     "current_world", "times_joined", "total_playtime_seconds", "primary_group", "groups", "banned")
             .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
@@ -231,7 +241,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     
     @Override
     protected String buildUpdateQuery() {
-        QueryBuilder builder = queryBuilder.update(tableName);
+        // Create a new QueryBuilder instance for thread safety
+        QueryBuilder builder = createQueryBuilder();
+        builder = builder.update(tableName);
         builder.set("current_name", "?")
                .set("name_history", "?")
                .set("last_seen", "?")

@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.database.repository;
 import org.fourz.rvnkcore.api.exception.DatabaseException;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.QueryBuilder;
+import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -63,7 +64,9 @@ public abstract class BaseRepository<T, ID> {
      */
     public CompletableFuture<Optional<T>> findById(ID id) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .where(getPrimaryKeyColumn() + " = ?")
                 .build();
@@ -93,7 +96,9 @@ public abstract class BaseRepository<T, ID> {
      */
     public CompletableFuture<List<T>> findAll() {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
                 .from(tableName)
                 .build();
                 
@@ -198,7 +203,9 @@ public abstract class BaseRepository<T, ID> {
      */
     public CompletableFuture<Void> deleteById(ID id) {
         return CompletableFuture.runAsync(() -> {
-            String query = queryBuilder.delete()
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.delete()
                 .from(tableName)
                 .where(getPrimaryKeyColumn() + " = ?")
                 .build();
@@ -239,7 +246,9 @@ public abstract class BaseRepository<T, ID> {
 
     public CompletableFuture<Boolean> existsById(ID id) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("COUNT(*)")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("COUNT(*)")
                 .from(tableName)
                 .where(getPrimaryKeyColumn() + " = ?")
                 .build();
@@ -266,7 +275,9 @@ public abstract class BaseRepository<T, ID> {
      */
     public CompletableFuture<Long> count() {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("COUNT(*)")
+            // Create a new QueryBuilder instance for thread safety
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("COUNT(*)")
                 .from(tableName)
                 .build();
                 
@@ -349,4 +360,13 @@ public abstract class BaseRepository<T, ID> {
      * @throws SQLException if setting parameters fails
      */
     protected abstract void setUpdateParameters(PreparedStatement stmt, T entity) throws SQLException;
+    
+    /**
+     * Creates a new QueryBuilder instance for thread-safe query construction.
+     * 
+     * @return A new QueryBuilder instance
+     */
+    protected QueryBuilder createQueryBuilder() {
+        return BasicSQLQueryBuilder.create();
+    }
 }

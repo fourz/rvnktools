@@ -340,7 +340,9 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
     
     @Override
     protected String buildInsertQuery() {
-        return queryBuilder.insert(tableName)
+        // Create a new QueryBuilder instance for thread safety
+        QueryBuilder builder = createQueryBuilder();
+        return builder.insert(tableName)
             .columns("id", "title", "message", "type", "active", "created_at", "updated_at", 
                     "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata")
             .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
@@ -349,7 +351,9 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
     
     @Override
     protected String buildUpdateQuery() {
-        return queryBuilder.update(tableName)
+        // Create a new QueryBuilder instance for thread safety
+        QueryBuilder builder = createQueryBuilder();
+        return builder.update(tableName)
             .set("title", "?")
             .set("message", "?")
             .set("type", "?")
