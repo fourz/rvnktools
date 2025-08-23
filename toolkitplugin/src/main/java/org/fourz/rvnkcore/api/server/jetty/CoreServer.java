@@ -11,6 +11,7 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -31,6 +32,7 @@ public class CoreServer {
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
+    private final WorldService worldService;
     private final Gson gson;
     private final LogManager logger;
     private final Plugin plugin;
@@ -47,14 +49,16 @@ public class CoreServer {
      * @param playerService Player service for data operations
      * @param playerWorldService Player world service for world-specific data operations
      * @param announcementService Announcement service for data operations
+     * @param worldService World service for world tracking and management
      * @param plugin Plugin instance
      */
     public CoreServer(ApiConfig config, PlayerService playerService, PlayerWorldService playerWorldService, 
-                                    AnnouncementService announcementService, Plugin plugin) {
+                                    AnnouncementService announcementService, WorldService worldService, Plugin plugin) {
         this.config = config;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
+        this.worldService = worldService;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.gson = createGson();
@@ -64,7 +68,7 @@ public class CoreServer {
         
         // Initialize specialized factories
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
-        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, gson);
+        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
     }
 

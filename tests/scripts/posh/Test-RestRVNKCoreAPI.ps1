@@ -6,6 +6,7 @@
 # Test all APIs: .\Test-RestRVNKCoreAPI.ps1 -Tests all
 # Test player API only: .\Test-RestRVNKCoreAPI.ps1 -Tests player -HttpsOnly
 # Test player world API only: .\Test-RestRVNKCoreAPI.ps1 -Tests playerworld -HttpOnly
+# Test world API only: .\Test-RestRVNKCoreAPI.ps1 -Tests world -HttpOnly -Detail
 # Test announcements only: .\Test-RestRVNKCoreAPI.ps1 -Tests announcement -HttpOnly
 
 # MANUAL TESTING EXAMPLES:
@@ -29,7 +30,7 @@ param (
     [Parameter(Mandatory = $false)]
     [switch]$Detail,
     [Parameter(Mandatory = $false)]
-    [ValidateSet("all", "player", "playerworld", "announcement")]
+    [ValidateSet("all", "player", "playerworld", "world", "announcement")]
     [string]$Tests = "all"
 )
 
@@ -120,6 +121,17 @@ $Endpoints = @{
     PlayerVisitedWorlds = "/api/v1/players/{uuid}/worlds/visited"
     PlayerWorldStats = "/api/v1/players/{uuid}/worlds/stats"
     
+    # World API Endpoints (NEW)
+    Worlds = "/api/v1/worlds"
+    ActiveWorlds = "/api/v1/worlds/active"
+    WorldsWithPlayers = "/api/v1/worlds/with-players"
+    WorldByName = "/api/v1/worlds/{worldName}"
+    WorldsByEnvironment = "/api/v1/worlds/environment/{environment}"
+    WorldsForPlayer = "/api/v1/worlds/player/{playerUuid}"
+    WorldPlayerCorrelation = "/api/v1/worlds/correlation/{playerUuid}"
+    WorldStatistics = "/api/v1/worlds/statistics"
+    RecentWorlds = "/api/v1/worlds/recent"
+    
     # Announcement API Endpoints
     Announcements = "/api/v1/announcements"
     AnnouncementById = "/api/v1/announcements/{id}"
@@ -144,6 +156,10 @@ $TestData = @{
     # Player World test data
     TestWorld = "world"
     AltWorld = "world_nether"
+    
+    # World API test data
+    TestEnvironment = "NORMAL"
+    WorldLimit = 5
     
     # Announcement test data
     NewAnnouncement = @{
@@ -469,6 +485,216 @@ function Test-GetPlayerWorldStats {
 }
 
 # ===========================================
+# WORLD API TEST FUNCTIONS
+# ===========================================
+
+function Test-GetAllWorlds {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.Worlds
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount worlds successfully"
+        
+        # Show detailed world data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $sampleWorld = $result.Data[0]
+                $message += "`n    Sample World Fields: Name=$($sampleWorld.name), Type=$($sampleWorld.worldType), Environment=$($sampleWorld.environment), Active=$($sampleWorld.isActive)"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve worlds"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get All Worlds" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetActiveWorlds {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.ActiveWorlds
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount active worlds successfully"
+        
+        # Show detailed active world data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array]) {
+                $activeCount = ($result.Data | Where-Object { $_.isActive -eq $true }).Count
+                $message += "`n    Active Status Verification: $activeCount/$worldCount worlds marked as active"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve active worlds"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Active Worlds" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldsWithPlayers {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.WorldsWithPlayers
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount worlds with players successfully"
+        
+        # Show detailed player count data if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array]) {
+                $totalPlayers = ($result.Data | ForEach-Object { $_.playerCount }).Sum
+                $message += "`n    Player Distribution: Total $totalPlayers players across $worldCount worlds"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve worlds with players"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Worlds With Players" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldByName {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.WorldByName -replace '\{worldName\}', $TestData.TestWorld
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    if ($result.Success) {
+        $message = "Retrieved world '$($TestData.TestWorld)' successfully"
+        
+        # Show detailed world metadata if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $world = $result.Data
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            $message += "`n    World Details: Name=$($world.name), Type=$($world.worldType), Environment=$($world.environment)"
+            $message += "`n    Spawn Location: X=$($world.spawnX), Y=$($world.spawnY), Z=$($world.spawnZ)"
+            $message += "`n    World Border: Size=$($world.worldBorderSize), Center=($($world.worldBorderCenterX), $($world.worldBorderCenterZ))"
+            $message += "`n    Statistics: Players=$($world.playerCount), Max Seen=$($world.maxPlayersSeen), Total Playtime=$($world.totalPlaytimeSeconds)s"
+        }
+    } else {
+        $message = "Failed to retrieve world '$($TestData.TestWorld)'"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get World By Name" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldsByEnvironment {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.WorldsByEnvironment -replace '\{environment\}', $TestData.TestEnvironment
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount worlds in '$($TestData.TestEnvironment)' environment"
+        
+        # Show detailed environment analysis if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $environments = $result.Data | Group-Object environment | ForEach-Object { "$($_.Name): $($_.Count)" }
+                $message += "`n    Environment Breakdown: $($environments -join ', ')"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve worlds by environment '$($TestData.TestEnvironment)'"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Worlds By Environment" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldsForPlayer {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.WorldsForPlayer -replace '\{playerUuid\}', $TestData.PlayerUuid
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount worlds for player successfully"
+        
+        # Show detailed player-world correlation if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $worldNames = ($result.Data | ForEach-Object { $_.name }) -join ', '
+                $message += "`n    Player Worlds: $worldNames"
+                $totalPlaytime = ($result.Data | ForEach-Object { $_.totalPlaytimeSeconds }).Sum
+                $message += "`n    Player Total Playtime Across Worlds: $totalPlaytime seconds"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve worlds for player"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Worlds For Player" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldPlayerCorrelation {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.WorldPlayerCorrelation -replace '\{playerUuid\}', $TestData.PlayerUuid
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    if ($result.Success) {
+        $correlationCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $correlationCount world-player correlations successfully"
+        
+        # Show detailed correlation analysis if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $correlations = $result.Data | ForEach-Object { 
+                    $worldName = $_.world.name
+                    $playerData = $_.playerWorldData
+                    "World: $worldName, Visits: $($playerData.visitCount), Playtime: $($playerData.playtimeSeconds)s, Last: ($($playerData.lastX), $($playerData.lastY), $($playerData.lastZ))"
+                }
+                $message += "`n    Correlation Details:`n      " + ($correlations -join "`n      ")
+            }
+        }
+    } else {
+        $message = "Failed to retrieve world-player correlation"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get World Player Correlation" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetWorldStatistics {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.WorldStatistics
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved statistics for $worldCount worlds successfully"
+        
+        # Show detailed statistics analysis if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $totalPlaytime = ($result.Data | ForEach-Object { $_.totalPlaytimeSeconds }).Sum
+                $totalPlayers = ($result.Data | ForEach-Object { $_.playerCount }).Sum
+                $maxPlayersEver = ($result.Data | ForEach-Object { $_.maxPlayersSeen }).Max
+                $message += "`n    Global Statistics: Total Playtime: $totalPlaytime seconds, Current Players: $totalPlayers, Peak Players Ever: $maxPlayersEver"
+                
+                $topWorlds = $result.Data | Sort-Object totalPlaytimeSeconds -Descending | Select-Object -First 3 | ForEach-Object { "$($_.name): $($_.totalPlaytimeSeconds)s" }
+                $message += "`n    Top Worlds by Playtime: $($topWorlds -join ', ')"
+            }
+        }
+    } else {
+        $message = "Failed to retrieve world statistics"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get World Statistics" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetRecentWorlds {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.RecentWorlds -QueryParams @{ limit = $TestData.WorldLimit }
+    if ($result.Success) {
+        $worldCount = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $message = "Retrieved $worldCount recent worlds (limit: $($TestData.WorldLimit)) successfully"
+        
+        # Show detailed recent access analysis if Detail flag is enabled
+        if ($Detail -and $result.Data) {
+            $message += "`n    Raw Response Data: " + ($result.Data | ConvertTo-Json -Compress)
+            if ($result.Data -is [array] -and $result.Data.Count -gt 0) {
+                $recentAccess = $result.Data | ForEach-Object { 
+                    "$($_.name): Last accessed $($_.lastAccessed), Players: $($_.playerCount)"
+                }
+                $message += "`n    Recent Access Details:`n      " + ($recentAccess -join "`n      ")
+            }
+        }
+    } else {
+        $message = "Failed to retrieve recent worlds"
+    }
+    Write-TestResult -Protocol $Protocol -TestName "Get Recent Worlds" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+# ===========================================
 # ANNOUNCEMENT API TEST FUNCTIONS
 # ===========================================
 
@@ -744,6 +970,21 @@ function Invoke-PlayerWorldTests {
     Test-GetPlayerWorldStats -Protocol $Protocol -BaseUrl $BaseUrl
 }
 
+function Invoke-WorldTests {
+    param ([string]$Protocol, [string]$BaseUrl)
+    
+    Write-Host "`n--- World API Tests ---" -ForegroundColor Cyan
+    Test-GetAllWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetActiveWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldsWithPlayers -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldByName -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldsByEnvironment -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldsForPlayer -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldPlayerCorrelation -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetWorldStatistics -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetRecentWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+}
+
 function Invoke-AnnouncementTests {
     param ([string]$Protocol, [string]$BaseUrl)
     
@@ -799,6 +1040,7 @@ function Invoke-AllTests {
     switch ($Tests.ToLower()) {
         "all" {
             Invoke-PlayerTests -Protocol $Protocol -BaseUrl $BaseUrl
+            Invoke-WorldTests -Protocol $Protocol -BaseUrl $BaseUrl
             Invoke-AnnouncementTests -Protocol $Protocol -BaseUrl $BaseUrl
         }
         "player" {
@@ -806,6 +1048,9 @@ function Invoke-AllTests {
         }
         "playerworld" {
             Invoke-PlayerWorldTests -Protocol $Protocol -BaseUrl $BaseUrl
+        }
+        "world" {
+            Invoke-WorldTests -Protocol $Protocol -BaseUrl $BaseUrl
         }
         "announcement" {
             Invoke-AnnouncementTests -Protocol $Protocol -BaseUrl $BaseUrl

@@ -7,10 +7,12 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
+import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -25,6 +27,7 @@ public class ServletFactory {
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
+    private final WorldService worldService;
     private final Gson gson;
 
     /**
@@ -36,17 +39,19 @@ public class ServletFactory {
      * @param playerService Player service for data operations
      * @param playerWorldService Player world service for world-specific data operations
      * @param announcementService Announcement service for data operations
+     * @param worldService World service for world tracking and management
      * @param gson JSON serializer instance
      */
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger, 
                                  PlayerService playerService, PlayerWorldService playerWorldService, 
-                                 AnnouncementService announcementService, Gson gson) {
+                                 AnnouncementService announcementService, WorldService worldService, Gson gson) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
+        this.worldService = worldService;
         this.gson = gson;
     }
 
@@ -107,6 +112,9 @@ public class ServletFactory {
         // Register announcement controller
         registerAnnouncementController(context);
         
+        // Register world controller
+        registerWorldController(context);
+        
         // Future controllers can be registered here
         // registerShopController(context);
         // registerLoreController(context);
@@ -124,6 +132,20 @@ public class ServletFactory {
         
         AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger);
         context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
+    }
+
+    /**
+     * Registers the world controller with the servlet context.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerWorldController(ServletContextHandler context) {
+        // Register world controller with proper class-specific logger
+        LogManager worldControllerLogger = LogManager.getInstance(plugin, 
+            org.fourz.rvnkcore.api.controller.WorldController.class);
+        
+        WorldController worldController = new WorldController(worldService, gson, worldControllerLogger);
+        context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
     }
 
     /**

@@ -6,6 +6,7 @@ import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
@@ -13,10 +14,12 @@ import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
+import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
 import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
+import org.fourz.rvnkcore.service.world.DefaultWorldService;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.util.log.LogManager;
@@ -82,6 +85,7 @@ public class RVNKCore {
             // Phase 2: Register Core Services
             registerPlayerService();
             registerPlayerWorldService();
+            registerWorldService();
             registerAnnouncementService();
             
             // Phase 3: Start API Server
@@ -149,6 +153,22 @@ public class RVNKCore {
     }
     
     /**
+     * Registers the WorldService with the service registry.
+     */
+    private void registerWorldService() {
+        try {
+            DefaultWorldRepository worldRepository = new DefaultWorldRepository(connectionProvider, parentPlugin);
+            DefaultWorldService worldService = new DefaultWorldService(worldRepository, parentPlugin);
+            
+            serviceRegistry.registerService(WorldService.class, worldService);
+            logger.info("WorldService registered successfully");
+        } catch (Exception e) {
+            logger.error("Failed to register WorldService", e);
+            throw new RuntimeException("WorldService registration failed", e);
+        }
+    }
+    
+    /**
      * Registers the AnnouncementService with the service registry.
      */
     private void registerAnnouncementService() {
@@ -177,7 +197,8 @@ public class RVNKCore {
                 PlayerService playerService = serviceRegistry.getService(PlayerService.class);
                 PlayerWorldService playerWorldService = serviceRegistry.getService(PlayerWorldService.class);
                 AnnouncementService announcementService = serviceRegistry.getService(AnnouncementService.class);
-                apiServer = new CoreServer(apiConfig, playerService, playerWorldService, announcementService, parentPlugin);
+                WorldService worldService = serviceRegistry.getService(WorldService.class);
+                apiServer = new CoreServer(apiConfig, playerService, playerWorldService, announcementService, worldService, parentPlugin);
                 apiServer.start();
                 logger.info("RVNKCore REST API server started");
             } else {
@@ -262,6 +283,15 @@ public class RVNKCore {
      */
     public PlayerWorldService getPlayerWorldService() {
         return getService(PlayerWorldService.class);
+    }
+    
+    /**
+     * Gets the WorldService for world tracking and management.
+     * 
+     * @return WorldService instance
+     */
+    public WorldService getWorldService() {
+        return getService(WorldService.class);
     }
     
     /**

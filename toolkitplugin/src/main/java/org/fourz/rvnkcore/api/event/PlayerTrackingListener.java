@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.listener;
+package org.fourz.rvnkcore.api.event;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
