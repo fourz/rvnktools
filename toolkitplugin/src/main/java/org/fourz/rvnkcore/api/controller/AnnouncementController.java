@@ -464,25 +464,17 @@ public class AnnouncementController extends HttpServlet {
                 .active(active)
                 .build();
             
-            CompletableFuture<AnnouncementDTO> future = announcementService.createAnnouncement(announcement);
-            
-            future.thenAccept(created -> {
-                try {
-                    response.setStatus(201); // Created
-                    String jsonResponse = buildAnnouncementResponse(created);
-                    sendSuccessResponse(response, jsonResponse);
-                } catch (IOException e) {
-                    logger.error("Error sending create announcement response", e);
-                }
-            }).exceptionally(ex -> {
-                try {
-                    logger.error("Failed to create announcement", ex);
-                    sendErrorResponse(response, 500, "Failed to create announcement: " + ex.getMessage());
-                } catch (IOException e) {
-                    logger.error("Error sending error response", e);
-                }
-                return null;
-            });
+            // Perform create synchronously for the HTTP request so the client reliably receives the
+            // created resource (ID and 201 status). Blocking here is acceptable for short CRUD ops.
+            try {
+                AnnouncementDTO created = announcementService.createAnnouncement(announcement).join();
+                response.setStatus(201); // Created
+                String jsonResponse = buildAnnouncementResponse(created);
+                sendSuccessResponse(response, jsonResponse);
+            } catch (Exception ex) {
+                logger.error("Failed to create announcement", ex);
+                sendErrorResponse(response, 500, "Failed to create announcement: " + ex.getMessage());
+            }
         } catch (Exception e) {
             logger.error("Error parsing JSON in create announcement request", e);
             sendErrorResponse(response, 400, "Invalid JSON format: " + e.getMessage());
@@ -718,7 +710,11 @@ public class AnnouncementController extends HttpServlet {
      * Sends a successful JSON response.
      */
     private void sendSuccessResponse(HttpServletResponse response, String json) throws IOException {
-        response.setStatus(200);
+        // Don't overwrite an already-set successful status (e.g. 201 Created).
+        int status = response.getStatus();
+        if (status < 200 || status >= 300) {
+            response.setStatus(200);
+        }
         PrintWriter writer = response.getWriter();
         writer.write(json);
         writer.flush();
@@ -994,34 +990,42 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
             
-            JsonObject jsonObject = JsonParser.parseString(requestBody).getAsJsonObject();
-            
-            if (!jsonObject.has("announcements") || !jsonObject.get("announcements").isJsonArray()) {
-                sendErrorResponse(response, 400, "Invalid request: 'announcements' array is required");
+            // Accept either a raw JSON array or an object with an "announcements" array.
+            com.google.gson.JsonElement root = JsonParser.parseString(requestBody);
+            String arrayJson;
+            if (root.isJsonArray()) {
+                arrayJson = root.getAsJsonArray().toString();
+            } else if (root.isJsonObject() && root.getAsJsonObject().has("announcements") && root.getAsJsonObject().get("announcements").isJsonArray()) {
+                arrayJson = root.getAsJsonObject().get("announcements").getAsJsonArray().toString();
+            } else {
+                sendErrorResponse(response, 400, "Invalid request: provide a JSON array or an object with 'announcements' array");
                 return;
             }
-            
-            // Use same logic as bulk import - parse and import announcements
-            List<AnnouncementDTO> announcements = parseAnnouncementListFromJson(requestBody);
-            CompletableFuture<Integer> future = announcementService.bulkImportAnnouncements(announcements);
-            future.whenComplete((importedCount, throwable) -> {
-                try {
-                    if (throwable != null) {
-                        logger.error("Error bulk creating announcements", throwable);
-                        if (throwable.getCause() instanceof IllegalArgumentException) {
-                            sendErrorResponse(response, 400, "Invalid announcement data: " + throwable.getMessage());
-                        } else {
-                            sendErrorResponse(response, 500, "Failed to create announcements: " + throwable.getMessage());
-                        }
-                    } else {
-                        response.setStatus(201);
-                        String result = "{\"created_count\":" + importedCount + ",\"message\":\"Successfully created " + importedCount + " announcements\"}";
-                        response.getWriter().write(result);
-                    }
-                } catch (IOException e) {
-                    logger.error("Error writing bulk create response", e);
+
+            // Parse and create announcements synchronously so client immediately receives result and IDs
+            try {
+                List<AnnouncementDTO> announcements = parseAnnouncementListFromJson(arrayJson);
+                List<AnnouncementDTO> createdAnnouncements = announcementService.bulkCreateAnnouncements(announcements).join();
+                
+                // Build response with created announcements and their IDs
+                StringBuilder responseJson = new StringBuilder();
+                responseJson.append("{\"created_count\":").append(createdAnnouncements.size())
+                           .append(",\"message\":\"Successfully created ").append(createdAnnouncements.size()).append(" announcements\"")
+                           .append(",\"announcements\":[");
+                
+                for (int i = 0; i < createdAnnouncements.size(); i++) {
+                    if (i > 0) responseJson.append(",");
+                    responseJson.append(buildAnnouncementResponse(createdAnnouncements.get(i)));
                 }
-            });
+                
+                responseJson.append("]}");
+                
+                response.setStatus(201);
+                sendSuccessResponse(response, responseJson.toString());
+            } catch (Exception e) {
+                logger.error("Error bulk creating announcements", e);
+                sendErrorResponse(response, 500, "Failed to create announcements: " + e.getMessage());
+            }
             
         } catch (Exception e) {
             logger.error("Error handling bulk create request", e);
@@ -1033,6 +1037,7 @@ public class AnnouncementController extends HttpServlet {
      * Handles PUT /api/v1/announcements/bulk/activate - Bulk activate announcements
      */
     private void handleBulkActivateAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logger.info("Bulk activate handler called");
         try {
             StringBuilder jsonBody = new StringBuilder();
             String line;
@@ -1042,6 +1047,8 @@ public class AnnouncementController extends HttpServlet {
             }
             
             String requestBody = jsonBody.toString();
+            logger.info("Bulk activate request body: " + requestBody);
+            
             if (requestBody == null || requestBody.trim().isEmpty()) {
                 sendErrorResponse(response, 400, "Request body is required");
                 return;
@@ -1066,11 +1073,15 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
             
+            // DEBUG: Log the parsed IDs
+            logger.info("Bulk activate request received with IDs: " + ids.toString());
+            
             // Process each ID individually for activation
             CompletableFuture<Void> allFutures = CompletableFuture.allOf(
-                ids.stream().map(id -> 
-                    announcementService.activateAnnouncement(id)
-                ).toArray(CompletableFuture[]::new)
+                ids.stream().map(id -> {
+                    logger.info("Processing activation for ID: " + id);
+                    return announcementService.activateAnnouncement(id);
+                }).toArray(CompletableFuture[]::new)
             );
             
             allFutures.whenComplete((result, throwable) -> {

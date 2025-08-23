@@ -7,6 +7,7 @@ import org.fourz.rvnktools.util.log.LogManager;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -364,6 +365,34 @@ public class DefaultAnnouncementService implements AnnouncementService {
             });
     }
     
+    @Override
+    public CompletableFuture<List<AnnouncementDTO>> bulkCreateAnnouncements(List<AnnouncementDTO> announcements) {
+        if (announcements == null) {
+            throw new IllegalArgumentException("Announcements list cannot be null");
+        }
+        
+        logger.info("Starting bulk creation of " + announcements.size() + " announcements");
+        
+        return CompletableFuture.supplyAsync(() -> {
+            List<AnnouncementDTO> createdAnnouncements = new ArrayList<>();
+            
+            for (AnnouncementDTO announcement : announcements) {
+                try {
+                    // Create the announcement (this will generate ID and set timestamps)
+                    AnnouncementDTO created = createAnnouncement(announcement).join();
+                    createdAnnouncements.add(created);
+                    
+                } catch (Exception e) {
+                    logger.warning("Failed to create announcement: " + e.getMessage());
+                }
+            }
+            
+            int count = createdAnnouncements.size();
+            logger.info("Successfully created " + count + " announcements");
+            return createdAnnouncements;
+        });
+    }
+
     @Override
     public CompletableFuture<Integer> bulkImportAnnouncements(List<AnnouncementDTO> announcements) {
         if (announcements == null) {

@@ -197,6 +197,20 @@ public interface AnnouncementService {
     CompletableFuture<Void> updateAnnouncementMetadata(String id, String key, Object value);
     
     /**
+     * Bulk creates new announcements.
+     * 
+     * This method creates multiple new announcements at once, generating unique IDs
+     * for each. Unlike bulk import, this method creates fresh announcements.
+     * 
+     * @param announcements The list of announcements to create (IDs will be generated)
+     * @return CompletableFuture containing list of created announcements with their IDs
+     * @throws org.fourz.rvnkcore.api.exception.ServiceException if creation fails
+     * @throws IllegalArgumentException if announcements list is null
+     * @since 1.3.0
+     */
+    CompletableFuture<List<AnnouncementDTO>> bulkCreateAnnouncements(List<AnnouncementDTO> announcements);
+
+    /**
      * Bulk imports announcements from external sources (e.g., YAML migration).
      * 
      * This method is designed for migration scenarios and will skip announcements

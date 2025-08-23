@@ -163,7 +163,7 @@ $TestData = @{
     
     # Announcement test data
     NewAnnouncement = @{
-        content = "Welcome to our test server! This is a test announcement."
+        message = "Welcome to our test server! This is a test announcement."
         type = "BROADCAST"
         priority = 1
         world = "world"
@@ -756,7 +756,7 @@ function Test-UpdateAnnouncement {
         return
     }
     $updateData = $TestData.NewAnnouncement.Clone()
-    $updateData.content = "Updated: $($updateData.content)"
+    $updateData.message = "Updated: $($updateData.message)"
     $updateData.priority = 3
     $endpoint = $Endpoints.AnnouncementById -replace "{id}", $Script:CreatedAnnouncementId
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint -Method "PUT" -Body $updateData
@@ -824,14 +824,14 @@ function Test-BulkCreateAnnouncements {
     param ([string]$Protocol, [string]$BaseUrl)
     $bulkData = @(
         @{
-            content = "Bulk announcement 1"
+            message = "Bulk announcement 1"
             type = "BROADCAST"
             priority = 1
             world = "world"
             isActive = $true
         },
         @{
-            content = "Bulk announcement 2"
+            message = "Bulk announcement 2"
             type = "INFO"
             priority = 2
             world = "world"
@@ -840,10 +840,10 @@ function Test-BulkCreateAnnouncements {
     )
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.BulkAnnouncements -Method "POST" -Body $bulkData
     if ($result.Success) {
-        $count = if ($result.Data -is [array]) { $result.Data.Count } else { if ($result.Data) { 1 } else { 0 } }
+        $count = if ($null -ne $result.Data.created_count) { $result.Data.created_count } else { 0 }
         $message = "Created $count announcements in bulk"
-        if ($result.Data -is [array]) {
-            $Script:BulkCreatedIds = $result.Data | ForEach-Object { $_.id }
+        if ($result.Data.announcements -and $result.Data.announcements.Count -gt 0) {
+            $Script:BulkCreatedIds = $result.Data.announcements | ForEach-Object { $_.id }
         }
     } else {
         $message = "Failed to create announcements in bulk"
@@ -858,7 +858,7 @@ function Test-BulkActivateAnnouncements {
         return
     }
     $bulkData = @{ ids = $Script:BulkCreatedIds }
-    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.BulkActivate -Method "POST" -Body $bulkData
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.BulkActivate -Method "PUT" -Body $bulkData
     $message = if ($result.Success) { "Bulk activation completed successfully" } else { "Failed to activate announcements in bulk" }
     Write-TestResult -Protocol $Protocol -TestName "Bulk Activate Announcements" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }
@@ -870,7 +870,7 @@ function Test-BulkDeactivateAnnouncements {
         return
     }
     $bulkData = @{ ids = $Script:BulkCreatedIds }
-    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.BulkDeactivate -Method "POST" -Body $bulkData
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.BulkDeactivate -Method "PUT" -Body $bulkData
     $message = if ($result.Success) { "Bulk deactivation completed successfully" } else { "Failed to deactivate announcements in bulk" }
     Write-TestResult -Protocol $Protocol -TestName "Bulk Deactivate Announcements" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
 }

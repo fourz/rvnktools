@@ -131,8 +131,18 @@ public class DefaultAnnouncementService implements AnnouncementService {
     @Override
     public CompletableFuture<List<AnnouncementDTO>> searchAnnouncements(String searchPattern) {
         if (shutdown) throw new ServiceException("Service is shut down");
-        // TODO: Implement repository.searchByPattern(searchPattern)
-        return CompletableFuture.completedFuture(List.of());
+        if (searchPattern == null || searchPattern.trim().isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        
+        return repository.searchByContent(searchPattern.trim())
+            .whenComplete((results, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to search announcements with pattern: " + searchPattern, throwable);
+                } else {
+                    logger.info("Search completed for pattern '" + searchPattern + "' - found " + results.size() + " results");
+                }
+            });
     }
 
     @Override
@@ -188,6 +198,29 @@ public class DefaultAnnouncementService implements AnnouncementService {
     }
 
     // === Bulk Operations ===
+
+    @Override
+    public CompletableFuture<List<AnnouncementDTO>> bulkCreateAnnouncements(List<AnnouncementDTO> announcements) {
+        if (shutdown) throw new ServiceException("Service is shut down");
+        if (announcements == null) {
+            throw new IllegalArgumentException("Announcements list cannot be null");
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            List<AnnouncementDTO> createdAnnouncements = new java.util.ArrayList<>();
+            
+            for (AnnouncementDTO announcement : announcements) {
+                try {
+                    AnnouncementDTO created = createAnnouncement(announcement).join();
+                    createdAnnouncements.add(created);
+                } catch (Exception e) {
+                    logger.warning("Failed to create announcement in bulk: " + e.getMessage());
+                }
+            }
+            
+            return createdAnnouncements;
+        });
+    }
 
     @Override
     public CompletableFuture<Integer> bulkImportAnnouncements(List<AnnouncementDTO> announcements) {
