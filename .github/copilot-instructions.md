@@ -323,7 +323,6 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **ServerCleanup**: Remove existing plugin files and folders from server as needed
 - **Restart Server**: Full server restart via MCSS API
 - **Reload Server**: Plugin reload without full restart (faster alternative)
-- **Clean&Restart Server**: Combined folder cleanup and restart sequence
 
 **Usage Guidelines**: 
 - Use **Build & Deploy** for complete development cycle with automatic validation
