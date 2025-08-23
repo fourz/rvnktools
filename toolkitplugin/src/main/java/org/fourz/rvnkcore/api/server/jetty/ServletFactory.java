@@ -9,6 +9,7 @@ import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -22,6 +23,7 @@ public class ServletFactory {
     private final Plugin plugin;
     private final LogManager logger;
     private final PlayerService playerService;
+    private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
     private final Gson gson;
 
@@ -32,15 +34,18 @@ public class ServletFactory {
      * @param plugin Plugin instance
      * @param logger Logger instance
      * @param playerService Player service for data operations
+     * @param playerWorldService Player world service for world-specific data operations
      * @param announcementService Announcement service for data operations
      * @param gson JSON serializer instance
      */
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger, 
-                                 PlayerService playerService, AnnouncementService announcementService, Gson gson) {
+                                 PlayerService playerService, PlayerWorldService playerWorldService, 
+                                 AnnouncementService announcementService, Gson gson) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
         this.playerService = playerService;
+        this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
         this.gson = gson;
     }
@@ -93,7 +98,7 @@ public class ServletFactory {
         LogManager playerControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.PlayerController.class);
         
-        PlayerController playerController = new PlayerController(playerService, gson, playerControllerLogger);
+        PlayerController playerController = new PlayerController(playerService, playerWorldService, gson, playerControllerLogger);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
         
         // Also register player controller for singular player endpoints
@@ -210,7 +215,10 @@ public class ServletFactory {
         // GET endpoints: /players, /players/online, /players/{uuid}, /player/name/{name}, 
         //                /player/name/{name}/history, /players/group/{group}, /players/search, /players/count
         // PUT endpoints: /players/{uuid}/location, /players/{uuid}/groups
-        return 10;
+        // PlayerWorld GET endpoints: /players/{uuid}/worlds, /players/{uuid}/worlds/{world}, 
+        //                           /players/{uuid}/worlds/{world}/location, /players/{uuid}/worlds/visited,
+        //                           /players/{uuid}/worlds/stats
+        return 15;
     }
 
     /**

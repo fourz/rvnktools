@@ -175,8 +175,9 @@ public class RVNKCore {
             
             if (apiConfig.isEnabled()) {
                 PlayerService playerService = serviceRegistry.getService(PlayerService.class);
+                PlayerWorldService playerWorldService = serviceRegistry.getService(PlayerWorldService.class);
                 AnnouncementService announcementService = serviceRegistry.getService(AnnouncementService.class);
-                apiServer = new CoreServer(apiConfig, playerService, announcementService, parentPlugin);
+                apiServer = new CoreServer(apiConfig, playerService, playerWorldService, announcementService, parentPlugin);
                 apiServer.start();
                 logger.info("RVNKCore REST API server started");
             } else {

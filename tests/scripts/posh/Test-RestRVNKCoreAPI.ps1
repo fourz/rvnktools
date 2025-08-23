@@ -5,6 +5,7 @@
 # USAGE EXAMPLES:
 # Test all APIs: .\Test-RestRVNKCoreAPI.ps1 -Tests all
 # Test player API only: .\Test-RestRVNKCoreAPI.ps1 -Tests player -HttpsOnly
+# Test player world API only: .\Test-RestRVNKCoreAPI.ps1 -Tests playerworld -HttpOnly
 # Test announcements only: .\Test-RestRVNKCoreAPI.ps1 -Tests announcement -HttpOnly
 
 # MANUAL TESTING EXAMPLES:
@@ -28,7 +29,7 @@ param (
     [Parameter(Mandatory = $false)]
     [switch]$Detail,
     [Parameter(Mandatory = $false)]
-    [ValidateSet("all", "player", "announcement")]
+    [ValidateSet("all", "player", "playerworld", "announcement")]
     [string]$Tests = "all"
 )
 
@@ -112,6 +113,13 @@ $Endpoints = @{
     SearchPlayers = "/api/v1/players/search"
     PlayerCount = "/api/v1/players/count"
     
+    # Player World API Endpoints (NEW)
+    PlayerWorlds = "/api/v1/players/{uuid}/worlds"
+    PlayerWorldData = "/api/v1/players/{uuid}/worlds/{world}"
+    PlayerWorldLocation = "/api/v1/players/{uuid}/worlds/{world}/location"
+    PlayerVisitedWorlds = "/api/v1/players/{uuid}/worlds/visited"
+    PlayerWorldStats = "/api/v1/players/{uuid}/worlds/stats"
+    
     # Announcement API Endpoints
     Announcements = "/api/v1/announcements"
     AnnouncementById = "/api/v1/announcements/{id}"
@@ -132,6 +140,10 @@ $TestData = @{
     PlayerName = "wizardofire"
     GroupName = "default"
     SearchQuery = "wizard"
+    
+    # Player World test data
+    TestWorld = "world"
+    AltWorld = "world_nether"
     
     # Announcement test data
     NewAnnouncement = @{
@@ -413,6 +425,50 @@ function Test-PutPlayerGroups {
 }
 
 # ===========================================
+# PLAYER WORLD API TEST FUNCTIONS
+# ===========================================
+
+function Test-GetPlayerWorlds {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerWorlds -replace '\{uuid\}', $TestData.PlayerUuid
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    $message = if ($result.Success) { "Retrieved player world data" } else { "Failed to retrieve player world data" }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player Worlds" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetPlayerWorldData {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerWorldData -replace '\{uuid\}', $TestData.PlayerUuid -replace '\{world\}', $TestData.TestWorld
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    $message = if ($result.Success) { "Retrieved player world data for specific world" } else { "Failed to retrieve player world data for specific world" }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player World Data" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetPlayerWorldLocation {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerWorldLocation -replace '\{uuid\}', $TestData.PlayerUuid -replace '\{world\}', $TestData.TestWorld
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    $message = if ($result.Success) { "Retrieved player last known location" } else { "Failed to retrieve player last known location" }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player World Location" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetPlayerVisitedWorlds {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerVisitedWorlds -replace '\{uuid\}', $TestData.PlayerUuid
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    $message = if ($result.Success) { "Retrieved player visited worlds" } else { "Failed to retrieve player visited worlds" }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player Visited Worlds" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+function Test-GetPlayerWorldStats {
+    param ([string]$Protocol, [string]$BaseUrl)
+    $endpoint = $Endpoints.PlayerWorldStats -replace '\{uuid\}', $TestData.PlayerUuid
+    $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
+    $message = if ($result.Success) { "Retrieved player world statistics" } else { "Failed to retrieve player world statistics" }
+    Write-TestResult -Protocol $Protocol -TestName "Get Player World Stats" -Success $result.Success -Message $message -Err $result.Error -RequestInfo $result.RequestInfo -ResponseInfo $result.ResponseInfo
+}
+
+# ===========================================
 # ANNOUNCEMENT API TEST FUNCTIONS
 # ===========================================
 
@@ -667,6 +723,25 @@ function Invoke-PlayerTests {
     # PUT endpoint tests
     Test-PutPlayerLocation -Protocol $Protocol -BaseUrl $BaseUrl
     Test-PutPlayerGroups -Protocol $Protocol -BaseUrl $BaseUrl
+    
+    # Player World API tests
+    Write-Host "`n--- Player World API Tests ---" -ForegroundColor Cyan
+    Test-GetPlayerWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldData -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldLocation -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerVisitedWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldStats -Protocol $Protocol -BaseUrl $BaseUrl
+}
+
+function Invoke-PlayerWorldTests {
+    param ([string]$Protocol, [string]$BaseUrl)
+    
+    Write-Host "`n--- Player World API Tests ---" -ForegroundColor Cyan
+    Test-GetPlayerWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldData -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldLocation -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerVisitedWorlds -Protocol $Protocol -BaseUrl $BaseUrl
+    Test-GetPlayerWorldStats -Protocol $Protocol -BaseUrl $BaseUrl
 }
 
 function Invoke-AnnouncementTests {
@@ -728,6 +803,9 @@ function Invoke-AllTests {
         }
         "player" {
             Invoke-PlayerTests -Protocol $Protocol -BaseUrl $BaseUrl
+        }
+        "playerworld" {
+            Invoke-PlayerWorldTests -Protocol $Protocol -BaseUrl $BaseUrl
         }
         "announcement" {
             Invoke-AnnouncementTests -Protocol $Protocol -BaseUrl $BaseUrl

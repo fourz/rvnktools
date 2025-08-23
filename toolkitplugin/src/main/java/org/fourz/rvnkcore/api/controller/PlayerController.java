@@ -13,6 +13,9 @@ import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
 import org.fourz.rvnkcore.api.model.response.StatusResponse;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
+import org.fourz.rvnkcore.api.model.response.PlayerWorldDataResponse;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -20,6 +23,8 @@ import org.bukkit.entity.Player;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -32,11 +37,13 @@ import java.util.stream.Collectors;
  */
 public class PlayerController extends HttpServlet {
     private final PlayerService playerService;
+    private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
 
-    public PlayerController(PlayerService playerService, Gson gson, LogManager logger) {
+    public PlayerController(PlayerService playerService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
         this.playerService = playerService;
+        this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
     }
@@ -92,10 +99,15 @@ public class PlayerController extends HttpServlet {
                         handleSinglePlayerEndpoints(parts, resp);
                         break;
                     default:
-                        // Try to parse as UUID for single player lookup
+                        // Try to parse as UUID for single player lookup or world endpoints
                         try {
                             UUID uuid = UUID.fromString(endpoint);
-                            handleGetPlayer(uuid, resp);
+                            // Check if this is a UUID-based player world query
+                            if (parts.length > 1 && "worlds".equals(parts[1].toLowerCase())) {
+                                handlePlayerWorldEndpoints(uuid, parts, req, resp);
+                            } else {
+                                handleGetPlayer(uuid, resp);
+                            }
                         } catch (IllegalArgumentException e) {
                             sendError(resp, 404, "Unknown endpoint: " + endpoint);
                         }
@@ -359,6 +371,163 @@ public class PlayerController extends HttpServlet {
         }
     }
 
+    // ====== PlayerWorld API Endpoints ======
+
+    /**
+     * Handles PlayerWorld-specific endpoints:
+     * - GET /api/v1/players/{uuid}/worlds - Get all world data for player
+     * - GET /api/v1/players/{uuid}/worlds/{world} - Get specific world data
+     * - GET /api/v1/players/{uuid}/worlds/{world}/location - Get last known location in world
+     * - GET /api/v1/players/{uuid}/worlds/visited - Get list of visited worlds
+     * - GET /api/v1/players/{uuid}/worlds/stats - Get world statistics
+     */
+    private void handlePlayerWorldEndpoints(UUID playerId, String[] parts, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (parts.length < 2) {
+            sendError(resp, 400, "Invalid world endpoint format");
+            return;
+        }
+        
+        // parts[0] = UUID, parts[1] = "worlds", parts[2+] = specific operations
+        if (parts.length == 2) {
+            // GET /{uuid}/worlds - All world data for player
+            handleGetPlayerAllWorldData(playerId, resp);
+        } else if (parts.length == 3) {
+            String operation = parts[2].toLowerCase();
+            switch (operation) {
+                case "visited":
+                    // GET /{uuid}/worlds/visited - List of visited worlds
+                    handleGetPlayerVisitedWorlds(playerId, resp);
+                    break;
+                case "stats":
+                    // GET /{uuid}/worlds/stats - World statistics
+                    handleGetPlayerWorldStats(playerId, resp);
+                    break;
+                default:
+                    // GET /{uuid}/worlds/{world} - Specific world data
+                    handleGetPlayerWorldData(playerId, parts[2], resp);
+                    break;
+            }
+        } else if (parts.length == 4) {
+            String worldName = parts[2];
+            String operation = parts[3].toLowerCase();
+            switch (operation) {
+                case "location":
+                    // GET /{uuid}/worlds/{world}/location - Last known location
+                    handleGetPlayerLastLocation(playerId, worldName, resp);
+                    break;
+                default:
+                    sendError(resp, 404, "Unknown world operation: " + operation);
+                    break;
+            }
+        } else {
+            sendError(resp, 400, "Invalid world endpoint format");
+        }
+    }
+
+    private void handleGetPlayerAllWorldData(UUID playerId, HttpServletResponse resp) throws IOException {
+        try {
+            List<PlayerWorldDataDTO> worldData = playerWorldService.getAllPlayerWorldData(playerId).get(15, TimeUnit.SECONDS);
+            List<PlayerWorldDataResponse> responses = worldData.stream()
+                    .map(this::convertWorldDataToResponse)
+                    .collect(Collectors.toList());
+            sendResponse(resp, 200, responses);
+        } catch (Exception ex) {
+            logger.error("Error retrieving player world data", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player world data");
+        }
+    }
+
+    private void handleGetPlayerWorldData(UUID playerId, String worldName, HttpServletResponse resp) throws IOException {
+        try {
+            Optional<PlayerWorldDataDTO> worldData = playerWorldService.getPlayerWorldData(playerId, worldName).get(15, TimeUnit.SECONDS);
+            if (worldData.isPresent()) {
+                PlayerWorldDataResponse response = convertWorldDataToResponse(worldData.get());
+                sendResponse(resp, 200, response);
+            } else {
+                sendError(resp, 404, "Player has not visited world: " + worldName);
+            }
+        } catch (Exception ex) {
+            logger.error("Error retrieving player world data", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player world data");
+        }
+    }
+
+    private void handleGetPlayerLastLocation(UUID playerId, String worldName, HttpServletResponse resp) throws IOException {
+        try {
+            Optional<PlayerWorldDataDTO> worldData = playerWorldService.getLastKnownLocation(playerId, worldName).get(15, TimeUnit.SECONDS);
+            if (worldData.isPresent()) {
+                PlayerWorldDataDTO data = worldData.get();
+                Map<String, Object> location = Map.of(
+                        "worldName", data.getWorldName(),
+                        "x", data.getLastX(),
+                        "y", data.getLastY(),
+                        "z", data.getLastZ(),
+                        "yaw", data.getLastYaw(),
+                        "pitch", data.getLastPitch(),
+                        "biome", data.getLastBiome() != null ? data.getLastBiome() : "unknown",
+                        "lastVisit", data.getLastVisit()
+                );
+                sendResponse(resp, 200, location);
+            } else {
+                sendError(resp, 404, "Player has not visited world: " + worldName);
+            }
+        } catch (Exception ex) {
+            logger.error("Error retrieving player last location", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve player location");
+        }
+    }
+
+    private void handleGetPlayerVisitedWorlds(UUID playerId, HttpServletResponse resp) throws IOException {
+        try {
+            List<String> visitedWorlds = playerWorldService.getPlayerVisitedWorlds(playerId).get(15, TimeUnit.SECONDS);
+            Map<String, Object> response = Map.of(
+                    "playerId", playerId,
+                    "worldCount", visitedWorlds.size(),
+                    "worlds", visitedWorlds
+            );
+            sendResponse(resp, 200, response);
+        } catch (Exception ex) {
+            logger.error("Error retrieving player visited worlds", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve visited worlds");
+        }
+    }
+
+    private void handleGetPlayerWorldStats(UUID playerId, HttpServletResponse resp) throws IOException {
+        try {
+            List<PlayerWorldDataDTO> allWorldData = playerWorldService.getAllPlayerWorldData(playerId).get(15, TimeUnit.SECONDS);
+            List<PlayerWorldDataDTO> mostVisited = playerWorldService.getPlayerMostVisitedWorlds(playerId, 5).get(15, TimeUnit.SECONDS);
+            
+            long totalPlaytimeSeconds = allWorldData.stream().mapToLong(PlayerWorldDataDTO::getPlaytimeSeconds).sum();
+            int totalDeaths = allWorldData.stream().mapToInt(PlayerWorldDataDTO::getDeathCount).sum();
+            int totalVisits = allWorldData.stream().mapToInt(PlayerWorldDataDTO::getVisitCount).sum();
+            
+            String favoriteWorld = mostVisited.isEmpty() ? null : mostVisited.get(0).getWorldName();
+            
+            Map<String, Object> stats = Map.of(
+                    "playerId", playerId,
+                    "totalWorlds", allWorldData.size(),
+                    "totalPlaytimeMinutes", totalPlaytimeSeconds / 60,
+                    "totalDeaths", totalDeaths,
+                    "totalVisits", totalVisits,
+                    "favoriteWorld", favoriteWorld != null ? favoriteWorld : "none",
+                    "mostVisitedWorlds", mostVisited.stream()
+                            .map(data -> Map.of(
+                                    "worldName", data.getWorldName(),
+                                    "visitCount", data.getVisitCount(),
+                                    "playtimeMinutes", data.getPlaytimeSeconds() / 60,
+                                    "deathCount", data.getDeathCount()
+                            ))
+                            .collect(Collectors.toList())
+            );
+            sendResponse(resp, 200, stats);
+        } catch (Exception ex) {
+            logger.error("Error retrieving player world statistics", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve world statistics");
+        }
+    }
+
+    // ====== End PlayerWorld API Endpoints ======
+
     private PlayerResponse convertToResponse(PlayerDTO player) {
         // Convert Timestamp to LocalDateTime
         LocalDateTime firstSeen = player.getFirstJoin() != null ? 
@@ -387,6 +556,34 @@ public class PlayerController extends HttpServlet {
                 .currentWorld(player.getWorld().getName())
                 .timesJoined(1) // Online players have at least joined once
                 .totalPlaytimeMinutes(0L) // Real-time calculation would require session tracking
+                .build();
+    }
+
+    private PlayerWorldDataResponse convertWorldDataToResponse(PlayerWorldDataDTO worldData) {
+        // Get player name from service if available
+        String playerName = null;
+        try {
+            Optional<PlayerDTO> player = playerService.getPlayer(worldData.getPlayerId()).get(5, TimeUnit.SECONDS);
+            if (player.isPresent()) {
+                playerName = player.get().getCurrentName();
+            }
+        } catch (Exception ex) {
+            logger.debug("Could not retrieve player name for world data response", ex);
+        }
+
+        return PlayerWorldDataResponse.builder()
+                .playerId(worldData.getPlayerId())
+                .playerName(playerName != null ? playerName : "unknown")
+                .worldName(worldData.getWorldName())
+                .firstVisit(worldData.getFirstVisit() != null ? worldData.getFirstVisit().toLocalDateTime() : null)
+                .lastVisit(worldData.getLastVisit() != null ? worldData.getLastVisit().toLocalDateTime() : null)
+                .visitCount(worldData.getVisitCount())
+                .playtimeSeconds(worldData.getPlaytimeSeconds())
+                .location(worldData.getLastX(), worldData.getLastY(), worldData.getLastZ(), 
+                         worldData.getLastYaw(), worldData.getLastPitch())
+                .lastBiome(worldData.getLastBiome())
+                .deathCount(worldData.getDeathCount())
+                .worldSpecificData(worldData.getWorldSpecificData())
                 .build();
     }
 
