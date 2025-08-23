@@ -411,4 +411,82 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         stmt.setString(11, metadataStr.toString());
         stmt.setString(12, entity.getId()); // WHERE clause
     }
+    
+    // === Additional methods required by service ===
+    
+    /**
+     * Update metadata for an announcement.
+     */
+    public CompletableFuture<Void> updateMetadata(String id, String key, Object value) {
+        return CompletableFuture.runAsync(() -> {
+            String query = queryBuilder.update(tableName)
+                .set("metadata", "?")
+                .set("updated_at", "?")
+                .where("id = ?")
+                .build();
+                
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement(query)) {
+                
+                // Simple metadata update - in production use proper JSON library
+                String metadataValue = key + "=" + value.toString();
+                stmt.setString(1, metadataValue);
+                stmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+                stmt.setString(3, id);
+                
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected == 0) {
+                    throw new org.fourz.rvnkcore.api.exception.DatabaseException("No announcement found with ID: " + id);
+                }
+            } catch (SQLException e) {
+                logger.error("Failed to update metadata for announcement ID: " + id, e);
+                throw new org.fourz.rvnkcore.api.exception.DatabaseException("Metadata update failed", e);
+            }
+        });
+    }
+    
+    /**
+     * Batch insert announcements for bulk import.
+     */
+    public CompletableFuture<Integer> batchInsert(List<AnnouncementDTO> announcements) {
+        return CompletableFuture.supplyAsync(() -> {
+            if (announcements.isEmpty()) {
+                return 0;
+            }
+            
+            String query = queryBuilder.insert(tableName)
+                .columns("id", "title", "message", "type", "active", "created_at", "updated_at")
+                .build();
+                
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement(query)) {
+                
+                int count = 0;
+                for (AnnouncementDTO announcement : announcements) {
+                    // Skip if already exists
+                    if (existsById(announcement.getId()).join()) {
+                        continue;
+                    }
+                    
+                    stmt.setString(1, announcement.getId());
+                    stmt.setString(2, announcement.getTitle());
+                    stmt.setString(3, announcement.getMessage());
+                    stmt.setString(4, announcement.getType());
+                    stmt.setBoolean(5, announcement.isActive());
+                    stmt.setTimestamp(6, announcement.getCreatedAt());
+                    stmt.setTimestamp(7, announcement.getUpdatedAt());
+                    stmt.addBatch();
+                    count++;
+                }
+                
+                if (count > 0) {
+                    stmt.executeBatch();
+                }
+                return count;
+            } catch (SQLException e) {
+                logger.error("Failed to batch insert announcements", e);
+                throw new org.fourz.rvnkcore.api.exception.DatabaseException("Batch insert failed", e);
+            }
+        });
+    }
 }

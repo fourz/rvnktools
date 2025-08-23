@@ -3,15 +3,18 @@ package org.fourz.rvnkcore;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
+import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
+import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
+import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
@@ -79,6 +82,7 @@ public class RVNKCore {
             // Phase 2: Register Core Services
             registerPlayerService();
             registerPlayerWorldService();
+            registerAnnouncementService();
             
             // Phase 3: Start API Server
             startApiServer();
@@ -141,6 +145,24 @@ public class RVNKCore {
         } catch (Exception e) {
             logger.error("Failed to register PlayerWorldService", e);
             throw new RuntimeException("PlayerWorldService registration failed", e);
+        }
+    }
+    
+    /**
+     * Registers the AnnouncementService with the service registry.
+     */
+    private void registerAnnouncementService() {
+        try {
+            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
+            AnnouncementRepository announcementRepository = new AnnouncementRepository(connectionProvider, queryBuilder, parentPlugin);
+            LogManager announcementLogger = LogManager.getInstance(parentPlugin, DefaultAnnouncementService.class);
+            DefaultAnnouncementService announcementService = new DefaultAnnouncementService(announcementRepository, announcementLogger);
+            
+            serviceRegistry.registerService(AnnouncementService.class, announcementService);
+            logger.info("AnnouncementService registered successfully");
+        } catch (Exception e) {
+            logger.error("Failed to register AnnouncementService", e);
+            throw new RuntimeException("AnnouncementService registration failed", e);
         }
     }
     
