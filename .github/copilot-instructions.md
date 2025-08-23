@@ -312,9 +312,9 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 **Build and Deployment Tasks (Sequential Control):**
 - **Build Plugin**: Compile and package plugin JAR using Maven
 - **Copy to Server**: Copy built JAR to development server plugins folder
-- **ServerCleanup**: Remove existing plugin files and folders from server
+- **ServerCleanup**: Remove existing plugin files and folders from server as needed
 - **Restart Server**: Full server restart via MCSS API
-- **Clean&Restart Server**: Combined cleanup and restart sequence
+- **Clean&Restart Server**: Combined folder cleanup and restart sequence
 Note: Tasks run independently for granular control in agentic debugging workflows. Call sequentially as needed.
 
 **Database Management Tasks:**
