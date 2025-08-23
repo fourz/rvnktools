@@ -209,7 +209,7 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 
 ## Development Workflow
 
-*See detailed instructions: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-cmd-palette.md)*
+*See detailed instructions: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-tasks.md)*
 
 ## Documentation and Reference Structure
 
