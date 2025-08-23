@@ -369,7 +369,7 @@ For development database management and schema reset scenarios:
 # Force cleanup without confirmation (use with caution)
 .\clean-mysqldb-DEV.ps1 -Force
 
-# Password is automatically retrieved from project.json configuration
+# Password is automatically retrieved from project.json configuration and environment variable is set for future use
 ```
 
 #### Query System Features for Copilot Agents

@@ -1,6 +1,6 @@
 # RVNKCore Per-World Player Tracking API Documentation
 
-**Version**: 1.2.0-alpha  
+**Version**: 1.3.0-alpha  
 **Last Updated**: August 2, 2025  
 **Status**: Implemented
 
