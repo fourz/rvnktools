@@ -11,12 +11,59 @@ This guide provides comprehensive instructions for implementing the database int
 
 ## Prerequisites
 
+## Prerequisites
+
 ### Required Infrastructure
 
-- RVNKCore database connection established (MySQL or SQLite)
+- RVNKCore database connection established (MySQL or SQLite with YAML fallback)
 - Service layer implementation completed
 - Repository base classes available
-- Database connection pooling configured
+- Database connection pooling configured via HikariCP
+
+### Configuration Framework
+
+**Database Configuration Strategy:**
+
+1. **Primary Database**: MySQL or SQLite based on server configuration
+2. **YAML Fallback**: Automatic fallback to YAML when database unavailable
+3. **Configuration Detection**: Runtime database availability checking
+4. **Migration Support**: Seamless transition between storage types
+
+```yaml
+# config-core.yml - Database configuration
+database:
+  # Primary database settings
+  type: "mysql"  # or "sqlite" 
+  enabled: true
+  
+  # MySQL configuration
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "rvnktools"
+    username: "rvnk_user"
+    # Password via environment variable: RVNK_MYSQL_PASSWORD
+  
+  # SQLite configuration  
+  sqlite:
+    filename: "rvnktools.db"
+    path: "plugins/RVNKCore/data/"
+  
+  # Fallback configuration
+  fallback:
+    enabled: true
+    fallback_to: "yaml"  # yaml, memory, or disabled
+    yaml_config: "announcements.yml"
+    fallback_timeout_seconds: 30
+    
+# Connection pool settings
+connection_pool:
+  minimum_idle: 2
+  maximum_pool_size: 10
+  connection_timeout: 5000
+  idle_timeout: 300000
+  max_lifetime: 1800000
+```
 
 ### Schema Requirements
 

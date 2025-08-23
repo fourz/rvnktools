@@ -9,6 +9,68 @@
 
 This feature provides comprehensive backward compatibility with the existing RVNKTools announcement system during the migration to RVNKCore, ensuring zero downtime and seamless transition for server administrators.
 
+## AnnounceManager Hook Points Analysis
+
+### Current AnnounceManager Method Inventory
+
+**Core Data Access Methods (REQUIRES HOOKS)**:
+```java
+// These methods need compatibility layer hooks for RVNKCore migration
+public class AnnounceManager {
+    // HOOK REQUIRED: Data retrieval methods
+    public List<Announcement> getAnnouncements()  // → AnnouncementService.getAllAnnouncements()
+    public List<Announcement> getAnnouncements(String type)  // → AnnouncementService.getAnnouncementsByType()
+    public Announcement getAnnouncement(String id)  // → AnnouncementService.getAnnouncement()
+    
+    // HOOK REQUIRED: Data modification methods  
+    public boolean addAnnouncement(Announcement announcement)  // → AnnouncementService.createAnnouncement()
+    public boolean deleteAnnouncement(String id)  // → AnnouncementService.deleteAnnouncement()
+    public boolean updateAnnouncement(String id, String newMessage)  // → AnnouncementService.updateAnnouncement()
+    
+    // HOOK REQUIRED: Configuration management
+    public void reloadConfig()  // → AnnouncementService.reloadConfiguration()
+    public void saveConfig()  // → AnnouncementService.saveConfiguration()
+    
+    // HOOK REQUIRED: Player preference management
+    public void toggleAnnouncementType(Player player, String type)  // → AnnouncementService.togglePlayerDisabledType()
+    public String[] getPlayerDisabledAnnouncementTypes(Player player)  // → AnnouncementService.getPlayerDisabledTypes()
+    
+    // HOOK REQUIRED: Type management
+    public Set<String> getAnnounceTypes()  // → AnnouncementService.getAllAnnouncementTypes()
+    public AnnounceType getAnnounceType(String type)  // → AnnouncementService.getAnnouncementType()
+    public boolean validateAnnounceType(String type)  // → AnnouncementService.validateAnnouncementType()
+    
+    // HOOK REQUIRED: Operational methods
+    public boolean announcementExists(String id)  // → AnnouncementService.announcementExists()
+    public boolean sendAnnouncementNow(CommandSender sender, String id)  // → AnnouncementService.broadcastAnnouncement()
+}
+```
+
+### Deprecated Methods Migration Plan
+
+**DEPRECATED (Phase Out after Migration):**
+```java
+// These methods will be deprecated and replaced with RVNKCore equivalents
+@Deprecated(since = "2.1.0", forRemoval = true)
+public void setAnnouncements(List<Announcement> announcementList) {
+    // Migration Path: Use AnnouncementService.batchUpdateAnnouncements()
+    logger.warning("setAnnouncements() is deprecated. Use AnnouncementService.batchUpdateAnnouncements()");
+}
+
+@Deprecated(since = "2.1.0", forRemoval = true) 
+public void setAnnouncementImported(String id) {
+    // Migration Path: Use AnnouncementService metadata system
+    logger.warning("setAnnouncementImported() is deprecated. Use AnnouncementService.updateMetadata()");
+}
+
+@Deprecated(since = "2.1.0", forRemoval = true)
+public boolean isAnnouncementImported(String id) {
+    // Migration Path: Use AnnouncementService.getMetadata()
+    logger.warning("isAnnouncementImported() is deprecated. Use AnnouncementService.getMetadata()");
+    return false;
+}
+```
+
 ## Compatibility Architecture
 
 ### Dual System Support
@@ -21,16 +83,18 @@ This feature provides comprehensive backward compatibility with the existing RVN
                     │  ┌─────────────────────────────────┐ │
                     │  │    Migration Detection          │ │
                     │  │  ┌─────────┐    ┌─────────────┐ │ │
-                    │  │  │ RVNKCore│    │  YAML       │ │ │
-                    │  │  │Available│    │  Fallback   │ │ │
+                    │  │  │ RVNKCore│    │ MySQL/SQLite│ │ │
+                    │  │  │Available│    │  + YAML     │ │ │
+                    │  │  │         │    │  Fallback   │ │ │
                     │  │  └─────────┘    └─────────────┘ │ │
                     │  └─────────────────────────────────┘ │
                     │                                     │
                     │  ┌─────────────────────────────────┐ │
-                    │  │    Announcement Interface       │ │
+                    │  │   AnnounceManager Hook Layer    │ │
                     │  │  ┌─────────┐    ┌─────────────┐ │ │
                     │  │  │RVNKCore │ OR │   YAML      │ │ │
                     │  │  │Service  │    │   Manager   │ │ │
+                    │  │  │Methods  │    │   Methods   │ │ │
                     │  │  └─────────┘    └─────────────┘ │ │
                     │  └─────────────────────────────────┘ │
                     └─────────────────────────────────────┘
@@ -38,20 +102,26 @@ This feature provides comprehensive backward compatibility with the existing RVN
 
 ### Integration Strategy
 
-**Phase 1: Detection and Initialization**
+#### Phase 1: Detection and Initialization
+
 - Detect RVNKCore availability on plugin startup
-- Fall back to YAML system if RVNKCore unavailable
-- Initialize appropriate announcement provider
+- Test database connectivity (MySQL/SQLite)
+- Fall back to YAML system if database unavailable
+- Initialize appropriate announcement provider with configuration
 
-**Phase 2: Transparent Operations**
-- Route all announcement operations through compatibility layer
+#### Phase 2: Transparent Operations
+
+- Route all announcement operations through compatibility layer hooks
 - Maintain identical API for existing commands and features
-- Preserve all configuration options and behavior
+- Preserve all configuration options and behavior patterns
+- Handle configuration migration automatically
 
-**Phase 3: Migration Support**
-- Provide migration utilities and status reporting
-- Support gradual migration with data validation
-- Enable rollback to YAML system if needed
+#### Phase 3: Migration Support
+
+- Provide migration utilities and status reporting capabilities
+- Support gradual migration with comprehensive data validation
+- Enable rollback to YAML system with full data preservation
+- Implement seamless operation switching without downtime
 
 ## Implementation Components
 

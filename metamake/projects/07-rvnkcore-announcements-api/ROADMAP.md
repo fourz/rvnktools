@@ -35,31 +35,41 @@
   - Design dependency injection framework for RVNKTools consumption
   - Create service lifecycle management for initialization and cleanup
 
-### Week 2: Database Integration and Migration Framework  
-- [ ] **Database Schema Implementation** - Production database setup
-  - Validate and optimize rvnk_announcements table schema
-  - Implement repository layer with performance optimization
-  - Create database migration scripts and version management
-  - Establish connection pooling configuration for production
+### Week 2: Database Configuration & Migration Framework  
+
+- [ ] **Database Configuration Strategy** - MySQL/SQLite with YAML fallback ⚠️ **UPDATED REQUIREMENTS**
+  - Implement MySQL/SQLite primary storage with runtime detection
+  - Configure YAML fallback when database unavailable or misconfigured
+  - Create intelligent database selection and connection validation
+  - Establish configuration validation and error recovery procedures
 
 - [ ] **YAML Migration Framework** - Data transformation pipeline  
-  - Build YAML parser with robust error handling
+  - Build YAML parser with robust error handling and validation
   - Implement data transformation service (YAML → AnnouncementDTO)
-  - Create migration orchestrator with validation and rollback
-  - Develop migration testing framework
+  - Create migration orchestrator with progress reporting and rollback
+  - Develop comprehensive migration testing framework with real data samples
 
-### Week 3: REST API and Legacy Compatibility
+### Week 3: AnnounceManager Hook Points & Legacy Compatibility
+
+- [ ] **AnnounceManager Hook Integration** - Critical compatibility layer ⚠️ **NEW REQUIREMENT**
+  - Hook all data retrieval methods (`getAnnouncements*()`) to route through compatibility layer
+  - Hook all data modification methods (`add*()`, `delete*()`, `update*()`) for dual-system support
+  - Hook configuration management methods (`reloadConfig()`, `saveConfig()`) with service integration
+  - Hook player preference methods (`disableAnnouncements()`, `enableAnnouncements()`) with database backing
+
 - [ ] **REST API Controllers** - Web integration endpoints
-  - Complete AnnouncementController implementation
-  - Add authentication and authorization middleware
-  - Implement CORS support and rate limiting
-  - Create comprehensive API documentation and examples
+  - Complete AnnouncementController implementation with authentication
+  - Add authorization middleware with role-based permissions
+  - Implement CORS support and rate limiting for production security
+  - Create comprehensive API documentation with interactive examples
 
-- [ ] **Legacy Compatibility Layer** - Backward compatibility
-  - Design adapter pattern for existing AnnounceManager interface
-  - Maintain command structure and permission compatibility
-  - Implement graceful fallback to YAML if RVNKCore unavailable
-  - Create configuration migration utilities
+### Week 3.5: Deprecation Strategy Implementation
+
+- [ ] **Legacy Method Deprecation** - Smooth migration path
+  - Add @Deprecated annotations to all legacy AnnounceManager methods
+  - Implement runtime deprecation warnings with migration guidance
+  - Create method mapping documentation for all deprecated methods
+  - Establish version compatibility matrix and migration timeline
 
 ### Week 4: Testing and Validation
 - [ ] **Comprehensive Testing Framework** - Quality assurance

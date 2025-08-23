@@ -4,6 +4,17 @@
 
 This project implements a comprehensive announcements API system in RVNKCore, migrating from the existing YAML-based RVNKTools implementation to a modern, database-backed, REST-enabled service architecture. The implementation establishes the service separation pattern for the entire RVNK plugin ecosystem.
 
+**Key Configuration Update**: The system now supports **MySQL/SQLite primary storage with YAML fallback** when databases are unavailable, ensuring robust operation in all deployment scenarios.
+
+**Hook Point Integration**: All existing AnnounceManager method calls have been mapped to RVNKCore service methods with comprehensive compatibility layers and deprecation strategies.
+
+## Recent Updates (August 22, 2025)
+
+✅ **Configuration Requirements Updated**: Enhanced database configuration strategy with MySQL/SQLite + YAML fallback  
+✅ **Hook Point Analysis Complete**: Comprehensive mapping of all AnnounceManager methods to RVNKCore services  
+✅ **Legacy Compatibility Enhanced**: Detailed compatibility layer with deprecation strategy  
+✅ **Integration Guide Created**: Complete AnnounceManager integration guide with implementation details
+
 ## Solution Structure
 
 ### Features
