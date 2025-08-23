@@ -209,4 +209,16 @@ public interface AnnouncementService {
      * @since 1.0.0
      */
     CompletableFuture<Integer> bulkImportAnnouncements(List<AnnouncementDTO> announcements);
+    
+    /**
+     * Gets comprehensive metrics about the announcement system.
+     * 
+     * Returns statistics including total count, active count, counts by type,
+     * recent activity, and performance metrics.
+     * 
+     * @return CompletableFuture containing announcement metrics as JSON-formatted map
+     * @throws org.fourz.rvnkcore.api.exception.ServiceException if metrics retrieval fails
+     * @since 1.0.0
+     */
+    CompletableFuture<java.util.Map<String, Object>> getAnnouncementMetrics();
 }

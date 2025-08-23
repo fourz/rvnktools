@@ -194,6 +194,90 @@ public class DefaultAnnouncementService implements AnnouncementService {
         if (shutdown) throw new ServiceException("Service is shut down");
         return repository.batchInsert(announcements);
     }
+    
+    @Override
+    public CompletableFuture<java.util.Map<String, Object>> getAnnouncementMetrics() {
+        if (shutdown) throw new ServiceException("Service is shut down");
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                java.util.Map<String, Object> metrics = new java.util.HashMap<>();
+                
+                // Basic counts
+                CompletableFuture<Long> totalCountFuture = getAnnouncementCount();
+                CompletableFuture<Long> activeCountFuture = getActiveAnnouncementCount();
+                CompletableFuture<List<AnnouncementDTO>> allAnnouncementsFuture = getAllAnnouncements();
+                
+                // Wait for all basic metrics
+                Long totalCount = totalCountFuture.join();
+                Long activeCount = activeCountFuture.join();
+                List<AnnouncementDTO> allAnnouncements = allAnnouncementsFuture.join();
+                
+                metrics.put("total_announcements", totalCount);
+                metrics.put("active_announcements", activeCount);
+                metrics.put("inactive_announcements", totalCount - activeCount);
+                
+                // Type breakdown
+                java.util.Map<String, Long> typeBreakdown = new java.util.HashMap<>();
+                java.util.Map<String, Long> activeTypeBreakdown = new java.util.HashMap<>();
+                
+                for (AnnouncementDTO announcement : allAnnouncements) {
+                    String type = announcement.getType() != null ? announcement.getType() : "unknown";
+                    typeBreakdown.merge(type, 1L, Long::sum);
+                    
+                    if (announcement.isActive()) {
+                        activeTypeBreakdown.merge(type, 1L, Long::sum);
+                    }
+                }
+                
+                metrics.put("type_breakdown", typeBreakdown);
+                metrics.put("active_type_breakdown", activeTypeBreakdown);
+                
+                // Cache statistics
+                CacheStatistics cacheStats = getCacheStatistics();
+                java.util.Map<String, Object> cacheMetrics = new java.util.HashMap<>();
+                cacheMetrics.put("size", cacheStats.cacheSize);
+                cacheMetrics.put("hit_rate", cacheStats.hitRate);
+                cacheMetrics.put("max_size", MAX_CACHE_SIZE);
+                metrics.put("cache", cacheMetrics);
+                
+                // System information
+                java.util.Map<String, Object> systemInfo = new java.util.HashMap<>();
+                systemInfo.put("cache_ttl_seconds", CACHE_TTL_MS / 1000);
+                systemInfo.put("service_status", shutdown ? "shutdown" : "active");
+                metrics.put("system", systemInfo);
+                
+                // Recent activity (last 24 hours)
+                java.time.LocalDateTime yesterday = java.time.LocalDateTime.now().minusDays(1);
+                java.sql.Timestamp yesterdayTs = java.sql.Timestamp.valueOf(yesterday);
+                
+                long recentCount = allAnnouncements.stream()
+                    .filter(a -> a.getCreatedAt() != null && a.getCreatedAt().after(yesterdayTs))
+                    .count();
+                    
+                long recentUpdates = allAnnouncements.stream()
+                    .filter(a -> a.getUpdatedAt() != null && a.getUpdatedAt().after(yesterdayTs))
+                    .count();
+                
+                java.util.Map<String, Object> recentActivity = new java.util.HashMap<>();
+                recentActivity.put("created_last_24h", recentCount);
+                recentActivity.put("updated_last_24h", recentUpdates);
+                metrics.put("recent_activity", recentActivity);
+                
+                // Generation timestamp
+                metrics.put("generated_at", java.time.Instant.now().toString());
+                
+                return metrics;
+                
+            } catch (Exception e) {
+                logger.error("Failed to generate announcement metrics", e);
+                throw new ServiceException("Failed to generate announcement metrics", e);
+            }
+        }).exceptionally(throwable -> {
+            logger.error("Failed to get announcement metrics", throwable);
+            throw new ServiceException("Failed to get announcement metrics", throwable);
+        });
+    }
 
     // === Service Management ===
 

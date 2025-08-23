@@ -398,6 +398,81 @@ public class DefaultAnnouncementService implements AnnouncementService {
         });
     }
     
+    @Override
+    public CompletableFuture<java.util.Map<String, Object>> getAnnouncementMetrics() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                java.util.Map<String, Object> metrics = new java.util.HashMap<>();
+                
+                // Basic counts
+                CompletableFuture<Long> totalCountFuture = getAnnouncementCount();
+                CompletableFuture<Long> activeCountFuture = getActiveAnnouncementCount();
+                CompletableFuture<List<AnnouncementDTO>> allAnnouncementsFuture = getAllAnnouncements();
+                
+                // Wait for all basic metrics
+                Long totalCount = totalCountFuture.join();
+                Long activeCount = activeCountFuture.join();
+                List<AnnouncementDTO> allAnnouncements = allAnnouncementsFuture.join();
+                
+                metrics.put("total_announcements", totalCount);
+                metrics.put("active_announcements", activeCount);
+                metrics.put("inactive_announcements", totalCount - activeCount);
+                
+                // Type breakdown
+                java.util.Map<String, Long> typeBreakdown = new java.util.HashMap<>();
+                java.util.Map<String, Long> activeTypeBreakdown = new java.util.HashMap<>();
+                
+                for (AnnouncementDTO announcement : allAnnouncements) {
+                    String type = announcement.getType() != null ? announcement.getType() : "unknown";
+                    typeBreakdown.merge(type, 1L, Long::sum);
+                    
+                    if (announcement.isActive()) {
+                        activeTypeBreakdown.merge(type, 1L, Long::sum);
+                    }
+                }
+                
+                metrics.put("type_breakdown", typeBreakdown);
+                metrics.put("active_type_breakdown", activeTypeBreakdown);
+                
+                // Cache statistics
+                java.util.Map<String, Object> cacheMetrics = new java.util.HashMap<>();
+                cacheMetrics.put("size", cache.size());
+                cacheMetrics.put("hits", cacheHits.get());
+                cacheMetrics.put("misses", cacheMisses.get());
+                long totalRequests = cacheHits.get() + cacheMisses.get();
+                double hitRate = totalRequests > 0 ? (double) cacheHits.get() / totalRequests : 0.0;
+                cacheMetrics.put("hit_rate", hitRate);
+                metrics.put("cache", cacheMetrics);
+                
+                // Recent activity (last 24 hours)
+                java.time.LocalDateTime yesterday = java.time.LocalDateTime.now().minusDays(1);
+                java.sql.Timestamp yesterdayTs = java.sql.Timestamp.valueOf(yesterday);
+                
+                long recentCount = allAnnouncements.stream()
+                    .filter(a -> a.getCreatedAt() != null && a.getCreatedAt().after(yesterdayTs))
+                    .count();
+                    
+                long recentUpdates = allAnnouncements.stream()
+                    .filter(a -> a.getUpdatedAt() != null && a.getUpdatedAt().after(yesterdayTs))
+                    .count();
+                
+                java.util.Map<String, Object> recentActivity = new java.util.HashMap<>();
+                recentActivity.put("created_last_24h", recentCount);
+                recentActivity.put("updated_last_24h", recentUpdates);
+                metrics.put("recent_activity", recentActivity);
+                
+                // Generation timestamp
+                metrics.put("generated_at", java.time.Instant.now().toString());
+                
+                return metrics;
+                
+            } catch (Exception e) {
+                logger.error("Failed to generate announcement metrics", e);
+                throw new RuntimeException("Failed to generate announcement metrics", e);
+            }
+        });
+    }
+    
     /**
      * Generates a unique announcement ID.
      * 

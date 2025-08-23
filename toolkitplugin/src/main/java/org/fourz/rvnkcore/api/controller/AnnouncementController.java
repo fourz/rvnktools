@@ -9,8 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -78,6 +76,9 @@ public class AnnouncementController extends HttpServlet {
                 } else {
                     sendErrorResponse(response, 400, "Missing required parameter: q");
                 }
+            } else if (pathInfo.equals("/metrics")) {
+                // GET /api/v1/announcements/metrics - Get announcement system metrics
+                handleGetAnnouncementMetrics(request, response);
             } else if (pathInfo.startsWith("/")) {
                 // GET /api/v1/announcements/{id} - Get announcement by ID
                 String id = pathInfo.substring(1);
@@ -488,19 +489,125 @@ public class AnnouncementController extends HttpServlet {
     }
     
     /**
-     * Handles PUT /api/v1/announcements/{id} - Update announcement (stub)
+     * Handles PUT /api/v1/announcements/{id} - Update announcement
      */
     private void handleUpdateAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // This is a stub implementation. In production, you'd parse JSON from request body
-        sendErrorResponse(response, 501, "Update announcement endpoint not yet implemented");
+        try {
+            // Parse JSON request body
+            StringBuilder jsonBody = new StringBuilder();
+            String line;
+            java.io.BufferedReader reader = request.getReader();
+            while ((line = reader.readLine()) != null) {
+                jsonBody.append(line);
+            }
+            
+            // Basic JSON parsing (a real implementation would use Jackson or similar)
+            String json = jsonBody.toString();
+            if (json == null || json.trim().isEmpty()) {
+                sendErrorResponse(response, 400, "Request body is required");
+                return;
+            }
+            
+            // Create AnnouncementDTO from JSON - simplified parsing
+            AnnouncementDTO announcement = parseAnnouncementFromJson(json, id);
+            
+            CompletableFuture<AnnouncementDTO> future = announcementService.updateAnnouncement(announcement);
+            future.whenComplete((updatedAnnouncement, throwable) -> {
+                try {
+                    if (throwable != null) {
+                        logger.error("Error updating announcement: " + id, throwable);
+                        if (throwable.getCause() instanceof IllegalArgumentException) {
+                            sendErrorResponse(response, 400, "Invalid announcement data: " + throwable.getMessage());
+                        } else {
+                            sendErrorResponse(response, 500, "Failed to update announcement: " + throwable.getMessage());
+                        }
+                    } else {
+                        response.setStatus(200);
+                        response.getWriter().write(buildAnnouncementResponse(updatedAnnouncement));
+                    }
+                } catch (IOException e) {
+                    logger.error("Error writing update response", e);
+                }
+            });
+            
+        } catch (Exception e) {
+            logger.error("Error handling update announcement request for ID: " + id, e);
+            sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
+        }
     }
     
     /**
-     * Handles POST /api/v1/announcements/bulk-import - Bulk import announcements (stub)
+     * Handles POST /api/v1/announcements/bulk-import - Bulk import announcements
      */
     private void handleBulkImportAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // This is a stub implementation. In production, you'd parse JSON array from request body
-        sendErrorResponse(response, 501, "Bulk import endpoint not yet implemented");
+        try {
+            // Parse JSON request body
+            StringBuilder jsonBody = new StringBuilder();
+            String line;
+            java.io.BufferedReader reader = request.getReader();
+            while ((line = reader.readLine()) != null) {
+                jsonBody.append(line);
+            }
+            
+            String json = jsonBody.toString();
+            if (json == null || json.trim().isEmpty()) {
+                sendErrorResponse(response, 400, "Request body is required");
+                return;
+            }
+            
+            // Parse JSON array to List<AnnouncementDTO>
+            List<AnnouncementDTO> announcements = parseAnnouncementListFromJson(json);
+            
+            CompletableFuture<Integer> future = announcementService.bulkImportAnnouncements(announcements);
+            future.whenComplete((importedCount, throwable) -> {
+                try {
+                    if (throwable != null) {
+                        logger.error("Error bulk importing announcements", throwable);
+                        if (throwable.getCause() instanceof IllegalArgumentException) {
+                            sendErrorResponse(response, 400, "Invalid announcement data: " + throwable.getMessage());
+                        } else {
+                            sendErrorResponse(response, 500, "Failed to import announcements: " + throwable.getMessage());
+                        }
+                    } else {
+                        response.setStatus(201);
+                        String result = "{\"imported_count\":" + importedCount + ",\"message\":\"Successfully imported " + importedCount + " announcements\"}";
+                        response.getWriter().write(result);
+                    }
+                } catch (IOException e) {
+                    logger.error("Error writing bulk import response", e);
+                }
+            });
+            
+        } catch (Exception e) {
+            logger.error("Error handling bulk import request", e);
+            sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Handles GET /api/v1/announcements/metrics - Get announcement system metrics
+     */
+    private void handleGetAnnouncementMetrics(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            CompletableFuture<java.util.Map<String, Object>> future = announcementService.getAnnouncementMetrics();
+            future.whenComplete((metrics, throwable) -> {
+                try {
+                    if (throwable != null) {
+                        logger.error("Error retrieving announcement metrics", throwable);
+                        sendErrorResponse(response, 500, "Failed to retrieve metrics: " + throwable.getMessage());
+                    } else {
+                        response.setStatus(200);
+                        response.getWriter().write(buildMetricsResponse(metrics));
+                    }
+                } catch (IOException e) {
+                    logger.error("Error writing metrics response", e);
+                }
+            });
+            
+        } catch (Exception e) {
+            logger.error("Error handling metrics request", e);
+            sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
+        }
     }
     
     /**
@@ -568,5 +675,234 @@ public class AnnouncementController extends HttpServlet {
                     .replace("\n", "\\n")
                     .replace("\r", "\\r")
                     .replace("\t", "\\t");
+    }
+    
+    /**
+     * Parses a single announcement from JSON string.
+     * This is a simplified JSON parser - a real implementation would use Jackson or similar.
+     */
+    private AnnouncementDTO parseAnnouncementFromJson(String json, String id) {
+        AnnouncementDTO announcement = new AnnouncementDTO();
+        announcement.setId(id);
+        
+        // Simplified JSON parsing - extract key fields
+        try {
+            if (json.contains("\"title\":")) {
+                String title = extractJsonValue(json, "title");
+                announcement.setTitle(title);
+            }
+            
+            if (json.contains("\"message\":")) {
+                String message = extractJsonValue(json, "message");
+                announcement.setMessage(message);
+            }
+            
+            if (json.contains("\"type\":")) {
+                String type = extractJsonValue(json, "type");
+                announcement.setType(type);
+            }
+            
+            if (json.contains("\"active\":")) {
+                String activeStr = extractJsonValue(json, "active");
+                boolean active = "true".equalsIgnoreCase(activeStr);
+                announcement.setActive(active);
+            }
+            
+            if (json.contains("\"interval_seconds\":")) {
+                String intervalStr = extractJsonValue(json, "interval_seconds");
+                try {
+                    int interval = Integer.parseInt(intervalStr);
+                    announcement.setIntervalSeconds(interval);
+                } catch (NumberFormatException e) {
+                    // Use default interval
+                    announcement.setIntervalSeconds(300);
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error parsing announcement JSON", e);
+            throw new IllegalArgumentException("Invalid JSON format: " + e.getMessage());
+        }
+        
+        return announcement;
+    }
+    
+    /**
+     * Parses a list of announcements from JSON array string.
+     * This is a simplified JSON parser - a real implementation would use Jackson or similar.
+     */
+    private List<AnnouncementDTO> parseAnnouncementListFromJson(String json) {
+        List<AnnouncementDTO> announcements = new java.util.ArrayList<>();
+        
+        try {
+            // Remove array brackets and split by object boundaries
+            String cleaned = json.trim();
+            if (!cleaned.startsWith("[") || !cleaned.endsWith("]")) {
+                throw new IllegalArgumentException("JSON must be an array");
+            }
+            
+            cleaned = cleaned.substring(1, cleaned.length() - 1); // Remove [ ]
+            
+            // Split by },{ pattern to separate objects
+            String[] objects = cleaned.split("\\},\\s*\\{");
+            
+            for (int i = 0; i < objects.length; i++) {
+                String obj = objects[i].trim();
+                
+                // Add back braces if they were removed during split
+                if (!obj.startsWith("{")) obj = "{" + obj;
+                if (!obj.endsWith("}")) obj = obj + "}";
+                
+                // Generate a temporary ID for parsing
+                String tempId = "import_" + System.currentTimeMillis() + "_" + i;
+                AnnouncementDTO announcement = parseAnnouncementFromJson(obj, tempId);
+                announcement.setId(null); // Clear temp ID - let service generate real ID
+                announcements.add(announcement);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error parsing announcement list JSON", e);
+            throw new IllegalArgumentException("Invalid JSON array format: " + e.getMessage());
+        }
+        
+        return announcements;
+    }
+    
+    /**
+     * Extracts a value from JSON string for a given key.
+     * This is a simplified extraction - a real implementation would use Jackson or similar.
+     */
+    private String extractJsonValue(String json, String key) {
+        String searchPattern = "\"" + key + "\":";
+        int startIndex = json.indexOf(searchPattern);
+        if (startIndex == -1) return "";
+        
+        startIndex += searchPattern.length();
+        
+        // Skip whitespace
+        while (startIndex < json.length() && Character.isWhitespace(json.charAt(startIndex))) {
+            startIndex++;
+        }
+        
+        if (startIndex >= json.length()) return "";
+        
+        char firstChar = json.charAt(startIndex);
+        String value;
+        
+        if (firstChar == '"') {
+            // String value
+            startIndex++; // Skip opening quote
+            int endIndex = json.indexOf('"', startIndex);
+            if (endIndex == -1) return "";
+            value = json.substring(startIndex, endIndex);
+        } else {
+            // Non-string value (number, boolean)
+            int endIndex = startIndex;
+            while (endIndex < json.length()) {
+                char ch = json.charAt(endIndex);
+                if (ch == ',' || ch == '}' || Character.isWhitespace(ch)) {
+                    break;
+                }
+                endIndex++;
+            }
+            value = json.substring(startIndex, endIndex).trim();
+        }
+        
+        return value;
+    }
+    
+    /**
+     * Builds a JSON response for metrics data.
+     */
+    private String buildMetricsResponse(java.util.Map<String, Object> metrics) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        boolean first = true;
+        for (java.util.Map.Entry<String, Object> entry : metrics.entrySet()) {
+            if (!first) json.append(",");
+            first = false;
+            
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            json.append("\"").append(escapeJson(key)).append("\":");
+            
+            if (value == null) {
+                json.append("null");
+            } else if (value instanceof String) {
+                json.append("\"").append(escapeJson(value.toString())).append("\"");
+            } else if (value instanceof Number || value instanceof Boolean) {
+                json.append(value.toString());
+            } else if (value instanceof java.util.Map) {
+                json.append(buildNestedMapJson((java.util.Map<?, ?>) value));
+            } else if (value instanceof java.util.List) {
+                json.append(buildListJson((java.util.List<?>) value));
+            } else {
+                json.append("\"").append(escapeJson(value.toString())).append("\"");
+            }
+        }
+        
+        json.append("}");
+        return json.toString();
+    }
+    
+    /**
+     * Builds JSON for nested map objects.
+     */
+    private String buildNestedMapJson(java.util.Map<?, ?> map) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        boolean first = true;
+        for (java.util.Map.Entry<?, ?> entry : map.entrySet()) {
+            if (!first) json.append(",");
+            first = false;
+            
+            String key = entry.getKey().toString();
+            Object value = entry.getValue();
+            
+            json.append("\"").append(escapeJson(key)).append("\":");
+            
+            if (value == null) {
+                json.append("null");
+            } else if (value instanceof String) {
+                json.append("\"").append(escapeJson(value.toString())).append("\"");
+            } else if (value instanceof Number || value instanceof Boolean) {
+                json.append(value.toString());
+            } else {
+                json.append("\"").append(escapeJson(value.toString())).append("\"");
+            }
+        }
+        
+        json.append("}");
+        return json.toString();
+    }
+    
+    /**
+     * Builds JSON for list objects.
+     */
+    private String buildListJson(java.util.List<?> list) {
+        StringBuilder json = new StringBuilder();
+        json.append("[");
+        
+        boolean first = true;
+        for (Object item : list) {
+            if (!first) json.append(",");
+            first = false;
+            
+            if (item == null) {
+                json.append("null");
+            } else if (item instanceof String) {
+                json.append("\"").append(escapeJson(item.toString())).append("\"");
+            } else if (item instanceof Number || item instanceof Boolean) {
+                json.append(item.toString());
+            } else {
+                json.append("\"").append(escapeJson(item.toString())).append("\"");
+            }
+        }
+        
+        json.append("]");
+        return json.toString();
     }
 }
