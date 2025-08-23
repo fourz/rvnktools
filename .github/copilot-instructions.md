@@ -306,10 +306,10 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 #### VS Code Query Tasks (Available via Command Palette)
 
 **Server Query Tasks:**
-- **Query Console - Recent**: Get last 25 console lines with color-coded formatting
+- **Query Console - Recent**: Get last 50 console lines with color-coded formatting
 - **Query Console - Errors Only**: Filter only ERROR/WARN messages from last 50 lines
 - **Query Console - Plugin Messages**: Show only RVNKTools-related log entries from last 100 lines  
-- **Query Console - Extended**: Get last 300 console lines for comprehensive debugging context
+- **Query Console - Extended**: Get last 500 console lines for comprehensive debugging context
 - **Query Server Status**: Get server running state, name, type, and memory info
 - **Query Server Statistics**: Get real-time CPU, memory usage, player count, uptime
 - **Query Server Info**: Get detailed server configuration and setup information
@@ -344,8 +344,8 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 For advanced queries and copilot agentic usage, execute the PowerShell script directly:
 
 ```powershell
-# Console queries with flexible parameters (1-300 lines or "all")
-.\query-server-DEV.ps1 console [1-300|all] [-ErrorsOnly] [-PluginOnly] [-FilterText "text"] [-Reversed] [-NoTimestamp] [-Raw]
+# Console queries with flexible parameters (1-500 lines or "all")
+.\query-server-DEV.ps1 console [1-500|all] [-ErrorsOnly] [-PluginOnly] [-FilterText "text"] [-Reversed] [-NoTimestamp] [-Raw]
 
 # Server information queries  
 .\query-server-DEV.ps1 status    # Server state and basic info
@@ -377,7 +377,7 @@ $env:RVNK_MYSQL_PASSWORD = "your_password"
 
 #### Query System Features for Copilot Agents
 
-- **Flexible Line Counts**: Support for 1-300 lines or "all" for complete history
+- **Flexible Line Counts**: Support for 1-500 lines or "all" for complete history
 - **Advanced Filtering**: 
   - `-ErrorsOnly`: Show only ERROR and WARN level messages
   - `-PluginOnly`: Show only plugin-related messages  
@@ -390,13 +390,13 @@ $env:RVNK_MYSQL_PASSWORD = "your_password"
 - **Zero Context Switching**: Query server without leaving VS Code environment
 - **Server Command Execution**: Execute commands remotely via MCSS API
 - **MySQL Database Management**: Complete database cleanup and table listing capabilities
-- **Extended Console Access**: Up to 300 lines for comprehensive debugging context
+- **Extended Console Access**: Up to 500 lines for comprehensive debugging context
 
 #### Usage Examples for Development Workflow
 
 ```powershell
 # Post-deployment verification
-.\query-server-DEV.ps1 console 25 -PluginOnly
+.\query-server-DEV.ps1 console 50 -PluginOnly
 
 # Error debugging after code changes  
 .\query-server-DEV.ps1 console 100 -ErrorsOnly -FilterText "database"
@@ -449,18 +449,18 @@ For comprehensive REST API testing and validation of RVNKCore endpoints, utilize
 
 **API Test Categories:**
 ```powershell
-# Test all RVNKCore APIs
-.\Test-RestRVNKCoreAPI.ps1 -Tests all
+# Test all RVNKCore APIs (test for https by default)
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests all
 
 # Test specific API categories
-.\Test-RestRVNKCoreAPI.ps1 -Tests player        # Player management APIs
-.\Test-RestRVNKCoreAPI.ps1 -Tests playerworld   # Player-world correlation APIs
-.\Test-RestRVNKCoreAPI.ps1 -Tests world         # World management APIs  
-.\Test-RestRVNKCoreAPI.ps1 -Tests announcement  # Announcement system APIs
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests player        # Player management APIs
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests playerworld   # Player-world correlation APIs
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests world         # World management APIs  
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests announcement  # Announcement system APIs
 
-# Advanced testing options
-.\Test-RestRVNKCoreAPI.ps1 -Tests world -HttpsOnly -Detail          # HTTPS only with detailed output
-.\Test-RestRVNKCoreAPI.ps1 -Tests all -IgnoreSSLErrors -Detail      # Full test suite with SSL bypass
+# Advanced testing options 
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests world -Detail          # HTTPS only with detailed output
+.\Test-RestRVNKCoreAPI.ps1 -HttpsOnly -Tests all -IgnoreSSLErrors -Detail      # Full test suite with SSL bypass
 ```
 
 **Key API Endpoints Tested:**
