@@ -6,8 +6,10 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.controller.PlayerController;
+import org.fourz.rvnkcore.api.controller.AnnouncementController;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -20,6 +22,7 @@ public class ServletFactory {
     private final Plugin plugin;
     private final LogManager logger;
     private final PlayerService playerService;
+    private final AnnouncementService announcementService;
     private final Gson gson;
 
     /**
@@ -29,14 +32,16 @@ public class ServletFactory {
      * @param plugin Plugin instance
      * @param logger Logger instance
      * @param playerService Player service for data operations
+     * @param announcementService Announcement service for data operations
      * @param gson JSON serializer instance
      */
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger, 
-                                 PlayerService playerService, Gson gson) {
+                                 PlayerService playerService, AnnouncementService announcementService, Gson gson) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
         this.playerService = playerService;
+        this.announcementService = announcementService;
         this.gson = gson;
     }
 
@@ -94,10 +99,26 @@ public class ServletFactory {
         // Also register player controller for singular player endpoints
         context.addServlet(new ServletHolder(playerController), "/v1/player/*");
 
+        // Register announcement controller
+        registerAnnouncementController(context);
+        
         // Future controllers can be registered here
-        // registerAnnouncementController(context);
         // registerShopController(context);
         // registerLoreController(context);
+    }
+
+    /**
+     * Registers the announcement controller with the servlet context.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerAnnouncementController(ServletContextHandler context) {
+        // Register announcement controller with proper class-specific logger
+        LogManager announcementControllerLogger = LogManager.getInstance(plugin, 
+            org.fourz.rvnkcore.api.controller.AnnouncementController.class);
+        
+        AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger);
+        context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
     }
 
     /**
@@ -167,13 +188,13 @@ public class ServletFactory {
     public void logRegisteredRoutes() {
         // Dynamic endpoint counting
         int playerEndpoints = getPlayerEndpointCount();
+        int announcementEndpoints = getAnnouncementEndpointCount();
         
         // Future endpoints would be counted dynamically here
-        // int announcementEndpoints = getAnnouncementEndpointCount();
         // int shopEndpoints = getShopEndpointCount();
         // int loreEndpoints = getLoreEndpointCount();
         
-        int totalEndpoints = playerEndpoints;
+        int totalEndpoints = playerEndpoints + announcementEndpoints;
         
         logger.info("REST API: " + totalEndpoints + " endpoints registered");
         logger.info("Authentication: X-API-Key header required");
@@ -190,5 +211,21 @@ public class ServletFactory {
         //                /player/name/{name}/history, /players/group/{group}, /players/search, /players/count
         // PUT endpoints: /players/{uuid}/location, /players/{uuid}/groups
         return 10;
+    }
+
+    /**
+     * Gets the count of announcement endpoints dynamically.
+     * This should be updated when new announcement endpoints are added.
+     * 
+     * @return Number of announcement endpoints
+     */
+    private int getAnnouncementEndpointCount() {
+        // GET endpoints: /announcements, /announcements/active, /announcements/count, /announcements/count/active,
+        //                /announcements/type/{type}, /announcements/world/{world}, /announcements/group/{group}, 
+        //                /announcements/search, /announcements/{id}
+        // POST endpoints: /announcements, /announcements/bulk-import
+        // PUT endpoints: /announcements/{id}, /announcements/{id}/activate, /announcements/{id}/deactivate
+        // DELETE endpoints: /announcements/{id}
+        return 15;
     }
 }

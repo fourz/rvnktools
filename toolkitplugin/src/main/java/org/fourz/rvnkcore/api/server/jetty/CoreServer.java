@@ -9,6 +9,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -27,6 +28,7 @@ public class CoreServer {
     private Server server;
     private final ApiConfig config;
     private final PlayerService playerService;
+    private final AnnouncementService announcementService;
     private final Gson gson;
     private final LogManager logger;
     private final Plugin plugin;
@@ -41,11 +43,13 @@ public class CoreServer {
      *
      * @param config API configuration
      * @param playerService Player service for data operations
+     * @param announcementService Announcement service for data operations
      * @param plugin Plugin instance
      */
-    public CoreServer(ApiConfig config, PlayerService playerService, Plugin plugin) {
+    public CoreServer(ApiConfig config, PlayerService playerService, AnnouncementService announcementService, Plugin plugin) {
         this.config = config;
         this.playerService = playerService;
+        this.announcementService = announcementService;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.gson = createGson();
@@ -55,7 +59,7 @@ public class CoreServer {
         
         // Initialize specialized factories
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
-        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, gson);
+        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, announcementService, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
     }
 

@@ -175,7 +175,8 @@ public class RVNKCore {
             
             if (apiConfig.isEnabled()) {
                 PlayerService playerService = serviceRegistry.getService(PlayerService.class);
-                apiServer = new CoreServer(apiConfig, playerService, parentPlugin);
+                AnnouncementService announcementService = serviceRegistry.getService(AnnouncementService.class);
+                apiServer = new CoreServer(apiConfig, playerService, announcementService, parentPlugin);
                 apiServer.start();
                 logger.info("RVNKCore REST API server started");
             } else {
@@ -260,6 +261,15 @@ public class RVNKCore {
      */
     public PlayerWorldService getPlayerWorldService() {
         return getService(PlayerWorldService.class);
+    }
+    
+    /**
+     * Gets the AnnouncementService for announcement management.
+     * 
+     * @return AnnouncementService instance
+     */
+    public AnnouncementService getAnnouncementService() {
+        return getService(AnnouncementService.class);
     }
     
     /**

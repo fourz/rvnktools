@@ -148,7 +148,7 @@ function Write-TestResult {
         [object]$ResponseInfo = $null
     )
     
-    $status = if ($Success) { "✅ PASS" } else { "❌ FAIL" }
+    $status = if ($Success) { "PASS" } else { "FAIL" }
     $color = if ($Success) { "Green" } else { "Red" }
     
     Write-Host "  [$Protocol] $status - $TestName`: $Message" -ForegroundColor $color
@@ -302,7 +302,7 @@ function Test-GetAnnouncementById {
         return
     }
     
-    Write-Host "`n🔍 Testing Get Announcement by ID ($Protocol)" -ForegroundColor Cyan
+    Write-Host "`nTesting Get Announcement by ID ($Protocol)" -ForegroundColor Cyan
     $endpoint = $Endpoints.AnnouncementById -replace "{id}", $AnnouncementId
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint
     
@@ -318,7 +318,7 @@ function Test-UpdateAnnouncement {
         return
     }
     
-    Write-Host "`n✏️ Testing Update Announcement ($Protocol)" -ForegroundColor Cyan
+    Write-Host "`nTesting Update Announcement ($Protocol)" -ForegroundColor Cyan
     $updateData = $TestData.NewAnnouncement.Clone()
     $updateData.content = "Updated: $($updateData.content)"
     $updateData.priority = 3
@@ -469,7 +469,7 @@ function Test-GetAnnouncementCount {
 function Test-GetAnnouncementMetrics {
     param ([string]$Protocol, [string]$BaseUrl)
     
-    Write-Host "`n📊 Testing Get Announcement Metrics ($Protocol)" -ForegroundColor Cyan
+    Write-Host "`nTesting Get Announcement Metrics ($Protocol)" -ForegroundColor Cyan
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.AnnouncementMetrics
     
     if ($result.Success) {
@@ -490,7 +490,7 @@ function Test-DeleteAnnouncement {
         return
     }
     
-    Write-Host "`n🗑️ Testing Delete Announcement ($Protocol)" -ForegroundColor Cyan
+    Write-Host "`nTesting Delete Announcement ($Protocol)" -ForegroundColor Cyan
     $endpoint = $Endpoints.AnnouncementById -replace "{id}", $AnnouncementId
     $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $endpoint -Method "DELETE"
     
@@ -501,7 +501,7 @@ function Test-DeleteAnnouncement {
 function Test-ErrorHandling {
     param ([string]$Protocol, [string]$BaseUrl)
     
-    Write-Host "`n⚠️ Testing Error Handling ($Protocol)" -ForegroundColor Cyan
+    Write-Host "`nTesting Error Handling ($Protocol)" -ForegroundColor Cyan
     
     # Test 404 - Non-existent announcement
     $endpoint = $Endpoints.AnnouncementById -replace "{id}", "non-existent-id"
@@ -512,7 +512,7 @@ function Test-ErrorHandling {
     
     # Test 400 - Invalid JSON
     try {
-        $invalidJson = '{ "content": "Test", invalid json }'
+        $invalidJson = "{ `"content`": `"Test`" invalid json }"
         $result = Invoke-WebRequest -Uri "$BaseUrl$($Endpoints.Announcements)" -Method "POST" -Headers $Headers -Body $invalidJson
         $is400 = $false
         $message = "Failed to return 400 for invalid JSON"
@@ -579,9 +579,9 @@ function Create-TestData {
     foreach ($announcement in $testAnnouncements) {
         $result = Invoke-ApiRequest -BaseUrl $BaseUrl -Endpoint $Endpoints.Announcements -Method "POST" -Body $announcement
         if ($result.Success) {
-            Write-Host "    ✅ Created: $($announcement.content.Substring(0, 50))..." -ForegroundColor Green
+            Write-Host "    Created: $($announcement.content.Substring(0, 50))..." -ForegroundColor Green
         } else {
-            Write-Host "    ❌ Failed to create: $($announcement.content.Substring(0, 50))..." -ForegroundColor Red
+            Write-Host "    Failed to create: $($announcement.content.Substring(0, 50))..." -ForegroundColor Red
         }
     }
 }
@@ -644,7 +644,7 @@ Write-Host "RVNKCore Announcements API Comprehensive Test Suite" -ForegroundColo
 Write-Host "====================================================" -ForegroundColor Magenta
 
 if ($IgnoreSSLErrors) {
-    Write-Host "⚠️  SSL certificate validation disabled for testing" -ForegroundColor Yellow
+    Write-Host "SSL certificate validation disabled for testing" -ForegroundColor Yellow
 }
 
 if ($CreateTestData) {
@@ -672,8 +672,8 @@ $totalFailed = 0
 foreach ($protocol in $TestResults.Keys) {
     if ($TestResults[$protocol].Passed -gt 0 -or $TestResults[$protocol].Failed -gt 0) {
         Write-Host "`n$protocol Results:" -ForegroundColor White
-        Write-Host "  ✅ Passed: $($TestResults[$protocol].Passed)" -ForegroundColor Green
-        Write-Host "  ❌ Failed: $($TestResults[$protocol].Failed)" -ForegroundColor Red
+        Write-Host "  Passed: $($TestResults[$protocol].Passed)" -ForegroundColor Green
+        Write-Host "  Failed: $($TestResults[$protocol].Failed)" -ForegroundColor Red
         $totalPassed += $TestResults[$protocol].Passed
         $totalFailed += $TestResults[$protocol].Failed
     }
@@ -688,7 +688,7 @@ $hasErrors = $false
 foreach ($protocol in $TestResults.Keys) {
     if ($TestResults[$protocol].Errors.Count -gt 0) {
         if (-not $hasErrors) {
-            Write-Host "`n❌ ERRORS ENCOUNTERED:" -ForegroundColor Red
+            Write-Host "`nERRORS ENCOUNTERED:" -ForegroundColor Red
             $hasErrors = $true
         }
         Write-Host "`n$protocol Errors:" -ForegroundColor Red
