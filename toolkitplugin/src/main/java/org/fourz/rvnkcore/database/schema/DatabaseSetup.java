@@ -101,6 +101,7 @@ public class DatabaseSetup {
         
         String createPlayersTable;
         String createPlayerWorldDataTable;
+        String createWorldsTable;
         String createAnnouncementsTable;
         
         if ("MySQL".equalsIgnoreCase(databaseType)) {
@@ -140,7 +141,44 @@ public class DatabaseSetup {
                     death_count INT DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (player_id, world_name)
+                    PRIMARY KEY (player_id, world_name),
+                    FOREIGN KEY (world_name) REFERENCES rvnk_worlds(name) ON UPDATE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """;
+
+            createWorldsTable = """
+                CREATE TABLE IF NOT EXISTS rvnk_worlds (
+                    name VARCHAR(255) PRIMARY KEY,
+                    display_name VARCHAR(255) NOT NULL,
+                    world_type VARCHAR(100) NOT NULL DEFAULT 'NORMAL',
+                    environment VARCHAR(50) NOT NULL DEFAULT 'NORMAL',
+                    world_folder VARCHAR(500),
+                    seed BIGINT,
+                    generator_name VARCHAR(255),
+                    generator_settings TEXT,
+                    difficulty VARCHAR(50) DEFAULT 'EASY',
+                    game_rule_settings TEXT,
+                    spawn_x DOUBLE DEFAULT 0,
+                    spawn_y DOUBLE DEFAULT 64,
+                    spawn_z DOUBLE DEFAULT 0,
+                    world_border_size DOUBLE,
+                    world_border_center_x DOUBLE DEFAULT 0,
+                    world_border_center_z DOUBLE DEFAULT 0,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_auto_save BOOLEAN DEFAULT TRUE,
+                    keep_spawn_in_memory BOOLEAN DEFAULT TRUE,
+                    allow_animals BOOLEAN DEFAULT TRUE,
+                    allow_monsters BOOLEAN DEFAULT TRUE,
+                    allow_pvp BOOLEAN DEFAULT FALSE,
+                    weather_enabled BOOLEAN DEFAULT TRUE,
+                    thunder_enabled BOOLEAN DEFAULT TRUE,
+                    first_loaded TIMESTAMP,
+                    last_accessed TIMESTAMP,
+                    total_playtime_seconds BIGINT DEFAULT 0,
+                    player_count INT DEFAULT 0,
+                    max_players_seen INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """;
             
@@ -198,7 +236,44 @@ public class DatabaseSetup {
                     death_count INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (player_id, world_name)
+                    PRIMARY KEY (player_id, world_name),
+                    FOREIGN KEY (world_name) REFERENCES rvnk_worlds(name) ON UPDATE CASCADE
+                )
+                """;
+
+            createWorldsTable = """
+                CREATE TABLE IF NOT EXISTS rvnk_worlds (
+                    name TEXT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    world_type TEXT NOT NULL DEFAULT 'NORMAL',
+                    environment TEXT NOT NULL DEFAULT 'NORMAL',
+                    world_folder TEXT,
+                    seed INTEGER,
+                    generator_name TEXT,
+                    generator_settings TEXT,
+                    difficulty TEXT DEFAULT 'EASY',
+                    game_rule_settings TEXT,
+                    spawn_x REAL DEFAULT 0,
+                    spawn_y REAL DEFAULT 64,
+                    spawn_z REAL DEFAULT 0,
+                    world_border_size REAL,
+                    world_border_center_x REAL DEFAULT 0,
+                    world_border_center_z REAL DEFAULT 0,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_auto_save BOOLEAN DEFAULT TRUE,
+                    keep_spawn_in_memory BOOLEAN DEFAULT TRUE,
+                    allow_animals BOOLEAN DEFAULT TRUE,
+                    allow_monsters BOOLEAN DEFAULT TRUE,
+                    allow_pvp BOOLEAN DEFAULT FALSE,
+                    weather_enabled BOOLEAN DEFAULT TRUE,
+                    thunder_enabled BOOLEAN DEFAULT TRUE,
+                    first_loaded TIMESTAMP,
+                    last_accessed TIMESTAMP,
+                    total_playtime_seconds INTEGER DEFAULT 0,
+                    player_count INTEGER DEFAULT 0,
+                    max_players_seen INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """;
             
@@ -222,6 +297,8 @@ public class DatabaseSetup {
         }
         
         try (var stmt = connection.createStatement()) {
+            logger.info("Creating rvnk_worlds table...");
+            stmt.execute(createWorldsTable);
             logger.info("Creating rvnk_players table...");
             stmt.execute(createPlayersTable);
             logger.info("Creating rvnk_player_world_data table...");
@@ -240,6 +317,11 @@ public class DatabaseSetup {
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL indexes with proper column lengths for TEXT columns
             indexes = new String[]{
+                "CREATE INDEX IF NOT EXISTS idx_worlds_world_type ON rvnk_worlds(world_type)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_environment ON rvnk_worlds(environment)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_is_active ON rvnk_worlds(is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_last_accessed ON rvnk_worlds(last_accessed)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_player_count ON rvnk_worlds(player_count)",
                 "CREATE INDEX IF NOT EXISTS idx_players_name_history ON rvnk_players(current_name(100))",
                 "CREATE INDEX IF NOT EXISTS idx_players_last_seen ON rvnk_players(last_seen)",
                 "CREATE INDEX IF NOT EXISTS idx_players_primary_group ON rvnk_players(primary_group(100))",
@@ -256,6 +338,11 @@ public class DatabaseSetup {
         } else {
             // SQLite indexes (original format)
             indexes = new String[]{
+                "CREATE INDEX IF NOT EXISTS idx_worlds_world_type ON rvnk_worlds(world_type)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_environment ON rvnk_worlds(environment)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_is_active ON rvnk_worlds(is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_last_accessed ON rvnk_worlds(last_accessed)",
+                "CREATE INDEX IF NOT EXISTS idx_worlds_player_count ON rvnk_worlds(player_count)",
                 "CREATE INDEX IF NOT EXISTS idx_players_name_history ON rvnk_players(current_name, name_history)",
                 "CREATE INDEX IF NOT EXISTS idx_players_last_seen ON rvnk_players(last_seen)",
                 "CREATE INDEX IF NOT EXISTS idx_players_primary_group ON rvnk_players(primary_group)",
@@ -283,7 +370,7 @@ public class DatabaseSetup {
     private void verifySchema(Connection connection) throws SQLException {
         logger.info("Verifying database schema...");
         // Verify critical tables exist
-        String[] requiredTables = {"rvnk_players", "rvnk_player_world_data", "rvnk_announcements"};
+        String[] requiredTables = {"rvnk_worlds", "rvnk_players", "rvnk_player_world_data", "rvnk_announcements"};
         
         try (var stmt = connection.createStatement()) {
             for (String table : requiredTables) {
