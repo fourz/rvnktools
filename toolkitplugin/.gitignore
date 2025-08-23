@@ -9,14 +9,16 @@ target/
 dist/
 build/
 
-# Ignore environment variable files
+# Ignore configuration files with sensitive data
 .env
 .env.local
 .env.*.local
 
 # Ignore IDE specific files 
-.vscode/
+.vscode/project.json
 .idea/
+!.vscode/*.ps1
+!.vscode/tasks.json
 
 # Ignore OS generated files
 .DS_Store

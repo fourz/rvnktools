@@ -334,8 +334,6 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation prompt
 - **List MySQL Tables - DEV**: List all tables in development database without modifications
 - **Force Clean MySQL Database - DEV**: Database cleanup without confirmation (use with caution)
-- **Set MySQL Password**: Configure secure environment variable for database access
-- **Verify MySQL Password**: Check if database credentials are properly configured
 - **Clean SQLite Database - DEV**: Remove local SQLite database files
 - **List SQLite Files - DEV**: List SQLite database files without removal
 
@@ -371,8 +369,7 @@ For development database management and schema reset scenarios:
 # Force cleanup without confirmation (use with caution)
 .\clean-mysqldb-DEV.ps1 -Force
 
-# Environment variable for password (optional)
-$env:RVNK_MYSQL_PASSWORD = "your_password"
+# Password is automatically retrieved from project.json configuration
 ```
 
 #### Query System Features for Copilot Agents

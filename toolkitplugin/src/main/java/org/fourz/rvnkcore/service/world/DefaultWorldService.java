@@ -72,6 +72,22 @@ public class DefaultWorldService implements WorldService {
         });
     }
     
+    /**
+     * Register a world with existence checking for proper logging.
+     * Used internally to differentiate between new registrations and metadata updates.
+     * 
+     * @param world The Bukkit World to register
+     * @return CompletableFuture containing boolean indicating if world was new (true) or updated (false)
+     */
+    private CompletableFuture<Boolean> registerWorldWithExistenceCheck(World world) {
+        return worldRepository.exists(world.getName())
+            .thenCompose(exists -> {
+                WorldDTO worldDTO = createWorldDTOFromBukkit(world);
+                return worldRepository.save(worldDTO)
+                    .thenApply(v -> !exists); // Return true if world was new (didn't exist before)
+            });
+    }
+    
     @Override
     public CompletableFuture<Void> updatePlayerCount(String worldName, int playerCount) {
         return worldRepository.updatePlayerCount(worldName, playerCount);
@@ -122,21 +138,24 @@ public class DefaultWorldService implements WorldService {
                 List<CompletableFuture<Void>> registrationFutures = new ArrayList<>();
                 
                 for (World world : loadedWorlds) {
-                    logger.info("Registering world: " + world.getName() + " [" + world.getEnvironment() + "]");
+                    logger.debug("Processing world for sync: " + world.getName() + " [" + world.getEnvironment() + "]");
                     
-                    // Register each world individually
-                    CompletableFuture<Void> registration = registerWorld(world)
-                        .thenCompose(v -> setActiveStatus(world.getName(), true))
-                        .whenComplete((result, throwable) -> {
+                    // Register each world individually with existence checking for proper logging
+                    CompletableFuture<Void> registration = registerWorldWithExistenceCheck(world)
+                        .thenCompose(isNew -> setActiveStatus(world.getName(), true)
+                            .thenApply(v -> isNew)) // Pass through the isNew flag
+                        .whenComplete((isNew, throwable) -> {
                             if (throwable != null) {
-                                logger.error("Failed to register world: " + world.getName(), throwable);
+                                logger.error("Failed to process world: " + world.getName(), throwable);
                             } else {
                                 int currentPlayers = world.getPlayers().size();
-                                logger.info("Successfully registered world: " + world.getName() + 
+                                String action = isNew ? "registered" : "updated metadata for";
+                                logger.info("Successfully " + action + " world: " + world.getName() + 
                                           " [" + world.getEnvironment() + ", " + world.getDifficulty() + 
                                           ", Players: " + currentPlayers + "/" + currentPlayers + " max]");
                             }
-                        });
+                        })
+                        .thenApply(v -> null); // Convert back to Void for compatibility
                     
                     registrationFutures.add(registration);
                 }
@@ -145,9 +164,9 @@ public class DefaultWorldService implements WorldService {
                 CompletableFuture.allOf(registrationFutures.toArray(new CompletableFuture[0]))
                     .whenComplete((result, throwable) -> {
                         if (throwable != null) {
-                            logger.error("Some worlds failed to register during sync", throwable);
+                            logger.error("Some worlds failed to process during sync", throwable);
                         } else {
-                            logger.info("World sync completed successfully - all " + loadedWorlds.size() + " worlds registered");
+                            logger.info("World sync completed successfully - all " + loadedWorlds.size() + " worlds processed");
                         }
                     });
                 
