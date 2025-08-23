@@ -201,6 +201,12 @@ function Invoke-ApiRequest {
             ContentType = "application/json"
             ErrorAction = "Stop"
         }
+        
+        # Add SkipCertificateCheck for PowerShell 7+ when IgnoreSSLErrors is enabled
+        if ($IgnoreSSLErrors -and $PSVersionTable.PSVersion.Major -ge 7) {
+            $params.SkipCertificateCheck = $true
+        }
+        
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json)
         }
