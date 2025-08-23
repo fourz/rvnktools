@@ -648,7 +648,7 @@ if ($IgnoreSSLErrors) {
 }
 
 if ($CreateTestData) {
-    Write-Host "🔧 Test data creation enabled" -ForegroundColor Yellow
+    Write-Host "Test data creation enabled" -ForegroundColor Yellow
 }
 
 # Run tests for HTTP, HTTPS, or both depending on parameters
@@ -699,9 +699,9 @@ foreach ($protocol in $TestResults.Keys) {
 }
 
 if ($totalFailed -gt 0) {
-    Write-Host "`n⚠️  Some tests failed. Check the errors above for details." -ForegroundColor Yellow
+    Write-Host "`nSome tests failed. Check the errors above for details." -ForegroundColor Yellow
     exit 1
 } else {
-    Write-Host "`n🎉 All tests passed successfully!" -ForegroundColor Green
+    Write-Host "`nAll tests passed successfully!" -ForegroundColor Green
     exit 0
 }
