@@ -236,27 +236,20 @@ public class AnnouncementController extends HttpServlet {
      * Handles GET /api/v1/announcements/{id} - Get announcement by ID
      */
     private void handleGetAnnouncementById(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Optional<AnnouncementDTO>> future = announcementService.getAnnouncement(id);
-        
-        future.thenAccept(optional -> {
-            try {
-                if (optional.isPresent()) {
-                    String json = buildAnnouncementResponse(optional.get());
-                    sendSuccessResponse(response, json);
-                } else {
-                    sendErrorResponse(response, 404, "Announcement not found: " + id);
-                }
-            } catch (IOException e) {
-                logger.error("Error sending announcement response", e);
+        try {
+            CompletableFuture<Optional<AnnouncementDTO>> future = announcementService.getAnnouncement(id);
+            Optional<AnnouncementDTO> optional = future.get(); // Wait for completion synchronously
+            
+            if (optional.isPresent()) {
+                String json = buildAnnouncementResponse(optional.get());
+                sendSuccessResponse(response, json);
+            } else {
+                sendErrorResponse(response, 404, "Announcement not found: " + id);
             }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to retrieve announcement: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        } catch (Exception e) {
+            logger.error("Error retrieving announcement: " + id, e);
+            sendErrorResponse(response, 500, "Failed to retrieve announcement: " + e.getMessage());
+        }
     }
     
     /**
