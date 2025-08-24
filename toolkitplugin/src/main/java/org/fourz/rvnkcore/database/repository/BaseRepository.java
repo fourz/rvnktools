@@ -102,14 +102,26 @@ public abstract class BaseRepository<T, ID> {
                 .from(tableName)
                 .build();
                 
+            logger.debug("Executing findAll query: " + query + " on table: " + tableName);
+                
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query);
                  ResultSet rs = stmt.executeQuery()) {
                 
                 List<T> results = new ArrayList<>();
+                int rowCount = 0;
                 while (rs.next()) {
-                    results.add(mapResultSet(rs));
+                    rowCount++;
+                    try {
+                        T entity = mapResultSet(rs);
+                        results.add(entity);
+                        logger.debug("Mapped row " + rowCount + " for table " + tableName);
+                    } catch (SQLException mapEx) {
+                        logger.error("Failed to map result set row " + rowCount + " for table: " + tableName, mapEx);
+                        throw mapEx;
+                    }
                 }
+                logger.info("FindAll query completed for table " + tableName + " - found " + rowCount + " rows, returning " + results.size() + " entities");
                 return results;
             } catch (SQLException e) {
                 logger.error("Failed to find all entities from table: " + tableName, e);

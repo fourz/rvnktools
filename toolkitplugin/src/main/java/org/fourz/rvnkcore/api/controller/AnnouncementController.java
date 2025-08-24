@@ -185,20 +185,25 @@ public class AnnouncementController extends HttpServlet {
      * Handles GET /api/v1/announcements - List all announcements
      */
     private void handleGetAllAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logger.info("Starting handleGetAllAnnouncements request");
         CompletableFuture<List<AnnouncementDTO>> future = announcementService.getAllAnnouncements();
         
         future.thenAccept(announcements -> {
             try {
+                logger.info("Received " + announcements.size() + " announcements from service");
                 String json = buildAnnouncementListResponse(announcements);
+                logger.info("Built JSON response of length: " + json.length());
                 sendSuccessResponse(response, json);
+                logger.info("Sent successful response for getAllAnnouncements");
             } catch (IOException e) {
                 logger.error("Error sending announcement list response", e);
             }
         }).exceptionally(ex -> {
+            logger.error("Exception in getAllAnnouncements future", ex);
             try {
-                sendErrorResponse(response, 500, "Failed to retrieve announcements: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
+                sendErrorResponse(response, 500, "Internal server error: " + ex.getMessage());
+            } catch (IOException ioEx) {
+                logger.error("Error sending error response", ioEx);
             }
             return null;
         });

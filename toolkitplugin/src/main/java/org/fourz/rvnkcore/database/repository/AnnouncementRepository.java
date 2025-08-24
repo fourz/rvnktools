@@ -286,41 +286,53 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
     
     @Override
     protected AnnouncementDTO mapResultSet(ResultSet rs) throws SQLException {
-        AnnouncementDTO.Builder builder = new AnnouncementDTO.Builder()
-            .id(rs.getString("id"))
-            .title(rs.getString("title"))
-            .message(rs.getString("message"))
-            .type(rs.getString("type"))
-            .active(rs.getBoolean("active"))
-            .createdAt(rs.getTimestamp("created_at"))
-            .updatedAt(rs.getTimestamp("updated_at"))
-            .scheduledFor(rs.getTimestamp("scheduled_for"))
-            .expiresAt(rs.getTimestamp("expires_at"))
-            .intervalSeconds(rs.getInt("interval_seconds"));
-        
-        // Parse target worlds from comma-separated string
-        String targetWorldsStr = rs.getString("target_worlds");
-        if (targetWorldsStr != null && !targetWorldsStr.trim().isEmpty()) {
-            List<String> targetWorlds = Arrays.asList(targetWorldsStr.split(","));
-            builder.targetWorlds(targetWorlds);
+        try {
+            String id = rs.getString("id");
+            String title = rs.getString("title");
+            String message = rs.getString("message");
+            logger.debug("Mapping announcement: id=" + id + ", title=" + title);
+            
+            AnnouncementDTO.Builder builder = new AnnouncementDTO.Builder()
+                .id(id)
+                .title(title)
+                .message(message)
+                .type(rs.getString("type"))
+                .active(rs.getBoolean("active"))
+                .createdAt(rs.getTimestamp("created_at"))
+                .updatedAt(rs.getTimestamp("updated_at"))
+                .scheduledFor(rs.getTimestamp("scheduled_for"))
+                .expiresAt(rs.getTimestamp("expires_at"))
+                .intervalSeconds(rs.getInt("interval_seconds"));
+            
+            // Parse target worlds from comma-separated string
+            String targetWorldsStr = rs.getString("target_worlds");
+            if (targetWorldsStr != null && !targetWorldsStr.trim().isEmpty()) {
+                List<String> targetWorlds = Arrays.asList(targetWorldsStr.split(","));
+                builder.targetWorlds(targetWorlds);
+            }
+            
+            // Parse target groups from comma-separated string
+            String targetGroupsStr = rs.getString("target_groups");
+            if (targetGroupsStr != null && !targetGroupsStr.trim().isEmpty()) {
+                List<String> targetGroups = Arrays.asList(targetGroupsStr.split(","));
+                builder.targetGroups(targetGroups);
+            }
+            
+            // Parse metadata from JSON-like string (simplified implementation)
+            String metadataStr = rs.getString("metadata");
+            if (metadataStr != null && !metadataStr.trim().isEmpty()) {
+                // For now, store as a simple key-value pair
+                // In a full implementation, this would be proper JSON deserialization
+                builder.metadata("raw_metadata", metadataStr);
+            }
+            
+            AnnouncementDTO result = builder.build();
+            logger.debug("Successfully mapped announcement DTO: " + id);
+            return result;
+        } catch (SQLException e) {
+            logger.error("Failed to map announcement result set", e);
+            throw e;
         }
-        
-        // Parse target groups from comma-separated string
-        String targetGroupsStr = rs.getString("target_groups");
-        if (targetGroupsStr != null && !targetGroupsStr.trim().isEmpty()) {
-            List<String> targetGroups = Arrays.asList(targetGroupsStr.split(","));
-            builder.targetGroups(targetGroups);
-        }
-        
-        // Parse metadata from JSON-like string (simplified implementation)
-        String metadataStr = rs.getString("metadata");
-        if (metadataStr != null && !metadataStr.trim().isEmpty()) {
-            // For now, store as a simple key-value pair
-            // In a full implementation, this would be proper JSON deserialization
-            builder.metadata("raw_metadata", metadataStr);
-        }
-        
-        return builder.build();
     }
     
     @Override
