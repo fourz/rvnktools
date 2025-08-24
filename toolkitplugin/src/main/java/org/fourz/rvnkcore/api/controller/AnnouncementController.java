@@ -135,6 +135,12 @@ public class AnnouncementController extends HttpServlet {
                     // PUT /api/v1/announcements/{id} - Update announcement
                     String id = parts[0];
                     handleUpdateAnnouncement(id, request, response);
+                } else if (parts.length == 2 && parts[0].equals("bulk") && parts[1].equals("activate")) {
+                    // PUT /api/v1/announcements/bulk/activate - Bulk activate announcements
+                    handleBulkActivateAnnouncements(request, response);
+                } else if (parts.length == 2 && parts[0].equals("bulk") && parts[1].equals("deactivate")) {
+                    // PUT /api/v1/announcements/bulk/deactivate - Bulk deactivate announcements
+                    handleBulkDeactivateAnnouncements(request, response);
                 } else if (parts.length == 2 && parts[1].equals("activate")) {
                     // PUT /api/v1/announcements/{id}/activate - Activate announcement
                     String id = parts[0];
@@ -143,12 +149,6 @@ public class AnnouncementController extends HttpServlet {
                     // PUT /api/v1/announcements/{id}/deactivate - Deactivate announcement
                     String id = parts[0];
                     handleDeactivateAnnouncement(id, request, response);
-                } else if (parts.length == 2 && parts[0].equals("bulk") && parts[1].equals("activate")) {
-                    // PUT /api/v1/announcements/bulk/activate - Bulk activate announcements
-                    handleBulkActivateAnnouncements(request, response);
-                } else if (parts.length == 2 && parts[0].equals("bulk") && parts[1].equals("deactivate")) {
-                    // PUT /api/v1/announcements/bulk/deactivate - Bulk deactivate announcements
-                    handleBulkDeactivateAnnouncements(request, response);
                 } else {
                     sendErrorResponse(response, 404, "Endpoint not found");
                 }
@@ -1074,24 +1074,54 @@ public class AnnouncementController extends HttpServlet {
             // DEBUG: Log the parsed IDs
             logger.info("Bulk activate request received with IDs: " + ids.toString());
             
-            // Process each ID individually for activation
-            CompletableFuture<Void> allFutures = CompletableFuture.allOf(
-                ids.stream().map(id -> {
+            // Process each ID individually for activation with error handling
+            List<CompletableFuture<BulkOperationResult>> futures = ids.stream()
+                .map(id -> {
                     logger.info("Processing activation for ID: " + id);
-                    return announcementService.activateAnnouncement(id);
-                }).toArray(CompletableFuture[]::new)
-            );
+                    return announcementService.activateAnnouncement(id)
+                        .thenApply(v -> new BulkOperationResult(id, true, null))
+                        .exceptionally(ex -> {
+                            logger.warning("Failed to activate announcement " + id + ": " + ex.getMessage());
+                            return new BulkOperationResult(id, false, ex.getMessage());
+                        });
+                })
+                .collect(java.util.stream.Collectors.toList());
             
-            allFutures.whenComplete((result, throwable) -> {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).whenComplete((result, throwable) -> {
                 try {
-                    if (throwable != null) {
-                        logger.error("Error bulk activating announcements", throwable);
-                        sendErrorResponse(response, 500, "Failed to activate announcements: " + throwable.getMessage());
-                    } else {
-                        response.setStatus(200);
-                        String resultJson = "{\"activated_count\":" + ids.size() + ",\"message\":\"Successfully activated " + ids.size() + " announcements\"}";
-                        response.getWriter().write(resultJson);
+                    List<BulkOperationResult> results = futures.stream()
+                        .map(CompletableFuture::join)
+                        .collect(java.util.stream.Collectors.toList());
+                    
+                    long successful = results.stream().filter(r -> r.success).count();
+                    long failed = results.stream().filter(r -> !r.success).count();
+                    
+                    response.setStatus(200);
+                    
+                    // Build detailed response
+                    StringBuilder jsonResponse = new StringBuilder();
+                    jsonResponse.append("{");
+                    jsonResponse.append("\"message\":\"Bulk activation completed\",");
+                    jsonResponse.append("\"total\":").append(ids.size()).append(",");
+                    jsonResponse.append("\"successful\":").append(successful).append(",");
+                    jsonResponse.append("\"failed\":").append(failed).append(",");
+                    jsonResponse.append("\"results\":[");
+                    
+                    for (int i = 0; i < results.size(); i++) {
+                        BulkOperationResult r = results.get(i);
+                        jsonResponse.append("{");
+                        jsonResponse.append("\"id\":\"").append(r.id).append("\",");
+                        jsonResponse.append("\"success\":").append(r.success);
+                        if (r.error != null) {
+                            jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
+                        }
+                        jsonResponse.append("}");
+                        if (i < results.size() - 1) jsonResponse.append(",");
                     }
+                    
+                    jsonResponse.append("]}");
+                    response.getWriter().write(jsonResponse.toString());
+                    
                 } catch (IOException e) {
                     logger.error("Error writing bulk activation response", e);
                 }
@@ -1140,23 +1170,53 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
             
-            // Process each ID individually for deactivation
-            CompletableFuture<Void> allFutures = CompletableFuture.allOf(
-                ids.stream().map(id -> 
+            // Process each ID individually for deactivation with error handling
+            List<CompletableFuture<BulkOperationResult>> futures = ids.stream()
+                .map(id -> 
                     announcementService.deactivateAnnouncement(id)
-                ).toArray(CompletableFuture[]::new)
-            );
+                        .thenApply(v -> new BulkOperationResult(id, true, null))
+                        .exceptionally(ex -> {
+                            logger.warning("Failed to deactivate announcement " + id + ": " + ex.getMessage());
+                            return new BulkOperationResult(id, false, ex.getMessage());
+                        })
+                )
+                .collect(java.util.stream.Collectors.toList());
             
-            allFutures.whenComplete((result, throwable) -> {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).whenComplete((result, throwable) -> {
                 try {
-                    if (throwable != null) {
-                        logger.error("Error bulk deactivating announcements", throwable);
-                        sendErrorResponse(response, 500, "Failed to deactivate announcements: " + throwable.getMessage());
-                    } else {
-                        response.setStatus(200);
-                        String resultJson = "{\"deactivated_count\":" + ids.size() + ",\"message\":\"Successfully deactivated " + ids.size() + " announcements\"}";
-                        response.getWriter().write(resultJson);
+                    List<BulkOperationResult> results = futures.stream()
+                        .map(CompletableFuture::join)
+                        .collect(java.util.stream.Collectors.toList());
+                    
+                    long successful = results.stream().filter(r -> r.success).count();
+                    long failed = results.stream().filter(r -> !r.success).count();
+                    
+                    response.setStatus(200);
+                    
+                    // Build detailed response
+                    StringBuilder jsonResponse = new StringBuilder();
+                    jsonResponse.append("{");
+                    jsonResponse.append("\"message\":\"Bulk deactivation completed\",");
+                    jsonResponse.append("\"total\":").append(ids.size()).append(",");
+                    jsonResponse.append("\"successful\":").append(successful).append(",");
+                    jsonResponse.append("\"failed\":").append(failed).append(",");
+                    jsonResponse.append("\"results\":[");
+                    
+                    for (int i = 0; i < results.size(); i++) {
+                        BulkOperationResult r = results.get(i);
+                        jsonResponse.append("{");
+                        jsonResponse.append("\"id\":\"").append(r.id).append("\",");
+                        jsonResponse.append("\"success\":").append(r.success);
+                        if (r.error != null) {
+                            jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
+                        }
+                        jsonResponse.append("}");
+                        if (i < results.size() - 1) jsonResponse.append(",");
                     }
+                    
+                    jsonResponse.append("]}");
+                    response.getWriter().write(jsonResponse.toString());
+                    
                 } catch (IOException e) {
                     logger.error("Error writing bulk deactivation response", e);
                 }
@@ -1165,6 +1225,21 @@ public class AnnouncementController extends HttpServlet {
         } catch (Exception e) {
             logger.error("Error handling bulk deactivation request", e);
             sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Result class for tracking individual bulk operation outcomes
+     */
+    private static class BulkOperationResult {
+        public final String id;
+        public final boolean success;
+        public final String error;
+        
+        public BulkOperationResult(String id, boolean success, String error) {
+            this.id = id;
+            this.success = success;
+            this.error = error;
         }
     }
 }

@@ -311,7 +311,13 @@ public class DefaultAnnouncementService implements AnnouncementService {
                 logger.info("Activated announcement: " + id);
             })
             .exceptionally(ex -> {
-                logger.error("Failed to activate announcement: " + id, ex);
+                // Handle "not found" errors more gracefully than system errors
+                if (ex.getCause() instanceof org.fourz.rvnkcore.api.exception.DatabaseException &&
+                    ex.getCause().getMessage().contains("No announcement found with ID:")) {
+                    logger.warning("Announcement not found for activation: " + id);
+                } else {
+                    logger.error("Failed to activate announcement: " + id, ex);
+                }
                 throw new org.fourz.rvnkcore.api.exception.ServiceException("Failed to activate announcement", ex);
             });
     }
@@ -334,7 +340,13 @@ public class DefaultAnnouncementService implements AnnouncementService {
                 logger.info("Deactivated announcement: " + id);
             })
             .exceptionally(ex -> {
-                logger.error("Failed to deactivate announcement: " + id, ex);
+                // Handle "not found" errors more gracefully than system errors
+                if (ex.getCause() instanceof org.fourz.rvnkcore.api.exception.DatabaseException &&
+                    ex.getCause().getMessage().contains("No announcement found with ID:")) {
+                    logger.warning("Announcement not found for deactivation: " + id);
+                } else {
+                    logger.error("Failed to deactivate announcement: " + id, ex);
+                }
                 throw new org.fourz.rvnkcore.api.exception.ServiceException("Failed to deactivate announcement", ex);
             });
     }

@@ -1,5 +1,9 @@
 # Maven
-target/
+target/maven-*
+target/classes*
+target/generated-sources*
+target/original-rvnktools-*
+
 .mvn/
 
 # Ignore log files
