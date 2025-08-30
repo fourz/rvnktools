@@ -104,4 +104,34 @@ public class LogManager implements RVNKLogger {
     public void setDebugEnabled(boolean enabled) {
         this.debugEnabled = enabled;
     }
+    
+    /**
+     * Logs a concise, helpful error summary without full stack traces.
+     * Used for graceful error handling with actionable information.
+     * 
+     * @param context The error context (e.g., "MySQL Connection")
+     * @param problem The specific problem
+     * @param solution The suggested solution
+     */
+    public void errorSummary(String context, String problem, String solution) {
+        logger.log(Level.SEVERE, "");
+        logger.log(Level.SEVERE, prefix + "ERROR: " + context + " Failed");
+        logger.log(Level.SEVERE, prefix + "Issue: " + problem);
+        logger.log(Level.SEVERE, prefix + "Action: " + solution);
+        logger.log(Level.SEVERE, "");
+    }
+    
+    /**
+     * Extracts the root cause message from an exception chain.
+     * 
+     * @param throwable The exception to analyze
+     * @return The root cause message
+     */
+    public static String getRootCauseMessage(Throwable throwable) {
+        Throwable rootCause = throwable;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause.getMessage() != null ? rootCause.getMessage() : rootCause.getClass().getSimpleName();
+    }
 }

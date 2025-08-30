@@ -115,8 +115,14 @@ public class RVNKTools extends JavaPlugin implements Listener {
             
             logger.info("RVNKCore initialization completed successfully");
         } catch (Exception e) {
-            logger.error("Failed to initialize RVNKCore components", e);
+            // Error details are already logged by the lower-level components
+            logger.error("Failed to initialize RVNKCore components");
             logger.warning("Continuing with legacy initialization...");
+            
+            // Enable debug mode if not already enabled to help with troubleshooting
+            if (!logger.isDebugEnabled()) {
+                logger.info("Run 'rvnktools debug enable' for detailed error information");
+            }
         }
     }
 

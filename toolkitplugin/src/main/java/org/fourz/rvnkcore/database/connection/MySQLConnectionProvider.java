@@ -4,7 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.fourz.rvnkcore.api.exception.DatabaseException;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Connection;
@@ -126,6 +126,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
                 return;
             }
             
+            logger.info("Initializing MySQL connection provider - Host: " + config.getHost() + ":" + config.getPort() + ", Database: " + config.getDatabase());
             logger.info("Initializing MySQL connection pool");
             
             HikariConfig hikariConfig = new HikariConfig();
@@ -170,7 +171,43 @@ public class MySQLConnectionProvider implements ConnectionProvider {
                        config.getMaxConnections() + ", Min idle: " + config.getMinIdleConnections());
             
         } catch (Exception e) {
-            logger.error("Failed to initialize MySQL connection pool", e);
+            // Parse the exception to provide helpful, concise error messages
+            String rootCause = LogManager.getRootCauseMessage(e);
+            
+            if (rootCause.contains("Access denied")) {
+                // Extract username from error message
+                String user = config.getUsername();
+                logger.errorSummary("MySQL Database Connection", 
+                    "Access denied for user '" + user + "' - Invalid credentials or insufficient permissions",
+                    "Verify username/password in config.yml and ensure user has database access");
+            } else if (rootCause.contains("Unknown database")) {
+                logger.errorSummary("MySQL Database Connection",
+                    "Database '" + config.getDatabase() + "' does not exist on server " + config.getHost(),
+                    "Create the database or verify the database name in config.yml");
+            } else if (rootCause.contains("Communications link failure") || rootCause.contains("Connection refused")) {
+                logger.errorSummary("MySQL Database Connection",
+                    "Cannot reach MySQL server at " + config.getHost() + ":" + config.getPort(),
+                    "Verify server is running, check host/port in config.yml, and ensure firewall allows connection");
+            } else if (rootCause.contains("Unknown host")) {
+                logger.errorSummary("MySQL Database Connection",
+                    "Cannot resolve hostname '" + config.getHost() + "'",
+                    "Verify the MySQL host address in config.yml");
+            } else if (rootCause.contains("SSL connection error") || rootCause.contains("SSL")) {
+                logger.errorSummary("MySQL Database Connection",
+                    "SSL/TLS connection failed - " + rootCause,
+                    "Check SSL configuration or set 'useSSL: false' in config.yml for local testing");
+            } else {
+                // Generic database connection error
+                logger.errorSummary("MySQL Database Connection",
+                    "Connection failed - " + rootCause,
+                    "Check MySQL server status and configuration settings");
+            }
+            
+            // Log debug info if enabled
+            if (logger.isDebugEnabled()) {
+                logger.debug("Full MySQL connection error details", e);
+            }
+            
             throw new DatabaseException("MySQL connection pool initialization failed", e);
         } finally {
             initializationLock.unlock();

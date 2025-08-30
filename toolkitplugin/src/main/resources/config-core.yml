@@ -7,7 +7,7 @@ logging:
 # Database Configuration
 # Supported types: sqlite, mysql
 database:
-  type: sqlite
+  type: mysql
   
   # SQLite Configuration (default)
   sqlite:
@@ -15,11 +15,11 @@ database:
   
   # MySQL Configuration
   mysql:
-    host: localhost
+    host: 64.20.41.122
     port: 3306
-    database: rvnktools
-    username: rvnkuser
-    password: secure_password
+    database: fourzorg_rvnkcore_dev
+    username: fourzorg_rvnkuser
+    password: INVALID_PASSWORD_TEST
     useSSL: true
     connectionParameters: allowPublicKeyRetrieval=true
     

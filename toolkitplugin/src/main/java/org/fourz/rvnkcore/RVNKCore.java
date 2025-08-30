@@ -22,7 +22,7 @@ import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.world.DefaultWorldService;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
  * RVNKCore - Centralized Data and Service Layer
@@ -94,7 +94,8 @@ public class RVNKCore {
             initialized = true;
             logger.info("RVNKCore initialization complete");
         } catch (Exception e) {
-            logger.error("Failed to initialize RVNKCore", e);
+            // Don't repeat detailed error messages - let the specific components handle that
+            logger.error("Failed to initialize RVNKCore");
             throw new RuntimeException("RVNKCore initialization failed", e);
         }
     }
@@ -112,7 +113,9 @@ public class RVNKCore {
             
             logger.info("Database setup completed using " + connectionProvider.getClass().getSimpleName());
         } catch (Exception e) {
-            logger.error("Failed to setup database", e);
+            // Database setup failure - let the lower-level components provide detailed error messages
+            // We just need to indicate the overall failure here
+            logger.error("Failed to setup database");
             throw new RuntimeException("Database setup failed", e);
         }
     }
