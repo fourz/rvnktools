@@ -82,8 +82,6 @@ public class ConnectionProviderFactory {
      * @return MySQLConnectionProvider instance
      */
     private ConnectionProvider createMySQLProvider(DatabaseConfig config) {
-        logger.info("Initializing MySQL connection provider - Host: " + config.getHost() + 
-                   ":" + config.getPort() + ", Database: " + config.getDatabase());
         return new MySQLConnectionProvider(config, plugin);
     }
     
