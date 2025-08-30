@@ -1,0 +1,3 @@
+Project Subject: __________
+Following project instructions, generate a new project under `projects/` with the required folder structure and minimal starter outlines. Include `README.md`, `ROADMAP.md`, `COPILOT-INSTRUCTIONS.md`, `project-details.md`, and subfolders as needed for the given solution and template. Follow Metamake framework guidelines and use `projects/00-example/` as a template.
+Keep content outlines brief and focused on key solution features, implementation guides, validation checklists, and documentation deliverables. Documentation writing and integration should be part of the project workflow.

@@ -1,0 +1,60 @@
+# RVNKCore Database Configuration Examples
+# Copy the desired configuration section to your application.properties file
+
+# =============================================================================
+# SQLite Configuration (Default - Works out of the box)
+# =============================================================================
+database.type=sqlite
+database.sqlite.file=rvnkcore.db
+
+# =============================================================================
+# MySQL Configuration (Production Recommended)
+# =============================================================================
+# database.type=mysql
+# database.mysql.host=localhost
+# database.mysql.port=3306
+# database.mysql.database=rvnktools
+# database.mysql.username=rvnkuser
+# database.mysql.password=secure_password
+# database.mysql.useSSL=true
+# database.mysql.connectionParameters=allowPublicKeyRetrieval=true&serverTimezone=UTC
+
+# MySQL Connection Pool Configuration (Optional - Uses defaults if not specified)
+# database.mysql.pool.maxConnections=20
+# database.mysql.pool.minIdleConnections=5
+# database.mysql.pool.connectionTimeoutMs=30000
+# database.mysql.pool.idleTimeoutMs=600000
+# database.mysql.pool.maxLifetimeMs=1800000
+# database.mysql.pool.leakDetectionMs=60000
+
+# =============================================================================
+# Example Production MySQL Configuration
+# =============================================================================
+# database.type=mysql
+# database.mysql.host=mysql.example.com
+# database.mysql.port=3306
+# database.mysql.database=rvnktools_production
+# database.mysql.username=rvnk_prod_user
+# database.mysql.password=super_secure_production_password_123
+# database.mysql.useSSL=true
+# database.mysql.connectionParameters=allowPublicKeyRetrieval=true&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8mb4
+
+# Production connection pool settings
+# database.mysql.pool.maxConnections=50
+# database.mysql.pool.minIdleConnections=10
+# database.mysql.pool.connectionTimeoutMs=30000
+# database.mysql.pool.idleTimeoutMs=300000
+# database.mysql.pool.maxLifetimeMs=1800000
+# database.mysql.pool.leakDetectionMs=30000
+
+# =============================================================================
+# REST API Configuration (Optional)
+# =============================================================================
+api.enabled=false
+api.port=8080
+api.host=localhost
+api.ssl.enabled=false
+# api.ssl.keystorePath=keystore.jks
+# api.ssl.keystorePassword=changeit
+# api.ssl.trustStorePath=truststore.jks
+# api.ssl.trustStorePassword=changeit

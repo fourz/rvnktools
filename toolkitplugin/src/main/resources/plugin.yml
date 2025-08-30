@@ -1,5 +1,5 @@
 name: RVNKTools
-version: ${project.version}
+version: 1.3.0-alpha
 author: fourz
 main: org.fourz.rvnktools.RVNKTools
 description: RVNK Admin Toolkit
@@ -42,6 +42,22 @@ commands:
     permissions: 
       - rvnktools.command.broadcast    
     default: op      
+  pstest:
+    description: Test PlayerService functionality (Debug Command)
+    usage: /pstest <recent|groups|syncgroups> [args...]
+    permissions: 
+      - rvnktools.admin.pstest
+    default: op
+  worldswap:
+    description: Teleport to your last known location in a specific world
+    usage: /worldswap <world_name>
+    aliases: [ws]
+    permission: rvnktools.command.worldswap
+  teleport:
+    description: Teleportation utilities and world management
+    usage: /teleport <subcommand> [args]
+    aliases: [tp]
+    permission: rvnktools.command.teleport
   cyclegamemode:
     description: Cycle through gamemodes.
     usage: /cyclegamemode
@@ -65,7 +81,12 @@ commands:
     usage: /countdown 
     permissions: 
       - rvnktools.command.countdown
-    default: op      
+    default: op
+  logfilter:
+    description: Manage log filtering for server plugins
+    usage: /logfilter <status|reload|enable|disable|add|remove|list> [args]
+    permission: rvnktools.command.logfilter
+    default: op
   announcer:
     description: Enable or disable announcements feature.
     usage: /announcer
@@ -126,5 +147,14 @@ permissions:
   rvnktools.command.worldswap:
     description: Allows swapping between worlds while maintaining location history
     default: op
+  rvnktools.command.teleport:
+    description: Allows access to teleportation utilities
+    default: op
+  rvnktools.command.teleport.worldswap:
+    description: Allows teleporting between worlds while preserving locations
+    default: op
   rvnktools.command.example:
     description: Allows using the example command
+  rvnktools.command.logfilter:
+    description: Allows managing log filtering for server plugins
+    default: op

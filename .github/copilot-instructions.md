@@ -1,12 +1,139 @@
-# RVNKTools Copilot Instructions
+# RVNK Plugin Ecosystem Copilot Instructions
 
-These guidelines should be followed when modifying or creating code to maintain consistency throughout the codebase using documentation files as references.
+These guidelines should be followed when modifying or creating code to maintain consistency throughout the RVNK plugin ecosystem, including RVNKTools, RVNKCore, RVNKLore, RVNKQuests, and any other RVNK plugins.
 
-## General Directive
+## Metamake Project Management Integration
+
+*See detailed instructions: [Metamake Project Management](copilot-instructions.metamake.md)*
+
+When the user explicitly requests metamake functionality using phrases like "use metamake to..." or "with metamake", activate the integrated project management capabilities.
+
+## Core Directives
 
 - **Use the CommandManager framework for all commands. Do not create standalone command executors.**
 - **Follow SOLID principles when adding new features or refactoring existing code.**
 - **Ensure proper resource cleanup in all managers and services.**
+- **Implement RVNKCore patterns when working on core functionality extraction.**
+- **Use service interfaces for all business logic across all RVNK plugins**
+- **Implement services through the ServiceRegistry pattern for dependency injection**
+- **Use the Repository pattern for all data access across the ecosystem**
+- **Use DTOs for data transfer between layers and across plugin boundaries**
+- **Create clean, versioned API interfaces for all plugin interactions**
+- **Use RVNKCore's event system for cross-plugin communication**
+
+## Asynchronous Programming Guidelines
+
+### When to Use Async (CompletableFuture)
+- Database operations (SELECT, INSERT, UPDATE, DELETE)
+- External API calls and web requests
+- File I/O operations (reading/writing config files)
+- Long-running computations (>50ms)
+
+### When NOT to Use Async
+- In-memory operations (cache lookups, Map/List operations)
+- Simple validation (null checks, format validation)
+- Configuration access (already-loaded values)
+- Event handlers (already on appropriate threads)
+- Command responses (users expect immediate feedback)
+
+### Service Interface Pattern
+
+**Naming Conventions:**
+- **Do not use the `I` prefix for interfaces.** Use `PlayerService` instead of `IPlayerService`.
+- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.** 
+  - Examples: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
+- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
+  - Examples: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
+
+*See examples: [Service Interface Pattern](copilot-instructions.examples.md#service-interface-pattern)*
+
+### Command Framework Integration
+
+- Validate synchronously (permissions, args, format)
+- Use async for database/API operations
+- Provide immediate feedback to users
+- Handle async results with proper error messages
+
+**Important**: Command responses must be immediate to provide user feedback, but long-running database/API operations within commands should be wrapped in `CompletableFuture` to avoid blocking the main thread.
+
+*See examples: [Command Framework Integration](copilot-instructions.examples.md#command-framework-integration)*
+
+
+When metamake is invoked, reference the `metamake/prompts/` directory for specialized prompts and use the `metamake/template/` directory for project structure templates.
+
+### Performance Rules
+- Don't async operations that take <10ms
+- Batch operations instead of individual async calls
+- Consider thread pool limits
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
+
+## Plugin Architecture
+
+All RVNK plugins should follow a consistent architecture:
+
+*See examples: [Standard Plugin Structure](copilot-instructions.examples.md#standard-plugin-structure)*
+
+### Dependencies and Standards
+
+- **Declare RVNKCore as a dependency** in plugin.yml for all RVNK plugins
+- **Use ServiceRegistry** to obtain dependencies rather than direct instantiation
+- **Implement proper service lifecycle** with initialization and cleanup phases
+- **Handle missing dependencies gracefully** with appropriate fallback behavior
+- **For configuration management**: See [Configuration Standards](#configuration-standards) section
+- **For error handling**: See [Error Handling and Resilience](#error-handling-and-resilience) section
+- **For caching strategies**: See [Performance and Monitoring](#performance-and-monitoring) section
+
+*See examples: [Plugin Dependencies Configuration](copilot-instructions.examples.md#plugin-dependencies-configuration)*
+
+### Error Handling and Resilience
+
+- **Use the RVNK exception hierarchy** for consistent error handling across all plugins
+- **Implement circuit breaker patterns** for external service calls
+- **Provide meaningful error messages** with actionable information for administrators
+- **Log errors with appropriate context** including player IDs, operation details, and stack traces
+- **Handle missing dependencies gracefully** with appropriate fallback behavior
+- **Implement proper exception chaining** to preserve stack trace information
+- **Use custom exception types** for domain-specific error conditions
+
+*See examples: [Error Handling and Resilience](copilot-instructions.examples.md#error-handling-and-resilience)*
+
+### Performance and Monitoring
+
+- **Use DebugLogger as needed** for debugging only
+- **Implement caching strategies** for frequently accessed data:
+  - Use caching to reduce database calls
+  - Implement proper cache invalidation strategies
+  - Consider memory usage vs. performance trade-offs
+  - Use connection pooling for external resources
+- **Monitor async operation completion** and log performance metrics
+- **Use connection pooling** through RVNKCore for database operations
+
+*See examples: [Performance and Monitoring](copilot-instructions.examples.md#performance-and-monitoring)*
+
+### Configuration Standards
+
+- **Use YAML for all configuration files** with consistent naming conventions
+- **Implement configuration validation** with clear error messages
+- **Support configuration reloading** without server restart where possible
+- **Document all configuration options** with examples and default values
+
+*See examples: [Configuration Standards](copilot-instructions.examples.md#configuration-standards)*
+
+### Testing Requirements
+
+- **Write integration tests** for all async operations
+- **Mock external dependencies** using RVNKCore's testing framework
+- **Test cross-plugin compatibility** when implementing shared features
+- **Validate performance** under concurrent load for database operations
+
+### Documentation Standards
+
+- **Document all public APIs** with complete JavaDoc including since tags
+- **Provide configuration examples** in README files
+- **Create integration guides** for server administrators
+- **Maintain changelog** with version compatibility information
+
+This comprehensive set of standards ensures consistency, performance, and maintainability across the entire RVNK plugin ecosystem while emphasizing asynchronous operations and proper data layer abstraction.
 
 ## Commenting Guidelines
 
@@ -18,12 +145,7 @@ These guidelines should be followed when modifying or creating code to maintain 
 - Note important design patterns or architectural decisions
 - Focus on "why" over implementation details
 
-```java
-/**
- * Manages lore item creation and distribution with configurable properties.
- * Acts as the central registry for all custom items within the lore system.
- */
-```
+*See examples: [Class Documentation](copilot-instructions.examples.md#class-documentation)*
 
 #### Method Documentation
 
@@ -32,113 +154,32 @@ These guidelines should be followed when modifying or creating code to maintain 
 - Note exceptions that may be thrown
 - Include examples for complex methods
 
-```java
-/**
- * Retrieves lore content based on provided entity type and identifier.
- * Handles fallback behavior when specific lore isn't available.
- *
- * @param entityType The type of entity to retrieve lore for
- * @param identifier Unique identifier within the entity type
- * @return The lore content or default text if none found
- * @throws IllegalArgumentException If entityType is null
- */
-```
+*See examples: [Method Documentation](copilot-instructions.examples.md#method-documentation)*
 
 ### Code Comments
-
-- Comment on "why" less "what" - explain reasoning behind code
+- Comment on "why" not "what" - explain reasoning behind code
 - Place comments above the code they describe
 - Keep comments concise and meaningful
-- Use TODO and FIXME sparingly and with clear descriptions
 - Explain complex logic, business rules, or non-obvious decisions
 
 ## Message Formatting Standards
 
-### Player-Facing Messages
+*See detailed instructions: [Message Formatting Standards](copilot-instructions.formatting.md)*
 
-- Use `ChatFormat` for all player-facing command output, including messages, titles, and action bars.
-- Use standardized message prefixes:
+## Logging and Debug Standards
 
-  - `&c▶` for usage instructions and command help
-  - `&6⚙` for operations in progress
-  - `&a✓` for success messages
-  - `&c✖` for error messages
-  - `&e⚠` for warnings
-  - `&7␣␣␣` for additional information or tips (three spaces after)
+*See detailed instructions: [Logging and Debug Standards](copilot-instructions.logging.md)*
 
-### Console and Debug Messages
+### Console Output Guidelines
 
-- Use the designated logging system for all console output
 - **Do not use emojis or symbols in console messages**
 - **Do not use color codes in console output**
 - **Do not use ChatFormat for logger output**
 - For all command output to console (outside of logger), use `ChatFormat.stripColors()` to ensure clean output
-- Create clear, concise messages that explain the context
-- For errors, include actionable information to help troubleshoot
-- Use appropriate log levels (INFO, WARNING, ERROR, DEBUG)
-
-## Logging Manager Standard
-
-- Use the persistent `LogManager` class for all info, warning, and error logging in plugin code.
-- Always declare the property as `private final LogManager logger;` (or `private LogManager logger;` if not final).
-- Initialize with `this.logger = LogManager.getInstance(plugin);` in constructors.
-- Use `logger.info(message)`, `logger.warning(message)`, and `logger.error(message, exception)` for all logging.
-- Do not use `System.out.println()`, direct logger calls, or custom logger fields for these log levels.
-- Use the property name `logger` for all `LogManager` usages to ensure consistency across the codebase.
-- Reserve the `Debug` class for debug-level or trace logging only.
-
-**Example:**
-
-```java
-private final LogManager logger;
-
-public MyClass(RVNKLore plugin) {
-    this.logger = LogManager.getInstance(plugin);
-}
-
-public void doSomething() {
-    logger.info("Something happened");
-    logger.warning("A warning");
-    logger.error("An error occurred", exception);
-}
-```
 
 ## Command Framework Guidelines
 
-Follow the CommandManager framework for all commands:
-
-1. Extend `BaseCommand` for new commands:
-```java
-public class MyCommand extends BaseCommand {
-    public MyCommand(RVNKTools plugin) {
-        super(plugin, "commandname", 
-              "Command description", 
-              "/commandname <arg>",
-              "rvnktools.command.permission");
-    }
-}
-```
-
-2. Register commands through CommandManager:
-```java
-commandManager.registerCommand(new MyCommand(plugin));
-```
-
-3. Use subcommands where appropriate:
-```java
-registerSubCommand("subcommand", new MySubCommand(plugin));
-```
-
-4. Implement proper tab completion:
-```java
-@Override
-public List<String> tabComplete(CommandSender sender, String[] args) {
-    if (args.length == 1) {
-        return getMatchingSubCommands(sender, args[0]);
-    }
-    return Collections.emptyList();
-}
-```
+*See detailed instructions: [Command Framework Guidelines](copilot-instructions.commands.md)*
 
 ## Resource Management
 
@@ -148,79 +189,120 @@ public List<String> tabComplete(CommandSender sender, String[] args) {
 - Cancel tasks and unregister listeners properly
 - Implement shutdown methods in manager classes
 
-## Plugin Architecture
-
-### Core Components
-
-1. **CommandManager**
-   - Central command registration and handling
-   - Permission management
-   - Tab completion support
-
-2. **AnnounceManager**
-   - Announcement scheduling and delivery
-   - YAML configuration integration
-   - PlaceholderAPI support
-
-3. **LinkMaker**
-   - Link creation and management
-   - Click handling
-   - Permission integration
-
-4. **Integration Support**
-   - Economy (Vault)
-   - Permissions (LuckPerms)
-   - PlaceholderAPI
-   - Multiverse
-
-### Best Practices
-
-1. **Command Implementation**
-   - Use CommandManager framework
-   - Follow consistent error handling
-   - Implement proper permissions
-   - Support tab completion
-
-2. **Configuration Management**
-   - Use typed configuration objects
-   - Validate configuration on load
-   - Support live reloading
-   - Handle missing/invalid values
-
-3. **Event Handling**
-   - Register listeners properly
-   - Keep handlers focused
-   - Consider performance impact
-   - Clean up on disable
-
-## Performance Considerations
-
-- Use async tasks for I/O operations
-- Implement caching where appropriate
-- Batch operations when possible
-- Monitor resource usage
-- Clean up resources promptly
-
 ## Development Workflow
 
-Use VS Code tasks for development:
+### VS Code Tasks (Command Palette)
 
-- **Build Plugin**: `mvn clean package` (builds the plugin JAR)
-- **Copy to Server**: Copy JAR to dev server
-- **Restart Server**: Build and full server restart on dev server
-- **Reload Server**: Build and plugin reload only via api call
+**Primary Development Tasks:**
+- **Build & Deploy**: Complete automated sequence (Build → Copy → Restart → Validation)
+- **Build Plugin**: Maven compile and package (`mvn clean package`)
+- **Copy to Server**: Copy JAR to development server
+- **Restart Server**: Full server restart via MCSS API
+- **Reload Server**: Plugin reload without full restart (faster alternative)
 
-## Testing Guidelines
+**Server Query Tasks:**
+- **Query Console - Recent**: Last 50 console lines with color-coded formatting
+- **Query Console - Errors Only**: Filter ERROR/WARN messages from recent logs
+- **Query Console - Plugin Messages**: RVNKTools-specific log entries from last 100 lines
+- **Query Console - Extended**: Last 500 lines for comprehensive debugging
+- **Query Server Status**: Server state, name, type, and memory information
+- **Query Server Statistics**: Real-time CPU, memory, player count, uptime metrics
+- **Send Server Command**: Interactive command execution with custom input
+- **RVNKTools Debug**: Execute `rvnktools debug` for comprehensive plugin status
 
-- Test commands with various input combinations
-- Verify permission handling
-- Check resource cleanup
-- Test integration points
-- Validate configuration handling
+**Database Management Tasks:**
+- **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation
+- **List MySQL Tables - DEV**: List all tables without modifications
+- **Clean SQLite Database - DEV**: Remove local SQLite database files
 
-## Documentation Reference
+**Usage Guidelines:**
+- Use **Build & Deploy** for complete development cycle with validation
+- Use granular tasks (Build Plugin, Copy to Server, etc.) for targeted operations
+- Database cleanup tasks support both interactive and force modes
 
-For detailed information, refer to:
+### PowerShell Query Scripts
 
-- [README.md](../README.md) - Project overview and features
-- [ROADMAP.md](../ROADMAP.md) - Development roadmap and priorities
+**Console Queries (`query-server-DEV.ps1`):**
+```powershell
+# Console queries (1-500 lines or "all")
+.\query-server-DEV.ps1 console 50                    # Recent 50 lines
+.\query-server-DEV.ps1 console 100 -ErrorsOnly       # Errors/warnings only
+.\query-server-DEV.ps1 console 100 -FilterText "RVNKTools"  # Plugin-specific
+
+# Server information
+.\query-server-DEV.ps1 status    # Basic server info
+.\query-server-DEV.ps1 stats     # Performance metrics
+.\query-server-DEV.ps1 info      # Detailed configuration
+
+# Remote command execution
+.\query-server-DEV.ps1 command "rvnktools debug"     # Plugin status
+.\query-server-DEV.ps1 command "plugin list"         # Installed plugins
+```
+
+**Database Management (`clean-mysqldb-DEV.ps1`):**
+```powershell
+.\clean-mysqldb-DEV.ps1 -ListOnly    # List tables only
+.\clean-mysqldb-DEV.ps1              # Interactive cleanup
+.\clean-mysqldb-DEV.ps1 -Force       # Force cleanup without prompt
+```
+
+**Advanced Query Features:**
+- Flexible line counts (1-500 or "all"), advanced filtering (-ErrorsOnly, -FilterText)
+- Color-coded output (Green=INFO, Yellow=WARN, Red=ERROR), real-time access (1-2s response)
+- Zero context switching from VS Code, complete MySQL database management
+
+*See comprehensive documentation: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-tasks.md)*
+
+## Documentation and Reference Structure
+
+### Primary Documentation Files
+
+- **README.md**: Main project description, features overview, and architectural principles
+- **ROADMAP.md**: Current implementation status, development priorities, and timelines
+- **RVNKCore README.md**: `toolkitplugin/src/main/java/org/fourz/rvnkcore/README.md` - Core implementation status and architecture
+
+### Reference Documentation (Parse As Needed)
+
+The following documentation should be referenced only when relevant to specific prompts:
+
+#### Core Architecture and Migration
+- `docs/requirements/rvnkcore-outline.md` - Core architecture overview
+- `docs/requirements/rvnkcore-implementation-status.md` - Detailed implementation status
+- `docs/requirements/announcemanager-migration-requirements.md` - Announcement system migration plan
+- `docs/implementation/announcement-architecture-evolution.md` - Architecture comparison guide
+
+#### Data Schema and Database
+- `docs/rvnkcore-mysql-implementation.md` - MySQL integration details
+- `docs/rvnktools-datalayer-diagram.md` - Data layer architecture diagrams
+- `docs/requirements/rvnkcore-database.md` - Database implementation requirements
+
+#### API and Service Documentation
+- `docs/requirements/rvnkcore-api.md` - API design specifications
+- `docs/requirements/rvnkcore-service.md` - Service layer requirements
+- `docs/api/rvnkcore-java.md` - Java API documentation
+- `docs/api/rvnkcore-httprest.md` - REST API documentation
+
+#### Configuration and Migration Guides
+- `docs/configuration-migration-summary.md` - Configuration migration overview
+- `docs/rvnkcore-configuration-migration.md` - Detailed configuration migration
+- `docs/configuration-validation-summary.md` - Configuration validation guide
+
+#### Implementation Plans and Testing
+- `docs/plans/rvnkcore/` - Detailed implementation plans
+- `docs/tests/` - Testing documentation and status
+- `docs/requirements/rvnkcore-action-plan.md` - Action plan and priorities
+
+### Documentation Usage Guidelines
+
+- **README files contain project descriptions and current status**
+- **ROADMAP files contain implementation status and timelines** 
+- **Reference docs should be parsed only when specific technical details are needed**
+- **Migration documentation contains comprehensive transition plans**
+- **API documentation provides interface specifications and examples**
+
+### Status Information Location
+
+- **Implementation Status**: Use ROADMAP.md files for current progress and priorities
+- **Project Description**: Use README.md files for feature overview and architecture
+- **Technical Details**: Reference specific docs/ files only when needed for implementation
+- **Migration Plans**: Use migration-specific documentation for transition requirements

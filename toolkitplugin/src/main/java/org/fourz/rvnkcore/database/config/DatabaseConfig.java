@@ -34,14 +34,29 @@ public class DatabaseConfig {
     private int prepStmtCacheSqlLimit = 2048;
     
     /**
+<<<<<<< HEAD
      * Default constructor for DatabaseConfig.
      */
     public DatabaseConfig() {
+=======
+     * Private constructor for builder pattern.
+     */
+    private DatabaseConfig() {}
+    
+    /**
+     * Creates a new builder for DatabaseConfig.
+     * 
+     * @return A new DatabaseConfig builder
+     */
+    public static Builder builder() {
+        return new Builder();
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
     }
     
     /**
      * Creates a default SQLite configuration.
      * 
+<<<<<<< HEAD
      * @param database The SQLite database file path
      * @return A DatabaseConfig configured for SQLite
      */
@@ -49,6 +64,15 @@ public class DatabaseConfig {
         return builder()
                 .type("sqlite")
                 .database(database)
+=======
+     * @param databaseFileName The SQLite database file name
+     * @return A DatabaseConfig configured for SQLite
+     */
+    public static DatabaseConfig sqlite(String databaseFileName) {
+        return builder()
+                .type("sqlite")
+                .database(databaseFileName)
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
                 .build();
     }
     
@@ -82,12 +106,20 @@ public class DatabaseConfig {
     public String getPassword() { return password; }
     public boolean isUseSSL() { return useSSL; }
     public String getConnectionParameters() { return connectionParameters; }
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
     public int getMaxConnections() { return maxConnections; }
     public int getMinIdleConnections() { return minIdleConnections; }
     public long getConnectionTimeoutMs() { return connectionTimeoutMs; }
     public long getIdleTimeoutMs() { return idleTimeoutMs; }
     public long getMaxLifetimeMs() { return maxLifetimeMs; }
     public long getLeakDetectionMs() { return leakDetectionMs; }
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
     public boolean isCachePrepStmts() { return cachePrepStmts; }
     public int getPrepStmtCacheSize() { return prepStmtCacheSize; }
     public int getPrepStmtCacheSqlLimit() { return prepStmtCacheSqlLimit; }
@@ -102,15 +134,25 @@ public class DatabaseConfig {
             throw new IllegalArgumentException("Database type cannot be null or empty");
         }
         
+<<<<<<< HEAD
+=======
+        if (database == null || database.trim().isEmpty()) {
+            throw new IllegalArgumentException("Database name cannot be null or empty");
+        }
+        
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
         if ("mysql".equalsIgnoreCase(type)) {
             if (host == null || host.trim().isEmpty()) {
                 throw new IllegalArgumentException("MySQL host cannot be null or empty");
             }
             
+<<<<<<< HEAD
             if (database == null || database.trim().isEmpty()) {
                 throw new IllegalArgumentException("MySQL database cannot be null or empty");
             }
             
+=======
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
             if (username == null || username.trim().isEmpty()) {
                 throw new IllegalArgumentException("MySQL username cannot be null or empty");
             }
@@ -127,6 +169,7 @@ public class DatabaseConfig {
         if (minIdleConnections < 0 || minIdleConnections > maxConnections) {
             throw new IllegalArgumentException("Min idle connections must be between 0 and max connections");
         }
+<<<<<<< HEAD
     }
     
     /**
@@ -136,6 +179,12 @@ public class DatabaseConfig {
      */
     public static Builder builder() {
         return new Builder();
+=======
+        
+        if (connectionTimeoutMs <= 0) {
+            throw new IllegalArgumentException("Connection timeout must be greater than 0");
+        }
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
     }
     
     /**
@@ -229,6 +278,15 @@ public class DatabaseConfig {
             return this;
         }
         
+<<<<<<< HEAD
+=======
+        /**
+         * Builds and validates the DatabaseConfig.
+         * 
+         * @return A validated DatabaseConfig instance
+         * @throws IllegalArgumentException If configuration is invalid
+         */
+>>>>>>> 7cee8eeb73daf93dba3633eb701951e937d3f908
         public DatabaseConfig build() {
             config.validate();
             return config;
