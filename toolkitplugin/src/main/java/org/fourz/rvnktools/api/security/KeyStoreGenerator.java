@@ -25,8 +25,8 @@ public class KeyStoreGenerator {
         keyPairGenerator.initialize(2048);
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
-        // Generate self-signed certificate
-        X500Name dnName = new X500Name("CN=localhost");
+        // Generate self-signed certificate with SAN extensions
+        X500Name dnName = new X500Name("CN=localhost, O=RVNKCore, OU=API Server");
         BigInteger certSerialNumber = BigInteger.valueOf(System.currentTimeMillis());
         
         Calendar calendar = Calendar.getInstance();
@@ -36,6 +36,21 @@ public class KeyStoreGenerator {
 
         X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
             dnName, certSerialNumber, startDate, endDate, dnName, keyPair.getPublic());
+        
+        // Add Subject Alternative Names for better compatibility
+        try {
+            org.bouncycastle.asn1.x509.GeneralNames subjectAltNames = new org.bouncycastle.asn1.x509.GeneralNames(
+                new org.bouncycastle.asn1.x509.GeneralName[] {
+                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, "localhost"),
+                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "127.0.0.1"),
+                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "::1")
+                }
+            );
+            certBuilder.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false, subjectAltNames);
+        } catch (Exception sanEx) {
+            // SAN extension is optional, continue without it
+            System.err.println("Warning: Could not add Subject Alternative Names to certificate: " + sanEx.getMessage());
+        }
 
         ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA")
             .build(keyPair.getPrivate());

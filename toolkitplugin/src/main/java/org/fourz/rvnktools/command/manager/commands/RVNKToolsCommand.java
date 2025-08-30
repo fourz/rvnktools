@@ -17,16 +17,15 @@ public class RVNKToolsCommand extends BaseCommand {
               "/rvnktools <subcommand> [args]",
               "rvnktools.command");
         
-        // Register all administrative subcommands
+        // Register admin subcommands (these don't use world swap)
         registerSubCommand("links", new LinksSubCommand(plugin, this));
         registerSubCommand("cycle", new CycleSubCommand(plugin, this));
-        registerSubCommand("teleport", new TeleportSubCommand(plugin, this));
         registerSubCommand("reload", new ReloadSubCommand(plugin, this));
         registerSubCommand("debug", new DebugSubCommand(plugin, this));
+        registerSubCommand("createtestdata", new CreateTestDataSubCommand(plugin, this));
         
-        // Register convenience aliases for teleport functionality
-        registerSubCommand("worldswap", new WorldSwapAliasSubCommand(plugin, this));
-        registerSubCommand("event", new WorldSwapAliasSubCommand(plugin, this));
+        // Create teleport subcommands without world swap - they will get it from CommandManager
+        registerSubCommand("teleport", new TeleportSubCommand(plugin, this));
     }
     
     @Override
@@ -46,10 +45,11 @@ public class RVNKToolsCommand extends BaseCommand {
         sender.sendMessage("§f/rvnktools teleport worldswap [world] §7- Teleport between worlds");
         sender.sendMessage("§f/rvnktools reload §7- Reload plugin configuration");
         sender.sendMessage("§f/rvnktools debug §7- Show debug information");
+        sender.sendMessage("§f/rvnktools createtestdata [all|types|announcements] §7- Create test data for API");
         sender.sendMessage("");
-        sender.sendMessage("§e⚠ §7Convenience aliases:");
-        sender.sendMessage("§f/rvnktools worldswap [world] §7- Direct world swap");
-        sender.sendMessage("§f/rvnktools event [world] §7- Event world shortcut");
+        sender.sendMessage("§e⚠ §7Quick access commands:");
+        sender.sendMessage("§f/worldswap [world] §7- Direct world swap command");
+        sender.sendMessage("§f/event [world] §7- Event world shortcut command");
     }
     
     @Override
