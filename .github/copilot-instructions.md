@@ -133,24 +133,6 @@ All RVNK plugins should follow a consistent architecture:
 - **Create integration guides** for server administrators
 - **Maintain changelog** with version compatibility information
 
-## Legacy Support and Migration
-
-### Backward Compatibility
-
-- **Maintain compatibility** for at least 2 major versions
-- **Provide deprecation warnings** with clear migration paths
-- **Support legacy configuration formats** during transition periods
-- **Test with existing server setups** before releasing breaking changes
-
-### Data Migration
-
-- **Implement automatic data migration** from legacy formats
-- **Provide manual migration tools** for complex scenarios
-- **Backup data** before performing migrations
-- **Validate data integrity** after migration completion
-
-*See examples: [Data Migration Service](copilot-instructions.examples.md#data-migration-service)*
-
 This comprehensive set of standards ensures consistency, performance, and maintainability across the entire RVNK plugin ecosystem while emphasizing asynchronous operations and proper data layer abstraction.
 
 ## Commenting Guidelines
@@ -209,7 +191,67 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 
 ## Development Workflow
 
-*See detailed instructions: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-tasks.md)*
+### VS Code Tasks (Command Palette)
+
+**Primary Development Tasks:**
+- **Build & Deploy**: Complete automated sequence (Build → Copy → Restart → Validation)
+- **Build Plugin**: Maven compile and package (`mvn clean package`)
+- **Copy to Server**: Copy JAR to development server
+- **Restart Server**: Full server restart via MCSS API
+- **Reload Server**: Plugin reload without full restart (faster alternative)
+
+**Server Query Tasks:**
+- **Query Console - Recent**: Last 50 console lines with color-coded formatting
+- **Query Console - Errors Only**: Filter ERROR/WARN messages from recent logs
+- **Query Console - Plugin Messages**: RVNKTools-specific log entries from last 100 lines
+- **Query Console - Extended**: Last 500 lines for comprehensive debugging
+- **Query Server Status**: Server state, name, type, and memory information
+- **Query Server Statistics**: Real-time CPU, memory, player count, uptime metrics
+- **Send Server Command**: Interactive command execution with custom input
+- **RVNKTools Debug**: Execute `rvnktools debug` for comprehensive plugin status
+
+**Database Management Tasks:**
+- **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation
+- **List MySQL Tables - DEV**: List all tables without modifications
+- **Clean SQLite Database - DEV**: Remove local SQLite database files
+
+**Usage Guidelines:**
+- Use **Build & Deploy** for complete development cycle with validation
+- Use granular tasks (Build Plugin, Copy to Server, etc.) for targeted operations
+- Database cleanup tasks support both interactive and force modes
+
+### PowerShell Query Scripts
+
+**Console Queries (`query-server-DEV.ps1`):**
+```powershell
+# Console queries (1-500 lines or "all")
+.\query-server-DEV.ps1 console 50                    # Recent 50 lines
+.\query-server-DEV.ps1 console 100 -ErrorsOnly       # Errors/warnings only
+.\query-server-DEV.ps1 console 100 -FilterText "RVNKTools"  # Plugin-specific
+
+# Server information
+.\query-server-DEV.ps1 status    # Basic server info
+.\query-server-DEV.ps1 stats     # Performance metrics
+.\query-server-DEV.ps1 info      # Detailed configuration
+
+# Remote command execution
+.\query-server-DEV.ps1 command "rvnktools debug"     # Plugin status
+.\query-server-DEV.ps1 command "plugin list"         # Installed plugins
+```
+
+**Database Management (`clean-mysqldb-DEV.ps1`):**
+```powershell
+.\clean-mysqldb-DEV.ps1 -ListOnly    # List tables only
+.\clean-mysqldb-DEV.ps1              # Interactive cleanup
+.\clean-mysqldb-DEV.ps1 -Force       # Force cleanup without prompt
+```
+
+**Advanced Query Features:**
+- Flexible line counts (1-500 or "all"), advanced filtering (-ErrorsOnly, -FilterText)
+- Color-coded output (Green=INFO, Yellow=WARN, Red=ERROR), real-time access (1-2s response)
+- Zero context switching from VS Code, complete MySQL database management
+
+*See comprehensive documentation: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-tasks.md)*
 
 ## Documentation and Reference Structure
 

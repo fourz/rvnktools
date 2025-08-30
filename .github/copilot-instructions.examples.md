@@ -122,38 +122,6 @@ plugin-name:
     vault: true
 ```
 
-## Legacy Support and Migration Examples
-
-### Data Migration Service
-
-```java
-public class DataMigrationService {
-    public CompletableFuture<MigrationResult> migrateFromLegacy() {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // 1. Backup existing data
-                backupService.createBackup("pre-migration");
-                
-                // 2. Migrate data to new format
-                List<LegacyData> legacyData = legacyRepository.findAll();
-                List<NewData> migratedData = convertToNewFormat(legacyData);
-                
-                // 3. Validate migration
-                validateMigration(legacyData, migratedData);
-                
-                // 4. Save migrated data
-                newRepository.saveAll(migratedData);
-                
-                return MigrationResult.success(migratedData.size());
-            } catch (Exception e) {
-                logger.error("Migration failed", e);
-                return MigrationResult.failure(e.getMessage());
-            }
-        });
-    }
-}
-```
-
 ## JavaDoc Examples
 
 ### Class Documentation

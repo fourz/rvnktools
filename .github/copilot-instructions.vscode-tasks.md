@@ -1,21 +1,51 @@
-# RVNK VS Code Command Palette and Development Tools
+# RVNK VS Code Development Tools - Advanced Usage Guide
 
-## Development Workflow
+## Overview
 
-Use VS Code tasks for development. Most tasks are **granular** for precise control, except for the complete deployment sequence:
+This document provides detailed usage patterns and advanced configuration for the VS Code development workflow. For basic task usage, refer to the main copilot instructions.
 
-### Complete Deployment Sequence
+## Advanced Task Usage Patterns
 
-- **Build & Deploy**: Complete automated sequence - Build Plugin → Copy to Server → Restart Server → Wait for startup validation
+### Deployment Strategies
 
-### Granular Development Tasks
+**Granular Control Workflow:**
 
-- **Build Plugin**: `mvn clean package` (builds the plugin JAR only)
-- **Copy to Server**: Copy JAR to dev server (requires build first)
-- **Restart Server**: Full server restart on dev server (independent action)
-- **Reload Server**: Plugin reload without full restart (faster alternative)
+```text
+Build Plugin → Copy to Server → Restart Server
+```
 
-**Usage Pattern**: Use granular tasks for targeted development workflows, use "Build & Deploy" for complete code-to-server deployment with validation.
+Use when you need to verify each step or handle custom deployment scenarios.
+
+**Complete Automation:**
+
+```text
+Build & Deploy (single task with dependencies)
+```
+
+Automatically executes the full sequence with startup validation.
+
+### Task Dependencies and Sequencing
+
+**Clean & Deploy Sequences:**
+
+- **Clean&Restart Server**: Cleanup Plugin Folder → Restart Server
+- **Clean&Reload Server**: Cleanup Plugin Folder → Reload Server
+- **Increment Version Tasks**: Clean Jar → Version Update → File Updates
+
+### Version Management Integration
+
+**Automated Version Increment:**
+
+- **Increment Version - Patch/Minor/Major**: Automated semantic versioning
+- **Set Custom Version**: Manual version specification (e.g., 2.0.0-beta)
+- **Preview Version Changes**: Dry-run mode to preview file updates
+
+**Files Updated During Version Increment:**
+
+- `pom.xml` (Maven project version)
+- `plugin.yml` (Plugin version metadata)
+- `project.json` (VS Code project configuration)
+- Documentation files with version references
 
 ### Server Query System Integration
 
@@ -44,7 +74,7 @@ The project includes a comprehensive MCSS API-based query system for seamless se
 - **Restart Server**: Full server restart via MCSS API
 - **Reload Server**: Plugin reload without full restart (faster alternative)
 
-**Usage Guidelines**: 
+**Usage Guidelines**:
 
 - Use **Build & Deploy** for complete development cycle with automatic validation
 - Use individual tasks for targeted operations (build-only, copy-only, restart-only)
@@ -96,7 +126,7 @@ For development database management and schema reset scenarios:
 #### Query System Features for Copilot Agents
 
 - **Flexible Line Counts**: Support for 1-500 lines or "all" for complete history
-- **Advanced Filtering**: 
+- **Advanced Filtering**:
   - `-ErrorsOnly`: Show only ERROR and WARN level messages
   - `-PluginOnly`: Show only plugin-related messages  
   - `-FilterText "keyword"`: Filter logs containing specific text
