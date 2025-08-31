@@ -365,11 +365,24 @@ public class MigrationOrchestrator {
     }
     
     /**
-     * Log multiple errors
+     * Log info message
+     */
+    private void logInfo(String message) {
+        String timestampedMessage = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_TIME) + " - " + message;
+        progressLog.add(timestampedMessage);
+        logger.info(message);
+    }
+    
+    /**
+     * Log validation errors and info messages appropriately
      */
     private void logErrors(List<String> errors) {
         for (String error : errors) {
-            logError(error);
+            if (error.startsWith("INFO:")) {
+                logInfo(error.substring(5).trim()); // Remove "INFO:" prefix and log as info
+            } else {
+                logError(error);
+            }
         }
     }
     
