@@ -87,11 +87,10 @@ All RVNK plugins should follow a consistent architecture:
 
 ### Error Handling and Resilience
 
-- **Use the RVNK exception hierarchy** for consistent error handling across all plugins
 - **Implement circuit breaker patterns** for external service calls
 - **Provide meaningful error messages** with actionable information for administrators
 - **Log errors with appropriate context** including player IDs, operation details, and stack traces
-- **Handle missing dependencies gracefully** with appropriate fallback behavior
+- **Handle missing dependencies gracefully** 
 - **Implement proper exception chaining** to preserve stack trace information
 - **Use custom exception types** for domain-specific error conditions
 
@@ -191,14 +190,31 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 
 ## Development Workflow
 
+### Multi-Server Development Environment
+
+**RVNK Dev (Local)**: Local development server using MCSS API
+- **Status**: ✅ **OPERATIONAL** - Maintains all existing functionality and shortcuts
+- **Usage**: Primary development, testing, debugging
+- **Key Bindings**: `Ctrl+Shift+-` (build & copy), `Ctrl+Shift+/` (restart)
+
+**RVNK Test (SparkedHost)**: Remote test server using SparkedHost MCP tools
+- **Status**: ✅ **OPERATIONAL** - New integration for production-like testing
+- **Usage**: Final testing, validation, staging deployments
+- **Key Bindings**: `Ctrl+Shift++` (build, copy to test, restart via MCP)
+
 ### VS Code Tasks (Command Palette)
 
-**Primary Development Tasks:**
+**Primary Development Tasks (RVNK Dev - Local):**
 - **Build & Deploy**: Complete automated sequence (Build → Copy → Restart → Validation)
 - **Build Plugin**: Maven compile and package (`mvn clean package`)
 - **Copy to Server**: Copy JAR to development server
 - **Restart Server**: Full server restart via MCSS API
 - **Reload Server**: Plugin reload without full restart (faster alternative)
+
+**New Test Server Tasks (RVNK Test - SparkedHost):**
+- **Build & Deploy to Test**: Complete sequence using SparkedHost MCP tools
+- **Copy to Test Server**: Deploy JAR to RVNK Test server via SparkedHost MCP
+- **Restart Test Server**: Remote server restart using SparkedHost MCP server management
 
 **Server Query Tasks:**
 - **Query Console - Recent**: Last 50 console lines with color-coded formatting
@@ -216,9 +232,234 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 - **Clean SQLite Database - DEV**: Remove local SQLite database files
 
 **Usage Guidelines:**
-- Use **Build & Deploy** for complete development cycle with validation
+- **RVNK Dev (Local)**: Use **Build & Deploy** for complete development cycle with validation
+- **RVNK Test (SparkedHost)**: Use **Build & Deploy to Test** for production-like testing
 - Use granular tasks (Build Plugin, Copy to Server, etc.) for targeted operations
 - Database cleanup tasks support both interactive and force modes
+
+**Key Bindings for Development Workflow:**
+- `Ctrl+Shift+-`: Build and copy to RVNK Dev (local development server)
+- `Ctrl+Shift+/`: Restart RVNK Dev server via MCSS API
+- `Ctrl+Shift++`: **NEW** - Build, copy to RVNK Test, restart via SparkedHost MCP tools
+
+### SparkedHost MCP Server Operations
+
+**⚠️ PRODUCTION SAFETY**: Never operate on Ravenkraft (production server). Only use RVNK Test server for development operations.
+
+**Server Configuration:**
+- **RVNK Test Server**: `serverId: "b2bc4d7e"` `serverName: "RVNK Test"` (✅ Safe for all operations)
+- **Ravenkraft Server**: `serverId: "140324c4"` `serverName: "Ravenkraft"` (🔒 READ-ONLY - Status queries only)
+
+**Quick Reference MCP Commands:**
+
+**Server Management (RVNK Test Only):**
+- **Restart**: `mcp_sparkedhost_restart-server` 
+- **Console Monitoring**: Use `mcp_sparkedhost_send-console-command` + `mcp_sparkedhost_get-file-contents` (/logs/latest.log)
+- **Send Command**: `mcp_sparkedhost_send-console-command`
+- **Plugin List**: `mcp_sparkedhost_get-plugin-list`
+
+**File Operations (Both Servers):**
+- **List Files**: `mcp_sparkedhost_list-files` (optional directory parameter)
+- **Get File**: `mcp_sparkedhost_get-file-contents` 
+
+**Common File Paths:**
+- `/logs/latest.log` - Current server log
+- `/plugins/` - Plugin directory listing  
+- `/server.properties` - Server configuration
+- `/plugins/RVNKTools/config.yml` - Plugin configuration
+
+**Console Monitoring Pattern:**
+- **Console streaming is currently broken** - `mcp_sparkedhost_console-stream` fails with "Unknown error"
+- **Working alternative**: Use `mcp_sparkedhost_send-console-command` followed by `mcp_sparkedhost_get-file-contents` on `/logs/latest.log`
+- **Best practice**: Send command → wait 2-3 seconds → fetch log file to see output
+
+#### Console Monitoring MCP Workflow
+
+**Real-Time Console Monitoring (Workaround):**
+```javascript
+// Console streaming is currently broken, use this alternative:
+// 1. Send a test command to generate log entry
+mcp_sparkedhost_send-console-command({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test",
+  command: "say Monitoring console..."
+})
+
+// 2. Fetch latest log to see recent activity (wait 2-3 seconds)
+mcp_sparkedhost_get-file-contents({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test",
+  filePath: "/logs/latest.log"  // Shows recent console output
+})
+```
+
+**Console Command Execution:**
+```javascript
+// Execute server commands remotely
+mcp_sparkedhost_send-console-command({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test",
+  command: "rvnktools debug"  // or any server command
+})
+
+// Common monitoring commands
+mcp_sparkedhost_send-console-command({ command: "plugins" })
+mcp_sparkedhost_send-console-command({ command: "tps" })
+mcp_sparkedhost_send-console-command({ command: "list" })
+mcp_sparkedhost_send-console-command({ command: "version" })
+```
+
+**Plugin Status Monitoring:**
+```javascript
+// Get installed plugin list
+mcp_sparkedhost_get-plugin-list({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test"
+})
+
+// Check specific plugin files
+mcp_sparkedhost_list-files({
+  serverId: "b2bc4d7e", 
+  directory: "/plugins"
+})
+```
+
+#### Build & Upload Sequence MCP Workflow Reference
+
+**Complete Development Deployment Pipeline:**
+
+**Phase 1: Local Build**
+```powershell
+# Build plugin using Maven
+mvn clean package -f toolkitplugin/pom.xml
+
+# Verify JAR creation
+Get-ChildItem -Path "toolkitplugin\target" -Filter "*.jar" | 
+  Where-Object { $_.Name -notlike '*original*' -and $_.Name -notlike '*sources*' }
+```
+
+**Phase 2: Upload to Test Server**
+```javascript
+// Upload built JAR to test server
+mcp_sparkedhost_upload-file({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test",
+  localFilePath: "c:\\tools\\rvnktools\\toolkitplugin\\target\\rvnktools-1.3.0-alpha.jar",
+  filePath: "/plugins/RVNKTools.jar"
+})
+
+// Alternative: Upload with content (for config files)
+mcp_sparkedhost_upload-file({
+  serverId: "b2bc4d7e", 
+  serverName: "RVNK Test",
+  content: "# Configuration content here",
+  filePath: "/plugins/RVNKTools/config.yml"
+})
+```
+
+**Phase 3: Server Restart & Validation**
+```javascript
+// Restart test server to apply changes
+mcp_sparkedhost_restart-server({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test" 
+})
+
+// Monitor restart process (wait 10-15 seconds after restart)
+// Console stream is broken, use log file monitoring instead:
+mcp_sparkedhost_get-file-contents({
+  serverId: "b2bc4d7e", 
+  serverName: "RVNK Test",
+  filePath: "/logs/latest.log"  // Check for startup messages
+})
+
+// Validate plugin loaded successfully
+mcp_sparkedhost_get-plugin-list({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test"
+})
+
+// Test plugin functionality
+mcp_sparkedhost_send-console-command({
+  serverId: "b2bc4d7e",
+  command: "rvnktools debug"
+})
+```
+
+**Phase 4: Configuration Verification**
+```javascript
+// Verify configuration files
+mcp_sparkedhost_get-file-contents({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test",
+  filePath: "/plugins/RVNKTools/config.yml"
+})
+
+// Check log files for errors
+mcp_sparkedhost_get-file-contents({
+  serverId: "b2bc4d7e", 
+  serverName: "RVNK Test",
+  filePath: "/logs/latest.log"
+})
+```
+
+**Error Handling & Troubleshooting:**
+```javascript
+// Check for upload errors
+if (uploadResult.includes("ERROR")) {
+  // Retry upload or check file permissions
+  mcp_sparkedhost_list-files({ directory: "/plugins" })
+}
+
+// Monitor for plugin errors during startup  
+// Console stream broken - use log file monitoring:
+mcp_sparkedhost_get-file-contents({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test", 
+  filePath: "/logs/latest.log"
+})
+
+// Check plugin dependencies
+mcp_sparkedhost_send-console-command({ command: "version RVNKTools" })
+```
+
+**Batch Operations:**
+```javascript
+// Multiple file upload (configurations, data files)
+const files = [
+  { local: "config.yml", remote: "/plugins/RVNKTools/config.yml" },
+  { local: "announcements.yml", remote: "/plugins/RVNKTools/announcements.yml" }
+];
+
+files.forEach(file => {
+  mcp_sparkedhost_upload-file({
+    serverId: "b2bc4d7e",
+    localFilePath: file.local,
+    filePath: file.remote
+  });
+});
+```
+
+### Integrated Development Workflow: Local + Test Server
+
+**Dual-Server Development Strategy:**
+
+**RVNK Dev (Local) - Primary Development:**
+- **Purpose**: Rapid iteration, debugging, initial testing
+- **Tools**: MCSS API, PowerShell scripts, VS Code tasks
+- **Workflow**: Build → Copy → Restart → Validate (2-5 seconds)
+- **Usage**: 80% of development time for quick iterations
+
+**RVNK Test (SparkedHost) - Production Validation:**
+- **Purpose**: Final testing, production-like environment validation  
+- **Tools**: SparkedHost MCP server operations
+- **Workflow**: Build → Upload → Restart → Monitor (30-60 seconds)
+- **Usage**: 20% of development time for staging deployment
+
+**Recommended Development Cycle:**
+1. **Local Development**: Use RVNK Dev for rapid iteration (5-10 cycles)
+2. **Test Server Validation**: Deploy to RVNK Test for final validation (1 cycle)
+3. **Production Deployment**: Manual deployment to production server
 
 ### PowerShell Query Scripts
 
@@ -237,6 +478,27 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 # Remote command execution
 .\query-server-DEV.ps1 command "rvnktools debug"     # Plugin status
 .\query-server-DEV.ps1 command "plugin list"         # Installed plugins
+```
+
+**MCP Test Server Operations (Complementary to Local Dev):**
+```javascript
+// Test server console monitoring (mirrors local dev queries)
+mcp_sparkedhost_send-console-command({
+  serverId: "b2bc4d7e",
+  command: "rvnktools debug"  // Equivalent to PowerShell query
+})
+
+// Test server plugin validation
+mcp_sparkedhost_get-plugin-list({
+  serverId: "b2bc4d7e",
+  serverName: "RVNK Test"    // Equivalent to local plugin check
+})
+
+// Test server performance monitoring  
+mcp_sparkedhost_send-console-command({
+  serverId: "b2bc4d7e",
+  command: "tps"             // Server performance equivalent
+})
 ```
 
 **Database Management (`clean-mysqldb-DEV.ps1`):**
