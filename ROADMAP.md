@@ -1,6 +1,6 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: August 31, 2025
+**Last Updated**: September 27, 2025
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
@@ -17,8 +17,8 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ Multiverse integration
 - ✅ SQLite database support
 - ✅ Centralized `CommandManager` framework for consistent command handling
-- ✅ **WorldSwap command integration with per-world location tracking**
-- ✅ **Comprehensive player and world-specific data services**
+- ✅ **WorldSwap command integration with privacy-focused teleport tracking**
+- ✅ **Player and world-specific data services with teleport-only location tracking**
 
 ### RVNKCore Implementation Status
 
@@ -602,6 +602,96 @@ The YAML-to-Database Migration Framework has been **successfully completed and t
     - ✅ Enhanced error handling and logging
     - ✅ Created foundation for future extensions
 
+#### Privacy-Focused Teleport Tracking System *(NEW PRIORITY - September 2025)*
+
+**Philosophy**: Track only meaningful location changes (teleports, portals, world changes) rather than comprehensive player movement for privacy reasons. Focus on supporting worldswap functionality and events.
+
+- [ ] **Teleport-Only Location Tracking**
+  - **Database Schema**: Privacy-focused tables for teleport events and world-specific last locations
+  - **Tracking Triggers**: Player teleports, portal usage, world changes, and plugin-initiated location changes
+  - **WorldSwap Support**: Last known location per world for event-based teleportation
+  - **Privacy Compliance**: No continuous movement tracking or "creepy" location monitoring
+
+##### Database Schema Implementation
+
+````sql
+-- Teleport and meaningful location change tracking only
+CREATE TABLE rvnk_player_teleports (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_uuid VARCHAR(36) NOT NULL,
+    from_world VARCHAR(100),
+    to_world VARCHAR(100) NOT NULL,
+    to_x DOUBLE NOT NULL,
+    to_y DOUBLE NOT NULL, 
+    to_z DOUBLE NOT NULL,
+    to_yaw FLOAT,
+    to_pitch FLOAT,
+    teleport_reason VARCHAR(50) NOT NULL, -- 'COMMAND', 'PORTAL', 'PLUGIN', 'WORLD_CHANGE'
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_player_world (player_uuid, to_world),
+    INDEX idx_player_time (player_uuid, timestamp),
+    INDEX idx_reason (teleport_reason)
+);
+
+-- Last known location per world (for worldswap functionality)
+CREATE TABLE rvnk_player_world_locations (
+    player_uuid VARCHAR(36) NOT NULL,
+    world_name VARCHAR(100) NOT NULL,
+    last_x DOUBLE NOT NULL,
+    last_y DOUBLE NOT NULL,
+    last_z DOUBLE NOT NULL,
+    last_yaw FLOAT,
+    last_pitch FLOAT,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    teleport_count INT DEFAULT 1,
+    PRIMARY KEY (player_uuid, world_name),
+    INDEX idx_updated (last_updated)
+);
+````
+
+##### Service Interface Updates
+
+````java
+public interface TeleportTrackingService {
+    // Record teleport events only
+    CompletableFuture<Void> recordTeleport(UUID playerId, LocationDTO from, LocationDTO to, String reason);
+    
+    // Get last known location for worldswap command
+    CompletableFuture<Optional<LocationDTO>> getLastLocationInWorld(UUID playerId, String worldName);
+    
+    // Get teleport history (not movement history)
+    CompletableFuture<List<TeleportEventDTO>> getTeleportHistory(UUID playerId, int limit);
+    
+    // Get portal usage tracking
+    CompletableFuture<List<TeleportEventDTO>> getPortalUsage(UUID playerId, Duration period);
+    
+    // World change tracking for events
+    CompletableFuture<Map<String, LocationDTO>> getAllWorldLocations(UUID playerId);
+}
+````
+
+##### REST API Endpoints (Privacy-Focused)
+
+````java
+// Teleport and portal-based location tracking only
+GET /api/v1/players/{uuid}/teleports/history     // Teleport history only
+GET /api/v1/players/{uuid}/worlds/lastlocation   // Last known location per world
+PUT /api/v1/players/{uuid}/teleport              // Server-side teleportation
+GET /api/v1/players/{uuid}/portals/usage         // Portal usage tracking
+
+// World-specific last location for worldswap command
+GET /api/v1/players/{uuid}/worlds/{world}/lastlocation  // Last location in specific world
+POST /api/v1/players/{uuid}/teleports/record     // Record teleport event (admin only)
+````
+
+##### Privacy-Focused Tracking Benefits
+
+- **Privacy-Compliant**: No continuous location monitoring or movement tracking
+- **Event-Focused**: Perfect for worldswap command and server events
+- **Performance-Optimized**: Minimal database writes (only on teleports/portals)
+- **Admin-Friendly**: Clear audit trail of player teleportation activities
+- **Storage-Efficient**: Significantly less data than comprehensive location tracking
+
 - [ ] **REST API Framework**
   - Design RESTful endpoints for data access
   - Implement authentication and authorization
@@ -740,3 +830,4 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
 | August 22, 2025 | 2.0 | RVNKCore Phase 1 completion and announcement system operational |
 | August 30, 2025 | 2.1 | Updated completion status, identified next feature (YAML migration), reprioritized Phase 2 |
 | August 31, 2025 | 2.2 | **Migration Framework Complete** - YAML-to-Database migration framework implemented and tested, ready for production execution |
+| September 27, 2025 | 2.3 | **Privacy-Focused Location Tracking** - Updated project to implement teleport-only location tracking instead of comprehensive player movement monitoring |
