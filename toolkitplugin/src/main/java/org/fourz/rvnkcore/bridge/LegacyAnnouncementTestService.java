@@ -1,6 +1,6 @@
 package org.fourz.rvnkcore.bridge;
 
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.announceManager.AnnounceType;
@@ -21,7 +21,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public class LegacyAnnouncementTestService {
     
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     private final AnnounceManager announceManager;
     
@@ -31,7 +31,7 @@ public class LegacyAnnouncementTestService {
      * @param plugin The RVNKTools plugin instance
      * @param announceManager The legacy announcement manager
      */
-    public LegacyAnnouncementTestService(RVNKTools plugin, AnnounceManager announceManager) {
+    public LegacyAnnouncementTestService(RVNKCore plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.logger = LogManager.getInstance(plugin, getClass());

@@ -3,7 +3,7 @@ package org.fourz.rvnkcore.bridge;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 
@@ -31,7 +31,7 @@ public class ModernAnnouncementTestService {
      * @param plugin The RVNKTools plugin instance
      * @param rvnkCore The RVNKCore instance
      */
-    public ModernAnnouncementTestService(RVNKTools plugin, RVNKCore rvnkCore) {
+    public ModernAnnouncementTestService(RVNKCore plugin, RVNKCore rvnkCore) {
         this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
     }

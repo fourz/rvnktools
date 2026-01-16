@@ -8,8 +8,7 @@ import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.event.world.WorldInitEvent;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.WorldService;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
  * Event listener for tracking world loading and unloading events using RVNKCore services.
@@ -34,11 +33,11 @@ public class WorldTrackingListener implements Listener {
     
     /**
      * Constructor for WorldTrackingListener.
-     * 
-     * @param plugin The RVNKTools plugin instance
+     *
+     * @param plugin The RVNKCore plugin instance
      * @param rvnkCore The RVNKCore instance for service access
      */
-    public WorldTrackingListener(RVNKTools plugin, RVNKCore rvnkCore) {
+    public WorldTrackingListener(RVNKCore plugin, RVNKCore rvnkCore) {
         this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
         

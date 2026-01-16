@@ -12,8 +12,7 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Timestamp;
 import java.util.concurrent.CompletableFuture;
@@ -30,19 +29,17 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class PlayerTrackingListener implements Listener {
-    
-    private final RVNKTools plugin;
+
     private final LogManager logger;
     private final RVNKCore rvnkCore;
-    
+
     /**
      * Constructor for PlayerTrackingListener.
-     * 
-     * @param plugin The RVNKTools plugin instance
-     * @param rvnkCore The RVNKCore instance
+     *
+     * @param plugin The RVNKCore plugin instance
+     * @param rvnkCore The RVNKCore instance for service access
      */
-    public PlayerTrackingListener(RVNKTools plugin, RVNKCore rvnkCore) {
-        this.plugin = plugin;
+    public PlayerTrackingListener(RVNKCore plugin, RVNKCore rvnkCore) {
         this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
         
