@@ -10,7 +10,10 @@
       "mcp__archon__manage_task",
       "Bash(dir /b /ad \"c:\\\\tools\\\\_PROJECTS\\\\Ravenkaft Dev\\\\docs\")",
       "mcp__archon__manage_document",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__archon__health_check",
+      "Bash(mvn test:*)",
+      "mcp__archon__manage_project"
     ]
   },
   "enableAllProjectMcpServers": true,
