@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.logfilter;
 
 import org.bukkit.configuration.ConfigurationSection;
-import org.fourz.rvnktools.RVNKTools;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.util.log.LogManager;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ import java.util.List;
  */
 public class LogFilterConfig {
     
-    private final RVNKTools plugin;
+    private final JavaPlugin plugin;
     private final LogManager logger;
     
     // Configuration values
@@ -42,7 +42,7 @@ public class LogFilterConfig {
     // Configuration section name
     private static final String CONFIG_SECTION = "log-filter";
     
-    public LogFilterConfig(RVNKTools plugin) {
+    public LogFilterConfig(JavaPlugin plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
     }

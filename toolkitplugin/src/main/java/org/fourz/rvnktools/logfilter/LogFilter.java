@@ -2,7 +2,7 @@ package org.fourz.rvnktools.logfilter;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnktools.RVNKTools;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.util.log.LogManager;
 
 import java.util.List;
@@ -27,13 +27,13 @@ import java.util.logging.Logger;
  */
 public class LogFilter extends Handler {
     
-    private final RVNKTools plugin;
+    private final JavaPlugin plugin;
     private final LogManager logger;
     private LogFilterConfig config;
     private boolean filterEnabled = false;
     private Logger targetLogger;
     
-    public LogFilter(RVNKTools plugin) {
+    public LogFilter(JavaPlugin plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.config = new LogFilterConfig(plugin);

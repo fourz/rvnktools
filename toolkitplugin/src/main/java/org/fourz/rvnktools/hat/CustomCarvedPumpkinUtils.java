@@ -5,11 +5,11 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 public class CustomCarvedPumpkinUtils {
 
-    public static void setCustomCarvedPumpkinOnMob(Entity entity, int customModelData, RVNKTools plugin) {
+    public static void setCustomCarvedPumpkinOnMob(Entity entity, int customModelData, RVNKCore plugin) {
         // Ensure the entity is a LivingEntity
         if (!(entity instanceof LivingEntity)) {
             return;
