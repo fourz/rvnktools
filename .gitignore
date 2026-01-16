@@ -3,3 +3,5 @@ rvnktools.jar
 .vscode/
 shared-backup/
 docs
+toolkitplugin/target/rvnktools-1.3.0-alpha.jar
+toolkitplugin/target/original-rvnkcore-1.3.0-alpha.jar
