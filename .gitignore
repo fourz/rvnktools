@@ -1,6 +1,6 @@
 toolkitplugin/dependency-reduced-pom.xml
 rvnktools.jar
-.vscode/
+.vscode/bak
 shared-backup/
 docs
 toolkitplugin/target/rvnktools-1.3.0-alpha.jar
