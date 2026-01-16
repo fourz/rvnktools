@@ -1,8 +1,8 @@
-name: RVNKTools
+name: RVNKCore
 version: 1.3.0-alpha
 author: fourz
-main: org.fourz.rvnktools.RVNKTools
-description: RVNK Admin Toolkit
+main: org.fourz.rvnkcore.RVNKCore
+description: Core unified library for Ravenkraft Minecraft plugins
 api: "1.0"
 website: http://www.fourz.org
 api-version: 1.16
