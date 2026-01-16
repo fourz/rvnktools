@@ -375,10 +375,190 @@ public abstract class BaseRepository<T, ID> {
     
     /**
      * Creates a new QueryBuilder instance for thread-safe query construction.
-     * 
+     *
      * @return A new QueryBuilder instance
      */
     protected QueryBuilder createQueryBuilder() {
         return BasicSQLQueryBuilder.create();
+    }
+
+    // ========== Batch Operations ==========
+
+    /**
+     * Saves multiple entities in a single batch operation.
+     *
+     * All entities are saved within a single transaction for atomicity.
+     * If any save fails, all changes are rolled back.
+     *
+     * @param entities The entities to save
+     * @return CompletableFuture containing the saved entities
+     */
+    public CompletableFuture<List<T>> saveAll(List<T> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            List<T> results = new ArrayList<>(entities.size());
+
+            try (Connection conn = connectionProvider.getConnection()) {
+                boolean originalAutoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+
+                try {
+                    for (T entity : entities) {
+                        ID id = getId(entity);
+                        if (id != null && existsByIdSync(conn, id)) {
+                            updateSync(conn, entity);
+                        } else {
+                            insertSync(conn, entity);
+                        }
+                        results.add(entity);
+                    }
+                    conn.commit();
+                    logger.info("Batch saved " + results.size() + " entities to " + tableName);
+                    return results;
+                } catch (SQLException e) {
+                    conn.rollback();
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(originalAutoCommit);
+                }
+            } catch (SQLException e) {
+                logger.error("Failed to batch save entities to " + tableName, e);
+                throw new DatabaseException("Batch save failed", e);
+            }
+        });
+    }
+
+    /**
+     * Deletes multiple entities by their IDs in a single batch operation.
+     *
+     * All deletions occur within a single transaction for atomicity.
+     *
+     * @param ids The IDs of entities to delete
+     * @return CompletableFuture containing the number of deleted entities
+     */
+    public CompletableFuture<Integer> deleteAllById(List<ID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return CompletableFuture.completedFuture(0);
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.delete()
+                .from(tableName)
+                .where(getPrimaryKeyColumn() + " = ?")
+                .build();
+
+            try (Connection conn = connectionProvider.getConnection()) {
+                boolean originalAutoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    int totalDeleted = 0;
+
+                    for (ID id : ids) {
+                        setPrimaryKeyParameter(stmt, 1, id);
+                        totalDeleted += stmt.executeUpdate();
+                        stmt.clearParameters();
+                    }
+
+                    conn.commit();
+                    logger.info("Batch deleted " + totalDeleted + " entities from " + tableName);
+                    return totalDeleted;
+                } catch (SQLException e) {
+                    conn.rollback();
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(originalAutoCommit);
+                }
+            } catch (SQLException e) {
+                logger.error("Failed to batch delete entities from " + tableName, e);
+                throw new DatabaseException("Batch delete failed", e);
+            }
+        });
+    }
+
+    /**
+     * Inserts multiple entities using JDBC batch operations.
+     *
+     * More efficient than saveAll for pure inserts when you know entities are new.
+     *
+     * @param entities The entities to insert
+     * @return CompletableFuture containing the number of inserted entities
+     */
+    public CompletableFuture<Integer> insertAll(List<T> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return CompletableFuture.completedFuture(0);
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            String query = buildInsertQuery();
+
+            try (Connection conn = connectionProvider.getConnection()) {
+                boolean originalAutoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    for (T entity : entities) {
+                        setInsertParameters(stmt, entity);
+                        stmt.addBatch();
+                    }
+
+                    int[] results = stmt.executeBatch();
+                    conn.commit();
+
+                    int totalInserted = 0;
+                    for (int result : results) {
+                        if (result > 0) totalInserted++;
+                    }
+
+                    logger.info("Batch inserted " + totalInserted + " entities to " + tableName);
+                    return totalInserted;
+                } catch (SQLException e) {
+                    conn.rollback();
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(originalAutoCommit);
+                }
+            } catch (SQLException e) {
+                logger.error("Failed to batch insert entities to " + tableName, e);
+                throw new DatabaseException("Batch insert failed", e);
+            }
+        });
+    }
+
+    // Helper methods for synchronous operations within transactions
+
+    private boolean existsByIdSync(Connection conn, ID id) throws SQLException {
+        QueryBuilder builder = createQueryBuilder();
+        String query = builder.select("COUNT(*)")
+            .from(tableName)
+            .where(getPrimaryKeyColumn() + " = ?")
+            .build();
+
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            setPrimaryKeyParameter(stmt, 1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    private void insertSync(Connection conn, T entity) throws SQLException {
+        String query = buildInsertQuery();
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            setInsertParameters(stmt, entity);
+            stmt.executeUpdate();
+        }
+    }
+
+    private void updateSync(Connection conn, T entity) throws SQLException {
+        String query = buildUpdateQuery();
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            setUpdateParameters(stmt, entity);
+            stmt.executeUpdate();
+        }
     }
 }
