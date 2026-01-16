@@ -8,6 +8,86 @@ These guidelines should be followed when modifying or creating code to maintain 
 
 When the user explicitly requests metamake functionality using phrases like "use metamake to..." or "with metamake", activate the integrated project management capabilities.
 
+## Archon Project Management Integration
+
+When the user explicitly requests Archon functionality, activate the Archon MCP-based project management capabilities:
+
+### Archon Capabilities Available
+
+- **Task Management**: Create, update, and track development tasks with status workflows (todo → doing → review → done)
+- **Project Organization**: Structure and manage projects with documents, features, and versioning
+- **Knowledge Base Integration**: RAG-powered search for code examples and documentation
+- **Document Management**: Create and maintain project specifications, design docs, notes, and API documentation
+- **Version Management**: Track project component versions and changes
+
+### Archon MCP Tools
+
+**Task Management:**
+- `mcp_archon_find_tasks` - Search and list tasks with filtering (status, project, assignee)
+- `mcp_archon_manage_task` - Create, update, or delete tasks with detailed tracking
+
+**Project Management:**
+- `mcp_archon_find_projects` - Search and retrieve project information
+- `mcp_archon_manage_project` - Create, update, or delete projects
+
+**Knowledge Base:**
+- `mcp_archon_rag_search_knowledge_base` - Search documentation and knowledge base (keep queries 2-5 keywords)
+- `mcp_archon_rag_search_code_examples` - Find relevant code examples
+- `mcp_archon_rag_read_full_page` - Retrieve complete page content
+- `mcp_archon_rag_get_available_sources` - List available knowledge sources for filtering
+
+**Document Management:**
+- `mcp_archon_find_documents` - Search project documents (spec/design/note/prp/api/guide)
+- `mcp_archon_manage_document` - Create, update, or delete project documents
+
+**System Management:**
+- `mcp_archon_health_check` - Check Archon MCP server health and uptime
+- `mcp_archon_session_info` - Get active session information
+- `mcp_archon_get_project_features` - Retrieve project feature tracking
+
+### Archon Usage Patterns
+
+**Task-Driven Development Workflow:**
+1. Check current tasks: `mcp_archon_find_tasks(filter_by="status", filter_value="todo")`
+2. Start task: `mcp_archon_manage_task("update", task_id="...", status="doing")`
+3. Research phase: `mcp_archon_rag_search_knowledge_base(query="...")` and `mcp_archon_rag_search_code_examples(query="...")`
+4. Implementation: Code based on research findings
+5. Mark for review: `mcp_archon_manage_task("update", task_id="...", status="review")`
+6. Complete: `mcp_archon_manage_task("update", task_id="...", status="done")`
+
+**Knowledge Base Search Best Practices:**
+- **Keep queries SHORT and FOCUSED (2-5 keywords)** - Vector search works best with concise terms
+- **Good**: `"vector search pgvector"`, `"React useState"`, `"authentication JWT"`
+- **Bad**: `"how to implement vector search with pgvector in PostgreSQL for semantic similarity"`
+- **Filter by source**: Use `mcp_archon_rag_get_available_sources()` then provide `source_id` parameter
+
+**Task Status Flow:**
+- `todo` → `doing` → `review` → `done`
+- Only ONE task in 'doing' status at a time
+- Use 'review' for completed work awaiting validation
+
+**Project Documentation:**
+- Document types: spec, design, note, prp, api, guide
+- Use structured JSON content for complex documentation
+- Tag documents for easy filtering and discovery
+
+### RVNK-Specific Archon Context
+
+**Current Focus Areas:**
+- RVNKCore architectural refactor and plugin ecosystem consolidation
+- Announcement system migration (YAML → Database)
+- REST API framework expansion
+- Cross-plugin service integration
+- Database layer abstraction
+
+**Usage Examples:**
+```text
+"Use Archon to track the Phase 2 RVNKCore implementation tasks"
+"With Archon, search for REST API authentication patterns"
+"Use Archon to create a design document for the announcement service migration"
+"With Archon, find all todo tasks assigned to me"
+```
+
 ## Core Directives
 
 - **Use the CommandManager framework for all commands. Do not create standalone command executors.**
@@ -190,330 +270,37 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 
 ## Development Workflow
 
-### Multi-Server Development Environment
+### Claude Code AI Assistant Integration
 
-**RVNK Dev (Local)**: Local development server using MCSS API
-- **Status**: ✅ **OPERATIONAL** - Maintains all existing functionality and shortcuts
-- **Usage**: Primary development, testing, debugging
-- **Key Bindings**: `Ctrl+Shift+-` (build & copy), `Ctrl+Shift+/` (restart)
+**Project-Level Instructions:**
+- **CLAUDE.md**: [`shared/derek/CLAUDE.md`](../shared/derek/CLAUDE.md) - Central AI assistant instructions for Ravenkraft Dev
+  - Task-driven development workflow with Archon MCP integration
+  - Research patterns and knowledge base integration
+  - Documentation and project standards
 
-**RVNK Test (SparkedHost)**: Remote test server using SparkedHost MCP tools
-- **Status**: ✅ **OPERATIONAL** - New integration for production-like testing
-- **Usage**: Final testing, validation, staging deployments
-- **Key Bindings**: `Ctrl+Shift++` (build, copy to test, restart via MCP)
+**Claude Code Components (Parent Repo):**
+- **Commands**: [`shared/derek/.claude/commands/`](../shared/derek/.claude/commands/) - Custom slash commands
+- **Agents**: [`shared/derek/.claude/agents/`](../shared/derek/.claude/agents/) - Specialized AI agents (@archon-manager, @java-architect, @minecraft-rvnk-dev, etc.)
+- **Skills**: [`shared/derek/.claude/skills/`](../shared/derek/.claude/skills/) - Reusable skill modules
+- **Skillsets**: [`shared/derek/.claude/skillsets.config.json`](../shared/derek/.claude/skillsets.config.json) - Skillset configuration and management
 
-### VS Code Tasks (Command Palette)
+**RVNKDev Development Skillsets:**
+- **rvnkdev-dev**: RVNK Minecraft plugin development with remote deployment support
+- **rvnkdev-mcp**: RVNKDev MCP server tool usage and patterns (see [`shared/derek/.claude/skills/rvnkdev-mcp.md`](../shared/derek/.claude/skills/rvnkdev-mcp.md))
+- **rvnkdev-mcss**: Local MCSS server management (see [`shared/derek/.claude/skills/mcss-api.md`](../shared/derek/.claude/skills/mcss-api.md), [`mcss-scripts.md`](../shared/derek/.claude/skills/mcss-scripts.md), [`mcss-config.md`](../shared/derek/.claude/skills/mcss-config.md))
+- **rvnkdev-admin**: Ravenkraft server administration via MCP tools
 
-**Primary Development Tasks (RVNK Dev - Local):**
-- **Build & Deploy**: Complete automated sequence (Build → Copy → Restart → Validation)
-- **Build Plugin**: Maven compile and package (`mvn clean package`)
-- **Copy to Server**: Copy JAR to development server
-- **Restart Server**: Full server restart via MCSS API
-- **Reload Server**: Plugin reload without full restart (faster alternative)
+**Development Environment:**
+- **RVNK Dev (Local)**: Local development server using MCSS API for rapid iteration
+- **RVNK Test (SparkedHost)**: Remote test server using SparkedHost MCP tools for production-like testing
+- **Key Bindings**: `Ctrl+Shift+-` (build & copy), `Ctrl+Shift+/` (restart local), `Ctrl+Shift++` (deploy to test)
 
-**New Test Server Tasks (RVNK Test - SparkedHost):**
-- **Build & Deploy to Test**: Complete sequence using SparkedHost MCP tools
-- **Copy to Test Server**: Deploy JAR to RVNK Test server via SparkedHost MCP
-- **Restart Test Server**: Remote server restart using SparkedHost MCP server management
+**Workflow Reference:**
+- VS Code tasks and PowerShell scripts for server operations
+- MCP-based deployment pipelines for test server
+- Database management and console monitoring tools
 
-**Server Query Tasks:**
-- **Query Console - Recent**: Last 50 console lines with color-coded formatting
-- **Query Console - Errors Only**: Filter ERROR/WARN messages from recent logs
-- **Query Console - Plugin Messages**: RVNKTools-specific log entries from last 100 lines
-- **Query Console - Extended**: Last 500 lines for comprehensive debugging
-- **Query Server Status**: Server state, name, type, and memory information
-- **Query Server Statistics**: Real-time CPU, memory, player count, uptime metrics
-- **Send Server Command**: Interactive command execution with custom input
-- **RVNKTools Debug**: Execute `rvnktools debug` for comprehensive plugin status
-
-**Database Management Tasks:**
-- **Clean MySQL Database - DEV**: Interactive database cleanup with confirmation
-- **List MySQL Tables - DEV**: List all tables without modifications
-- **Clean SQLite Database - DEV**: Remove local SQLite database files
-
-**Usage Guidelines:**
-- **RVNK Dev (Local)**: Use **Build & Deploy** for complete development cycle with validation
-- **RVNK Test (SparkedHost)**: Use **Build & Deploy to Test** for production-like testing
-- Use granular tasks (Build Plugin, Copy to Server, etc.) for targeted operations
-- Database cleanup tasks support both interactive and force modes
-
-**Key Bindings for Development Workflow:**
-- `Ctrl+Shift+-`: Build and copy to RVNK Dev (local development server)
-- `Ctrl+Shift+/`: Restart RVNK Dev server via MCSS API
-- `Ctrl+Shift++`: **NEW** - Build, copy to RVNK Test, restart via SparkedHost MCP tools
-
-### SparkedHost MCP Server Operations
-
-**⚠️ PRODUCTION SAFETY**: Never operate on Ravenkraft (production server). Only use RVNK Test server for development operations.
-
-**Server Configuration:**
-- **RVNK Test Server**: `serverId: "b2bc4d7e"` `serverName: "RVNK Test"` (✅ Safe for all operations)
-- **Ravenkraft Server**: `serverId: "140324c4"` `serverName: "Ravenkraft"` (🔒 READ-ONLY - Status queries only)
-
-**Quick Reference MCP Commands:**
-
-**Server Management (RVNK Test Only):**
-- **Restart**: `mcp_sparkedhost_restart-server` 
-- **Console Monitoring**: Use `mcp_sparkedhost_send-console-command` + `mcp_sparkedhost_get-file-contents` (/logs/latest.log)
-- **Send Command**: `mcp_sparkedhost_send-console-command`
-- **Plugin List**: `mcp_sparkedhost_get-plugin-list`
-
-**File Operations (Both Servers):**
-- **List Files**: `mcp_sparkedhost_list-files` (optional directory parameter)
-- **Get File**: `mcp_sparkedhost_get-file-contents` 
-
-**Common File Paths:**
-- `/logs/latest.log` - Current server log
-- `/plugins/` - Plugin directory listing  
-- `/server.properties` - Server configuration
-- `/plugins/RVNKTools/config.yml` - Plugin configuration
-
-**Console Monitoring Pattern:**
-- **Console streaming is currently broken** - `mcp_sparkedhost_console-stream` fails with "Unknown error"
-- **Working alternative**: Use `mcp_sparkedhost_send-console-command` followed by `mcp_sparkedhost_get-file-contents` on `/logs/latest.log`
-- **Best practice**: Send command → wait 2-3 seconds → fetch log file to see output
-
-#### Console Monitoring MCP Workflow
-
-**Real-Time Console Monitoring (Workaround):**
-```javascript
-// Console streaming is currently broken, use this alternative:
-// 1. Send a test command to generate log entry
-mcp_sparkedhost_send-console-command({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test",
-  command: "say Monitoring console..."
-})
-
-// 2. Fetch latest log to see recent activity (wait 2-3 seconds)
-mcp_sparkedhost_get-file-contents({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test",
-  filePath: "/logs/latest.log"  // Shows recent console output
-})
-```
-
-**Console Command Execution:**
-```javascript
-// Execute server commands remotely
-mcp_sparkedhost_send-console-command({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test",
-  command: "rvnktools debug"  // or any server command
-})
-
-// Common monitoring commands
-mcp_sparkedhost_send-console-command({ command: "plugins" })
-mcp_sparkedhost_send-console-command({ command: "tps" })
-mcp_sparkedhost_send-console-command({ command: "list" })
-mcp_sparkedhost_send-console-command({ command: "version" })
-```
-
-**Plugin Status Monitoring:**
-```javascript
-// Get installed plugin list
-mcp_sparkedhost_get-plugin-list({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test"
-})
-
-// Check specific plugin files
-mcp_sparkedhost_list-files({
-  serverId: "b2bc4d7e", 
-  directory: "/plugins"
-})
-```
-
-#### Build & Upload Sequence MCP Workflow Reference
-
-**Complete Development Deployment Pipeline:**
-
-**Phase 1: Local Build**
-```powershell
-# Build plugin using Maven
-mvn clean package -f toolkitplugin/pom.xml
-
-# Verify JAR creation
-Get-ChildItem -Path "toolkitplugin\target" -Filter "*.jar" | 
-  Where-Object { $_.Name -notlike '*original*' -and $_.Name -notlike '*sources*' }
-```
-
-**Phase 2: Upload to Test Server**
-```javascript
-// Upload built JAR to test server
-mcp_sparkedhost_upload-file({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test",
-  localFilePath: "c:\\tools\\rvnktools\\toolkitplugin\\target\\rvnktools-1.3.0-alpha.jar",
-  filePath: "/plugins/RVNKTools.jar"
-})
-
-// Alternative: Upload with content (for config files)
-mcp_sparkedhost_upload-file({
-  serverId: "b2bc4d7e", 
-  serverName: "RVNK Test",
-  content: "# Configuration content here",
-  filePath: "/plugins/RVNKTools/config.yml"
-})
-```
-
-**Phase 3: Server Restart & Validation**
-```javascript
-// Restart test server to apply changes
-mcp_sparkedhost_restart-server({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test" 
-})
-
-// Monitor restart process (wait 10-15 seconds after restart)
-// Console stream is broken, use log file monitoring instead:
-mcp_sparkedhost_get-file-contents({
-  serverId: "b2bc4d7e", 
-  serverName: "RVNK Test",
-  filePath: "/logs/latest.log"  // Check for startup messages
-})
-
-// Validate plugin loaded successfully
-mcp_sparkedhost_get-plugin-list({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test"
-})
-
-// Test plugin functionality
-mcp_sparkedhost_send-console-command({
-  serverId: "b2bc4d7e",
-  command: "rvnktools debug"
-})
-```
-
-**Phase 4: Configuration Verification**
-```javascript
-// Verify configuration files
-mcp_sparkedhost_get-file-contents({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test",
-  filePath: "/plugins/RVNKTools/config.yml"
-})
-
-// Check log files for errors
-mcp_sparkedhost_get-file-contents({
-  serverId: "b2bc4d7e", 
-  serverName: "RVNK Test",
-  filePath: "/logs/latest.log"
-})
-```
-
-**Error Handling & Troubleshooting:**
-```javascript
-// Check for upload errors
-if (uploadResult.includes("ERROR")) {
-  // Retry upload or check file permissions
-  mcp_sparkedhost_list-files({ directory: "/plugins" })
-}
-
-// Monitor for plugin errors during startup  
-// Console stream broken - use log file monitoring:
-mcp_sparkedhost_get-file-contents({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test", 
-  filePath: "/logs/latest.log"
-})
-
-// Check plugin dependencies
-mcp_sparkedhost_send-console-command({ command: "version RVNKTools" })
-```
-
-**Batch Operations:**
-```javascript
-// Multiple file upload (configurations, data files)
-const files = [
-  { local: "config.yml", remote: "/plugins/RVNKTools/config.yml" },
-  { local: "announcements.yml", remote: "/plugins/RVNKTools/announcements.yml" }
-];
-
-files.forEach(file => {
-  mcp_sparkedhost_upload-file({
-    serverId: "b2bc4d7e",
-    localFilePath: file.local,
-    filePath: file.remote
-  });
-});
-```
-
-### Integrated Development Workflow: Local + Test Server
-
-**Dual-Server Development Strategy:**
-
-**RVNK Dev (Local) - Primary Development:**
-- **Purpose**: Rapid iteration, debugging, initial testing
-- **Tools**: MCSS API, PowerShell scripts, VS Code tasks
-- **Workflow**: Build → Copy → Restart → Validate (2-5 seconds)
-- **Usage**: 80% of development time for quick iterations
-
-**RVNK Test (SparkedHost) - Production Validation:**
-- **Purpose**: Final testing, production-like environment validation  
-- **Tools**: SparkedHost MCP server operations
-- **Workflow**: Build → Upload → Restart → Monitor (30-60 seconds)
-- **Usage**: 20% of development time for staging deployment
-
-**Recommended Development Cycle:**
-1. **Local Development**: Use RVNK Dev for rapid iteration (5-10 cycles)
-2. **Test Server Validation**: Deploy to RVNK Test for final validation (1 cycle)
-3. **Production Deployment**: Manual deployment to production server
-
-### PowerShell Query Scripts
-
-**Console Queries (`query-server-DEV.ps1`):**
-```powershell
-# Console queries (1-500 lines or "all")
-.\query-server-DEV.ps1 console 50                    # Recent 50 lines
-.\query-server-DEV.ps1 console 100 -ErrorsOnly       # Errors/warnings only
-.\query-server-DEV.ps1 console 100 -FilterText "RVNKTools"  # Plugin-specific
-
-# Server information
-.\query-server-DEV.ps1 status    # Basic server info
-.\query-server-DEV.ps1 stats     # Performance metrics
-.\query-server-DEV.ps1 info      # Detailed configuration
-
-# Remote command execution
-.\query-server-DEV.ps1 command "rvnktools debug"     # Plugin status
-.\query-server-DEV.ps1 command "plugin list"         # Installed plugins
-```
-
-**MCP Test Server Operations (Complementary to Local Dev):**
-```javascript
-// Test server console monitoring (mirrors local dev queries)
-mcp_sparkedhost_send-console-command({
-  serverId: "b2bc4d7e",
-  command: "rvnktools debug"  // Equivalent to PowerShell query
-})
-
-// Test server plugin validation
-mcp_sparkedhost_get-plugin-list({
-  serverId: "b2bc4d7e",
-  serverName: "RVNK Test"    // Equivalent to local plugin check
-})
-
-// Test server performance monitoring  
-mcp_sparkedhost_send-console-command({
-  serverId: "b2bc4d7e",
-  command: "tps"             // Server performance equivalent
-})
-```
-
-**Database Management (`clean-mysqldb-DEV.ps1`):**
-```powershell
-.\clean-mysqldb-DEV.ps1 -ListOnly    # List tables only
-.\clean-mysqldb-DEV.ps1              # Interactive cleanup
-.\clean-mysqldb-DEV.ps1 -Force       # Force cleanup without prompt
-```
-
-**Advanced Query Features:**
-- Flexible line counts (1-500 or "all"), advanced filtering (-ErrorsOnly, -FilterText)
-- Color-coded output (Green=INFO, Yellow=WARN, Red=ERROR), real-time access (1-2s response)
-- Zero context switching from VS Code, complete MySQL database management
-
-*See comprehensive documentation: [VS Code Query Tasks & PowerShell Query Script](copilot-instructions.vscode-tasks.md)*
+*See full details in parent repository CLAUDE.md and skillset documentation*
 
 ## Documentation and Reference Structure
 
