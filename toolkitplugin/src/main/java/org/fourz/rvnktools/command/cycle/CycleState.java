@@ -2,7 +2,7 @@ package org.fourz.rvnktools.command.cycle;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.fourz.rvnktools.RVNKTools;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.HashMap;
@@ -21,10 +21,10 @@ public class CycleState {
     /**
      * Initializes a new cycle state manager.
      *
-     * @param plugin The RVNKTools plugin instance
+     * @param plugin The plugin instance
      * @param filename The name of the file to store state in
      */
-    public CycleState(RVNKTools plugin, String filename) {
+    public CycleState(JavaPlugin plugin, String filename) {
         this.stateFile = new File(plugin.getDataFolder(), filename);
         this.playerCommandPositions = new HashMap<>();
     }

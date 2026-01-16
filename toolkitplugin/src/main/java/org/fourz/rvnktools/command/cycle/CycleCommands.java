@@ -14,7 +14,7 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.fourz.rvnktools.util.ChatFormat;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 /**
  * Manages cycle commands, which cycle through different instruction sets
@@ -22,7 +22,7 @@ import org.fourz.rvnktools.RVNKTools;
  * toggle between different behaviors.
  */
 public class CycleCommands {
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     private FileConfiguration config;
     private CycleState state;
@@ -31,9 +31,9 @@ public class CycleCommands {
     /**
      * Initializes the cycle commands manager.
      *
-     * @param plugin The RVNKTools plugin instance
+     * @param plugin The RVNKCore plugin instance
      */
-    public CycleCommands(RVNKTools plugin) {
+    public CycleCommands(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.playerCommandPositions = new HashMap<>();
@@ -45,9 +45,9 @@ public class CycleCommands {
     /**
      * Gets the plugin instance.
      *
-     * @return The RVNKTools plugin instance
+     * @return The RVNKCore plugin instance
      */
-    public RVNKTools getPlugin() {
+    public RVNKCore getPlugin() {
         return plugin;
     }
 
@@ -255,6 +255,6 @@ public class CycleCommands {
             message = PlaceholderAPI.setPlaceholders(player, message);
         }
 
-        return ChatFormat.parse(message, containsLinkPlaceholder(message) ? plugin.linkMaker : null);
+        return ChatFormat.parse(message, containsLinkPlaceholder(message) ? plugin.getLinkMaker() : null);
     }
 }

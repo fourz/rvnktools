@@ -32,14 +32,14 @@ public class CycleCommandExecutor implements CommandExecutor {
             sender.sendMessage("This command can only be used by players.");
             return true;
         }
-        
+
         Player player = (Player) sender;
         UUID playerId = player.getUniqueId();
         String instructionKey = cycleCommands.getNextInstructionKey(commandKey, playerId);
         ConfigurationSection instructions = commandConfig.getConfigurationSection("instructions");
 
-        if (commandConfig.contains("permission")) {                
-            String permissionsString = commandConfig.getString("permission").toLowerCase();     
+        if (commandConfig.contains("permission")) {
+            String permissionsString = commandConfig.getString("permission").toLowerCase();
             if (!player.hasPermission(permissionsString)) {
                 player.sendMessage("You do not have permission to use this command.");
                 return true;
@@ -59,7 +59,7 @@ public class CycleCommandExecutor implements CommandExecutor {
     private void executeInstructions(Player player, Iterator<Map<?, ?>> iterator) {
         if (!iterator.hasNext()) return;
 
-        Map<?, ?> instruction = iterator.next();            
+        Map<?, ?> instruction = iterator.next();
         String key = instruction.keySet().iterator().next().toString();
         String value = instruction.get(key).toString();
 
@@ -84,11 +84,11 @@ public class CycleCommandExecutor implements CommandExecutor {
                 executeInstructions(player, iterator);
                 break;
             case "set_permission":
-                cycleCommands.getPlugin().permissionService.addPermission(player.getUniqueId(), value);
+                cycleCommands.getPlugin().getPermissionService().addPermission(player.getUniqueId(), value);
                 executeInstructions(player, iterator);
                 break;
             case "unset_permission":
-                cycleCommands.getPlugin().permissionService.removePermission(player.getUniqueId(), value);
+                cycleCommands.getPlugin().getPermissionService().removePermission(player.getUniqueId(), value);
                 executeInstructions(player, iterator);
                 break;
             case "wait":

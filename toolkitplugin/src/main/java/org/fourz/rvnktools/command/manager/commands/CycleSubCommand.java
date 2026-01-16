@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import java.util.Arrays;
@@ -14,7 +14,7 @@ import java.util.List;
  */
 public class CycleSubCommand extends BaseSubCommand {
     
-    public CycleSubCommand(RVNKTools plugin, BaseCommand parent) {
+    public CycleSubCommand(RVNKCore plugin, BaseCommand parent) {
         super(plugin, parent, "cycle", 
               "Manage cycle commands configuration", 
               "/rvnktools cycle <reload|help>",
