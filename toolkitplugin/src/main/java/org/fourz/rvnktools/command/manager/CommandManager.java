@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.PluginCommand;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
@@ -29,13 +29,13 @@ import java.util.Set;
 public class CommandManager {
     
     private static CommandManager instance;
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final RVNKLogger logger;
     private final Map<String, RVNKCommand> commands;
     private final Map<String, String> aliases;
     private final CycleCommands cycleCommands;
     
-    private CommandManager(RVNKTools plugin) {
+    private CommandManager(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.commands = new HashMap<>();
@@ -93,7 +93,7 @@ public class CommandManager {
      * @param plugin The RVNKTools plugin instance
      * @return The CommandManager instance
      */
-    public static CommandManager getInstance(RVNKTools plugin) {
+    public static CommandManager getInstance(RVNKCore plugin) {
         if (instance == null) {
             instance = new CommandManager(plugin);
         }

@@ -6,7 +6,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 
@@ -18,8 +18,8 @@ import java.util.*;
  * subcommand management, and help text generation.
  */
 public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCompleter {
-    
-    protected final RVNKTools plugin;
+
+    protected final RVNKCore plugin;
     protected final String name;
     protected final String description;
     protected final String usage;
@@ -29,14 +29,14 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
     
     /**
      * Constructor for BaseCommand.
-     * 
-     * @param plugin The RVNKTools plugin instance
+     *
+     * @param plugin The RVNKCore plugin instance
      * @param name The command name
      * @param description The command description
      * @param usage The command usage string
      * @param permission The permission required to use the command (can be null)
      */
-    public BaseCommand(RVNKTools plugin, String name, String description, String usage, String permission) {
+    public BaseCommand(RVNKCore plugin, String name, String description, String usage, String permission) {
         this.plugin = plugin;
         this.name = name;
         this.description = description;
@@ -48,13 +48,13 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
     
     /**
      * Constructor for BaseCommand with default permission.
-     * 
-     * @param plugin The RVNKTools plugin instance
+     *
+     * @param plugin The RVNKCore plugin instance
      * @param name The command name
      * @param description The command description
      * @param usage The command usage string
      */
-    public BaseCommand(RVNKTools plugin, String name, String description, String usage) {
+    public BaseCommand(RVNKCore plugin, String name, String description, String usage) {
         this(plugin, name, description, usage, "rvnktools.command." + name.toLowerCase());
     }
     

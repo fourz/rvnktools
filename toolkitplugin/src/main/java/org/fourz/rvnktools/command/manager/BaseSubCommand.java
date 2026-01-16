@@ -3,7 +3,7 @@ package org.fourz.rvnktools.command.manager;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 
@@ -17,7 +17,7 @@ import java.util.List;
  */
 public abstract class BaseSubCommand implements SubCommand {
     
-    protected final RVNKTools plugin;
+    protected final RVNKCore plugin;
     protected final RVNKCommand parent;
     protected final String name;
     protected final String description;
@@ -29,7 +29,7 @@ public abstract class BaseSubCommand implements SubCommand {
     /**
      * Constructor for BaseSubCommand.
      * 
-     * @param plugin The RVNKTools plugin instance
+     * @param plugin The RVNKCore plugin instance
      * @param parent The parent command
      * @param name The subcommand name
      * @param description The subcommand description
@@ -37,7 +37,7 @@ public abstract class BaseSubCommand implements SubCommand {
      * @param permission The permission required to use the subcommand (can be null)
      * @param playerOnly Whether this subcommand is restricted to players only
      */
-    public BaseSubCommand(RVNKTools plugin, RVNKCommand parent, String name, String description, 
+    public BaseSubCommand(RVNKCore plugin, RVNKCommand parent, String name, String description, 
                          String usage, String permission, boolean playerOnly) {
         this.plugin = plugin;
         this.parent = parent;
@@ -52,14 +52,14 @@ public abstract class BaseSubCommand implements SubCommand {
     /**
      * Constructor for BaseSubCommand with default permission (inherits from parent).
      * 
-     * @param plugin The RVNKTools plugin instance
+     * @param plugin The RVNKCore plugin instance
      * @param parent The parent command
      * @param name The subcommand name
      * @param description The subcommand description
      * @param usage The subcommand usage string
      * @param playerOnly Whether this subcommand is restricted to players only
      */
-    public BaseSubCommand(RVNKTools plugin, RVNKCommand parent, String name, String description, 
+    public BaseSubCommand(RVNKCore plugin, RVNKCommand parent, String name, String description, 
                          String usage, boolean playerOnly) {
         this(plugin, parent, name, description, usage, 
              parent.getPermission() != null ? parent.getPermission() + "." + name.toLowerCase() : null, 
@@ -69,13 +69,13 @@ public abstract class BaseSubCommand implements SubCommand {
     /**
      * Constructor for BaseSubCommand with default permission and not player-only.
      * 
-     * @param plugin The RVNKTools plugin instance
+     * @param plugin The RVNKCore plugin instance
      * @param parent The parent command
      * @param name The subcommand name
      * @param description The subcommand description
      * @param usage The subcommand usage string
      */
-    public BaseSubCommand(RVNKTools plugin, RVNKCommand parent, String name, String description, String usage) {
+    public BaseSubCommand(RVNKCore plugin, RVNKCommand parent, String name, String description, String usage) {
         this(plugin, parent, name, description, usage, false);
     }
     
