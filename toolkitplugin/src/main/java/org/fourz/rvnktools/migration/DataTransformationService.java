@@ -3,7 +3,7 @@ package org.fourz.rvnktools.migration;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 @SuppressWarnings("unused") // Fields used for future enhancements and LogManager access
 public class DataTransformationService {
     
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     
     // Transformation statistics
@@ -44,7 +44,7 @@ public class DataTransformationService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HHmm");
     private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("&[0-9a-fk-or]");
     
-    public DataTransformationService(RVNKTools plugin) {
+    public DataTransformationService(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin);
         this.validationIssues = new ArrayList<>();

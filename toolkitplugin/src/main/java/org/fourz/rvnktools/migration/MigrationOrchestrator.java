@@ -4,7 +4,7 @@ import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class MigrationOrchestrator {
     
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     private final AnnouncementService announcementService;
     
@@ -47,7 +47,7 @@ public class MigrationOrchestrator {
     // Migration results
     private MigrationResult lastMigrationResult;
     
-    public MigrationOrchestrator(RVNKTools plugin, AnnouncementService announcementService) {
+    public MigrationOrchestrator(RVNKCore plugin, AnnouncementService announcementService) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin);
         this.announcementService = announcementService;

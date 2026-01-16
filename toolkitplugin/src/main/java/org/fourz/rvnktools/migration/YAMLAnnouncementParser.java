@@ -5,7 +5,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -29,7 +29,7 @@ import java.util.concurrent.CompletableFuture;
 @SuppressWarnings("unused") // Plugin field used for LogManager and data folder access
 public class YAMLAnnouncementParser {
     
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     private final File yamlFile;
     
@@ -38,7 +38,7 @@ public class YAMLAnnouncementParser {
     private List<AnnouncementDTO> parsedAnnouncements;
     private Map<String, Object> parsedConfig;
     
-    public YAMLAnnouncementParser(RVNKTools plugin) {
+    public YAMLAnnouncementParser(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin);
         this.yamlFile = new File(plugin.getDataFolder(), "announcements.yml");

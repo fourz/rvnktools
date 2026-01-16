@@ -3,7 +3,7 @@ package org.fourz.rvnktools.migration;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -33,7 +33,7 @@ import com.google.gson.GsonBuilder;
 @SuppressWarnings("unused") // Plugin field used for data folder access and LogManager
 public class BackupRollbackManager {
     
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final LogManager logger;
     private final File backupDirectory;
     private final Gson gson;
@@ -41,7 +41,7 @@ public class BackupRollbackManager {
     // Backup tracking
     private final Map<String, BackupMetadata> backupRegistry;
     
-    public BackupRollbackManager(RVNKTools plugin) {
+    public BackupRollbackManager(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin);
         this.backupDirectory = new File(plugin.getDataFolder(), "migration-backups");
