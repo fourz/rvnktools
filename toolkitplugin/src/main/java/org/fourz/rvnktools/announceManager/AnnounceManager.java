@@ -6,7 +6,7 @@ import org.bukkit.command.CommandSender;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.ChatServiceInterface;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
@@ -25,14 +25,14 @@ public class AnnounceManager {
         ADD_ANNOUNCEMENT
     }
 
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
     private final ChatServiceInterface chatService;    
     private final Map<String, Announcement> announcements = new ConcurrentHashMap<>();
     private boolean usingPlaceholderAPI;    
 
-    public AnnounceManager(RVNKTools plugin) {
+    public AnnounceManager(RVNKCore plugin) {
         this.logger = LogManager.getInstance(plugin, getClass());
         logger.info("Enabling AnnounceManager.");
         this.plugin = plugin;
@@ -200,7 +200,7 @@ public class AnnounceManager {
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
                     break;
                 default: // "chat"
-                    chatService.sendMessage(player, message, plugin.linkMaker);
+                    chatService.sendMessage(player, message, plugin.getLinkMaker());
                     break;
             }
             

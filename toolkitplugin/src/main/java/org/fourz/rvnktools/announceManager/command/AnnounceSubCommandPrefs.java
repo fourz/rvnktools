@@ -3,13 +3,13 @@ package org.fourz.rvnktools.announceManager.command;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.preferences.PreferenceProperty;
 
 public class AnnounceSubCommandPrefs extends AnnounceSubCommand {
     
-    public AnnounceSubCommandPrefs(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceSubCommandPrefs(AnnounceManager announceManager, RVNKCore plugin) {
         super(announceManager, plugin);
     }
 

@@ -1,12 +1,12 @@
 package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 
 public class AnnounceSubCommandNow extends AnnounceSubCommand {
     
-    public AnnounceSubCommandNow(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceSubCommandNow(AnnounceManager announceManager, RVNKCore plugin) {
         super(announceManager, plugin);
     }
 

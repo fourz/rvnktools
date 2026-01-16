@@ -2,7 +2,7 @@ package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.util.CurrencyFormatter;
@@ -11,7 +11,7 @@ import java.util.Arrays;
 
 public class AnnounceSubCommandAdd extends AnnounceSubCommand {
     
-    public AnnounceSubCommandAdd(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceSubCommandAdd(AnnounceManager announceManager, RVNKCore plugin) {
         super(announceManager, plugin);
     }
 

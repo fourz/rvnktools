@@ -2,7 +2,7 @@ package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.Announcement;
 
@@ -12,7 +12,7 @@ import java.time.format.DateTimeParseException;
 
 public class AnnounceSubCommandSet extends AnnounceSubCommand {
     
-    public AnnounceSubCommandSet(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceSubCommandSet(AnnounceManager announceManager, RVNKCore plugin) {
         super(announceManager, plugin);
     }
 

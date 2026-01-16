@@ -3,13 +3,13 @@ package org.fourz.rvnktools.announceManager.command;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import java.util.Arrays;
 
 public class AnnounceSubCommandStatus extends AnnounceSubCommand {
     
-    public AnnounceSubCommandStatus(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceSubCommandStatus(AnnounceManager announceManager, RVNKCore plugin) {
         super(announceManager, plugin);
     }
 

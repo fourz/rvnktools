@@ -2,7 +2,7 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.fourz.rvnktools.RVNKTools;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 
@@ -21,7 +21,7 @@ public class AnnounceScheduler {
     private static final String ANNUAL_DATE_PATTERN = "\\d{2}-\\d{2}";  // MM-dd pattern
 
     private final RVNKLogger logger;
-    private final RVNKTools plugin;
+    private final JavaPlugin plugin;
     private final AnnounceManager announceManager;
     private Map<Announcement, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();    
     private final Random rand = new Random();
@@ -30,7 +30,7 @@ public class AnnounceScheduler {
     private static final int RECURRENCE_UNSET = -1; 
 
     // Initialize the scheduler
-    public AnnounceScheduler(RVNKTools plugin, AnnounceManager announceManager) {
+    public AnnounceScheduler(JavaPlugin plugin, AnnounceManager announceManager) {
         this.plugin = plugin;
         this.announceManager = announceManager;
         this.logger = LogManager.getInstance(plugin, getClass());

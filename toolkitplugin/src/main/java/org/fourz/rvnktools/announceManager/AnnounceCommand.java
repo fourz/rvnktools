@@ -4,7 +4,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.command.*;
 
 import java.util.HashMap;
@@ -13,9 +13,9 @@ import java.util.Map;
 public class AnnounceCommand implements CommandExecutor {
     private final Map<String, AnnounceSubCommand> subcommands = new HashMap<>();
     private final AnnounceManager announceManager;
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
 
-    public AnnounceCommand(AnnounceManager announceManager, RVNKTools plugin) {
+    public AnnounceCommand(AnnounceManager announceManager, RVNKCore plugin) {
         this.announceManager = announceManager;
         this.plugin = plugin;
         
