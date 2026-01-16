@@ -2,18 +2,18 @@ package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 
 import java.util.Collections;
 import java.util.List;
 
 public class EventsCommand extends BaseCommand {
-    
-    public EventsCommand(RVNKTools plugin) {
-        super(plugin, "events", 
-              "Provides information about scheduled events", 
-              "/events", 
+
+    public EventsCommand(RVNKCore plugin) {
+        super(plugin, "events",
+              "Provides information about scheduled events",
+              "/events",
               null);  // No special permission required
     }
 
@@ -30,7 +30,7 @@ public class EventsCommand extends BaseCommand {
         } else {
             sender.sendMessage("This command can only be used by players.");
         }
-        return true;            
+        return true;
     }
 
     @Override

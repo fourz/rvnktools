@@ -8,7 +8,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 
 import java.util.Collections;
@@ -16,7 +16,7 @@ import java.util.List;
 
 public class PutHatCommand extends BaseCommand {
 
-    public PutHatCommand(RVNKTools plugin) {
+    public PutHatCommand(RVNKCore plugin) {
         super(plugin, "puthat",
               "Applies a custom Jack-o-Lantern to the nearest mob.",
               "/puthat <customModelData>",

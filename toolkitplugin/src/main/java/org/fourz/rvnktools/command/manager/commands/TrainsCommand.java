@@ -2,7 +2,7 @@ package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 
 import java.util.Collections;
@@ -11,10 +11,10 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 public class TrainsCommand extends BaseCommand {
-    private final RVNKTools plugin;
+    private final RVNKCore plugin;
     private final List<String> subcommands = Arrays.asList("enable", "disable", "modes", "examples", "links");
 
-    public TrainsCommand(RVNKTools plugin) {
+    public TrainsCommand(RVNKCore plugin) {
         super(plugin, "trains", "Toggle TrainCart/Vanilla minecart modes and show help.", "/trains [enable|disable|modes|examples|links]", "rvnktools.command.trains");
         this.plugin = plugin;
     }
@@ -29,7 +29,7 @@ public class TrainsCommand extends BaseCommand {
         if (args.length == 0) {
             showHelpPage(player, "");
             return true;
-        }        
+        }
 
         String subCommand = args[0].toLowerCase();
         switch (subCommand) {
@@ -100,7 +100,7 @@ public class TrainsCommand extends BaseCommand {
                 player.sendMessage("§e");
                 player.sendMessage("§e §c/train help §b-- §fTraincarts Default help.");
                 break;
-                
+
             case "default":
             default:
                 player.sendMessage("§a -------------- §6TrainCarts Help §fWelcome §a-----------------");

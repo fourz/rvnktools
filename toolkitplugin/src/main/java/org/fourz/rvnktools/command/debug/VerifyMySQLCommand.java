@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.command.debug;
 
 import org.fourz.rvnkcore.integration.MySQLIntegrationVerification;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.util.ChatFormat;
 import org.bukkit.command.CommandSender;
@@ -11,7 +11,7 @@ import org.bukkit.command.CommandSender;
  */
 public class VerifyMySQLCommand extends BaseCommand {
 
-    public VerifyMySQLCommand(RVNKTools plugin) {
+    public VerifyMySQLCommand(RVNKCore plugin) {
         super(plugin, "verifymysql",
               "Verify MySQL integration status",
               "/verifymysql",
@@ -21,13 +21,13 @@ public class VerifyMySQLCommand extends BaseCommand {
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
         sender.sendMessage(ChatFormat.colorize("&6⚙ Starting MySQL integration verification..."));
-        
+
         try {
             MySQLIntegrationVerification verification = new MySQLIntegrationVerification(plugin);
             MySQLIntegrationVerification.IntegrationStatus status = verification.verifyIntegration();
-            
+
             String report = status.generateReport();
-            
+
             // Send report to sender (split by lines to avoid message limits)
             String[] lines = report.split("\n");
             for (String line : lines) {
@@ -45,12 +45,12 @@ public class VerifyMySQLCommand extends BaseCommand {
                     }
                 }
             }
-            
+
         } catch (Exception e) {
             sender.sendMessage(ChatFormat.colorize("&c✖ Error during verification: " + e.getMessage()));
             logger.error("MySQL verification failed", e);
         }
-        
+
         return true;
     }
 }

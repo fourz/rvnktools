@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import java.util.List;
 
@@ -10,13 +10,13 @@ import java.util.List;
  * Provides access to plugin configuration, debugging, and utility functions.
  */
 public class RVNKToolsCommand extends BaseCommand {
-    
-    public RVNKToolsCommand(RVNKTools plugin) {
-        super(plugin, "rvnktools", 
-              "Main administrative command for RVNKTools plugin", 
+
+    public RVNKToolsCommand(RVNKCore plugin) {
+        super(plugin, "rvnktools",
+              "Main administrative command for RVNKTools plugin",
               "/rvnktools <subcommand> [args]",
               "rvnktools.command");
-        
+
         // Register admin subcommands (these don't use world swap)
         registerSubCommand("links", new LinksSubCommand(plugin, this));
         registerSubCommand("cycle", new CycleSubCommand(plugin, this));
@@ -24,18 +24,18 @@ public class RVNKToolsCommand extends BaseCommand {
         registerSubCommand("debug", new DebugSubCommand(plugin, this));
         registerSubCommand("createtestdata", new CreateTestDataSubCommand(plugin, this));
         registerSubCommand("migration", new MigrationSubCommand(plugin, this));
-        
+
         // Create teleport subcommands without world swap - they will get it from CommandManager
         registerSubCommand("teleport", new TeleportSubCommand(plugin, this));
     }
-    
+
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
         // This will be called when no subcommands match
         sendHelp(sender);
         return true;
     }
-    
+
     @Override
     public void sendHelp(CommandSender sender) {
         sender.sendMessage("§c▶ §6RVNKTools Administrative Commands");
@@ -52,13 +52,13 @@ public class RVNKToolsCommand extends BaseCommand {
         sender.sendMessage("§f/worldswap [world] §7- Direct world swap command");
         sender.sendMessage("§f/event [world] §7- Event world shortcut command");
     }
-    
+
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length <= 1) {
             return getMatchingSubCommands(sender, args.length == 0 ? "" : args[0]);
         }
-        
+
         return super.tabComplete(sender, args);
     }
 }

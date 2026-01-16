@@ -3,7 +3,7 @@ package org.fourz.rvnktools.command.manager.commands;
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.bridge.ModernAnnouncementTestService;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 
@@ -22,7 +22,7 @@ public class CreateTestDataSubCommand extends BaseSubCommand {
     
     private ModernAnnouncementTestService testService;
     
-    public CreateTestDataSubCommand(RVNKTools plugin, BaseCommand parent) {
+    public CreateTestDataSubCommand(RVNKCore plugin, BaseCommand parent) {
         super(plugin, parent, "createtestdata", 
               "Create test data for API validation", 
               "/rvnktools createtestdata <types|announcements|all|single|status>",

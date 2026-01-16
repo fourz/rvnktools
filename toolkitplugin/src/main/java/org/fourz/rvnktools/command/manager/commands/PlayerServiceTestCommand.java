@@ -6,7 +6,6 @@ import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.service.PlayerService;
-import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.util.ChatFormat;
@@ -29,12 +28,12 @@ public class PlayerServiceTestCommand extends BaseCommand {
     
     private final RVNKCore rvnkCore;
     
-    public PlayerServiceTestCommand(RVNKTools plugin) {
-        super(plugin, "pstest", 
-              "Test PlayerService functionality", 
+    public PlayerServiceTestCommand(RVNKCore plugin) {
+        super(plugin, "pstest",
+              "Test PlayerService functionality",
               "/pstest <recent|groups|syncgroups> [args...]",
               "rvnktools.admin.pstest");
-        this.rvnkCore = plugin.getRVNKCore();
+        this.rvnkCore = plugin;
     }
     
     @Override

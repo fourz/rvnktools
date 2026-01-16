@@ -3,7 +3,7 @@ package org.fourz.rvnktools.command.manager.commands;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import java.util.List;
 import java.util.Collections;
@@ -28,7 +28,7 @@ public class ToggleCommand extends BaseCommand {
      * @param toggleOffMessage Message to show when toggled off
      * @param permissionNode Permission required to use the command
      */
-    public ToggleCommand(RVNKTools plugin, List<String> toggleOnCommands, List<String> toggleOffCommands, String toggleOnMessage, String toggleOffMessage, String permissionNode) {
+    public ToggleCommand(RVNKCore plugin, List<String> toggleOnCommands, List<String> toggleOffCommands, String toggleOnMessage, String toggleOffMessage, String permissionNode) {
         super(plugin, "toggle", "Toggle a set of server commands on/off", "/toggle", permissionNode);
         this.toggleOnCommands = toggleOnCommands;
         this.toggleOffCommands = toggleOffCommands;

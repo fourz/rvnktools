@@ -12,7 +12,6 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
-import org.fourz.rvnktools.RVNKTools;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import java.util.ArrayList;
@@ -30,13 +29,13 @@ public class WorldSwapSubCommand extends BaseSubCommand {
     private final RVNKCore rvnkCore;
     private static final String DEFAULT_EVENT_WORLD = "event";
     
-    public WorldSwapSubCommand(RVNKTools plugin, BaseCommand parent) {
-        super(plugin, parent, "worldswap", 
-              "Teleport between worlds while preserving locations", 
+    public WorldSwapSubCommand(RVNKCore plugin, BaseCommand parent) {
+        super(plugin, parent, "worldswap",
+              "Teleport between worlds while preserving locations",
               "/rvnktools teleport worldswap [world]",
               "rvnktools.command.teleport.worldswap", true);
-        
-        this.rvnkCore = ((RVNKTools) plugin).getRVNKCore();
+
+        this.rvnkCore = plugin;
         
         Plugin mvPlugin = Bukkit.getPluginManager().getPlugin("Multiverse-Core");
         if (mvPlugin == null || !mvPlugin.isEnabled()) {

@@ -2,7 +2,7 @@ package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 
 import java.util.Collections;
@@ -16,9 +16,9 @@ import java.text.DecimalFormat;
 public class PingCommand extends BaseCommand {
     private static final DecimalFormat df = new DecimalFormat("#.##");
 
-    public PingCommand(RVNKTools plugin) {
-        super(plugin, "ping", 
-              "Shows server performance information including TPS and memory usage", 
+    public PingCommand(RVNKCore plugin) {
+        super(plugin, "ping",
+              "Shows server performance information including TPS and memory usage",
               "/ping",
               null); // No permission required
     }

@@ -3,14 +3,14 @@ package org.fourz.rvnktools.command.manager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 
 import java.util.Collections;
 import java.util.List;
 
 public class BroadcastCommand extends BaseCommand {
 
-    public BroadcastCommand(RVNKTools plugin) {
+    public BroadcastCommand(RVNKCore plugin) {
         super(plugin, "broadcast",
               "Broadcasts a message to all players",
               "/broadcast <message>",
@@ -31,11 +31,11 @@ public class BroadcastCommand extends BaseCommand {
 
         // Join the args into a single message
         String message = String.join(" ", args);
-        
+
         // Format with ChatColor (not color codes) and broadcast
         String formattedMessage = ChatColor.GOLD + "[Broadcast] " + ChatColor.RESET + message;
         Bukkit.broadcastMessage(formattedMessage);
-        
+
         return true;
     }
 

@@ -1,7 +1,7 @@
 package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnktools.RVNKTools;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import java.util.List;
 
@@ -10,24 +10,24 @@ import java.util.List;
  * Provides organized access to world swapping and other teleportation utilities.
  */
 public class TeleportCommand extends BaseCommand {
-    
-    public TeleportCommand(RVNKTools plugin, WorldSwapSubCommand sharedWorldSwap) {
-        super(plugin, "teleport", 
-              "Teleportation utilities and world management", 
+
+    public TeleportCommand(RVNKCore plugin, WorldSwapSubCommand sharedWorldSwap) {
+        super(plugin, "teleport",
+              "Teleportation utilities and world management",
               "/teleport <subcommand> [args]",
               "rvnktools.command.teleport");
-        
+
         // Register teleport subcommands using the shared instance directly
         registerSubCommand("worldswap", sharedWorldSwap);
     }
-    
+
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
         // This will be called when no subcommands match
         sendHelp(sender);
         return true;
     }
-    
+
     @Override
     public void sendHelp(CommandSender sender) {
         sender.sendMessage("§c▶ §6Teleportation Commands");
@@ -37,13 +37,13 @@ public class TeleportCommand extends BaseCommand {
         sender.sendMessage("§7   Your location in each world will be saved and restored");
         sender.sendMessage("§7   Use specific world name or default to 'event' world");
     }
-    
+
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length <= 1) {
             return getMatchingSubCommands(sender, args.length == 0 ? "" : args[0]);
         }
-        
+
         return super.tabComplete(sender, args);
     }
 }
