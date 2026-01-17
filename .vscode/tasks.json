@@ -1,0 +1,1300 @@
+{
+    "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "mcpServer",
+            "description": "Select target server",
+            "type": "pickString",
+            "options": [
+                "rvnk-dev",
+                "rvnk-test",
+                "rvnk-prod"
+            ],
+            "default": "rvnk-dev"
+        },
+        {
+            "id": "mcpConsoleLine",
+            "description": "Number of console lines to retrieve",
+            "type": "pickString",
+            "options": ["25", "50", "100", "200", "500"],
+            "default": "50"
+        },
+        {
+            "id": "mcpCommand",
+            "description": "Command to send to the server (without /)",
+            "type": "promptString",
+            "default": "rvnktools debug"
+        },
+        {
+            "id": "mcpRemotePath",
+            "description": "Remote path on server",
+            "type": "promptString",
+            "default": "/plugins"
+        },
+        {
+            "id": "serverCommand",
+            "description": "Enter the command to send to the server",
+            "default": "rvnktools debug",
+            "type": "promptString"
+        },
+        {
+            "id": "versionType",
+            "description": "Select version increment type",
+            "default": "patch",
+            "type": "pickString",
+            "options": [
+                "patch",
+                "minor", 
+                "major"
+            ]
+        },
+        {
+            "id": "customVersion",
+            "description": "Enter custom version (e.g., 1.2.0-alpha) or leave empty for automatic increment",
+            "default": "",
+            "type": "promptString"
+        },
+        {
+            "id": "rvnkApiQueryType",
+            "description": "Select RVNKCore API query type",
+            "default": "test",
+            "type": "pickString",
+            "options": [
+                "test",
+                "players",
+                "announcements",
+                "player",
+                "announcement",
+                "custom"
+            ]
+        },
+        {
+            "id": "rvnkApiEndpoint",
+            "description": "Enter API endpoint (e.g., /api/v1/players)",
+            "default": "/api/v1/players",
+            "type": "promptString"
+        },
+        {
+            "id": "rvnkApiMethod",
+            "description": "Select HTTP method",
+            "default": "GET",
+            "type": "pickString",
+            "options": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE"
+            ]
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Build Plugin",
+            "type": "shell",
+            "command": "mvn clean package",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true                
+            },
+            "detail": "Compiles and packages the Spigot plugin using Maven.",
+            "presentation": {
+                "reveal": "always",
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Copy to Dev Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\copyto-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": "build",
+            //"dependsOn": "Build Plugin",
+            "detail": "Copies the built plugin JAR to the development server plugins folder. 'Build Plugin' task may need to be run first.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,                
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Restart Dev Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\restart-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build"
+            },
+            //"dependsOn": "Copy to Dev Server",
+            "detail": "Performs a full development server restart. Best used after 'Copy to Dev Server' task to apply changes. May take up to 30 seconds to complete.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,                
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Reload Server",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\reload-server-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build"
+            },
+            //"dependsOn": "Copy to Dev Server",
+            "detail": "Reloads all plugins without full server restart. Requires 'Copy to Dev Server' task first. Note: Some changes may require a full restart.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Cleanup Plugin Folder",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File C:\\tools\\rvnktools\\.vscode\\cleanup-folder-DEV.ps1",
+            "options": {
+                "cwd": "${workspaceFolder}\\toolkitplugin"
+            },
+            "group": {
+                "kind": "build"
+            },
+            "detail": "Cleans up server files, SQLite databases, and plugin data. Should be run before applying major changes.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Clean Jar",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\cleanup-jar-DEV.ps1"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Remove old RVNKTools JAR files from development server plugins folder. Use before version increment to clean up old versions.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Clean&Restart Server",
+            "type": "shell",
+            "dependsOn": ["Cleanup Plugin Folder", "Restart Dev Server"],
+            "group": {
+                "kind": "build"
+            },
+            "detail": "Comprehensive cleanup followed by development server restart. Runs 'Cleanup Plugin Folder' then 'Restart Dev Server' in sequence. Best for major updates.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Clean&Reload Server",
+            "type": "shell",
+            "dependsOn": ["Cleanup Plugin Folder", "Reload Server"],
+            "group": {
+                "kind": "build"
+            },
+            "detail": "Comprehensive cleanup followed by plugin reload. Runs 'Cleanup Plugin Folder' then 'Reload Server' in sequence. For changes that don't require full restart.",
+            "presentation": {
+                "reveal": "always",
+                "echo": false,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Console - Recent",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "console", "50"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get the last 50 console log entries from the development server. Supports 1-500 lines or 'all'.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Console - Errors Only",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "console", "50", "-ErrorsOnly"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get recent error and warning messages from console. Supports 1-500 lines or 'all'.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Console - Plugin Messages",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "console", "100", "-FilterText", "RVNKTools"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get console messages containing 'RVNKTools' from last 100 entries. Supports 1-500 lines or 'all'.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Server Status",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "status"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get current server status and basic information.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Server Statistics",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "stats"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get server performance statistics (CPU, memory, players, uptime).",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Server Info",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "info"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get detailed server configuration and setup information.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Send Server Command",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "command", "${input:serverCommand}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Send a command to the development server and show the output.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Build & Deploy",
+            "type": "shell",
+            "dependsOn": [
+                "Build Plugin",
+                "Copy to Dev Server",
+                "Restart Dev Server"
+            ],
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build"
+            },
+            "detail": "Complete build and deployment sequence: Builds the plugin, copies to dev server, and performs full restart.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "RVNKTools Debug",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "command", "rvnktools debug"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Run RVNKTools debug command to show comprehensive plugin status and system information.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Query Console - Extended",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-server-DEV.ps1",
+                "console", "500"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get the last 500 console log entries from the development server for comprehensive debugging context. Use for tracking startup sequences or complex operations.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Clean MySQL Database - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-mysqldb-DEV.ps1"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Remove all tables from the development MySQL database. Use when schema changes break compatibility.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "List MySQL Tables - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-mysqldb-DEV.ps1",
+                "-ListOnly"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "List all tables in the development MySQL database without removing them.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Force Clean MySQL Database - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-mysqldb-DEV.ps1",
+                "-Force"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Remove all tables from the development MySQL database without confirmation prompt.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Clean SQLite Database - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-sqlitedb-DEV.ps1"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Remove SQLite database files from the development server plugin folder.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "List SQLite Files - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-sqlitedb-DEV.ps1",
+                "-ListOnly"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "List all SQLite database files in the development server plugin folder without removing them.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Force Clean SQLite Database - DEV",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass", 
+                "-File", "C:\\tools\\rvnktools\\.vscode\\clean-sqlitedb-DEV.ps1",
+                "-Force"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Remove SQLite database files from the development server plugin folder without confirmation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Increment Version - Patch",
+            "type": "shell",
+            "dependsOn": "Clean Jar",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "patch"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Increment patch version (e.g., 1.1.0 → 1.1.1). Cleans old JARs first, then updates pom.xml, plugin.yml, project.json, and documentation files.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Increment Version - Minor",
+            "type": "shell",
+            "dependsOn": "Clean Jar",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "minor"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Increment minor version (e.g., 1.1.0 → 1.2.0). Cleans old JARs first, then updates pom.xml, plugin.yml, project.json, and documentation files.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Increment Version - Major",
+            "type": "shell",
+            "dependsOn": "Clean Jar",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "major"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Increment major version (e.g., 1.1.0 → 2.0.0). Cleans old JARs first, then updates pom.xml, plugin.yml, project.json, and documentation files.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Increment Version - Interactive",
+            "type": "shell",
+            "dependsOn": "Clean Jar",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "${input:versionType}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Increment version with interactive type selection (patch/minor/major). Cleans old JARs first, then updates pom.xml, plugin.yml, project.json, and documentation files.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Set Custom Version",
+            "type": "shell",
+            "dependsOn": "Clean Jar",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "-NewVersion", "${input:customVersion}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Set a custom version string (e.g., 2.0.0-beta). Cleans old JARs first, then updates pom.xml, plugin.yml, project.json, and documentation files.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Preview Version Changes",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\increment-version.ps1",
+                "${input:versionType}",
+                "-WhatIf"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Preview version changes without modifying files. Shows what would be updated for the selected increment type.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Execute RVNKCore API Call",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-rvnkcoreapi-DEV.ps1",
+                "${input:rvnkApiQueryType}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Execute RVNKCore API calls using project.json configuration. Select query type for targeted testing.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "RVNKCore API - Test Connectivity",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-rvnkcoreapi-DEV.ps1",
+                "test",
+                "-Detail",
+                "-IgnoreSSLErrors"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Test basic connectivity to RVNKCore API endpoints (HTTP and HTTPS) with detailed output.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "RVNKCore API - Test Players",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-rvnkcoreapi-DEV.ps1",
+                "players",
+                "-Detail",
+                "-IgnoreSSLErrors"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Test RVNKCore Player API endpoints with detailed response data.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "RVNKCore API - Test Announcements",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-rvnkcoreapi-DEV.ps1",
+                "announcements",
+                "-Detail",
+                "-IgnoreSSLErrors"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Test RVNKCore Announcement API endpoints with detailed response data.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "RVNKCore API - Custom Request",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-File", "C:\\tools\\rvnktools\\.vscode\\query-rvnkcoreapi-DEV.ps1",
+                "custom",
+                "${input:rvnkApiEndpoint}",
+                "${input:rvnkApiMethod}",
+                "-IgnoreSSLErrors"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Execute custom RVNKCore API request with specified endpoint and HTTP method.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Copy to Test Server",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-Command", 
+                "$jarPath = Get-ChildItem -Path '${workspaceFolder}\\toolkitplugin\\target' -Filter '*.jar' | Where-Object { $_.Name -notlike '*original*' -and $_.Name -notlike '*sources*' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($jarPath) { Write-Host \"JAR found: $($jarPath.FullName)\"; Write-Host \"Use Copilot to upload via SparkedHost MCP tools to RVNK Test server (b2bc4d7e)\"; } else { Write-Error 'No JAR file found in target directory'; exit 1 }"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Identify JAR for RVNK Test server upload. Use Copilot with SparkedHost MCP tools for actual upload to serverId: b2bc4d7e. 'Build Plugin' task may need to be run first.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Restart Test Server",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "Write-Host 'Use Copilot: mcp_sparkedhost_restart-server with serverId: b2bc4d7e, serverName: RVNK Test'; Write-Host 'MCP restart command required - ask Copilot to restart test server'"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Restart RVNK Test server using SparkedHost MCP: mcp_sparkedhost_restart-server (serverId: b2bc4d7e). Ask Copilot to execute MCP command.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": false,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Build and Deploy To Test Server",
+            "type": "shell",
+            "dependsOn": [
+                "Build Plugin",
+                "Copy to Test Server",
+                "Restart Test Server"
+            ],
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build"
+            },
+            "detail": "Complete build and deployment sequence for RVNK Test server: Builds the plugin, copies to test server via SparkedHost MCP, and performs restart.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Test Server Console Stream",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "Write-Host 'Use Copilot: mcp_sparkedhost_console-stream with serverId: b2bc4d7e, duration: 30'; Write-Host 'MCP console stream required - ask Copilot to stream test server console'"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Stream RVNK Test server console using SparkedHost MCP: mcp_sparkedhost_console-stream (serverId: b2bc4d7e, duration: 30s). Ask Copilot to execute MCP command.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Test Server Plugin List",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "Write-Host 'Use Copilot: mcp_sparkedhost_get-plugin-list with serverId: b2bc4d7e'; Write-Host 'MCP plugin list required - ask Copilot to get test server plugin list'"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Get RVNK Test server plugin list using SparkedHost MCP: mcp_sparkedhost_get-plugin-list (serverId: b2bc4d7e). Ask Copilot to execute MCP command.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "Test Server Send Command",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "Write-Host 'Use Copilot: mcp_sparkedhost_send-console-command with serverId: b2bc4d7e, command: [your command]'; Write-Host 'MCP send command required - ask Copilot to send command to test server'"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Send command to RVNK Test server using SparkedHost MCP: mcp_sparkedhost_send-console-command (serverId: b2bc4d7e). Ask Copilot to execute MCP command.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "runOptions": {
+                "runOn": "default"
+            }
+        },
+        {
+            "label": "MCP: Query Console",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\query-server.py",
+                "console",
+                "--lines", "${input:mcpConsoleLine}",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Query console output via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Query Status",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\query-server.py",
+                "status",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Query server status via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Query Stats",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\query-server.py",
+                "stats",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Query server statistics via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Send Command",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\query-server.py",
+                "command",
+                "${input:mcpCommand}",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Send console command via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Restart Server",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\control-server.py",
+                "restart",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Restart server via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Reload Plugins",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\control-server.py",
+                "reload",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "detail": "Reload plugins via MCP (no full restart). Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: List Files",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\file-ops.py",
+                "list",
+                "${input:mcpRemotePath}",
+                "--server", "${input:mcpServer}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "List remote directory contents via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Database List Tables",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\database-ops.py",
+                "list-tables"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "List database tables via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        },
+        {
+            "label": "MCP: Database Test Connection",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\.vscode\\mcp\\database-ops.py",
+                "test"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "detail": "Test database connection via MCP. Shows instructions for Claude Code MCP tool invocation.",
+            "presentation": {
+                "reveal": "always",
+                "echo": true,
+                "clear": true,
+                "panel": "shared",
+                "showReuseMessage": false
+            }
+        }
+    ]
+}

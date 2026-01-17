@@ -1,0 +1,12 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "cSpell.words": [
+        "disabledtypes",
+        "flatfile",
+        "rvnktools"
+    ],
+    "yaml.schemas": {
+        "https://www.schemastore.org/bukkit-plugin.json": "file:///c%3A/tools/rvnktools/toolkitplugin/src/main/resources/plugin.yml"
+    }
+}

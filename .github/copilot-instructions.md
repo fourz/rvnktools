@@ -270,6 +270,23 @@ This comprehensive set of standards ensures consistency, performance, and mainta
 
 ## Development Workflow
 
+### MCP Server Integration
+
+*See detailed instructions: [MCP Integration Guide](copilot-instructions.mcp.md)*
+
+The RVNKDev MCP server provides unified Minecraft server management across multiple providers. Use Claude Code to invoke MCP tools for server operations, file management, console access, and database queries. All credentials are managed by the MCP server and never exposed to scripts or LLM context.
+
+**Key MCP Tools:**
+- `get_server_state` / `set_server_state` - Server status and control
+- `get_console_output` / `send_console_command` - Console operations
+- `file_read` / `file_write` - Remote file operations
+- `database_tools` - Database queries and management
+
+**VSCode MCP Tasks:**
+- Tasks prefixed with "MCP:" use the new unified MCP workflow
+- Legacy tasks remain available as fallback
+- New keyboard shortcuts: Ctrl+Alt+C (console), Ctrl+Alt+S (status), Ctrl+Alt+R (restart)
+
 ### Claude Code AI Assistant Integration
 
 **Project-Level Instructions:**

@@ -1,6 +1,6 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: September 27, 2025
+**Last Updated**: January 16, 2026
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
@@ -822,6 +822,40 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
 - **API**: Third-party plugin integration and developer feedback
 - **Modularization**: Successful separation of components with minimal user impact
 
+## VSCode MCP Migration (January 2026)
+
+**Archon Project**: `cf874c22-3d5d-45f1-8efb-d1540cf4577a`
+
+Migrating VSCode tasks from direct API scripts to unified MCP-based operations.
+
+### ✅ Phase 1: Infrastructure (Complete)
+
+- [x] **impl-01**: MCP Client Library - Python and PowerShell JSON-RPC clients
+- [x] **impl-02**: Server Configuration - Unified config supporting multiple providers
+
+### 🔄 Phase 2: Script Migration (In Progress)
+
+- [ ] **impl-03**: Migrate Server Query Scripts
+- [ ] **impl-04**: Migrate Server Control Scripts
+- [ ] **impl-05**: Migrate File Operations Scripts
+- [ ] **impl-06**: Migrate Database Scripts
+
+### 📋 Phase 3: HTTP Transport (Planned)
+
+Fast CLI access via HTTP instead of subprocess per invocation.
+
+- [ ] **impl-11**: Add HTTP transport entry point to rvnkdev-mcp-server
+- [ ] **impl-12**: Add MCPHTTPClient to mcp_client.py with auto-detect
+- [ ] **impl-13**: Add HTTP transport to MCP-Client.psm1
+- [ ] **impl-14**: Create HTTP server startup script
+
+**Goal**: ~100ms response time via HTTP vs 10-15s subprocess startup.
+
+### Phase 4: Documentation & Testing
+
+- [ ] **impl-09**: Create Test Suite
+- [ ] **impl-10**: Update Documentation
+
 ## Revision History
 
 | Date | Version | Notes |
@@ -831,3 +865,4 @@ This phase focuses on transforming RVNKTools into a platform that other plugins 
 | August 30, 2025 | 2.1 | Updated completion status, identified next feature (YAML migration), reprioritized Phase 2 |
 | August 31, 2025 | 2.2 | **Migration Framework Complete** - YAML-to-Database migration framework implemented and tested, ready for production execution |
 | September 27, 2025 | 2.3 | **Privacy-Focused Location Tracking** - Updated project to implement teleport-only location tracking instead of comprehensive player movement monitoring |
+| January 16, 2026 | 2.4 | **VSCode MCP Migration** - Added MCP migration project status, HTTP transport tasks (impl-11 to impl-14) |
