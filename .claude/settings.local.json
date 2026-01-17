@@ -13,7 +13,11 @@
       "Bash(grep:*)",
       "mcp__archon__health_check",
       "Bash(mvn test:*)",
-      "mcp__archon__manage_project"
+      "mcp__archon__manage_project",
+      "Bash(timeout 30 python:*)",
+      "Bash(dir /S /B \"c:\\\\tools\\\\_PROJECTS\\\\Ravenkaft Dev\\\\repos\\\\rvnktools\\\\docs\\\\*.md\")",
+      "Read(//c/**)",
+      "Bash(dir:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
