@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "parent_ref": {
+    "path": "../..",
+    "config_hash": "skillsets-v1.0.0",
+    "synced_at": "2026-01-17T00:00:00Z"
+  },
+  "project_type": "minecraft-plugin",
+  "installed_skillsets": [
+    {
+      "name": "rvnkdev-dev",
+      "enabled": true,
+      "reason": "Primary - Minecraft plugin development, remote deployment, server queries",
+      "components": {
+        "commands": ["rvnk-plugin-integrate", "rvnk-rca", "rvnk-code-review", "rvnkdev-deploy", "rvnkdev-query"],
+        "agents": ["java-architect", "minecraft-rvnk-dev"],
+        "skills": ["rvnkdev-mcp"]
+      }
+    },
+    {
+      "name": "utility",
+      "enabled": true,
+      "reason": "General development - code analysis, refactoring, optimization",
+      "components": {
+        "commands": ["agent-audit", "primer"],
+        "agents": ["codebase-analyst", "refactoring-specialist", "performance-optimizer"],
+        "skills": ["context-optimization", "rvnkdev-doc-standards"]
+      }
+    },
+    {
+      "name": "archon-utility",
+      "enabled": true,
+      "reason": "Task management - Archon project workflows",
+      "components": {
+        "commands": ["roadmap-update", "execute-plan", "create-plan", "doc-cleanup", "epic-consolidation", "doc-batch-sync"],
+        "agents": ["archon-manager", "project-architect", "documentation-specialist"],
+        "skills": ["archon-task-workflow", "documentation-lifecycle"]
+      }
+    }
+  ],
+  "skillset_overrides": [],
+  "local_extensions": {
+    "commands": [],
+    "agents": [],
+    "skills": []
+  },
+  "notes": "Component files copied from parent (Ravenkraft Dev). These components are now available when running Claude directly from this project directory."
+}
