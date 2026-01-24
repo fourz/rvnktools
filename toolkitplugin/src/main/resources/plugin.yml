@@ -3,11 +3,9 @@ version: 1.3.0-alpha
 author: fourz
 main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
-api: "1.0"
+api-version: 1.21
 website: http://www.fourz.org
-api-version: 1.16
-depend: []
-softdepend: [Multiverse-Core,PlaceholderAPI]
+softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault]
 
 commands:
   rvnktools:
@@ -16,37 +14,34 @@ commands:
     aliases: [tools]
     permission: rvnktools.command
   puthat:
-    description: Applies a custom Jack-o-Lantern to the nearest mob.
+    description: Applies a custom Jack-o-Lantern to the nearest mob
     usage: /puthat <customModelData>
     permission: rvnktools.command.puthat
   tps:
-    description: Shows the server's current TPS and performance information.
+    description: Shows the server's current TPS and performance information
     usage: /tps
     aliases: [ping]
   events:
-    description: Provides information about scheduled events.
+    description: Provides information about scheduled events
     usage: /events
   discord:
-    description: Provides information about the server's discord.
+    description: Provides information about the server's discord
     usage: /discord
   announce:
-    description: Manages announcements.
+    description: Manages announcements
     usage: /announce <toggle|list|add|delete> [args]
     aliases: [announcement]
-    permissions: 
-      - rvnktools.command.announce
-    default: op      
+    permission: rvnktools.command.announce
+    default: op
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>
-    permissions: 
-      - rvnktools.command.broadcast    
-    default: op      
+    permission: rvnktools.command.broadcast
+    default: op
   pstest:
-    description: Test PlayerService functionality (Debug Command)
+    description: Test PlayerService functionality
     usage: /pstest <recent|groups|syncgroups> [args...]
-    permissions: 
-      - rvnktools.admin.pstest
+    permission: rvnktools.admin.pstest
     default: op
   worldswap:
     description: Teleport to your last known location in a specific world
@@ -59,28 +54,25 @@ commands:
     aliases: [tp]
     permission: rvnktools.command.teleport
   cyclegamemode:
-    description: Cycle through gamemodes.
+    description: Cycle through gamemodes
     usage: /cyclegamemode
-    permissions: 
-      - rvnktools.command.cyclegamemode
+    permission: rvnktools.command.cyclegamemode
     aliases: [gmc]
-    default: op    
+    default: op
   railroad:
-    description: Cycle through instruction sets.
-    aliases: [cycletrainmode]
+    description: Cycle through instruction sets
     usage: /railroad
-    permissions: 
-      - rvnktools.command.railroad
+    aliases: [cycletrainmode]
+    permission: rvnktools.command.railroad
   event:
     description: Teleport between worlds preserving location history
     usage: /event [world]
     permission: rvnktools.command.worldswap
     aliases: [worldswap]
-  countdown:  
-    description: Countdown for restarting the server.
-    usage: /countdown 
-    permissions: 
-      - rvnktools.command.countdown
+  countdown:
+    description: Countdown for restarting the server
+    usage: /countdown
+    permission: rvnktools.command.countdown
     default: op
   logfilter:
     description: Manage log filtering for server plugins
@@ -88,7 +80,7 @@ commands:
     permission: rvnktools.command.logfilter
     default: op
   announcer:
-    description: Enable or disable announcements feature.
+    description: Enable or disable announcements feature
     usage: /announcer
   trains:
     description: Manage TrainCarts settings and view help pages
@@ -129,7 +121,7 @@ permissions:
   rvnktools.command.railroad:
     description: Allows the player to toggle between minecart modes
   rvnktools.announce.help:
-    description: Allows the player to access announcement help 
+    description: Allows the player to access announcement help
   rvnktools.command.puthat:
     description: Allows the player to use the puthat command
   rvnktools.links:
@@ -157,4 +149,7 @@ permissions:
     description: Allows using the example command
   rvnktools.command.logfilter:
     description: Allows managing log filtering for server plugins
+    default: op
+  rvnktools.admin.pstest:
+    description: Allows using player service test command
     default: op
