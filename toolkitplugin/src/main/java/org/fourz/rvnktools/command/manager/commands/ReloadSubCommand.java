@@ -22,7 +22,7 @@ public class ReloadSubCommand extends BaseSubCommand {
 
     @Override
     protected boolean executeSubCommand(CommandSender sender, String[] args) {
-        sender.sendMessage("§6⚙ Reloading RVNKTools configuration...");
+        sender.sendMessage("§6[*] Reloading RVNKTools configuration...");
         logger.info("Plugin reload initiated by " + sender.getName());
 
         try {
@@ -40,11 +40,11 @@ public class ReloadSubCommand extends BaseSubCommand {
 
             // TODO: Add other component reloads as needed
 
-            sender.sendMessage("§a✓ RVNKTools configuration reloaded successfully!");
+            sender.sendMessage("§a[+] RVNKTools configuration reloaded successfully!");
             logger.info("Plugin configuration reloaded successfully by " + sender.getName());
 
         } catch (Exception e) {
-            sender.sendMessage("§c✖ Failed to reload configuration. Check console for errors.");
+            sender.sendMessage("§c[!] Failed to reload configuration. Check console for errors.");
             logger.error("Failed to reload plugin configuration", e);
         }
 

@@ -111,10 +111,16 @@ public class CycleCommands {
                 ConfigurationSection commandConfig = commandsSection.getConfigurationSection(commandKey);
                 if (commandConfig != null) {
                     try {
+                        // Check if command exists in plugin.yml first
+                        if (plugin.getCommand(commandKey) == null) {
+                            logger.warning("Failed to register command: " + commandKey + " - not found in plugin.yml");
+                            continue;
+                        }
+
                         // Register the command with a CycleCommandExecutor
                         CycleCommandExecutor executor = new CycleCommandExecutor(commandKey, commandConfig, this);
                         plugin.getCommand(commandKey).setExecutor(executor);
-                        
+
                         // Get permission if specified in config
                         String permission = commandConfig.getString("permission");
                         if (permission != null) {
@@ -122,7 +128,7 @@ public class CycleCommands {
                         } else {
                             logger.debug("Registering command: " + commandKey + " with no permission");
                         }
-                        
+
                         registeredCount++;
                     } catch (Exception e) {
                         logger.error("Failed to register command: " + commandKey, e);
