@@ -2,10 +2,9 @@ package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnkcore.RVNKCore;
-import org.fourz.rvnkcore.bridge.ModernAnnouncementTestService;
-import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
+import org.fourz.rvnktools.util.AnnouncementTestService;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -15,12 +14,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Subcommand for creating test data using the modern RVNKCore announcement API.
  * This is used for API testing and validation purposes.
- * 
+ *
  * Usage: /rvnktools createtestdata [types|announcements|all]
  */
 public class CreateTestDataSubCommand extends BaseSubCommand {
-    
-    private ModernAnnouncementTestService testService;
+
+    private AnnouncementTestService testService;
     
     public CreateTestDataSubCommand(RVNKCore plugin, BaseCommand parent) {
         super(plugin, parent, "createtestdata", 
@@ -38,7 +37,7 @@ public class CreateTestDataSubCommand extends BaseSubCommand {
                 sender.sendMessage("§c✖ RVNKCore is not available. Cannot create test data.");
                 return true;
             }
-            testService = new ModernAnnouncementTestService(plugin, rvnkCore);
+            testService = new AnnouncementTestService(plugin, rvnkCore);
         }
         
         if (args.length == 0) {
@@ -179,7 +178,7 @@ public class CreateTestDataSubCommand extends BaseSubCommand {
                 if (rvnkCore == null) {
                     return Collections.emptyList();
                 }
-                testService = new ModernAnnouncementTestService(plugin, rvnkCore);
+                testService = new AnnouncementTestService(plugin, rvnkCore);
             }
             List<String> types = testService.getAvailableTypes();
             return types.stream()

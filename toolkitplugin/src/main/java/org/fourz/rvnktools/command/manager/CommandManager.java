@@ -25,16 +25,23 @@ import java.util.Set;
 /**
  * Centralized command management system for RVNKTools.
  * Handles registration, lookup, and management of all plugin commands.
+ *
+ * <p>Thread-safe singleton using double-checked locking pattern.</p>
+ *
+ * @since 1.0.0
+ * @since 1.4.0 (thread safety improvements)
  */
 public class CommandManager {
-    
-    private static CommandManager instance;
+
+    private static volatile CommandManager instance;
+    private static final Object lock = new Object();
+
     private final RVNKCore plugin;
     private final RVNKLogger logger;
     private final Map<String, RVNKCommand> commands;
     private final Map<String, String> aliases;
     private final CycleCommands cycleCommands;
-    
+
     private CommandManager(RVNKCore plugin) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -89,13 +96,19 @@ public class CommandManager {
     
     /**
      * Get the CommandManager instance (singleton pattern).
-     * 
-     * @param plugin The RVNKTools plugin instance
+     *
+     * <p>Thread-safe using double-checked locking with volatile.</p>
+     *
+     * @param plugin The RVNKCore plugin instance
      * @return The CommandManager instance
      */
     public static CommandManager getInstance(RVNKCore plugin) {
         if (instance == null) {
-            instance = new CommandManager(plugin);
+            synchronized (lock) {
+                if (instance == null) {
+                    instance = new CommandManager(plugin);
+                }
+            }
         }
         return instance;
     }

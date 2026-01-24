@@ -1,9 +1,8 @@
-package org.fourz.rvnkcore.bridge;
+package org.fourz.rvnktools.util;
 
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
-import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.fourz.rvnktools.util.log.RVNKLogger;
 
@@ -17,29 +16,34 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * Modern test service for creating announcements using the new RVNKCore AnnouncementService.
- * This replaces the legacy AnnounceManager bridge and uses the modern async API.
+ * Test service for creating announcements using the RVNKCore AnnouncementService.
+ * This is used for API testing and validation purposes.
+ *
+ * <p>Relocated from org.fourz.rvnkcore.bridge.ModernAnnouncementTestService
+ * as part of SOLID refactoring to remove bridge package.</p>
+ *
+ * @since 1.4.0
  */
-public class ModernAnnouncementTestService {
-    
+public class AnnouncementTestService {
+
     private final RVNKCore rvnkCore;
     private final RVNKLogger logger;
-    
+
     /**
-     * Creates a new modern announcement test service.
-     * 
-     * @param plugin The RVNKTools plugin instance
-     * @param rvnkCore The RVNKCore instance
+     * Creates a new announcement test service.
+     *
+     * @param plugin The RVNKCore plugin instance (used for logging)
+     * @param rvnkCore The RVNKCore instance for service access
      */
-    public ModernAnnouncementTestService(RVNKCore plugin, RVNKCore rvnkCore) {
+    public AnnouncementTestService(RVNKCore plugin, RVNKCore rvnkCore) {
         this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
     }
-    
+
     /**
      * Creates default announcement types for testing.
      * Since the service uses string types, this just returns the available types.
-     * 
+     *
      * @return CompletableFuture with the number of types available (always 5)
      */
     public CompletableFuture<Integer> createDefaultAnnouncementTypes() {
@@ -48,17 +52,17 @@ public class ModernAnnouncementTestService {
             return 5; // We have 5 predefined types
         });
     }
-    
+
     /**
      * Creates test announcements using the modern API.
-     * 
+     *
      * @return CompletableFuture with the number of announcements created
      */
     public CompletableFuture<Integer> createTestAnnouncements() {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 AnnouncementService service = rvnkCore.getAnnouncementService();
-                
+
                 // Define test announcements
                 List<TestAnnouncement> testAnnouncements = Arrays.asList(
                     new TestAnnouncement("welcome", "Welcome to the server!", "Welcome Message", "info", true),
@@ -67,15 +71,15 @@ public class ModernAnnouncementTestService {
                     new TestAnnouncement("backup", "Daily backup starting", "System Notification", "system", false),
                     new TestAnnouncement("holiday-event", "Special holiday event this weekend!", "Holiday Event", "event", true)
                 );
-                
+
                 logger.info("Creating " + testAnnouncements.size() + " test announcements...");
-                
+
                 int createdCount = 0;
-                
+
                 for (TestAnnouncement testAnnouncement : testAnnouncements) {
                     // Check if announcement already exists
                     CompletableFuture<Optional<AnnouncementDTO>> existingFuture = service.getAnnouncement(testAnnouncement.getId());
-                    
+
                     try {
                         Optional<AnnouncementDTO> existing = existingFuture.get();
                         if (existing.isPresent()) {
@@ -85,7 +89,7 @@ public class ModernAnnouncementTestService {
                     } catch (Exception e) {
                         // Announcement doesn't exist, continue with creation
                     }
-                    
+
                     // Create new announcement
                     AnnouncementDTO announcement = new AnnouncementDTO.Builder()
                         .id(testAnnouncement.getId())
@@ -96,10 +100,10 @@ public class ModernAnnouncementTestService {
                         .createdAt(Timestamp.valueOf(LocalDateTime.now()))
                         .updatedAt(Timestamp.valueOf(LocalDateTime.now()))
                         .build();
-                    
+
                     CompletableFuture<AnnouncementDTO> createFuture = service.createAnnouncement(announcement);
                     AnnouncementDTO created = createFuture.get();
-                    
+
                     if (created != null) {
                         createdCount++;
                         logger.info("Created announcement: " + testAnnouncement.getId());
@@ -107,20 +111,20 @@ public class ModernAnnouncementTestService {
                         logger.warning("Failed to create announcement: " + testAnnouncement.getId());
                     }
                 }
-                
+
                 logger.info("Created " + createdCount + " test announcements");
                 return createdCount;
-                
+
             } catch (Exception e) {
                 logger.error("Failed to create test announcements", e);
                 throw new RuntimeException("Failed to create test announcements", e);
             }
         });
     }
-    
+
     /**
      * Creates a single announcement with the specified parameters.
-     * 
+     *
      * @param id The announcement ID
      * @param message The announcement message
      * @param type The announcement type
@@ -131,7 +135,7 @@ public class ModernAnnouncementTestService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 AnnouncementService service = rvnkCore.getAnnouncementService();
-                
+
                 // Check if announcement already exists
                 try {
                     CompletableFuture<Optional<AnnouncementDTO>> existingFuture = service.getAnnouncement(id);
@@ -143,7 +147,7 @@ public class ModernAnnouncementTestService {
                 } catch (Exception e) {
                     // Announcement doesn't exist, continue with creation
                 }
-                
+
                 // Validate announcement type (basic validation for known types)
                 List<String> validTypes = Arrays.asList("info", "warning", "alert", "system", "event");
                 String finalType = type;
@@ -151,7 +155,7 @@ public class ModernAnnouncementTestService {
                     logger.warning("Unknown announcement type '" + type + "'. Using 'info' instead.");
                     finalType = "info";
                 }
-                
+
                 // Create the announcement
                 AnnouncementDTO announcement = new AnnouncementDTO.Builder()
                     .id(id)
@@ -162,38 +166,38 @@ public class ModernAnnouncementTestService {
                     .createdAt(Timestamp.valueOf(LocalDateTime.now()))
                     .updatedAt(Timestamp.valueOf(LocalDateTime.now()))
                     .build();
-                
+
                 CompletableFuture<AnnouncementDTO> createFuture = service.createAnnouncement(announcement);
                 AnnouncementDTO created = createFuture.get();
-                
+
                 boolean success = created != null;
                 if (success) {
                     logger.info("Successfully created announcement: " + id);
                 } else {
                     logger.warning("Failed to create announcement: " + id);
                 }
-                
+
                 return success;
-                
+
             } catch (Exception e) {
                 logger.error("Failed to create announcement '" + id + "'", e);
                 return false;
             }
         });
     }
-    
+
     /**
      * Gets the list of available announcement types.
-     * 
+     *
      * @return List of announcement type IDs
      */
     public List<String> getAvailableTypes() {
         return Arrays.asList("info", "warning", "alert", "system", "event");
     }
-    
+
     /**
      * Gets the list of current announcement IDs.
-     * 
+     *
      * @return List of announcement IDs
      */
     public List<String> getCurrentAnnouncements() {
@@ -207,10 +211,10 @@ public class ModernAnnouncementTestService {
             return Arrays.asList(); // Empty list on error
         }
     }
-    
+
     /**
      * Gets current announcement metrics.
-     * 
+     *
      * @return Map of metrics or null if unavailable
      */
     public Map<String, Object> getMetrics() {
@@ -223,16 +227,16 @@ public class ModernAnnouncementTestService {
             return null;
         }
     }
-    
+
     // Helper classes for test data
-    
+
     private static class TestAnnouncement {
         private final String id;
         private final String message;
         private final String title;
         private final String type;
         private final boolean enabled;
-        
+
         public TestAnnouncement(String id, String message, String title, String type, boolean enabled) {
             this.id = id;
             this.message = message;
@@ -240,7 +244,7 @@ public class ModernAnnouncementTestService {
             this.type = type;
             this.enabled = enabled;
         }
-        
+
         public String getId() { return id; }
         public String getMessage() { return message; }
         public String getTitle() { return title; }

@@ -1,6 +1,6 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: January 16, 2026
+**Last Updated**: January 24, 2026
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
@@ -19,6 +19,7 @@ RVNKTools has established a solid foundation with core functionality in place:
 - ✅ Centralized `CommandManager` framework for consistent command handling
 - ✅ **WorldSwap command integration with privacy-focused teleport tracking**
 - ✅ **Player and world-specific data services with teleport-only location tracking**
+- ✅ **SOLID refactor: Extracted initializer classes (CoreServiceFactory, BundledComponentInitializer, ApiServerInitializer)**
 
 ### RVNKCore Implementation Status
 
@@ -866,3 +867,4 @@ Fast CLI access via HTTP instead of subprocess per invocation.
 | August 31, 2025 | 2.2 | **Migration Framework Complete** - YAML-to-Database migration framework implemented and tested, ready for production execution |
 | September 27, 2025 | 2.3 | **Privacy-Focused Location Tracking** - Updated project to implement teleport-only location tracking instead of comprehensive player movement monitoring |
 | January 16, 2026 | 2.4 | **VSCode MCP Migration** - Added MCP migration project status, HTTP transport tasks (impl-11 to impl-14) |
+| January 24, 2026 | 2.5 | **SOLID Refactor Complete** - Extracted initializer classes (CoreServiceFactory, BundledComponentInitializer, ApiServerInitializer), removed scaffold files, fixed thread safety in singletons, all components registered via ServiceRegistry |

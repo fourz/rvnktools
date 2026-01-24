@@ -31,7 +31,10 @@
       "mcp__rvnkdev-minecraft-server__set_server_state",
       "mcp__rvnkdev-minecraft-server__send_console_command",
       "WebSearch",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(timeout:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

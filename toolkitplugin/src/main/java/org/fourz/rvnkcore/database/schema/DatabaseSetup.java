@@ -34,28 +34,55 @@ public class DatabaseSetup {
     /**
      * Performs one-time database setup during plugin initialization.
      * This includes schema creation, indexes, and any version upgrades.
-     * 
+     *
      * @throws SQLException if setup fails
      */
     public void initializeDatabase() throws SQLException {
         if (schemaInitialized.get()) {
             return; // Already initialized
         }
-        
-        logger.info("Initializing database schema...");
-        
+
         try (Connection connection = connectionProvider.getConnection()) {
-            createTables(connection);
-            createIndexes(connection);
-            verifySchema(connection);
-            
+            // Check if schema already exists (to provide accurate logging)
+            boolean schemaExists = checkSchemaExists(connection);
+
+            if (schemaExists) {
+                logger.info("Database schema already initialized - performing verification only");
+                verifySchema(connection);
+            } else {
+                logger.info("Initializing database schema for the first time...");
+                createTables(connection);
+                createIndexes(connection);
+                logger.info("Database schema initialization completed successfully");
+            }
+
             schemaInitialized.set(true);
             schemaVerified.set(true);
-            
-            logger.info("Database schema initialization completed successfully");
         } catch (SQLException e) {
             logger.error("Database schema initialization failed", e);
             throw e;
+        }
+    }
+
+    /**
+     * Quick check to see if schema already exists without detailed logging.
+     */
+    private boolean checkSchemaExists(Connection connection) {
+        try (var stmt = connection.createStatement()) {
+            String checkQuery;
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                checkQuery = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rvnk_worlds' LIMIT 1";
+            } else {
+                checkQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='rvnk_worlds' LIMIT 1";
+            }
+
+            var rs = stmt.executeQuery(checkQuery);
+            boolean exists = rs.next();
+            rs.close();
+            return exists;
+        } catch (SQLException e) {
+            logger.debug("Schema existence check failed: " + e.getMessage());
+            return false; // Assume schema doesn't exist if check fails
         }
     }
     
@@ -97,8 +124,8 @@ public class DatabaseSetup {
     }
     
     private void createTables(Connection connection) throws SQLException {
-        logger.info("Creating tables for database type: " + databaseType);
-        
+        logger.debug("Creating tables for database type: " + databaseType);
+
         String createPlayersTable;
         String createPlayerWorldDataTable;
         String createWorldsTable;
@@ -297,21 +324,21 @@ public class DatabaseSetup {
         }
         
         try (var stmt = connection.createStatement()) {
-            logger.info("Creating rvnk_worlds table...");
+            logger.debug("Creating rvnk_worlds table...");
             stmt.execute(createWorldsTable);
-            logger.info("Creating rvnk_players table...");
+            logger.debug("Creating rvnk_players table...");
             stmt.execute(createPlayersTable);
-            logger.info("Creating rvnk_player_world_data table...");
+            logger.debug("Creating rvnk_player_world_data table...");
             stmt.execute(createPlayerWorldDataTable);
-            logger.info("Creating rvnk_announcements table...");
+            logger.debug("Creating rvnk_announcements table...");
             stmt.execute(createAnnouncementsTable);
-            logger.info("All tables created successfully");
+            logger.debug("All tables created successfully");
         }
     }
     
     private void createIndexes(Connection connection) throws SQLException {
-        logger.info("Creating indexes for database type: " + databaseType);
-        
+        logger.debug("Creating indexes for database type: " + databaseType);
+
         String[] indexes;
         
         if ("MySQL".equalsIgnoreCase(databaseType)) {
@@ -363,15 +390,15 @@ public class DatabaseSetup {
                 logger.debug("Creating index: " + index);
                 stmt.execute(index);
             }
-            logger.info("All indexes created successfully");
+            logger.debug("All indexes created successfully");
         }
     }
     
     private void verifySchema(Connection connection) throws SQLException {
-        logger.info("Verifying database schema...");
+        logger.debug("Verifying database schema...");
         // Verify critical tables exist
         String[] requiredTables = {"rvnk_worlds", "rvnk_players", "rvnk_player_world_data", "rvnk_announcements"};
-        
+
         try (var stmt = connection.createStatement()) {
             for (String table : requiredTables) {
                 String query;
@@ -380,7 +407,7 @@ public class DatabaseSetup {
                 } else {
                     query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + table + "'";
                 }
-                
+
                 var rs = stmt.executeQuery(query);
                 if (!rs.next()) {
                     throw new SQLException("Required table '" + table + "' not found");
@@ -389,7 +416,7 @@ public class DatabaseSetup {
                 logger.debug("Verified table exists: " + table);
             }
         }
-        logger.info("Schema verification completed successfully");
+        logger.debug("Schema verification completed successfully");
     }
     
     /**
