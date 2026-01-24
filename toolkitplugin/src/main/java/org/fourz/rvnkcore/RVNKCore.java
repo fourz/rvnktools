@@ -297,6 +297,9 @@ public class RVNKCore extends JavaPlugin implements Listener {
         initializeCommandFramework();
         initializeLogFilter();
 
+        // Register bundled component commands after CommandManager initialization
+        registerBundledComponentCommands();
+
         logger.info("Bundled components initialization complete");
     }
 
@@ -384,6 +387,16 @@ public class RVNKCore extends JavaPlugin implements Listener {
             logger.info("Log Filter initialized");
         } catch (Exception e) {
             logger.error("Failed to initialize Log Filter", e);
+        }
+    }
+
+    private void registerBundledComponentCommands() {
+        try {
+            if (announceManager != null) {
+                announceManager.registerCommands();
+            }
+        } catch (Exception e) {
+            logger.error("Failed to register bundled component commands", e);
         }
     }
 
