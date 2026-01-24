@@ -41,11 +41,19 @@ public class AnnounceManager {
         this.announceConfig = new AnnounceConfig(plugin, this);
         this.announceConfig.initializeDataStore();
         this.announceScheduler = new AnnounceScheduler(plugin, this);
-        // Register commands
-        plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
-        plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
 
         announceScheduler.scheduleAnnouncements();
+    }
+
+    public void registerCommands() {
+        // This is called after plugin.yml commands are registered by Paper
+        if (plugin.getCommand("announce") != null) {
+            plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
+            plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
+            logger.info("Announce command registered successfully");
+        } else {
+            logger.warning("Announce command not found in plugin.yml");
+        }
     }
 
     // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
