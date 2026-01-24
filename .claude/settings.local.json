@@ -17,7 +17,21 @@
       "Bash(timeout 30 python:*)",
       "Bash(dir /S /B \"c:\\\\tools\\\\_PROJECTS\\\\Ravenkaft Dev\\\\repos\\\\rvnktools\\\\docs\\\\*.md\")",
       "Read(//c/**)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "mcp__rvnkdev-minecraft-server__get_console_output",
+      "Skill(rvnkdev-query)",
+      "Skill(rvnkdev-query:*)",
+      "mcp__rvnkdev-minecraft-server__find_servers",
+      "mcp__rvnkdev-minecraft-server__get_server_state",
+      "mcp__rvnkdev-minecraft-server__file_read",
+      "Bash(timeout 90 bash:*)",
+      "Bash(mvn clean package:*)",
+      "Bash(claude mcp tools rvnkdev-minecraft-server:*)",
+      "mcp__rvnkdev-minecraft-server__file_write",
+      "mcp__rvnkdev-minecraft-server__set_server_state",
+      "mcp__rvnkdev-minecraft-server__send_console_command",
+      "WebSearch",
+      "Bash(cd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

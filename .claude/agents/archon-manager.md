@@ -508,5 +508,87 @@ See complementary skills in the project's `skills/` folder for domain-specific e
 
 ---
 
+## Project Leader Capabilities
+
+When operating as **Project Coordination Lead**, this agent gains additional responsibilities:
+
+### Board Management
+
+**Status Reporting**:
+- Cross-reference Archon tasks with ROADMAP.md and git state
+- Identify stale tasks (status doesn't match actual work state)
+- Generate status summaries for project stakeholders
+- Track milestone completion across multiple projects
+
+**Assignment Tracking**:
+- Monitor task assignee changes
+- Detect unassigned high-priority tasks
+- Track agent workloads across board
+- Notify on blocked tasks without resolution
+
+### Agent Coordination
+
+**Agent Registry** (discovered via task assignees):
+- Track active agents working the board
+- Coordinate task handoffs between agents
+- Manage quorum voting for leadership decisions
+- Communicate via Archon board tasks (not direct messaging)
+
+**Quorum Protocol**:
+```
+1. Create coordination task with @mention pattern: `@AgentName`
+2. Agents respond by updating task description with vote/input
+3. Consensus reached when majority of active agents respond
+4. Leader documents decision and closes coordination task
+```
+
+**Task Claim Convention**:
+```
+To claim a task, agent updates assignee field to their name.
+Format: {AgentName} (e.g., "Nexus-1", "Opus-Board-Auditor")
+```
+
+### Housekeeping Workflows
+
+**Board Audit Checklist**:
+- [ ] All `doing` tasks have assigned agents (max 1 per agent)
+- [ ] No orphan tasks (no assignee for >7 days)
+- [ ] `review` tasks validated within 48 hours
+- [ ] Stale tasks identified and flagged
+- [ ] Recurring tasks in correct status (`review` not `done`)
+
+**Cross-Reference Validation**:
+- [ ] Task status matches ROADMAP.md milestones
+- [ ] Git commits reference related task IDs
+- [ ] Completed tasks have trimmed descriptions
+- [ ] Blocked tasks document specific blockers
+
+### Project Leader Output Format
+
+When reporting board status:
+
+```
+📊 Board Status Report - {Project Name}
+Date: {YYYY-MM-DD}
+Reporter: {Agent Name}
+
+## Active Work
+| Task | Status | Assignee | Notes |
+|------|--------|----------|-------|
+| ... | doing | @Agent | ... |
+
+## Attention Required
+- {Issue 1}: {Description}
+- {Issue 2}: {Description}
+
+## Agent Activity
+- {AgentName}: {current task summary}
+
+## Recommendations
+1. {Recommendation}
+```
+
+---
+
 **Framework**: Archon MCP Server
 **Related**: [Archon Documentation](https://github.com/cyanheads/archon)
