@@ -1,48 +1,79 @@
 {
+  "schema_version": "2.0.0",
   "version": "1.0.0",
-  "parent_ref": {
-    "path": "../..",
-    "config_hash": "skillsets-v1.0.0",
-    "synced_at": "2026-01-17T00:00:00Z"
-  },
-  "project_type": "minecraft-plugin",
-  "installed_skillsets": [
+  "project": "rvnktools",
+  "parent": "../..",
+  "notes": "Schema upgraded to v2.0.0. rvnkdev-dev skillset synced from parent.",
+  "skillsets": [
     {
       "name": "rvnkdev-dev",
+      "description": "RVNK Minecraft plugin development with remote deployment support",
       "enabled": true,
-      "reason": "Primary - Minecraft plugin development, remote deployment, server queries",
-      "components": {
-        "commands": ["rvnk-plugin-integrate", "rvnk-rca", "rvnk-code-review", "rvnkdev-deploy", "rvnkdev-query"],
-        "agents": ["java-architect", "minecraft-rvnk-dev"],
-        "skills": ["rvnkdev-mcp"]
-      }
+      "source": "parent",
+      "commands": [
+        "rvnk-plugin-integrate",
+        "rvnk-rca",
+        "rvnk-code-review",
+        "rvnkdev-deploy",
+        "rvnkdev-query"
+      ],
+      "agents": [
+        "java-architect",
+        "minecraft-rvnk-dev"
+      ],
+      "skills": [
+        "rvnkdev-mcp"
+      ],
+      "activated_at": "2026-01-25T00:00:00Z"
     },
     {
       "name": "utility",
+      "description": "General development and optimization",
       "enabled": true,
-      "reason": "General development - code analysis, refactoring, optimization",
-      "components": {
-        "commands": ["agent-audit", "primer"],
-        "agents": ["codebase-analyst", "refactoring-specialist", "performance-optimizer"],
-        "skills": ["context-optimization", "rvnkdev-doc-standards"]
-      }
+      "source": "parent",
+      "commands": [
+        "agent-audit",
+        "primer"
+      ],
+      "agents": [
+        "codebase-analyst",
+        "refactoring-specialist",
+        "performance-optimizer"
+      ],
+      "skills": [
+        "context-optimization",
+        "rvnkdev-doc-standards"
+      ],
+      "activated_at": "2026-01-17T00:00:00Z"
     },
     {
       "name": "archon-utility",
+      "description": "Archon project management workflows",
       "enabled": true,
-      "reason": "Task management - Archon project workflows",
-      "components": {
-        "commands": ["roadmap-update", "execute-plan", "create-plan", "doc-cleanup", "epic-consolidation", "doc-batch-sync"],
-        "agents": ["archon-manager", "project-architect", "documentation-specialist"],
-        "skills": ["archon-task-workflow", "documentation-lifecycle"]
-      }
+      "source": "parent",
+      "commands": [
+        "roadmap-update",
+        "execute-plan",
+        "create-plan",
+        "doc-cleanup",
+        "epic-consolidation",
+        "doc-batch-sync"
+      ],
+      "agents": [
+        "archon-manager",
+        "project-architect",
+        "documentation-specialist"
+      ],
+      "skills": [
+        "archon-task-workflow",
+        "documentation-lifecycle"
+      ],
+      "activated_at": "2026-01-17T00:00:00Z"
     }
   ],
-  "skillset_overrides": [],
-  "local_extensions": {
-    "commands": [],
+  "global_components": {
     "agents": [],
-    "skills": []
-  },
-  "notes": "Component files copied from parent (Ravenkraft Dev). These components are now available when running Claude directly from this project directory."
+    "skills": [],
+    "commands": []
+  }
 }
