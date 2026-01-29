@@ -11,7 +11,7 @@ import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
 import org.fourz.rvnkcore.init.ApiServerInitializer;
-import org.fourz.rvnkcore.init.BundledComponentInitializer;
+import org.fourz.rvnkcore.init.RVNKToolsInitializer;
 import org.fourz.rvnkcore.init.CoreServiceFactory;
 import org.fourz.rvnkcore.service.registry.DefaultServiceRegistry;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
@@ -19,7 +19,6 @@ import org.fourz.rvnkcore.util.log.LogManager;
 
 // Bundled component imports for accessor compatibility
 import org.fourz.rvnktools.announceManager.AnnounceManager;
-import org.fourz.rvnktools.command.cycle.CycleCommands;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
@@ -49,7 +48,7 @@ import net.milkbowl.vault.economy.Economy;
  * to specialized initializer classes:</p>
  * <ul>
  *   <li>{@link CoreServiceFactory} - Core service construction</li>
- *   <li>{@link BundledComponentInitializer} - RVNKTools component lifecycle</li>
+ *   <li>{@link RVNKToolsInitializer} - RVNKTools component lifecycle</li>
  *   <li>{@link ApiServerInitializer} - REST API server lifecycle</li>
  * </ul>
  *
@@ -69,7 +68,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
 
     // Initializers (SOLID: delegated responsibilities)
     private CoreServiceFactory coreServiceFactory;
-    private BundledComponentInitializer bundledInitializer;
+    private RVNKToolsInitializer toolsInitializer;
     private ApiServerInitializer apiInitializer;
 
     @Override
@@ -197,13 +196,13 @@ public class RVNKCore extends JavaPlugin implements Listener {
     // ============================================================
 
     private void initializeBundledComponents() {
-        bundledInitializer = new BundledComponentInitializer(this, serviceRegistry);
-        bundledInitializer.initializeAll();
+        toolsInitializer = new RVNKToolsInitializer(this, serviceRegistry);
+        toolsInitializer.initializeAll();
     }
 
     private void shutdownBundledComponents() {
-        if (bundledInitializer != null) {
-            bundledInitializer.shutdownAll();
+        if (toolsInitializer != null) {
+            toolsInitializer.shutdownAll();
         }
     }
 
@@ -321,17 +320,6 @@ public class RVNKCore extends JavaPlugin implements Listener {
     }
 
     /**
-     * Gets the CycleCommands instance.
-     *
-     * @return CycleCommands instance, or null if not available
-     * @deprecated CycleCommands not currently registered in ServiceRegistry
-     */
-    @Deprecated
-    public CycleCommands getCycleCommands() {
-        return null;
-    }
-
-    /**
      * Gets the AnnounceManager for announcement operations.
      *
      * @return AnnounceManager instance
@@ -380,12 +368,4 @@ public class RVNKCore extends JavaPlugin implements Listener {
         return getService(LogFilter.class);
     }
 
-    /**
-     * @deprecated Use RVNKCore.getInstance() directly. This method exists for backward compatibility.
-     * @return this instance
-     */
-    @Deprecated
-    public RVNKCore getRVNKCore() {
-        return this;
-    }
 }

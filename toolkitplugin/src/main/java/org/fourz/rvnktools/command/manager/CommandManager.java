@@ -8,6 +8,7 @@ import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
+import org.fourz.rvnktools.command.manager.commands.RVNKTestCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
@@ -81,6 +82,7 @@ public class CommandManager {
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));
+        registerCommand(new RVNKTestCommand(plugin));
         
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));

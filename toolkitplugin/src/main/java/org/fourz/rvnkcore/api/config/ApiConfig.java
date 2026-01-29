@@ -38,22 +38,6 @@ public class ApiConfig {
     private final LogManager logger;
 
     /**
-     * Creates ApiConfig from plugin configuration with default values.
-     * DEPRECATED: Use ConfigLoader.getInstance(plugin).getApiConfig() so values come from config-core.yml.
-     *
-     * @param plugin The plugin instance for configuration access
-     * @deprecated Use ConfigLoader.getInstance(plugin).getApiConfig() instead
-     */
-    @Deprecated
-    public ApiConfig(Plugin plugin) {
-        this(plugin, plugin.getConfig());
-        LogManager.getInstance(plugin).warning(
-            "ApiConfig(Plugin) constructor is deprecated. Use ConfigLoader.getInstance(plugin).getApiConfig() " +
-            "to read from config-core.yml. This call used plugin.getConfig() (config.yml)."
-        );
-    }
-    
-    /**
      * Creates ApiConfig from specific FileConfiguration with plugin context.
      *
      * @param plugin The plugin instance for logging context

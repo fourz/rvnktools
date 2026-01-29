@@ -34,14 +34,8 @@ public class CycleSubCommand extends BaseSubCommand {
                 return true;
             }
             
-            try {
-                plugin.getCycleCommands().loadConfig();
-                sender.sendMessage("§a✓ Cycle commands configuration reloaded successfully!");
-                logger.info("Cycle commands configuration reloaded by " + sender.getName());
-            } catch (Exception e) {
-                sender.sendMessage("§c✖ Failed to reload cycle commands configuration. Check console for errors.");
-                logger.error("Failed to reload cycle commands configuration", e);
-            }
+            sender.sendMessage("§c✖ Cycle commands reload not available. Use /rvnktools reload instead.");
+            logger.info("Cycle reload attempted by " + sender.getName() + " — redirected to /rvnktools reload");
             return true;
         }
         

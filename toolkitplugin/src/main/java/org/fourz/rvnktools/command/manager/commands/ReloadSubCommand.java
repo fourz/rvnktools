@@ -34,10 +34,6 @@ public class ReloadSubCommand extends BaseSubCommand {
                 plugin.getLinkMaker().reloadConfig();
             }
 
-            if (plugin.getCycleCommands() != null) {
-                plugin.getCycleCommands().loadConfig();
-            }
-
             // TODO: Add other component reloads as needed
 
             sender.sendMessage("§a[+] RVNKTools configuration reloaded successfully!");

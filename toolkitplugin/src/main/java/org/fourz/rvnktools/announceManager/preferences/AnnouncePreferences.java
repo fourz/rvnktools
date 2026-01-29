@@ -128,27 +128,7 @@ public class AnnouncePreferences {
         return new HashMap<>(playerDisabledTypes);
     }
 
-    @Deprecated
-    public void setPlayerPreferences(UUID playerId, String preferences) {
-        debug.warning("Using deprecated setPlayerPreferences method");
-        setPreference(playerId, "legacy", preferences);
-        playerPreferences.put(playerId, preferences);  // Keep legacy map updated
-        syncToYAML();
-    }
-
-    @Deprecated
-    public String getPlayerPreferences(UUID playerId) {
-        debug.warning("Using deprecated getPlayerPreferences method");
-        // First check legacy map
-        String legacy = playerPreferences.get(playerId);
-        if (legacy != null) {
-            return legacy;
-        }
-        // Try structured preferences
-        return getPreference(playerId, "legacy");
-    }
-
-    // Add new methods that should be used instead
+    // Structured preference methods (replacement for legacy string-based preferences)
     public void setPreference(UUID playerId, String property, String value) {
         // Update structured preferences
         playerPreferenceMap

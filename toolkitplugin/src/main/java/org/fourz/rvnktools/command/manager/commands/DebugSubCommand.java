@@ -43,7 +43,6 @@ public class DebugSubCommand extends BaseSubCommand {
         sender.sendMessage("");
         sender.sendMessage("§6Component Status:");
         sender.sendMessage("§eLinkMaker: §f" + (plugin.getLinkMaker() != null ? "§aLoaded" : "§cNot loaded"));
-        sender.sendMessage("§eCycle Commands: §f" + (plugin.getCycleCommands() != null ? "§aLoaded" : "§cNot loaded"));
 
         // Dependency status
         sender.sendMessage("");

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Verifies SOLID refactoring deliverables:</p>
  * <ul>
  *   <li>CoreServiceFactory exists and has correct API</li>
- *   <li>BundledComponentInitializer exists and has correct API</li>
+ *   <li>RVNKToolsInitializer exists and has correct API</li>
  *   <li>ApiServerInitializer exists and has correct API</li>
  * </ul>
  *
@@ -36,17 +36,17 @@ class InitializerClassesTest {
     }
 
     @Test
-    @DisplayName("BundledComponentInitializer class exists with expected API")
-    void bundledComponentInitializerClassExists() {
+    @DisplayName("RVNKToolsInitializer class exists with expected API")
+    void rvnkToolsInitializerClassExists() {
         // Verify class can be loaded
-        assertDoesNotThrow(() -> Class.forName("org.fourz.rvnkcore.init.BundledComponentInitializer"));
+        assertDoesNotThrow(() -> Class.forName("org.fourz.rvnkcore.init.RVNKToolsInitializer"));
 
         // Verify expected methods exist
         assertDoesNotThrow(() -> {
-            Class<?> clazz = Class.forName("org.fourz.rvnkcore.init.BundledComponentInitializer");
+            Class<?> clazz = Class.forName("org.fourz.rvnkcore.init.RVNKToolsInitializer");
             clazz.getMethod("initializeAll");
             clazz.getMethod("shutdownAll");
-        }, "BundledComponentInitializer should have initializeAll() and shutdownAll() methods");
+        }, "RVNKToolsInitializer should have initializeAll() and shutdownAll() methods");
     }
 
     @Test
@@ -70,7 +70,7 @@ class InitializerClassesTest {
         // All three classes should be loadable from the init package
         String[] expectedClasses = {
             "org.fourz.rvnkcore.init.CoreServiceFactory",
-            "org.fourz.rvnkcore.init.BundledComponentInitializer",
+            "org.fourz.rvnkcore.init.RVNKToolsInitializer",
             "org.fourz.rvnkcore.init.ApiServerInitializer"
         };
 
@@ -98,11 +98,11 @@ class InitializerClassesTest {
         });
 
         assertDoesNotThrow(() -> {
-            Class<?> bundled = Class.forName("org.fourz.rvnkcore.init.BundledComponentInitializer");
-            long publicMethods = java.util.Arrays.stream(bundled.getDeclaredMethods())
+            Class<?> toolsInit = Class.forName("org.fourz.rvnkcore.init.RVNKToolsInitializer");
+            long publicMethods = java.util.Arrays.stream(toolsInit.getDeclaredMethods())
                 .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers()))
                 .count();
-            assertTrue(publicMethods <= 3, "BundledComponentInitializer should have minimal public methods (SRP)");
+            assertTrue(publicMethods <= 3, "RVNKToolsInitializer should have minimal public methods (SRP)");
         });
 
         assertDoesNotThrow(() -> {
@@ -122,18 +122,18 @@ class InitializerClassesTest {
 
         // Check for initializer fields (they're private, so use getDeclaredFields)
         boolean hasCoreServiceFactory = false;
-        boolean hasBundledInitializer = false;
+        boolean hasToolsInitializer = false;
         boolean hasApiInitializer = false;
 
         for (java.lang.reflect.Field field : rvnkCore.getDeclaredFields()) {
             String typeName = field.getType().getSimpleName();
             if (typeName.equals("CoreServiceFactory")) hasCoreServiceFactory = true;
-            if (typeName.equals("BundledComponentInitializer")) hasBundledInitializer = true;
+            if (typeName.equals("RVNKToolsInitializer")) hasToolsInitializer = true;
             if (typeName.equals("ApiServerInitializer")) hasApiInitializer = true;
         }
 
         assertTrue(hasCoreServiceFactory, "RVNKCore should have CoreServiceFactory field");
-        assertTrue(hasBundledInitializer, "RVNKCore should have BundledComponentInitializer field");
+        assertTrue(hasToolsInitializer, "RVNKCore should have RVNKToolsInitializer field");
         assertTrue(hasApiInitializer, "RVNKCore should have ApiServerInitializer field");
     }
 
