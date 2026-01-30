@@ -34,7 +34,8 @@
       "Bash(cd:*)",
       "Bash(python:*)",
       "Bash(ls:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

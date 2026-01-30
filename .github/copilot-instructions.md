@@ -119,11 +119,12 @@ When the user explicitly requests Archon functionality, activate the Archon MCP-
 ### Service Interface Pattern
 
 **Naming Conventions:**
-- **Do not use the `I` prefix for interfaces.** Use `PlayerService` instead of `IPlayerService`.
-- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.** 
-  - Examples: `PlayerService`, `AnnouncementService`, `WorldService`, `EconomyService`.
-- **Implementation classes should use a clear suffix such as `Default`, `Sql`, or another specific descriptor.**
-  - Examples: `DefaultPlayerService`, `SqlPlayerService`, `CorePlayerService`.
+- **USE the `I` prefix for all service and repository interfaces.** Use `IPlayerService` not `PlayerService`.
+- **Service interfaces should use descriptive names ending with `Service`, `Repository`, or `Manager` as appropriate.**
+  - Examples: `IPlayerService`, `IAnnouncementService`, `IWorldService`, `IEconomyService`.
+- **Implementation classes should use a clear suffix such as `Impl`, `Default`, `Sql`, or another specific descriptor.**
+  - Examples: `PlayerServiceImpl`, `SqlPlayerService`, `CorePlayerService`.
+- **This aligns with RVNKCore ServiceRegistry patterns** - see [RVNKCore Integration](../../../docs/standard/rvnkcore-integration.md).
 
 *See examples: [Service Interface Pattern](copilot-instructions.examples.md#service-interface-pattern)*
 
