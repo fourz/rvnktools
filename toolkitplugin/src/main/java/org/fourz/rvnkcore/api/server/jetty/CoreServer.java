@@ -8,10 +8,12 @@ import com.google.gson.stream.JsonWriter;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImpl;
 import org.fourz.rvnktools.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -23,8 +25,14 @@ import java.time.format.DateTimeFormatter;
  * RVNKCore Jetty server for REST API services.
  * Provides HTTP/HTTPS endpoints for player and core data access.
  * 
- * This class has been refactored to use composition with specialized factories
- * for better separation of concerns and maintainability.
+ * <p>This class has been refactored to use composition with specialized factories
+ * for better separation of concerns and maintainability.</p>
+ * 
+ * <p>External plugins can register their own servlets via the {@link IServletRegistrationService}
+ * which is registered with the ServiceRegistry on server startup.</p>
+ * 
+ * @since 1.3.0-alpha
+ * @since 1.4.0 Added external servlet registration support
  */
 public class CoreServer {
     private Server server;
@@ -41,6 +49,9 @@ public class CoreServer {
     private final ServerConnectorFactory connectorFactory;
     private final ServletFactory servletFactory;
     private final ServerLifecycle serverLifecycle;
+    
+    // External servlet registration service
+    private final ServletRegistrationServiceImpl servletRegistrationService;
 
     /**
      * Creates a new RVNKCore server instance.
@@ -70,6 +81,9 @@ public class CoreServer {
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
         this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
+        
+        // Initialize external servlet registration service
+        this.servletRegistrationService = new ServletRegistrationServiceImpl(config, plugin);
     }
 
     /**
@@ -137,8 +151,14 @@ public class CoreServer {
             // Start the server
             serverLifecycle.startServer(server);
             
+            // Enable external servlet registration now that server is running
+            servletRegistrationService.setServletContext(context);
+            
             // Log available routes
             servletFactory.logRegisteredRoutes();
+            
+            // Log external servlet registration availability
+            logger.info("External servlet registration: ENABLED (use IServletRegistrationService)");
             
         } catch (ServerLifecycle.ServerStartupException e) {
             logger.error("Server startup failed: " + e.getMessage());
@@ -152,6 +172,8 @@ public class CoreServer {
      * Stops the Jetty server.
      */
     public void stop() {
+        // Notify servlet registration service that server is stopping
+        servletRegistrationService.onServerStop();
         serverLifecycle.stopServer(server);
     }
 
@@ -167,10 +189,24 @@ public class CoreServer {
      */
     public void restart() {
         try {
+            servletRegistrationService.onServerStop();
             serverLifecycle.restartServer(server);
         } catch (ServerLifecycle.ServerStartupException e) {
             logger.error("Server restart failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Gets the servlet registration service for external plugin servlet registration.
+     *
+     * <p>External plugins should use this service via the ServiceRegistry instead
+     * of accessing it directly from CoreServer.</p>
+     *
+     * @return The IServletRegistrationService implementation
+     * @since 1.4.0
+     */
+    public IServletRegistrationService getServletRegistrationService() {
+        return servletRegistrationService;
     }
 
     /**

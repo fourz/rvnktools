@@ -4,6 +4,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
@@ -22,9 +23,13 @@ import org.fourz.rvnkcore.util.log.LogManager;
  * retrieving services from the ServiceRegistry rather than accepting them
  * as direct constructor parameters.</p>
  *
+ * <p>As of 1.4.0, this initializer also registers the {@link IServletRegistrationService}
+ * with the ServiceRegistry, enabling external plugins to register their own HTTP endpoints.</p>
+ *
  * @since 1.4.0
  * @see CoreServer
  * @see ServiceRegistry
+ * @see IServletRegistrationService
  */
 public class ApiServerInitializer {
 
@@ -59,6 +64,9 @@ public class ApiServerInitializer {
      *   <li>{@link AnnouncementService}</li>
      *   <li>{@link WorldService}</li>
      * </ul>
+     *
+     * <p>After server startup, the {@link IServletRegistrationService} is registered
+     * with the ServiceRegistry, enabling external plugins to add their own endpoints.</p>
      */
     public void start() {
         try {
@@ -96,6 +104,11 @@ public class ApiServerInitializer {
             logger.debug("REST API: Starting server...");
             apiServer.start();
 
+            // Register IServletRegistrationService for external plugin use
+            logger.debug("REST API: Registering IServletRegistrationService...");
+            registry.registerService(IServletRegistrationService.class, apiServer.getServletRegistrationService());
+            logger.debug("  + IServletRegistrationService registered");
+
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " with 30 endpoints (" + totalTime + "ms)");
         } catch (Exception e) {
@@ -109,6 +122,9 @@ public class ApiServerInitializer {
     public void stop() {
         if (apiServer != null) {
             try {
+                // Unregister servlet registration service
+                registry.unregisterService(IServletRegistrationService.class);
+                
                 apiServer.stop();
                 logger.info("REST API server stopped");
             } catch (Exception e) {
@@ -125,5 +141,17 @@ public class ApiServerInitializer {
      */
     public boolean isRunning() {
         return apiServer != null;
+    }
+    
+    /**
+     * Gets the CoreServer instance for direct access.
+     *
+     * <p>External plugins should use the ServiceRegistry to access services
+     * rather than accessing CoreServer directly.</p>
+     *
+     * @return The CoreServer instance, or null if not started
+     */
+    public CoreServer getApiServer() {
+        return apiServer;
     }
 }
