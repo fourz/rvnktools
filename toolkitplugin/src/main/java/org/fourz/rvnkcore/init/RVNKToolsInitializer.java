@@ -99,17 +99,18 @@ public class RVNKToolsInitializer {
         registerEventListeners();
         logger.debug("  + Event listeners registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
-        initializeCommandFramework();
-        logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
-
+        // Initialize LogFilter BEFORE CommandManager to ensure service is available
         initializeLogFilter();
         logger.debug("  + LogFilter initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        initializeCommandFramework();
+        logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         registerBundledComponentCommands();
         logger.debug("  + Bundled commands registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, AnnounceManager, API, Events, CommandManager, LogFilter (" + totalTime + "ms)");
+        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, AnnounceManager, API, Events, LogFilter, CommandManager (" + totalTime + "ms)");
     }
 
     /**
