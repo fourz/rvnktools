@@ -1,33 +1,11 @@
-## [CRITICAL] ARCHON-FIRST WORKFLOW
+# RVNKTools: AI Assistant Instructions
 
-**BEFORE starting ANY task-related work:**
-
-1. **CHECK** if Archon MCP server is available
-2. **USE** Archon task management as PRIMARY system
-3. **FOLLOW** task-driven development workflow
-
-This rule overrides all other development patterns.
+@import ../../.claude/rules/archon-workflow.md
+@import ../../.claude/rules/java-plugin-build.md
 
 ---
 
-## [QUICKSTART] Task-Driven Development
-
-**Core Workflow:**
-
-```text
-1. Get Task → find_tasks(filter_by="status", filter_value="todo")
-2. Start Work → manage_task("update", task_id="...", status="doing")
-3. Research → rag_search_knowledge_base(query="...")
-4. Implement → Write code based on research
-5. Review → manage_task("update", task_id="...", status="review")
-6. Next Task → find_tasks(filter_by="status", filter_value="todo")
-```
-
-**Task Status Flow:** `todo` → `doing` → `review` → `done`
-
-**NEVER skip task updates. NEVER code without checking current tasks first.**
-
-### Archon Project IDs
+## Archon Project IDs
 
 **Related Projects**:
 
