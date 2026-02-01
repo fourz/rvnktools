@@ -202,6 +202,92 @@ class ServletRegistrationServiceImplTest {
             assertTrue(result);
             assertFalse(service.isRegistered("/api/active/*"));
         }
+
+        @Test
+        @DisplayName("Unregister with normalized path")
+        void testUnregisterWithNormalization() {
+            HttpServlet servlet = mock(HttpServlet.class);
+            service.registerServlet("/api/normalized/*", servlet);
+
+            // Unregister without leading slash
+            boolean result = service.unregisterServlet("api/normalized/*");
+
+            assertTrue(result, "Should unregister with normalized path");
+            assertFalse(service.isRegistered("/api/normalized/*"));
+        }
+    }
+
+    // ==================== Plugin Servlet Management ====================
+
+    @Nested
+    @DisplayName("Plugin Servlet Management")
+    class PluginServletManagement {
+
+        @Test
+        @DisplayName("Two-argument convenience method with null servlet")
+        void testTwoArgConvenienceMethodNullServlet() {
+            assertThrows(IllegalArgumentException.class, () ->
+                service.registerServlet("/api/test/*", null, true));
+        }
+
+        @Test
+        @DisplayName("Two-argument convenience method registers with auth")
+        void testTwoArgConvenienceMethodWithAuth() {
+            HttpServlet servlet = mock(HttpServlet.class);
+
+            boolean result = service.registerServlet("/api/plugin/*", servlet, true);
+
+            assertTrue(result);
+            assertTrue(service.isRegistered("/api/plugin/*"));
+
+            Map<String, String> details = service.getRegistrationDetails();
+            assertTrue(details.get("/api/plugin/*").contains("auth=true"));
+        }
+
+        @Test
+        @DisplayName("Two-argument convenience method registers public endpoint")
+        void testTwoArgConvenienceMethodPublic() {
+            HttpServlet servlet = mock(HttpServlet.class);
+
+            boolean result = service.registerServlet("/api/public/*", servlet, false);
+
+            assertTrue(result);
+            Map<String, String> details = service.getRegistrationDetails();
+            assertTrue(details.get("/api/public/*").contains("auth=false"));
+        }
+
+        @Test
+        @DisplayName("Single-argument convenience method defaults to auth required")
+        void testSingleArgConvenienceMethod() {
+            HttpServlet servlet = mock(HttpServlet.class);
+
+            boolean result = service.registerServlet("/api/default/*", servlet);
+
+            assertTrue(result);
+            Map<String, String> details = service.getRegistrationDetails();
+            assertTrue(details.get("/api/default/*").contains("auth=true"));
+        }
+
+        @Test
+        @DisplayName("Multiple plugins can register different paths")
+        void testMultiplePluginRegistrations() {
+            service.setServletContext(mockServletContext);
+
+            HttpServlet plugin1Servlet = mock(HttpServlet.class);
+            HttpServlet plugin2Servlet = mock(HttpServlet.class);
+            HttpServlet plugin3Servlet = mock(HttpServlet.class);
+
+            service.registerServlet("/api/plugin1/*", plugin1Servlet, "Plugin1 API", true);
+            service.registerServlet("/api/plugin2/*", plugin2Servlet, "Plugin2 API", false);
+            service.registerServlet("/api/plugin3/health", plugin3Servlet, "Plugin3 Health", false);
+
+            assertEquals(3, service.getRegisteredCount());
+
+            Map<String, String> details = service.getRegistrationDetails();
+            assertTrue(details.get("/api/plugin1/*").contains("Plugin1 API"));
+            assertTrue(details.get("/api/plugin2/*").contains("Plugin2 API"));
+            assertTrue(details.get("/api/plugin3/health").contains("Plugin3 Health"));
+        }
     }
 
     // ==================== Query Methods ====================
