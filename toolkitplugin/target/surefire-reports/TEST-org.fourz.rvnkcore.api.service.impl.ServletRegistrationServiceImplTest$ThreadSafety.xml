@@ -1,0 +1,773 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$ThreadSafety" time="0.224" tests="3" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="22"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.class.path" value="C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin\target\test-classes;C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin\target\classes;C:\Users\derek.INTERNAL\.m2\repository\org\spigotmc\spigot-api\1.21-R0.1-SNAPSHOT\spigot-api-1.21-R0.1-SNAPSHOT.jar;C:\Users\derek.INTERNAL\.m2\repository\org\joml\joml\1.10.5\joml-1.10.5.jar;C:\Users\derek.INTERNAL\.m2\repository\net\md-5\bungeecord-chat\1.20-R0.2\bungeecord-chat-1.20-R0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\yaml\snakeyaml\2.0\snakeyaml-2.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\guava\31.0.1-jre\guava-31.0.1-jre.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\failureaccess\1.0.1\failureaccess-1.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\listenablefuture\9999.0-empty-to-avoid-conflict-with-guava\listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\checkerframework\checker-qual\3.12.0\checker-qual-3.12.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\errorprone\error_prone_annotations\2.7.1\error_prone_annotations-2.7.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\j2objc\j2objc-annotations\1.3\j2objc-annotations-1.3.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\code\gson\gson\2.8.9\gson-2.8.9.jar;C:\Users\derek.INTERNAL\.m2\repository\me\clip\placeholderapi\2.11.6\placeholderapi-2.11.6.jar;C:\Users\derek.INTERNAL\.m2\repository\org\jetbrains\annotations\23.0.0\annotations-23.0.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bstats\bstats-bukkit\3.0.1\bstats-bukkit-3.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bstats\bstats-base\3.0.1\bstats-base-3.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-bukkit\4.3.2\adventure-platform-bukkit-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-api\4.3.2\adventure-platform-api-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-api\4.13.1\adventure-api-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-key\4.13.1\adventure-key-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-bungeecord\4.3.2\adventure-text-serializer-bungeecord-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-legacy\4.13.1\adventure-text-serializer-legacy-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-nbt\4.13.1\adventure-nbt-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\examination-api\1.3.0\examination-api-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\examination-string\1.3.0\examination-string-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-gson\4.13.1\adventure-text-serializer-gson-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-gson-legacy-impl\4.13.1\adventure-text-serializer-gson-legacy-impl-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-facet\4.3.2\adventure-platform-facet-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-viaversion\4.3.2\adventure-platform-viaversion-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\luckperms\api\5.4\api-5.4.jar;C:\Users\derek.INTERNAL\.m2\repository\com\github\MilkBowl\VaultAPI\1.7\VaultAPI-1.7.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bukkit\bukkit\1.13.1-R0.1-SNAPSHOT\bukkit-1.13.1-R0.1-SNAPSHOT.jar;C:\Users\derek.INTERNAL\.m2\repository\commons-lang\commons-lang\2.6\commons-lang-2.6.jar;C:\Users\derek.INTERNAL\.m2\repository\com\googlecode\json-simple\json-simple\1.1.1\json-simple-1.1.1.jar;C:\Users\derek.INTERNAL\.m2\repository\junit\junit\4.10\junit-4.10.jar;C:\Users\derek.INTERNAL\.m2\repository\org\hamcrest\hamcrest-core\1.1\hamcrest-core-1.1.jar;C:\Users\derek.INTERNAL\.m2\repository\org\xerial\sqlite-jdbc\3.44.1.0\sqlite-jdbc-3.44.1.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\slf4j\slf4j-api\1.7.36\slf4j-api-1.7.36.jar;C:\Users\derek.INTERNAL\.m2\repository\com\zaxxer\HikariCP\5.1.0\HikariCP-5.1.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\mysql\mysql-connector-j\8.0.33\mysql-connector-j-8.0.33.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\protobuf\protobuf-java\3.21.9\protobuf-java-3.21.9.jar;C:\Users\derek.INTERNAL\.m2\repository\commons-codec\commons-codec\1.16.0\commons-codec-1.16.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-server\11.0.17\jetty-server-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\toolchain\jetty-jakarta-servlet-api\5.0.2\jetty-jakarta-servlet-api-5.0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-http\11.0.17\jetty-http-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-io\11.0.17\jetty-io-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-servlet\11.0.17\jetty-servlet-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-security\11.0.17\jetty-security-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-servlets\11.0.17\jetty-servlets-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-util\11.0.17\jetty-util-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcprov-jdk18on\1.77\bcprov-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcpkix-jdk18on\1.77\bcpkix-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcutil-jdk18on\1.77\bcutil-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\com\onarandombox\multiversecore\Multiverse-Core\4.3.1\Multiverse-Core-4.3.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\auth0\java-jwt\4.4.0\java-jwt-4.4.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.14.2\jackson-databind-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.14.2\jackson-annotations-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.14.2\jackson-core-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\io\swagger\core\v3\swagger-annotations\2.2.19\swagger-annotations-2.2.19.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.0\junit-jupiter-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.0\junit-jupiter-api-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\platform\junit-platform-commons\1.10.0\junit-platform-commons-1.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.0\junit-jupiter-params-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.0\junit-jupiter-engine-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\platform\junit-platform-engine\1.10.0\junit-platform-engine-1.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\mockito\mockito-core\5.8.0\mockito-core-5.8.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\bytebuddy\byte-buddy\1.14.10\byte-buddy-1.14.10.jar;C:\Users\derek.INTERNAL\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.10\byte-buddy-agent-1.14.10.jar;C:\Users\derek.INTERNAL\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\derek.INTERNAL\.m2\repository\org\mockito\mockito-junit-jupiter\5.8.0\mockito-junit-jupiter-5.8.0.jar;"/>
+    <property name="java.vm.vendor" value="Oracle Corporation"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://java.oracle.com/"/>
+    <property name="user.timezone" value="America/Chicago"/>
+    <property name="os.name" value="Windows 10"/>
+    <property name="java.vm.specification.version" value="22"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="C:\Program Files\Java\jdk-22\bin"/>
+    <property name="sun.java.command" value="C:\Users\derek.INTERNAL\AppData\Local\Temp\surefire15470613234810810821\surefirebooter-20260131205350896_3.jar C:\Users\derek.INTERNAL\AppData\Local\Temp\surefire15470613234810810821 2026-01-31T20-53-50_665-jvmRun1 surefire-20260131205350896_1tmp surefire_0-20260131205350896_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin\target\test-classes;C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin\target\classes;C:\Users\derek.INTERNAL\.m2\repository\org\spigotmc\spigot-api\1.21-R0.1-SNAPSHOT\spigot-api-1.21-R0.1-SNAPSHOT.jar;C:\Users\derek.INTERNAL\.m2\repository\org\joml\joml\1.10.5\joml-1.10.5.jar;C:\Users\derek.INTERNAL\.m2\repository\net\md-5\bungeecord-chat\1.20-R0.2\bungeecord-chat-1.20-R0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\yaml\snakeyaml\2.0\snakeyaml-2.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\guava\31.0.1-jre\guava-31.0.1-jre.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\failureaccess\1.0.1\failureaccess-1.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\guava\listenablefuture\9999.0-empty-to-avoid-conflict-with-guava\listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\checkerframework\checker-qual\3.12.0\checker-qual-3.12.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\errorprone\error_prone_annotations\2.7.1\error_prone_annotations-2.7.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\j2objc\j2objc-annotations\1.3\j2objc-annotations-1.3.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\code\gson\gson\2.8.9\gson-2.8.9.jar;C:\Users\derek.INTERNAL\.m2\repository\me\clip\placeholderapi\2.11.6\placeholderapi-2.11.6.jar;C:\Users\derek.INTERNAL\.m2\repository\org\jetbrains\annotations\23.0.0\annotations-23.0.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bstats\bstats-bukkit\3.0.1\bstats-bukkit-3.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bstats\bstats-base\3.0.1\bstats-base-3.0.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-bukkit\4.3.2\adventure-platform-bukkit-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-api\4.3.2\adventure-platform-api-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-api\4.13.1\adventure-api-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-key\4.13.1\adventure-key-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-bungeecord\4.3.2\adventure-text-serializer-bungeecord-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-legacy\4.13.1\adventure-text-serializer-legacy-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-nbt\4.13.1\adventure-nbt-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\examination-api\1.3.0\examination-api-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\examination-string\1.3.0\examination-string-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-gson\4.13.1\adventure-text-serializer-gson-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-text-serializer-gson-legacy-impl\4.13.1\adventure-text-serializer-gson-legacy-impl-4.13.1.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-facet\4.3.2\adventure-platform-facet-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\kyori\adventure-platform-viaversion\4.3.2\adventure-platform-viaversion-4.3.2.jar;C:\Users\derek.INTERNAL\.m2\repository\net\luckperms\api\5.4\api-5.4.jar;C:\Users\derek.INTERNAL\.m2\repository\com\github\MilkBowl\VaultAPI\1.7\VaultAPI-1.7.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bukkit\bukkit\1.13.1-R0.1-SNAPSHOT\bukkit-1.13.1-R0.1-SNAPSHOT.jar;C:\Users\derek.INTERNAL\.m2\repository\commons-lang\commons-lang\2.6\commons-lang-2.6.jar;C:\Users\derek.INTERNAL\.m2\repository\com\googlecode\json-simple\json-simple\1.1.1\json-simple-1.1.1.jar;C:\Users\derek.INTERNAL\.m2\repository\junit\junit\4.10\junit-4.10.jar;C:\Users\derek.INTERNAL\.m2\repository\org\hamcrest\hamcrest-core\1.1\hamcrest-core-1.1.jar;C:\Users\derek.INTERNAL\.m2\repository\org\xerial\sqlite-jdbc\3.44.1.0\sqlite-jdbc-3.44.1.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\slf4j\slf4j-api\1.7.36\slf4j-api-1.7.36.jar;C:\Users\derek.INTERNAL\.m2\repository\com\zaxxer\HikariCP\5.1.0\HikariCP-5.1.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\mysql\mysql-connector-j\8.0.33\mysql-connector-j-8.0.33.jar;C:\Users\derek.INTERNAL\.m2\repository\com\google\protobuf\protobuf-java\3.21.9\protobuf-java-3.21.9.jar;C:\Users\derek.INTERNAL\.m2\repository\commons-codec\commons-codec\1.16.0\commons-codec-1.16.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-server\11.0.17\jetty-server-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\toolchain\jetty-jakarta-servlet-api\5.0.2\jetty-jakarta-servlet-api-5.0.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-http\11.0.17\jetty-http-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-io\11.0.17\jetty-io-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-servlet\11.0.17\jetty-servlet-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-security\11.0.17\jetty-security-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-servlets\11.0.17\jetty-servlets-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\eclipse\jetty\jetty-util\11.0.17\jetty-util-11.0.17.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcprov-jdk18on\1.77\bcprov-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcpkix-jdk18on\1.77\bcpkix-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\org\bouncycastle\bcutil-jdk18on\1.77\bcutil-jdk18on-1.77.jar;C:\Users\derek.INTERNAL\.m2\repository\com\onarandombox\multiversecore\Multiverse-Core\4.3.1\Multiverse-Core-4.3.1.jar;C:\Users\derek.INTERNAL\.m2\repository\com\auth0\java-jwt\4.4.0\java-jwt-4.4.0.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.14.2\jackson-databind-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.14.2\jackson-annotations-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.14.2\jackson-core-2.14.2.jar;C:\Users\derek.INTERNAL\.m2\repository\io\swagger\core\v3\swagger-annotations\2.2.19\swagger-annotations-2.2.19.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.0\junit-jupiter-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.0\junit-jupiter-api-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\platform\junit-platform-commons\1.10.0\junit-platform-commons-1.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.0\junit-jupiter-params-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.0\junit-jupiter-engine-5.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\junit\platform\junit-platform-engine\1.10.0\junit-platform-engine-1.10.0.jar;C:\Users\derek.INTERNAL\.m2\repository\org\mockito\mockito-core\5.8.0\mockito-core-5.8.0.jar;C:\Users\derek.INTERNAL\.m2\repository\net\bytebuddy\byte-buddy\1.14.10\byte-buddy-1.14.10.jar;C:\Users\derek.INTERNAL\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.10\byte-buddy-agent-1.14.10.jar;C:\Users\derek.INTERNAL\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\derek.INTERNAL\.m2\repository\org\mockito\mockito-junit-jupiter\5.8.0\mockito-junit-jupiter-5.8.0.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\derek.INTERNAL"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2024-04-16"/>
+    <property name="java.home" value="C:\Program Files\Java\jdk-22"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="surefire.real.class.path" value="C:\Users\derek.INTERNAL\AppData\Local\Temp\surefire15470613234810810821\surefirebooter-20260131205350896_3.jar"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="22.0.1+8-16"/>
+    <property name="user.name" value="derek"/>
+    <property name="stdout.encoding" value="Cp1252"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="Java(TM) SE Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="Java HotSpot(TM) 64-Bit Server VM"/>
+    <property name="localRepository" value="C:\Users\derek.INTERNAL\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://bugreport.java.com/bugreport/"/>
+    <property name="jetty.git.hash" value="48e7716b9462bebea6732b885dbebb4300787a5c"/>
+    <property name="java.io.tmpdir" value="C:\Users\DEREK~1.INT\AppData\Local\Temp\"/>
+    <property name="java.version" value="22.0.1"/>
+    <property name="user.dir" value="C:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnktools\toolkitplugin"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="C:\Program Files\Java\jdk-22\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\PowerShell\7;c:\Users\derek.INTERNAL\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\debugCommand;c:\Users\derek.INTERNAL\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\copilotCli;C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin;C:\Python313\Scripts\;C:\Python313\;C:\Program Files\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\Git\cmd;C:\Program Files\dotnet\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\tools\apache-maven-3.9.5\bin;C:\Program Files\PuTTY\;c:\Users\derek.INTERNAL\AppData\Local\Programs\cursor\resources\app\bin;C:\Program Files\GitHub CLI\;C:\Program Files\Microsoft VS Code\bin;C:\ProgramData\chocolatey\bin;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Users\derek.INTERNAL\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Program Files\nodejs\;C:\Program Files\Go\bin;C:\Program Files\PowerShell\7\;C:\Users\derek.INTERNAL\.local\bin;;C:\Program Files\Docker\Docker\resources\bin;C:\Users\derek.INTERNAL\AppData\Local\Microsoft\WindowsApps;C:\Users\derek.INTERNAL\.dotnet\tools;%maven home%\bin;C:\Users\derek.INTERNAL\AppData\Local\GitHubDesktop\bin;C:\Users\derek.INTERNAL\AppData\Local\Microsoft\WinGet\Packages\Schniz.fnm_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\derek.INTERNAL\AppData\Roaming\npm;C:\Users\derek.INTERNAL\go\bin;C:\Users\derek.INTERNAL\AppData\Local\nanobot;C:\Users\derek.INTERNAL\AppData\Local\Programs\Ollama;C:\Users\derek.INTERNAL\AppData\Local\PowerToys\;C:\Users\derek.INTERNAL\AppData\Local\Microsoft\WinGet\Packages\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe;c:\Users\derek.INTERNAL\.vscode\extensions\ms-python.debugpy-2025.18.0-win32-x64\bundled\scripts\noConfigScripts;c:\Users\derek.INTERNAL\.vscode\extensions\vscjava.vscode-java-debug-0.58.5\bundled\scripts\noConfigScripts;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="Cp1252"/>
+    <property name="java.vendor" value="Oracle Corporation"/>
+    <property name="java.vm.version" value="22.0.1+8-16"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="66.0"/>
+  </properties>
+  <testcase name="testRegistrationDuringContextSet" classname="org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$ThreadSafety" time="0.07">
+    <system-err><![CDATA[Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Applied 5 pending servlet registrations
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race10/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race11/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race12/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race13/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race14/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race15/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race16/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race17/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race18/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race19/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race20/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race21/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race22/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race23/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race24/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race25/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race26/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race27/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race28/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race29/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race30/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race31/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race32/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race33/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race34/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race35/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race36/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race37/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race38/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race39/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race40/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race41/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race42/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race43/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race44/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race45/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race46/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race47/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race48/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/race49/* (authenticated)
+]]></system-err>
+  </testcase>
+  <testcase name="testConcurrentRegistrations" classname="org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$ThreadSafety" time="0.059">
+    <system-err><![CDATA[Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread4/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread1/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread7/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread6/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread2/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread8/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread9/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread0/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread3/servlet9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/thread5/servlet9/* (authenticated)
+]]></system-err>
+  </testcase>
+  <testcase name="testConcurrentUnregistration" classname="org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$ThreadSafety" time="0.088">
+    <system-err><![CDATA[Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister0/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister1/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister2/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister3/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister4/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister5/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister6/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister7/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister8/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister9/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister10/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister11/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister12/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister13/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister14/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister15/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister16/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister17/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister18/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister19/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister20/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister21/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister22/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister23/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister24/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister25/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister26/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister27/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister28/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister29/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister30/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister31/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister32/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister33/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister34/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister35/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister36/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister37/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister38/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister39/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister40/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister41/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister42/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister43/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister44/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister45/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister46/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister47/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister48/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister49/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister50/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister51/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister52/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister53/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister54/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister55/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister56/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister57/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister58/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister59/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister60/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister61/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister62/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister63/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister64/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister65/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister66/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister67/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister68/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister69/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister70/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister71/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister72/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister73/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister74/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister75/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister76/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister77/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister78/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister79/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister80/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister81/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister82/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister83/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister84/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister85/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister86/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister87/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister88/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister89/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister90/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister91/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister92/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister93/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister94/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister95/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister96/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister97/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister98/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Registered external servlet: HttpServlet$MockitoMock$kSgXg0Mr at /api/unregister99/* (authenticated)
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister3/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister4/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister2/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister0/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister1/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister8/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister9/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister14/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister7/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister5/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister6/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister13/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister19/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister12/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister17/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister10/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister15/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister11/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister18/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister24/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister22/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister20/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister25/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister16/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister23/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister29/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister27/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister32/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister30/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister35/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister40/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister45/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister21/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister28/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister33/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister38/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister43/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister34/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister39/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister37/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister50/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister26/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister48/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister44/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister42/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister55/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister31/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister53/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister49/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister47/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister60/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister36/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister58/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister54/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister52/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister65/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister41/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister63/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister59/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister64/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister69/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister74/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister57/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister70/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister46/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister68/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister73/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister79/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister62/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister67/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister75/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister51/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister56/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister78/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister84/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister72/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister80/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister61/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister83/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister89/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister77/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister85/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister66/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister88/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister94/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister82/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister90/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister71/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister93/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister99/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister87/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister95/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister76/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister98/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister92/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister97/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister81/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister86/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister91/*
+Jan 31, 2026 8:53:55 PM org.fourz.rvnkcore.util.log.LogManager info
+INFO: [ServletRegistrationServiceImpl] Unregistered external servlet at: /api/unregister96/*
+]]></system-err>
+  </testcase>
+</testsuite>

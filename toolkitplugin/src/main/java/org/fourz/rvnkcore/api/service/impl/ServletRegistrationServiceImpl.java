@@ -102,6 +102,9 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
 
     @Override
     public boolean registerServlet(String pathSpec, HttpServlet servlet, boolean requireAuth) {
+        if (servlet == null) {
+            throw new IllegalArgumentException("servlet cannot be null");
+        }
         return registerServlet(pathSpec, servlet, servlet.getClass().getSimpleName(), requireAuth);
     }
 
