@@ -4,7 +4,7 @@ import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
 import org.fourz.rvnkcore.api.exception.ServiceException;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.List;
 import java.util.Optional;
