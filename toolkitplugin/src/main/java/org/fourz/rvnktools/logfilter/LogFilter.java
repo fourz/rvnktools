@@ -3,7 +3,7 @@ package org.fourz.rvnktools.logfilter;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.List;
 import java.util.logging.Handler;

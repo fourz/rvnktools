@@ -50,10 +50,13 @@ public class LogManager {
         "ALL", Level.ALL
     );
 
+    /** Static default level inherited by new instances. Updated by setGlobalLogLevel(). */
+    private static volatile Level defaultLevel = Level.INFO;
+
     private final Logger logger;
     private final String prefix;
     private final String pluginName;
-    private volatile Level logLevel = Level.INFO;
+    private volatile Level logLevel = defaultLevel;
     private volatile boolean debugEnabled = false;
     
     /**
@@ -275,11 +278,13 @@ public class LogManager {
     }
 
     /**
-     * Sets the log level for all LogManager instances.
+     * Sets the log level for all existing LogManager instances and updates the
+     * default level for future instances.
      *
      * @param level The new global log level
      */
     public static void setGlobalLogLevel(Level level) {
+        defaultLevel = level;
         instances.values().forEach(manager -> manager.setLogLevel(level));
     }
 

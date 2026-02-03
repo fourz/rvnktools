@@ -3,7 +3,11 @@ package org.fourz.rvnktools.util.log;
 /**
  * Common interface for all logging implementations in RVNKTools.
  * Allows for easy switching between different logging strategies.
+ *
+ * @deprecated Use {@link org.fourz.rvnkcore.util.log.LogManager} directly instead.
+ *             This interface will be removed in a future version.
  */
+@Deprecated(since = "1.4.0", forRemoval = true)
 public interface RVNKLogger {
     void debug(String message);
     void debug(String message, Throwable throwable);

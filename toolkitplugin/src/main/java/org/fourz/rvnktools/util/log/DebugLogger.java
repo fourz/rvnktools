@@ -8,7 +8,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Performance-focused logger implementation that collects metrics
  * and provides detailed debugging information when enabled.
+ *
+ * @deprecated Use {@link org.fourz.rvnkcore.util.log.LogManager} directly instead.
+ *             This class will be removed in a future version.
  */
+@Deprecated(since = "1.4.0", forRemoval = true)
 public class DebugLogger implements RVNKLogger {
     private final RVNKLogger baseLogger;
     private final Map<String, AtomicLong> performanceMetrics = new ConcurrentHashMap<>();

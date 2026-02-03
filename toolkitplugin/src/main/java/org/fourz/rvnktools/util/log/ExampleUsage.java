@@ -5,7 +5,12 @@ import org.bukkit.plugin.Plugin;
 /**
  * Example usage of the logging system.
  * Shows how to use both LogManager and DebugLogger in a typical class.
+ *
+ * @deprecated This example references deprecated logging classes.
+ *             Use {@link org.fourz.rvnkcore.util.log.LogManager} directly instead.
+ *             This class will be removed in a future version.
  */
+@Deprecated(since = "1.4.0", forRemoval = true)
 public class ExampleUsage {
     private final RVNKLogger logger;
     private final DebugLogger debugLogger;
@@ -13,10 +18,10 @@ public class ExampleUsage {
     public ExampleUsage(Plugin plugin) {
         // For normal logging, use LogManager
         this.logger = LogManager.getInstance(plugin, getClass());
-        
+
         // For performance-critical sections, use DebugLogger
         this.debugLogger = new DebugLogger(plugin, getClass());
-        
+
         // Enable debug logging if needed (e.g., based on config)
         debugLogger.setDebugEnabled(true);
     }
@@ -27,7 +32,7 @@ public class ExampleUsage {
         try (AutoCloseable timer = debugLogger.timeSection("criticalOperation")) {
             // Your performance-critical code here
             performCriticalOperation();
-            
+
             // Debug messages will only be logged if debug is enabled
             debugLogger.debug("Critical operation details: ...");
         } catch (Exception e) {
@@ -40,7 +45,7 @@ public class ExampleUsage {
         debugLogger.performance("anotherOperation", System.nanoTime() - startTime);
 
         // Check accumulated metrics
-        debugLogger.getPerformanceMetrics().forEach((section, time) -> 
+        debugLogger.getPerformanceMetrics().forEach((section, time) ->
             logger.info(String.format("Total time for %s: %.2fms", section, time / 1_000_000.0))
         );
     }
