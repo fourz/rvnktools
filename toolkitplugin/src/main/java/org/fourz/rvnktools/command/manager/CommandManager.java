@@ -14,8 +14,7 @@ import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
 import org.fourz.rvnktools.command.cycle.CycleCommands;
 
@@ -38,7 +37,7 @@ public class CommandManager {
     private static final Object lock = new Object();
 
     private final RVNKCore plugin;
-    private final RVNKLogger logger;
+    private final LogManager logger;
     private final Map<String, RVNKCommand> commands;
     private final Map<String, String> aliases;
     private final CycleCommands cycleCommands;

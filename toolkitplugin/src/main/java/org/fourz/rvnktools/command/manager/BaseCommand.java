@@ -7,8 +7,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.*;
 
@@ -24,7 +23,7 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
     protected final String description;
     protected final String usage;
     protected final String permission;
-    protected final RVNKLogger logger;
+    protected final LogManager logger;
     protected final Map<String, SubCommand> subCommands;
     
     /**

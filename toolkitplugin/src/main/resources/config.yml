@@ -5,6 +5,24 @@
 logging:
   level: INFO
 
+# Storage configuration for RVNKCore database tables
+storage:
+  # Storage type: sqlite (default) or mysql
+  type: sqlite
+  sqlite:
+    # Table prefix for shared database hosting (e.g., "core_" creates "core_rvnk_players")
+    # Leave empty for no prefix (default)
+    tablePrefix: ""
+  mysql:
+    host: localhost
+    port: 3306
+    database: minecraft
+    username: root
+    password: ""
+    useSSL: false
+    # Table prefix for shared database hosting
+    tablePrefix: ""
+
 # Log Filter Configuration
 # Controls which types of server messages are displayed in console
 logfilter:

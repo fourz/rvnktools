@@ -9,7 +9,7 @@ import net.luckperms.api.model.user.User;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnktools.permission.LuckPermsManager;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;

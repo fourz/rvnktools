@@ -2,7 +2,7 @@ package org.fourz.rvnktools.config;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.logging.Level;
 

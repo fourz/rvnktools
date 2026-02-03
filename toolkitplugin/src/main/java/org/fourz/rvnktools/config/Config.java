@@ -1,8 +1,7 @@
 package org.fourz.rvnktools.config;
 
 import org.bukkit.configuration.file.FileConfiguration;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.logging.Level;
 
@@ -44,7 +43,7 @@ public class Config {
         
         // Load logging configuration
         String logLevelStr = config.getString("logging.level", "INFO");
-        this.logLevel = Debug.getLevel(logLevelStr);
+        this.logLevel = LogManager.parseLevel(logLevelStr);
         
         // Load LogFilter configuration
         this.logFilterEnabled = config.getBoolean("logfilter.enabled", true);

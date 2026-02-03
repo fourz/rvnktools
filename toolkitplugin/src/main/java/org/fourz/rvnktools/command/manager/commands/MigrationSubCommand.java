@@ -6,7 +6,7 @@ import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import org.fourz.rvnktools.command.manager.RVNKCommand;
 import org.fourz.rvnktools.migration.MigrationOrchestrator;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.RVNKCore;
 
 import java.util.ArrayList;
