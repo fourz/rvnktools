@@ -1,6 +1,6 @@
 package org.fourz.rvnkcore.api.config;
 
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
  * Utility class for testing and validating API configuration.

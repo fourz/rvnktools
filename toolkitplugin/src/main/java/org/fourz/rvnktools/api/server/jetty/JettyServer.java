@@ -20,9 +20,8 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import java.util.logging.Level;
 import com.google.gson.TypeAdapter;
 import com.google.gson.GsonBuilder;
 import com.google.gson.stream.JsonReader;
@@ -38,19 +37,14 @@ public class JettyServer {
     private final AnnounceManager announceManager;
     private final Gson gson = createGson();
     private final RestConfig config;
-    private final JettyServerDebug debug;
+    private final LogManager logger;
     private final JavaPlugin plugin;
-    private class JettyServerDebug extends Debug {
-        public JettyServerDebug(JavaPlugin plugin) {
-            super(plugin, "JettyServer", Level.FINE);
-        }
-    }
 
     public JettyServer(AnnounceManager announceManager, RestConfig config, JavaPlugin plugin) {
         this.announceManager = announceManager;
         this.config = config;
         this.plugin = plugin;
-        this.debug = new JettyServerDebug(plugin);
+        this.logger = LogManager.getInstance(plugin, "JettyServer");
     }
 
     private boolean validateTlsConfig() {
@@ -60,24 +54,24 @@ public class JettyServer {
 
         boolean isValid = true;
         if (config.getKeystorePath().equals("keystore.jks")) {
-            debug.warning("Using default keystore path. Please configure a proper keystore for HTTPS.");
+            logger.warning("Using default keystore path. Please configure a proper keystore for HTTPS.");
             isValid = false;
         }
         if (config.getKeystorePassword().equals("changeme")) {
-            debug.warning("Using default keystore password. Please configure a secure password for HTTPS.");
+            logger.warning("Using default keystore password. Please configure a secure password for HTTPS.");
             isValid = false;
         }
         if (config.getKeyManagerPassword().equals("changeme")) {
-            debug.warning("Using default key manager password. Please configure a secure password for HTTPS.");
+            logger.warning("Using default key manager password. Please configure a secure password for HTTPS.");
             isValid = false;
         }
-        
+
         if (!isValid) {
-            debug.warning("HTTPS is enabled but using default configuration values. This is not recommended for production use.");
-            debug.warning("Please generate a proper keystore using:");
-            debug.warning("keytool -genkeypair -alias jetty -keyalg RSA -keysize 2048 -keystore keystore.jks -validity 365");
+            logger.warning("HTTPS is enabled but using default configuration values. This is not recommended for production use.");
+            logger.warning("Please generate a proper keystore using:");
+            logger.warning("keytool -genkeypair -alias jetty -keyalg RSA -keysize 2048 -keystore keystore.jks -validity 365");
         }
-        
+
         return isValid;
     }
 
@@ -85,39 +79,39 @@ public class JettyServer {
         // Configure Jetty logging before creating server
         org.eclipse.jetty.util.log.Log.setLog(new org.eclipse.jetty.util.log.Logger() {
             public String getName() { return "Jetty"; }
-            
-            public void warn(String msg, Object... args) { 
-                if (msg != null) debug.warning(formatMessage(msg, args)); 
+
+            public void warn(String msg, Object... args) {
+                if (msg != null) logger.warning(formatMessage(msg, args));
             }
-            
-            public void warn(Throwable thrown) { 
-                if (thrown != null) debug.warning(thrown.getMessage()); 
+
+            public void warn(Throwable thrown) {
+                if (thrown != null) logger.warning(thrown.getMessage());
             }
-            
-            public void warn(String msg, Throwable thrown) { 
-                debug.warning(msg + ": " + (thrown != null ? thrown.getMessage() : "")); 
+
+            public void warn(String msg, Throwable thrown) {
+                logger.warning(msg + ": " + (thrown != null ? thrown.getMessage() : ""));
             }
-            
-            public void info(String msg, Object... args) { 
+
+            public void info(String msg, Object... args) {
                 if (msg != null) {
                     String formatted = formatMessage(msg, args);
                     // Filter out noisy startup messages
-                    if (!formatted.contains("Started @") && 
+                    if (!formatted.contains("Started @") &&
                         !formatted.contains("Started Server@") &&
                         !formatted.contains("Started o.e.j.s.ServletContextHandler")) {
-                        debug.debug(formatted);
+                        logger.debug(formatted);
                     }
                 }
             }
-            
-            public void info(Throwable thrown) { 
-                if (thrown != null) debug.debug(thrown.getMessage()); 
+
+            public void info(Throwable thrown) {
+                if (thrown != null) logger.debug(thrown.getMessage());
             }
-            
-            public void info(String msg, Throwable thrown) { 
+
+            public void info(String msg, Throwable thrown) {
                 String message = msg;
                 if (thrown != null) message += ": " + thrown.getMessage();
-                debug.debug(message);
+                logger.debug(message);
             }
 
             private String formatMessage(String msg, Object... args) {
@@ -127,7 +121,7 @@ public class JettyServer {
                     return msg;
                 }
             }
-            
+
             // Required no-op methods
             public boolean isDebugEnabled() { return true; }
             public void setDebugEnabled(boolean enabled) {}
@@ -142,7 +136,7 @@ public class JettyServer {
         });
 
         server = new Server();
-        
+
         // HTTP Configuration
         HttpConfiguration httpConfig = new HttpConfiguration();
         httpConfig.setSendServerVersion(config.isSendServerVersion());
@@ -169,13 +163,13 @@ public class JettyServer {
                     config.getKeystorePath(),
                     config.getKeystorePassword(),
                     config.getKeyManagerPassword(),
-                    debug
+                    logger
                 );
             } else {
                 // Use KeyStoreGenerator
             }
-            debug.debug("TLS Configuration is " + (validateTlsConfig() ? "valid" : "invalid"));
-            
+            logger.debug("TLS Configuration is " + (validateTlsConfig() ? "valid" : "invalid"));
+
             HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
             httpsConfig.addCustomizer(new SecureRequestCustomizer());
 
@@ -195,30 +189,30 @@ public class JettyServer {
 
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/");
-        
+
         // Add authentication filter
         context.addFilter(new FilterHolder(new ApiKeyAuthFilter(config.getApiKey())), "/api/*", null);
-        
+
         // Add servlets
         context.addServlet(new ServletHolder(new JettyServerAnnouncement(announceManager, gson)), "/api/announcements/*");
         context.addServlet(new ServletHolder(new JettyServerPlayers(plugin, gson)), "/api/players/*");
         context.addServlet(new ServletHolder(new JettyServerWorld(plugin, gson)), "/api/worlds/*");
         context.addServlet(new ServletHolder(new StatusServlet()), "/api/status");
-        
+
         server.setHandler(context);
 
         try {
             server.start();
             if (config.isTlsEnabled()) {
-                String ports = config.isAllowHttpWithTls() ? 
+                String ports = config.isAllowHttpWithTls() ?
                     String.format("HTTP on port %d, HTTPS on port %d", config.getPort(), config.getHttpsPort()) :
                     String.format("HTTPS on port %d (HTTP disabled)", config.getHttpsPort());
-                debug.info("Server started (" + ports + ")");
+                logger.info("Server started (" + ports + ")");
             } else {
-                debug.info(String.format("Server started on port %d", config.getPort()));
+                logger.info(String.format("Server started on port %d", config.getPort()));
             }
         } catch (Exception e) {
-            debug.error("Failed to start server", e);
+            logger.error("Failed to start server", e);
         }
     }
 
@@ -289,9 +283,9 @@ public class JettyServer {
             try {
                 server.stop();
                 server.join();
-                debug.info("HTTP server stopped");
+                logger.info("HTTP server stopped");
             } catch (Exception e) {
-                debug.error("Failed to stop server", e);
+                logger.error("Failed to stop server", e);
             }
         }
     }

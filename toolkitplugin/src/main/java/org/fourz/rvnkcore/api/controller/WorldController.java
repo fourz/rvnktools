@@ -2,7 +2,7 @@ package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.service.WorldService;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;

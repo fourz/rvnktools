@@ -2,7 +2,7 @@ package org.fourz.rvnkcore.api.controller;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 

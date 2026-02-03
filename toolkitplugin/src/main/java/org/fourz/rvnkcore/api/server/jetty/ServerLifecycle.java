@@ -2,7 +2,7 @@ package org.fourz.rvnkcore.api.server.jetty;
 
 import org.eclipse.jetty.server.Server;
 import org.fourz.rvnkcore.api.config.ApiConfig;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
  * Manages the lifecycle of the RVNKCore API server including startup, shutdown, and monitoring.

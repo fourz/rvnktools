@@ -3,7 +3,6 @@ package org.fourz.rvnktools.api;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
 
-import org.fourz.rvnktools.util.Debug;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.api.config.RestConfig;
 import org.fourz.rvnktools.api.server.jetty.JettyServer;

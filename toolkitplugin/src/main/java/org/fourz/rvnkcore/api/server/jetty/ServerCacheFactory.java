@@ -1,7 +1,7 @@
 package org.fourz.rvnkcore.api.server.jetty;
 
 import org.fourz.rvnkcore.api.config.ApiConfig;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
  * Factory for creating and managing caching components for the RVNKCore API server.

@@ -3,8 +3,7 @@ package org.fourz.rvnkcore.api.config;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.logging.Level;
 
@@ -48,7 +47,7 @@ public class ApiConfig {
         
         // Read global log level first and apply it
         String logLevelStr = config.getString("logging.level", "INFO");
-        this.globalLogLevel = Debug.getLevel(logLevelStr);
+        this.globalLogLevel = LogManager.parseLevel(logLevelStr);
         
         this.enabled = config.getBoolean("api.enabled", false);
         this.host = config.getString("api.host", "localhost");
@@ -67,7 +66,7 @@ public class ApiConfig {
         
         // Read API-specific log level, defaulting to global log level
         String apiLogLevelStr = config.getString("api.logging.level", logLevelStr);
-        this.apiLogLevel = Debug.getLevel(apiLogLevelStr);
+        this.apiLogLevel = LogManager.parseLevel(apiLogLevelStr);
         
         this.contextPath = config.getString("api.context-path", "/api");
         this.connectionTimeout = config.getInt("api.server.connection-timeout", 60000);
@@ -99,7 +98,7 @@ public class ApiConfig {
         LogManager logger = LogManager.getInstance(plugin);
         
         // Parse global log level
-        Level parsedGlobalLogLevel = Debug.getLevel(globalLogLevel);
+        Level parsedGlobalLogLevel = LogManager.parseLevel(globalLogLevel);
         
         // Create a private constructor call
         return new ApiConfig(plugin, apiSection, parsedGlobalLogLevel, logger);
@@ -129,7 +128,7 @@ public class ApiConfig {
         
         // Read API-specific log level, defaulting to global log level
         String apiLogLevelStr = apiSection.getString("logging.level", globalLogLevel.getName());
-        this.apiLogLevel = Debug.getLevel(apiLogLevelStr);
+        this.apiLogLevel = LogManager.parseLevel(apiLogLevelStr);
         
         this.contextPath = apiSection.getString("context-path", "/api");
         this.connectionTimeout = apiSection.getInt("server.connection-timeout", 60000);

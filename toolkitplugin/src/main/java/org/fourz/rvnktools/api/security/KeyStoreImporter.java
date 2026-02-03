@@ -15,14 +15,14 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Collection;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 import java.io.File;
 
 public class KeyStoreImporter {
-    
-    private static X509Certificate[] loadCertificateChain(String chainPath, Debug debug) {
+
+    private static X509Certificate[] loadCertificateChain(String chainPath, LogManager logger) {
         if (chainPath == null || !Files.exists(Paths.get(chainPath))) {
-            debug.info("No chain file specified or found, continuing with single certificate");
+            logger.info("No chain file specified or found, continuing with single certificate");
             return null;
         }
 
@@ -33,35 +33,35 @@ public class KeyStoreImporter {
                        .map(cert -> (X509Certificate) cert)
                        .toArray(X509Certificate[]::new);
         } catch (CertificateException e) {
-            debug.severe("Invalid certificate chain format: " + e.getMessage());
+            logger.error("Invalid certificate chain format: " + e.getMessage());
         } catch (IOException e) {
-            debug.severe("Failed to read certificate chain file: " + e.getMessage());
+            logger.error("Failed to read certificate chain file: " + e.getMessage());
         }
         return null;
     }
 
-    public static boolean importKeyStore(String certPath, String keyPath, String chainPath, 
-                                       String keystorePath, String keystorePassword, 
-                                       String keyManagerPassword, Debug debug) {
-        if (!validateInputs(certPath, keyPath, keystorePath, keystorePassword, keyManagerPassword, debug)) {
+    public static boolean importKeyStore(String certPath, String keyPath, String chainPath,
+                                       String keystorePath, String keystorePassword,
+                                       String keyManagerPassword, LogManager logger) {
+        if (!validateInputs(certPath, keyPath, keystorePath, keystorePassword, keyManagerPassword, logger)) {
             return false;
         }
 
         try {
             // Load certificate and validate
-            X509Certificate cert = loadCertificate(certPath, debug);
+            X509Certificate cert = loadCertificate(certPath, logger);
             if (cert == null) return false;
             cert.checkValidity();
 
             // Load private key
-            PrivateKey privateKey = loadPrivateKey(keyPath, debug);
+            PrivateKey privateKey = loadPrivateKey(keyPath, logger);
             if (privateKey == null) return false;
 
             // Load certificate chain if available
-            X509Certificate[] chain = loadCertificateChain(chainPath, debug);
-            
+            X509Certificate[] chain = loadCertificateChain(chainPath, logger);
+
             // Create or load keystore
-            KeyStore keyStore = createOrLoadKeystore(keystorePath, keystorePassword, debug);
+            KeyStore keyStore = createOrLoadKeystore(keystorePath, keystorePassword, logger);
             if (keyStore == null) return false;
 
             // Prepare full certificate chain
@@ -70,44 +70,44 @@ public class KeyStoreImporter {
                 fullChain = new X509Certificate[chain.length + 1];
                 fullChain[0] = cert;
                 System.arraycopy(chain, 0, fullChain, 1, chain.length);
-                debug.info("Using certificate chain with " + fullChain.length + " certificates");
+                logger.info("Using certificate chain with " + fullChain.length + " certificates");
             } else {
                 fullChain = new X509Certificate[]{cert};
-                debug.info("Using single certificate without chain");
+                logger.info("Using single certificate without chain");
             }
 
             // Store key and certificate chain
             keyStore.setKeyEntry("importedKey", privateKey, keyManagerPassword.toCharArray(), fullChain);
-            
+
             // Save keystore
-            saveKeystore(keyStore, keystorePath, keystorePassword, debug);
-            debug.info("Successfully imported certificate and chain into keystore");
+            saveKeystore(keyStore, keystorePath, keystorePassword, logger);
+            logger.info("Successfully imported certificate and chain into keystore");
             return true;
 
         } catch (CertificateException e) {
-            debug.severe("Certificate validation failed: " + e.getMessage());
+            logger.error("Certificate validation failed: " + e.getMessage());
         } catch (Exception e) {
-            debug.severe("Unexpected error during import: " + e.getMessage());
+            logger.error("Unexpected error during import: " + e.getMessage());
         }
-        
+
         return false;
     }
 
     private static boolean validateInputs(String certPath, String keyPath, String keystorePath,
-                                        String keystorePassword, String keyManagerPassword, Debug debug) {
-        if (certPath == null || keyPath == null || keystorePath == null || 
+                                        String keystorePassword, String keyManagerPassword, LogManager logger) {
+        if (certPath == null || keyPath == null || keystorePath == null ||
             keystorePassword == null || keyManagerPassword == null) {
-            debug.severe("One or more required parameters are null");
+            logger.error("One or more required parameters are null");
             return false;
         }
 
         if (!Files.exists(Paths.get(certPath))) {
-            debug.severe("Certificate file not found: " + certPath);
+            logger.error("Certificate file not found: " + certPath);
             return false;
         }
 
         if (!Files.exists(Paths.get(keyPath))) {
-            debug.severe("Private key file not found: " + keyPath);
+            logger.error("Private key file not found: " + keyPath);
             return false;
         }
 
@@ -115,7 +115,7 @@ public class KeyStoreImporter {
         if (!keystoreFile.exists()) {
             File parentDir = keystoreFile.getParentFile();
             if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-                debug.severe("Failed to create directory for keystore: " + parentDir);
+                logger.error("Failed to create directory for keystore: " + parentDir);
                 return false;
             }
         }
@@ -123,57 +123,57 @@ public class KeyStoreImporter {
         return true;
     }
 
-    private static X509Certificate loadCertificate(String certPath, Debug debug) {
+    private static X509Certificate loadCertificate(String certPath, LogManager logger) {
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             return (X509Certificate) cf.generateCertificate(Files.newInputStream(Paths.get(certPath)));
         } catch (CertificateException e) {
-            debug.severe("Invalid certificate format: " + e.getMessage());
+            logger.error("Invalid certificate format: " + e.getMessage());
         } catch (IOException e) {
-            debug.severe("Failed to read certificate file: " + e.getMessage());
+            logger.error("Failed to read certificate file: " + e.getMessage());
         }
         return null;
     }
 
-    private static PrivateKey loadPrivateKey(String keyPath, Debug debug) {
+    private static PrivateKey loadPrivateKey(String keyPath, LogManager logger) {
         try {
             byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
             return KeyFactory.getInstance("RSA").generatePrivate(keySpec);
         } catch (IOException e) {
-            debug.severe("Failed to read private key file: " + e.getMessage());
+            logger.error("Failed to read private key file: " + e.getMessage());
         } catch (NoSuchAlgorithmException e) {
-            debug.severe("RSA algorithm not available: " + e.getMessage());
+            logger.error("RSA algorithm not available: " + e.getMessage());
         } catch (InvalidKeySpecException e) {
-            debug.severe("Invalid private key format (must be PKCS8): " + e.getMessage());
+            logger.error("Invalid private key format (must be PKCS8): " + e.getMessage());
         }
         return null;
     }
 
-    private static KeyStore createOrLoadKeystore(String keystorePath, String keystorePassword, Debug debug) {
+    private static KeyStore createOrLoadKeystore(String keystorePath, String keystorePassword, LogManager logger) {
         try {
             KeyStore keyStore = KeyStore.getInstance("JKS");
             if (Files.exists(Paths.get(keystorePath))) {
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(keystorePath)) {
                     keyStore.load(fis, keystorePassword.toCharArray());
-                    debug.info("Loaded existing keystore: " + keystorePath);
+                    logger.info("Loaded existing keystore: " + keystorePath);
                 }
             } else {
                 keyStore.load(null, null);
-                debug.info("Created new keystore: " + keystorePath);
+                logger.info("Created new keystore: " + keystorePath);
             }
             return keyStore;
         } catch (KeyStoreException e) {
-            debug.severe("Failed to create keystore: " + e.getMessage());
+            logger.error("Failed to create keystore: " + e.getMessage());
         } catch (IOException e) {
-            debug.severe("Failed to read/write keystore: " + e.getMessage());
+            logger.error("Failed to read/write keystore: " + e.getMessage());
         } catch (NoSuchAlgorithmException | CertificateException e) {
-            debug.severe("Failed to load keystore: " + e.getMessage());
+            logger.error("Failed to load keystore: " + e.getMessage());
         }
         return null;
     }
 
-    private static void saveKeystore(KeyStore keyStore, String keystorePath, String keystorePassword, Debug debug) 
+    private static void saveKeystore(KeyStore keyStore, String keystorePath, String keystorePassword, LogManager logger)
             throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException {
         File tempFile = null;
         try {
@@ -182,11 +182,11 @@ public class KeyStoreImporter {
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
                 keyStore.store(fos, keystorePassword.toCharArray());
             }
-            
+
             // If successful, move to final location
-            Files.move(tempFile.toPath(), Paths.get(keystorePath), 
+            Files.move(tempFile.toPath(), Paths.get(keystorePath),
                       java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            
+
         } finally {
             // Cleanup temp file if it exists
             if (tempFile != null && tempFile.exists()) {
