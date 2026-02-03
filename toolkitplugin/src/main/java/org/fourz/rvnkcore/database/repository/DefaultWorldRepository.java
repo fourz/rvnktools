@@ -3,7 +3,7 @@ package org.fourz.rvnkcore.database.repository;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.dto.WorldDTO;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

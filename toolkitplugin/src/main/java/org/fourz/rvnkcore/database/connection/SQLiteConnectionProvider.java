@@ -1,7 +1,7 @@
 package org.fourz.rvnkcore.database.connection;
 
 import org.fourz.rvnkcore.api.exception.DatabaseException;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;

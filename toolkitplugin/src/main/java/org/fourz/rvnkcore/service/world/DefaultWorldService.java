@@ -8,7 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.dto.WorldDTO;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.database.repository.WorldRepository;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

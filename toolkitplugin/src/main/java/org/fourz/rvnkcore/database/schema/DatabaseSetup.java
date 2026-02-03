@@ -1,7 +1,7 @@
 package org.fourz.rvnkcore.database.schema;
 
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Connection;
@@ -17,18 +17,54 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0.0
  */
 public class DatabaseSetup {
-    
+
     private final ConnectionProvider connectionProvider;
     private final LogManager logger;
     private final AtomicBoolean schemaInitialized = new AtomicBoolean(false);
     private final AtomicBoolean schemaVerified = new AtomicBoolean(false);
     private final String databaseType;
-    
+    private final String tablePrefix;
+
+    // Table name constants (base names without prefix)
+    public static final String TABLE_WORLDS = "rvnk_worlds";
+    public static final String TABLE_PLAYERS = "rvnk_players";
+    public static final String TABLE_PLAYER_WORLD_DATA = "rvnk_player_world_data";
+    public static final String TABLE_ANNOUNCEMENTS = "rvnk_announcements";
+    public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
+
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
         this.connectionProvider = connectionProvider;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.databaseType = connectionProvider.getDatabaseType();
+
+        // Load table prefix from config
+        String storageType = plugin.getConfig().getString("storage.type", "sqlite");
+        this.tablePrefix = plugin.getConfig().getString("storage." + storageType + ".tablePrefix", "");
+
+        if (tablePrefix != null && !tablePrefix.isEmpty()) {
+            logger.info("DatabaseSetup using table prefix: " + tablePrefix);
+        }
         logger.info("DatabaseSetup initialized for database type: " + databaseType);
+    }
+
+    /**
+     * Get the table name with prefix applied.
+     * @param baseName The base table name (e.g., "rvnk_worlds")
+     * @return The prefixed table name (e.g., "core_rvnk_worlds")
+     */
+    public String table(String baseName) {
+        if (tablePrefix == null || tablePrefix.isEmpty()) {
+            return baseName;
+        }
+        return tablePrefix + baseName;
+    }
+
+    /**
+     * Get the configured table prefix.
+     * @return The table prefix, or empty string if none
+     */
+    public String getTablePrefix() {
+        return tablePrefix != null ? tablePrefix : "";
     }
     
     /**
@@ -69,11 +105,12 @@ public class DatabaseSetup {
      */
     private boolean checkSchemaExists(Connection connection) {
         try (var stmt = connection.createStatement()) {
+            String worldsTable = table(TABLE_WORLDS);
             String checkQuery;
             if ("MySQL".equalsIgnoreCase(databaseType)) {
-                checkQuery = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rvnk_worlds' LIMIT 1";
+                checkQuery = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + worldsTable + "' LIMIT 1";
             } else {
-                checkQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='rvnk_worlds' LIMIT 1";
+                checkQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + worldsTable + "' LIMIT 1";
             }
 
             var rs = stmt.executeQuery(checkQuery);
@@ -89,29 +126,30 @@ public class DatabaseSetup {
     /**
      * Quick verification that schema is ready without recreating tables.
      * Only runs if schema hasn't been verified yet.
-     * 
+     *
      * @return true if schema is verified and ready
      */
     public boolean isSchemaReady() {
         if (schemaVerified.get()) {
             return true;
         }
-        
+
         try (Connection connection = connectionProvider.getConnection()) {
             // Quick check for main tables
+            String playersTable = table(TABLE_PLAYERS);
             var stmt = connection.createStatement();
             String query;
             if ("MySQL".equalsIgnoreCase(databaseType)) {
-                query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rvnk_players'";
+                query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + playersTable + "'";
             } else {
-                query = "SELECT name FROM sqlite_master WHERE type='table' AND name='rvnk_players'";
+                query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + playersTable + "'";
             }
-            
+
             var rs = stmt.executeQuery(query);
             boolean exists = rs.next();
             rs.close();
             stmt.close();
-            
+
             if (exists) {
                 schemaVerified.set(true);
                 return true;
@@ -119,218 +157,208 @@ public class DatabaseSetup {
         } catch (SQLException e) {
             logger.warning("Schema verification check failed: " + e.getMessage());
         }
-        
+
         return false;
     }
     
     private void createTables(Connection connection) throws SQLException {
         logger.debug("Creating tables for database type: " + databaseType);
 
+        // Get prefixed table names
+        String worldsTable = table(TABLE_WORLDS);
+        String playersTable = table(TABLE_PLAYERS);
+        String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+
         String createPlayersTable;
         String createPlayerWorldDataTable;
         String createWorldsTable;
         String createAnnouncementsTable;
-        
+
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL-specific table definitions with proper column types
-            createPlayersTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_players (
-                    id VARCHAR(36) PRIMARY KEY,
-                    current_name VARCHAR(255) NOT NULL,
-                    name_history TEXT,
-                    first_join TIMESTAMP NOT NULL,
-                    last_seen TIMESTAMP NOT NULL,
-                    current_world VARCHAR(255),
-                    times_joined INT DEFAULT 1,
-                    total_playtime_seconds BIGINT DEFAULT 0,
-                    primary_group VARCHAR(255) DEFAULT 'default',
-                    groups TEXT,
-                    banned BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """;
-            
-            createPlayerWorldDataTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_player_world_data (
-                    player_id VARCHAR(36) NOT NULL,
-                    world_name VARCHAR(255) NOT NULL,
-                    first_visit TIMESTAMP NOT NULL,
-                    last_visit TIMESTAMP NOT NULL,
-                    visit_count INT DEFAULT 1,
-                    playtime_seconds BIGINT DEFAULT 0,
-                    last_x DOUBLE DEFAULT 0,
-                    last_y DOUBLE DEFAULT 0,
-                    last_z DOUBLE DEFAULT 0,
-                    last_yaw FLOAT DEFAULT 0,
-                    last_pitch FLOAT DEFAULT 0,
-                    last_biome VARCHAR(255),
-                    death_count INT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (player_id, world_name),
-                    FOREIGN KEY (world_name) REFERENCES rvnk_worlds(name) ON UPDATE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """;
+            createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "current_name VARCHAR(255) NOT NULL, " +
+                "name_history TEXT, " +
+                "first_join TIMESTAMP NOT NULL, " +
+                "last_seen TIMESTAMP NOT NULL, " +
+                "current_world VARCHAR(255), " +
+                "times_joined INT DEFAULT 1, " +
+                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "primary_group VARCHAR(255) DEFAULT 'default', " +
+                "groups TEXT, " +
+                "banned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-            createWorldsTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_worlds (
-                    name VARCHAR(255) PRIMARY KEY,
-                    display_name VARCHAR(255) NOT NULL,
-                    world_type VARCHAR(100) NOT NULL DEFAULT 'NORMAL',
-                    environment VARCHAR(50) NOT NULL DEFAULT 'NORMAL',
-                    world_folder VARCHAR(500),
-                    seed BIGINT,
-                    generator_name VARCHAR(255),
-                    generator_settings TEXT,
-                    difficulty VARCHAR(50) DEFAULT 'EASY',
-                    game_rule_settings TEXT,
-                    spawn_x DOUBLE DEFAULT 0,
-                    spawn_y DOUBLE DEFAULT 64,
-                    spawn_z DOUBLE DEFAULT 0,
-                    world_border_size DOUBLE,
-                    world_border_center_x DOUBLE DEFAULT 0,
-                    world_border_center_z DOUBLE DEFAULT 0,
-                    is_active BOOLEAN DEFAULT TRUE,
-                    is_auto_save BOOLEAN DEFAULT TRUE,
-                    keep_spawn_in_memory BOOLEAN DEFAULT TRUE,
-                    allow_animals BOOLEAN DEFAULT TRUE,
-                    allow_monsters BOOLEAN DEFAULT TRUE,
-                    allow_pvp BOOLEAN DEFAULT FALSE,
-                    weather_enabled BOOLEAN DEFAULT TRUE,
-                    thunder_enabled BOOLEAN DEFAULT TRUE,
-                    first_loaded TIMESTAMP,
-                    last_accessed TIMESTAMP,
-                    total_playtime_seconds BIGINT DEFAULT 0,
-                    player_count INT DEFAULT 0,
-                    max_players_seen INT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """;
-            
-            createAnnouncementsTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_announcements (
-                    id VARCHAR(36) PRIMARY KEY,
-                    title VARCHAR(500),
-                    message TEXT NOT NULL,
-                    type VARCHAR(100) NOT NULL DEFAULT 'general',
-                    active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    scheduled_for TIMESTAMP NULL,
-                    expires_at TIMESTAMP NULL,
-                    interval_seconds INT DEFAULT 0,
-                    target_worlds TEXT,
-                    target_groups TEXT,
-                    metadata TEXT
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """;
+            createPlayerWorldDataTable = "CREATE TABLE IF NOT EXISTS " + playerWorldDataTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "world_name VARCHAR(255) NOT NULL, " +
+                "first_visit TIMESTAMP NOT NULL, " +
+                "last_visit TIMESTAMP NOT NULL, " +
+                "visit_count INT DEFAULT 1, " +
+                "playtime_seconds BIGINT DEFAULT 0, " +
+                "last_x DOUBLE DEFAULT 0, " +
+                "last_y DOUBLE DEFAULT 0, " +
+                "last_z DOUBLE DEFAULT 0, " +
+                "last_yaw FLOAT DEFAULT 0, " +
+                "last_pitch FLOAT DEFAULT 0, " +
+                "last_biome VARCHAR(255), " +
+                "death_count INT DEFAULT 0, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, world_name), " +
+                "FOREIGN KEY (world_name) REFERENCES " + worldsTable + "(name) ON UPDATE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createWorldsTable = "CREATE TABLE IF NOT EXISTS " + worldsTable + " (" +
+                "name VARCHAR(255) PRIMARY KEY, " +
+                "display_name VARCHAR(255) NOT NULL, " +
+                "world_type VARCHAR(100) NOT NULL DEFAULT 'NORMAL', " +
+                "environment VARCHAR(50) NOT NULL DEFAULT 'NORMAL', " +
+                "world_folder VARCHAR(500), " +
+                "seed BIGINT, " +
+                "generator_name VARCHAR(255), " +
+                "generator_settings TEXT, " +
+                "difficulty VARCHAR(50) DEFAULT 'EASY', " +
+                "game_rule_settings TEXT, " +
+                "spawn_x DOUBLE DEFAULT 0, " +
+                "spawn_y DOUBLE DEFAULT 64, " +
+                "spawn_z DOUBLE DEFAULT 0, " +
+                "world_border_size DOUBLE, " +
+                "world_border_center_x DOUBLE DEFAULT 0, " +
+                "world_border_center_z DOUBLE DEFAULT 0, " +
+                "is_active BOOLEAN DEFAULT TRUE, " +
+                "is_auto_save BOOLEAN DEFAULT TRUE, " +
+                "keep_spawn_in_memory BOOLEAN DEFAULT TRUE, " +
+                "allow_animals BOOLEAN DEFAULT TRUE, " +
+                "allow_monsters BOOLEAN DEFAULT TRUE, " +
+                "allow_pvp BOOLEAN DEFAULT FALSE, " +
+                "weather_enabled BOOLEAN DEFAULT TRUE, " +
+                "thunder_enabled BOOLEAN DEFAULT TRUE, " +
+                "first_loaded TIMESTAMP, " +
+                "last_accessed TIMESTAMP, " +
+                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "player_count INT DEFAULT 0, " +
+                "max_players_seen INT DEFAULT 0, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "title VARCHAR(500), " +
+                "message TEXT NOT NULL, " +
+                "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "scheduled_for TIMESTAMP NULL, " +
+                "expires_at TIMESTAMP NULL, " +
+                "interval_seconds INT DEFAULT 0, " +
+                "target_worlds TEXT, " +
+                "target_groups TEXT, " +
+                "metadata TEXT" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
-            // SQLite table definitions (original format)
-            createPlayersTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_players (
-                    id TEXT PRIMARY KEY,
-                    current_name TEXT NOT NULL,
-                    name_history TEXT DEFAULT '',
-                    first_join TIMESTAMP NOT NULL,
-                    last_seen TIMESTAMP NOT NULL,
-                    current_world TEXT,
-                    times_joined INTEGER DEFAULT 1,
-                    total_playtime_seconds BIGINT DEFAULT 0,
-                    primary_group TEXT DEFAULT 'default',
-                    groups TEXT DEFAULT '',
-                    banned BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """;
-            
-            createPlayerWorldDataTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_player_world_data (
-                    player_id TEXT NOT NULL,
-                    world_name TEXT NOT NULL,
-                    first_visit TIMESTAMP NOT NULL,
-                    last_visit TIMESTAMP NOT NULL,
-                    visit_count INTEGER DEFAULT 1,
-                    playtime_seconds BIGINT DEFAULT 0,
-                    last_x REAL DEFAULT 0,
-                    last_y REAL DEFAULT 0,
-                    last_z REAL DEFAULT 0,
-                    last_yaw REAL DEFAULT 0,
-                    last_pitch REAL DEFAULT 0,
-                    last_biome TEXT,
-                    death_count INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (player_id, world_name),
-                    FOREIGN KEY (world_name) REFERENCES rvnk_worlds(name) ON UPDATE CASCADE
-                )
-                """;
+            // SQLite table definitions
+            createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+                "id TEXT PRIMARY KEY, " +
+                "current_name TEXT NOT NULL, " +
+                "name_history TEXT DEFAULT '', " +
+                "first_join TIMESTAMP NOT NULL, " +
+                "last_seen TIMESTAMP NOT NULL, " +
+                "current_world TEXT, " +
+                "times_joined INTEGER DEFAULT 1, " +
+                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "primary_group TEXT DEFAULT 'default', " +
+                "groups TEXT DEFAULT '', " +
+                "banned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")";
 
-            createWorldsTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_worlds (
-                    name TEXT PRIMARY KEY,
-                    display_name TEXT NOT NULL,
-                    world_type TEXT NOT NULL DEFAULT 'NORMAL',
-                    environment TEXT NOT NULL DEFAULT 'NORMAL',
-                    world_folder TEXT,
-                    seed INTEGER,
-                    generator_name TEXT,
-                    generator_settings TEXT,
-                    difficulty TEXT DEFAULT 'EASY',
-                    game_rule_settings TEXT,
-                    spawn_x REAL DEFAULT 0,
-                    spawn_y REAL DEFAULT 64,
-                    spawn_z REAL DEFAULT 0,
-                    world_border_size REAL,
-                    world_border_center_x REAL DEFAULT 0,
-                    world_border_center_z REAL DEFAULT 0,
-                    is_active BOOLEAN DEFAULT TRUE,
-                    is_auto_save BOOLEAN DEFAULT TRUE,
-                    keep_spawn_in_memory BOOLEAN DEFAULT TRUE,
-                    allow_animals BOOLEAN DEFAULT TRUE,
-                    allow_monsters BOOLEAN DEFAULT TRUE,
-                    allow_pvp BOOLEAN DEFAULT FALSE,
-                    weather_enabled BOOLEAN DEFAULT TRUE,
-                    thunder_enabled BOOLEAN DEFAULT TRUE,
-                    first_loaded TIMESTAMP,
-                    last_accessed TIMESTAMP,
-                    total_playtime_seconds INTEGER DEFAULT 0,
-                    player_count INTEGER DEFAULT 0,
-                    max_players_seen INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """;
-            
-            createAnnouncementsTable = """
-                CREATE TABLE IF NOT EXISTS rvnk_announcements (
-                    id TEXT PRIMARY KEY,
-                    title TEXT,
-                    message TEXT NOT NULL,
-                    type TEXT NOT NULL DEFAULT 'general',
-                    active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    scheduled_for TIMESTAMP NULL,
-                    expires_at TIMESTAMP NULL,
-                    interval_seconds INTEGER DEFAULT 0,
-                    target_worlds TEXT,
-                    target_groups TEXT,
-                    metadata TEXT
-                )
-                """;
+            createPlayerWorldDataTable = "CREATE TABLE IF NOT EXISTS " + playerWorldDataTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "world_name TEXT NOT NULL, " +
+                "first_visit TIMESTAMP NOT NULL, " +
+                "last_visit TIMESTAMP NOT NULL, " +
+                "visit_count INTEGER DEFAULT 1, " +
+                "playtime_seconds BIGINT DEFAULT 0, " +
+                "last_x REAL DEFAULT 0, " +
+                "last_y REAL DEFAULT 0, " +
+                "last_z REAL DEFAULT 0, " +
+                "last_yaw REAL DEFAULT 0, " +
+                "last_pitch REAL DEFAULT 0, " +
+                "last_biome TEXT, " +
+                "death_count INTEGER DEFAULT 0, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, world_name), " +
+                "FOREIGN KEY (world_name) REFERENCES " + worldsTable + "(name) ON UPDATE CASCADE" +
+                ")";
+
+            createWorldsTable = "CREATE TABLE IF NOT EXISTS " + worldsTable + " (" +
+                "name TEXT PRIMARY KEY, " +
+                "display_name TEXT NOT NULL, " +
+                "world_type TEXT NOT NULL DEFAULT 'NORMAL', " +
+                "environment TEXT NOT NULL DEFAULT 'NORMAL', " +
+                "world_folder TEXT, " +
+                "seed INTEGER, " +
+                "generator_name TEXT, " +
+                "generator_settings TEXT, " +
+                "difficulty TEXT DEFAULT 'EASY', " +
+                "game_rule_settings TEXT, " +
+                "spawn_x REAL DEFAULT 0, " +
+                "spawn_y REAL DEFAULT 64, " +
+                "spawn_z REAL DEFAULT 0, " +
+                "world_border_size REAL, " +
+                "world_border_center_x REAL DEFAULT 0, " +
+                "world_border_center_z REAL DEFAULT 0, " +
+                "is_active BOOLEAN DEFAULT TRUE, " +
+                "is_auto_save BOOLEAN DEFAULT TRUE, " +
+                "keep_spawn_in_memory BOOLEAN DEFAULT TRUE, " +
+                "allow_animals BOOLEAN DEFAULT TRUE, " +
+                "allow_monsters BOOLEAN DEFAULT TRUE, " +
+                "allow_pvp BOOLEAN DEFAULT FALSE, " +
+                "weather_enabled BOOLEAN DEFAULT TRUE, " +
+                "thunder_enabled BOOLEAN DEFAULT TRUE, " +
+                "first_loaded TIMESTAMP, " +
+                "last_accessed TIMESTAMP, " +
+                "total_playtime_seconds INTEGER DEFAULT 0, " +
+                "player_count INTEGER DEFAULT 0, " +
+                "max_players_seen INTEGER DEFAULT 0, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")";
+
+            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+                "id TEXT PRIMARY KEY, " +
+                "title TEXT, " +
+                "message TEXT NOT NULL, " +
+                "type TEXT NOT NULL DEFAULT 'general', " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "scheduled_for TIMESTAMP NULL, " +
+                "expires_at TIMESTAMP NULL, " +
+                "interval_seconds INTEGER DEFAULT 0, " +
+                "target_worlds TEXT, " +
+                "target_groups TEXT, " +
+                "metadata TEXT" +
+                ")";
         }
-        
+
         try (var stmt = connection.createStatement()) {
-            logger.debug("Creating rvnk_worlds table...");
+            logger.debug("Creating " + worldsTable + " table...");
             stmt.execute(createWorldsTable);
-            logger.debug("Creating rvnk_players table...");
+            logger.debug("Creating " + playersTable + " table...");
             stmt.execute(createPlayersTable);
-            logger.debug("Creating rvnk_player_world_data table...");
+            logger.debug("Creating " + playerWorldDataTable + " table...");
             stmt.execute(createPlayerWorldDataTable);
-            logger.debug("Creating rvnk_announcements table...");
+            logger.debug("Creating " + announcementsTable + " table...");
             stmt.execute(createAnnouncementsTable);
             logger.debug("All tables created successfully");
         }
@@ -339,52 +367,59 @@ public class DatabaseSetup {
     private void createIndexes(Connection connection) throws SQLException {
         logger.debug("Creating indexes for database type: " + databaseType);
 
+        // Get prefixed table names
+        String worldsTable = table(TABLE_WORLDS);
+        String playersTable = table(TABLE_PLAYERS);
+        String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
+
         String[] indexes;
-        
+
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL indexes with proper column lengths for TEXT columns
             indexes = new String[]{
-                "CREATE INDEX IF NOT EXISTS idx_worlds_world_type ON rvnk_worlds(world_type)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_environment ON rvnk_worlds(environment)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_is_active ON rvnk_worlds(is_active)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_last_accessed ON rvnk_worlds(last_accessed)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_player_count ON rvnk_worlds(player_count)",
-                "CREATE INDEX IF NOT EXISTS idx_players_name_history ON rvnk_players(current_name(100))",
-                "CREATE INDEX IF NOT EXISTS idx_players_last_seen ON rvnk_players(last_seen)",
-                "CREATE INDEX IF NOT EXISTS idx_players_primary_group ON rvnk_players(primary_group(100))",
-                "CREATE INDEX IF NOT EXISTS idx_players_current_world ON rvnk_players(current_world(100))",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_player ON rvnk_player_world_data(player_id)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_world ON rvnk_player_world_data(world_name(100))",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_last_visit ON rvnk_player_world_data(last_visit)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_playtime ON rvnk_player_world_data(playtime_seconds)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_type ON rvnk_announcements(type(50))",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_scheduled ON rvnk_announcements(scheduled_for)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON rvnk_announcements(created_at)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_world_type ON " + worldsTable + "(world_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_environment ON " + worldsTable + "(environment)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_is_active ON " + worldsTable + "(is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_last_accessed ON " + worldsTable + "(last_accessed)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_player_count ON " + worldsTable + "(player_count)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_name_history ON " + playersTable + "(current_name(100))",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_last_seen ON " + playersTable + "(last_seen)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_primary_group ON " + playersTable + "(primary_group(100))",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_current_world ON " + playersTable + "(current_world(100))",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_player ON " + playerWorldDataTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_world ON " + playerWorldDataTable + "(world_name(100))",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_last_visit ON " + playerWorldDataTable + "(last_visit)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_playtime ON " + playerWorldDataTable + "(playtime_seconds)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_active ON " + announcementsTable + "(active, expires_at)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_type ON " + announcementsTable + "(type(50))",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_scheduled ON " + announcementsTable + "(scheduled_for)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)"
             };
         } else {
-            // SQLite indexes (original format)
+            // SQLite indexes
             indexes = new String[]{
-                "CREATE INDEX IF NOT EXISTS idx_worlds_world_type ON rvnk_worlds(world_type)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_environment ON rvnk_worlds(environment)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_is_active ON rvnk_worlds(is_active)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_last_accessed ON rvnk_worlds(last_accessed)",
-                "CREATE INDEX IF NOT EXISTS idx_worlds_player_count ON rvnk_worlds(player_count)",
-                "CREATE INDEX IF NOT EXISTS idx_players_name_history ON rvnk_players(current_name, name_history)",
-                "CREATE INDEX IF NOT EXISTS idx_players_last_seen ON rvnk_players(last_seen)",
-                "CREATE INDEX IF NOT EXISTS idx_players_primary_group ON rvnk_players(primary_group)",
-                "CREATE INDEX IF NOT EXISTS idx_players_current_world ON rvnk_players(current_world)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_player ON rvnk_player_world_data(player_id)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_world ON rvnk_player_world_data(world_name)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_last_visit ON rvnk_player_world_data(last_visit)",
-                "CREATE INDEX IF NOT EXISTS idx_player_world_data_playtime ON rvnk_player_world_data(playtime_seconds)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_active ON rvnk_announcements(active, expires_at)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_type ON rvnk_announcements(type)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_scheduled ON rvnk_announcements(scheduled_for)",
-                "CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON rvnk_announcements(created_at)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_world_type ON " + worldsTable + "(world_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_environment ON " + worldsTable + "(environment)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_is_active ON " + worldsTable + "(is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_last_accessed ON " + worldsTable + "(last_accessed)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "worlds_player_count ON " + worldsTable + "(player_count)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_name_history ON " + playersTable + "(current_name, name_history)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_last_seen ON " + playersTable + "(last_seen)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_primary_group ON " + playersTable + "(primary_group)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "players_current_world ON " + playersTable + "(current_world)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_player ON " + playerWorldDataTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_world ON " + playerWorldDataTable + "(world_name)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_last_visit ON " + playerWorldDataTable + "(last_visit)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_world_data_playtime ON " + playerWorldDataTable + "(playtime_seconds)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_active ON " + announcementsTable + "(active, expires_at)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_type ON " + announcementsTable + "(type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_scheduled ON " + announcementsTable + "(scheduled_for)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)"
             };
         }
-        
+
         try (var stmt = connection.createStatement()) {
             for (String index : indexes) {
                 logger.debug("Creating index: " + index);
@@ -396,24 +431,29 @@ public class DatabaseSetup {
     
     private void verifySchema(Connection connection) throws SQLException {
         logger.debug("Verifying database schema...");
-        // Verify critical tables exist
-        String[] requiredTables = {"rvnk_worlds", "rvnk_players", "rvnk_player_world_data", "rvnk_announcements"};
+        // Verify critical tables exist (with prefix)
+        String[] requiredTables = {
+            table(TABLE_WORLDS),
+            table(TABLE_PLAYERS),
+            table(TABLE_PLAYER_WORLD_DATA),
+            table(TABLE_ANNOUNCEMENTS)
+        };
 
         try (var stmt = connection.createStatement()) {
-            for (String table : requiredTables) {
+            for (String tableName : requiredTables) {
                 String query;
                 if ("MySQL".equalsIgnoreCase(databaseType)) {
-                    query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + table + "'";
+                    query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + tableName + "'";
                 } else {
-                    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + table + "'";
+                    query = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + tableName + "'";
                 }
 
                 var rs = stmt.executeQuery(query);
                 if (!rs.next()) {
-                    throw new SQLException("Required table '" + table + "' not found");
+                    throw new SQLException("Required table '" + tableName + "' not found");
                 }
                 rs.close();
-                logger.debug("Verified table exists: " + table);
+                logger.debug("Verified table exists: " + tableName);
             }
         }
         logger.debug("Schema verification completed successfully");
@@ -421,55 +461,53 @@ public class DatabaseSetup {
     
     /**
      * Gets the current schema version.
-     * 
+     *
      * @return the schema version number
      */
     public int getSchemaVersion() {
+        String schemaVersionTable = table(TABLE_SCHEMA_VERSION);
+
         try (Connection connection = connectionProvider.getConnection()) {
             // Check if version table exists
             var stmt = connection.createStatement();
             String checkQuery;
             if ("MySQL".equalsIgnoreCase(databaseType)) {
-                checkQuery = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rvnk_schema_version'";
+                checkQuery = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + schemaVersionTable + "'";
             } else {
-                checkQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='rvnk_schema_version'";
+                checkQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + schemaVersionTable + "'";
             }
-            
+
             var rs = stmt.executeQuery(checkQuery);
             boolean versionTableExists = rs.next();
             rs.close();
-            
+
             if (!versionTableExists) {
                 // Create version table
                 String createVersionTable;
                 if ("MySQL".equalsIgnoreCase(databaseType)) {
-                    createVersionTable = """
-                        CREATE TABLE rvnk_schema_version (
-                            version INT PRIMARY KEY,
-                            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                        """;
+                    createVersionTable = "CREATE TABLE " + schemaVersionTable + " (" +
+                        "version INT PRIMARY KEY, " +
+                        "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
                 } else {
-                    createVersionTable = """
-                        CREATE TABLE rvnk_schema_version (
-                            version INTEGER PRIMARY KEY,
-                            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )
-                        """;
+                    createVersionTable = "CREATE TABLE " + schemaVersionTable + " (" +
+                        "version INTEGER PRIMARY KEY, " +
+                        "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                        ")";
                 }
-                
+
                 stmt.execute(createVersionTable);
-                stmt.execute("INSERT INTO rvnk_schema_version (version) VALUES (1)");
+                stmt.execute("INSERT INTO " + schemaVersionTable + " (version) VALUES (1)");
                 stmt.close();
                 return 1;
             }
-            
+
             // Get current version
-            rs = stmt.executeQuery("SELECT MAX(version) as current_version FROM rvnk_schema_version");
+            rs = stmt.executeQuery("SELECT MAX(version) as current_version FROM " + schemaVersionTable);
             int version = rs.next() ? rs.getInt("current_version") : 1;
             rs.close();
             stmt.close();
-            
+
             return version;
         } catch (SQLException e) {
             logger.warning("Failed to get schema version: " + e.getMessage());

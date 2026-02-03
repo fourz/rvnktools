@@ -3,7 +3,7 @@ package org.fourz.rvnkcore.service.registry;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.fourz.rvnkcore.api.exception.ServiceException;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 /**

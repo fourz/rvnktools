@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 /**

@@ -3,7 +3,7 @@ package org.fourz.rvnkcore.service.player;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Timestamp;

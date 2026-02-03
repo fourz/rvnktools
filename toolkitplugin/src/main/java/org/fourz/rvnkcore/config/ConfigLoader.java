@@ -4,8 +4,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
@@ -111,14 +110,23 @@ public class ConfigLoader {
     
     /**
      * Applies core logging settings from the configuration.
-     * This sets the RVNKCore-scoped logging level.
+     * Sets the global log level on both LogManager implementations
+     * for all existing and future instances.
      */
+    @SuppressWarnings("deprecation")
     private void applyCoreLoggingSettings() {
         String coreLogLevel = coreConfig.getString("logging.level", "INFO");
-        
-        // Apply the core log level to RVNKCore components
-        // This will be used by Debug utilities and RVNKCore-scoped loggers
-        logger.info("Applied RVNKCore logging level: " + coreLogLevel);
+        Level level = LogManager.parseLevel(coreLogLevel);
+
+        // Use plugin logger directly to guarantee visibility regardless of LogManager state
+        plugin.getLogger().info("[ConfigLoader] Applying global logging level: "
+            + coreLogLevel + " -> " + level.getName());
+
+        // Apply to rvnkcore LogManager (primary - used by all plugins)
+        LogManager.setGlobalLogLevel(level);
+
+        // Apply to deprecated rvnktools LogManager (for any remaining legacy instances)
+        org.fourz.rvnktools.util.log.LogManager.setGlobalLogLevel(level);
     }
     
     /**
@@ -333,7 +341,7 @@ public class ConfigLoader {
      */
     public Level getCoreLogLevel() {
         String logLevel = coreConfig.getString("logging.level", "INFO");
-        return Debug.getLevel(logLevel);
+        return LogManager.parseLevel(logLevel);
     }
     
     /**

@@ -2,7 +2,7 @@ package org.fourz.rvnkcore.database.connection;
 
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 import org.fourz.rvnkcore.config.ConfigLoader;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 /**

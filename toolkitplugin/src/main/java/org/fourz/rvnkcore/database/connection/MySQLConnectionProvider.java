@@ -4,7 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.fourz.rvnkcore.api.exception.DatabaseException;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.bukkit.plugin.Plugin;
 
