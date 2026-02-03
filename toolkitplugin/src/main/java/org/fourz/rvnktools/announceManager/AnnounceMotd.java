@@ -3,15 +3,14 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.util.ChatFormat;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 public class AnnounceMotd {
-    private final RVNKLogger logger;
+    private final LogManager logger;
     private final List<Announcement> motdAnnouncements = new ArrayList<>();
     private String currentMotd = null;
     private final Random random = new Random();

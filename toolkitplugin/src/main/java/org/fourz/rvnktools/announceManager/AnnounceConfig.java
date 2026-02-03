@@ -12,7 +12,7 @@ import org.fourz.rvnktools.announceManager.preferences.AnnouncePreferences;
 import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 import java.util.stream.Collectors;
 
 public class AnnounceConfig {
@@ -31,13 +31,7 @@ public class AnnounceConfig {
         DB_REBUILD_YML
     }
 
-    private class ConfigDebug extends Debug {
-        public ConfigDebug(JavaPlugin plugin, String className) {
-            super(plugin, className, logLevel);
-        }
-    }
-
-    private final ConfigDebug debug;
+    private final LogManager logger;
     private final JavaPlugin plugin;
     private final File configFile;
     private FileConfiguration config;
@@ -66,62 +60,62 @@ public class AnnounceConfig {
         
         // Load config and set log level, default to INFO.
         config = YamlConfiguration.loadConfiguration(configFile);       
-        logLevel = Debug.getLevel(config.getString("debug.level", "INFO")); 
-        this.debug = new ConfigDebug(plugin, CLASS_NAME);
+        logLevel = LogManager.parseLevel(config.getString("debug.level", "INFO"));
+        this.logger = LogManager.getInstance(plugin, CLASS_NAME);
         
         // Initialize managers first
         this.dataManager = new DataStoreManager(plugin, config);
         this.yamlManager = new YAMLManager(plugin);
         
         // Load config after managers are initialized
-        if (loadConfig()) debug.info("Configuration loaded successfully");
+        if (loadConfig()) logger.info("Configuration loaded successfully");
         
         this.configOperation = detectConfigState();
-        debug.info("AnnounceConfig Operation: " + configOperation);
+        logger.info("AnnounceConfig Operation: " + configOperation);
         this.announceMotd = new AnnounceMotd(plugin, this);  // Updated constructor call
     }
 
     private ConfigOperation detectConfigState() {
-        debug.info("Detecting config state...");
+        logger.info("Detecting config state...");
 
         // Update storage type checks to use dataManager
         if (dataManager.getStorageType().equals("flatfile") || 
             dataManager.getStorageType().equals("yml")) {
-            debug.info("YAML storage explicitly configured");
+            logger.info("YAML storage explicitly configured");
             return ConfigOperation.YML_ONLY;
         }
 
         if (dataManager.isUsingDatabase()) {
             try {
-                debug.debug("Testing database connectivity");
+                logger.debug("Testing database connectivity");
                 
                 if (dataManager.isEmpty()) {
-                    debug.info("Empty database detected - will import from YAML");
+                    logger.info("Empty database detected - will import from YAML");
                     return ConfigOperation.DB_IMPORT;
                 }
                 
                 if (dbMatchesYml()) {
                     return ConfigOperation.DB_NO_UPDATE;
                 } else {
-                    debug.info("Database differs from YAML - will merge");
+                    logger.info("Database differs from YAML - will merge");
                     return ConfigOperation.DB_MERGE_YML;
                 }
                 
             } catch (Exception e) {
-                debug.error("Database access test failed", e);
+                logger.error("Database access test failed", e);
                 return ConfigOperation.YML_FALLBACK;
             }
         }
         
-        debug.warning("No database configuration found - using YAML storage");
+        logger.warning("No database configuration found - using YAML storage");
         return ConfigOperation.YML_ONLY;
     }
 
     public void initializeDataStore() {
-        debug.info("AnnounceConfig using " + dataManager.getStorageType() + " storage");
+        logger.info("AnnounceConfig using " + dataManager.getStorageType() + " storage");
 
         // Add memory check
-        debug.debug("Memory state before initialization - YML: " + 
+        logger.debug("Memory state before initialization - YML: " + 
             (ymlAnnouncements != null ? ymlAnnouncements.size() : 0) + " announcements");
 
         // Initialize preferences after dataStore is initialized
@@ -140,7 +134,7 @@ public class AnnounceConfig {
             switch (configOperation) {
                 case YML_FALLBACK:
                 case YML_ONLY:
-                    debug.info("Using existing announcements from local configuration");
+                    logger.info("Using existing announcements from local configuration");
                 case DB_NO_UPDATE:                
                     announceManager.setAnnouncements(ymlAnnouncements);
                     announceTypes = ymlTypes;                    
@@ -173,17 +167,17 @@ public class AnnounceConfig {
             if (config.getBoolean("motd.enable", true)) {
                 announceMotd.setMotd(announceManager.getAnnouncements("motd"));
             } else {
-                debug.info("MOTD system is disabled in config");
+                logger.info("MOTD system is disabled in config");
             }
 
         } catch (Exception e) {
-            debug.error("Failed to initialize database: " + e.getMessage(), e);
+            logger.error("Failed to initialize database: " + e.getMessage(), e);
             e.printStackTrace();
             // Fallback to YAML data on database error
             announceManager.setAnnouncements(ymlAnnouncements);
             announceTypes = ymlTypes;
             // Failed to initialize MOTD announcements
-            debug.error("Failed to initialize MOTD announcements", e);
+            logger.error("Failed to initialize MOTD announcements", e);
         }
     }
 
@@ -195,7 +189,7 @@ public class AnnounceConfig {
             .collect(Collectors.toSet()));
         
         String dbHash = dataManager.calculateDatabaseHash();
-        debug.debug("Configuration hash comparison - YAML=" + ymlHash + " DB=" + dbHash);
+        logger.debug("Configuration hash comparison - YAML=" + ymlHash + " DB=" + dbHash);
         
         return ymlHash != null && dbHash != null && ymlHash.equals(dbHash);
     }
@@ -204,7 +198,7 @@ public class AnnounceConfig {
         if (ids.isEmpty()) return null;
         
         StringBuilder hashBuilder = new StringBuilder();
-        debug.debug("Processing " + ids.size() + " announcements for hash generation");
+        logger.debug("Processing " + ids.size() + " announcements for hash generation");
         
         ids.stream()
             .sorted()
@@ -218,7 +212,7 @@ public class AnnounceConfig {
     public boolean loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
-            debug.info("Created default announcements.yml");
+            logger.info("Created default announcements.yml");
         }
 
         config = YamlConfiguration.loadConfiguration(configFile);
@@ -226,7 +220,7 @@ public class AnnounceConfig {
         // Load MOTD configuration
         this.doMotd = config.getBoolean("motd.enable", true);
         this.doMotdScheduleBroadcast = config.getBoolean("motd.schedule-broadcast", false);
-        debug.debug("MOTD config - enabled: " + doMotd + ", schedule-broadcast: " + doMotdScheduleBroadcast);
+        logger.debug("MOTD config - enabled: " + doMotd + ", schedule-broadcast: " + doMotdScheduleBroadcast);
 
         // Update storage type initialization
         dataManager.setStorageType(config.getString("storage.type", "yml").toLowerCase());
@@ -235,7 +229,7 @@ public class AnnounceConfig {
         this.ymlAnnouncements = loadDataFromYAML();
         this.ymlTypes = loadTypesFromYAML();
         
-        debug.info(String.format("Loaded configuration: %d announcements, %d types, storage: %s", 
+        logger.info(String.format("Loaded configuration: %d announcements, %d types, storage: %s", 
             ymlAnnouncements.size(), ymlTypes.size(), dataManager.getStorageType()));
 
         return !ymlAnnouncements.isEmpty() || !ymlTypes.isEmpty();
@@ -261,9 +255,9 @@ public class AnnounceConfig {
             if (!existingTypeIds.contains(type.getId().toLowerCase())) {
                 try {                    
                     dataManager.getDataStore().saveAnnounceType(type);                    
-                    debug.info("Imported announce type: " + type.getId());                    
+                    logger.info("Imported announce type: " + type.getId());                    
                 } catch (Exception e) {
-                    debug.warning("Error saving announce type: " + type.getId());
+                    logger.warning("Error saving announce type: " + type.getId());
                     e.printStackTrace();
                 }
             }
@@ -280,9 +274,9 @@ public class AnnounceConfig {
                     announcement.setImported(); // Mark as imported immediately
                     successfulImports.add(announcement.getId().toLowerCase());
                     announceManager.getAnnouncements().add(announcement); // Add to memory
-                    debug.info("Imported announcement: " + announcement.getId());
+                    logger.info("Imported announcement: " + announcement.getId());
                 } catch (Exception e) {
-                    debug.warning("Error importing announcement " + announcement.getId() + ": " + e.getMessage());
+                    logger.warning("Error importing announcement " + announcement.getId() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
             }            
@@ -291,7 +285,7 @@ public class AnnounceConfig {
         // Update the local announcements list after import
         if (!successfulImports.isEmpty()) {
             announceManager.setAnnouncements(dataManager.getDataStore().loadAnnouncements());
-            debug.info("Updated in-memory announcements after import");
+            logger.info("Updated in-memory announcements after import");
         }
 
         // Only mark announcements that were successfully imported
@@ -324,7 +318,7 @@ public class AnnounceConfig {
                 }
             }
         } else {
-            debug.warning("Config file not found: " + configFile.getName());
+            logger.warning("Config file not found: " + configFile.getName());
         }
         return types;
     }
@@ -483,16 +477,16 @@ public class AnnounceConfig {
      */
     public boolean forceUpdatePrefs() {
         if (!isDataStoreAvailable()) {
-            debug.warning("Cannot force update preferences - no database available");
+            logger.warning("Cannot force update preferences - no database available");
             return false;
         }
 
         try {
             preferences.loadPreferences();
-            debug.info("Successfully reloaded all user preferences from database");
+            logger.info("Successfully reloaded all user preferences from database");
             return true;
         } catch (Exception e) {
-            debug.error("Failed to force update preferences", e);
+            logger.error("Failed to force update preferences", e);
             return false;
         }
     }

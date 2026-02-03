@@ -3,8 +3,7 @@ package org.fourz.rvnktools.util;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -27,7 +26,7 @@ import java.util.stream.Collectors;
 public class AnnouncementTestService {
 
     private final RVNKCore rvnkCore;
-    private final RVNKLogger logger;
+    private final LogManager logger;
 
     /**
      * Creates a new announcement test service.

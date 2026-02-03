@@ -2,7 +2,7 @@ package org.fourz.rvnktools.migration;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
-import org.fourz.rvnktools.util.log.LogManager;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.RVNKCore;
 
 import java.sql.Timestamp;

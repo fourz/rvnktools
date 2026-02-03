@@ -8,8 +8,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.util.ChatServiceInterface;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnktools.util.ChatService;
 
 import net.md_5.bungee.api.ChatMessageType;
@@ -18,7 +17,7 @@ import java.util.logging.Level;
 
 public class AnnounceManager {
     private static final String CLASS_NAME = "AnnounceManager";
-    private final RVNKLogger logger;
+    private final LogManager logger;
     private enum CheckCondition {
         ANNOUNCEMENT_EXISTS,
         SAVE_ANNOUNCEMENT,

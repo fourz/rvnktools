@@ -5,7 +5,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.announceManager.AnnounceType;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,12 +13,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 public class YAMLManager {
     private static final String CLASS_NAME = "YAMLManager";
-    private final Debug debug;
+    private final LogManager logger;
     private final JavaPlugin plugin;
     private final File configFile;
     private final File preferencesFile;
@@ -27,24 +25,17 @@ public class YAMLManager {
 
     public YAMLManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        String CLASS_NAME = "YAMLManager";
-        this.debug = new YAMLManagerDebug(plugin, CLASS_NAME);
+        this.logger = LogManager.getInstance(plugin, CLASS_NAME);
         this.configFile = new File(plugin.getDataFolder(), "announcements.yml");
         this.preferencesFile = new File(plugin.getDataFolder(), "announcePreferences.yml");
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
         loadConfig();
     }
 
-    private class YAMLManagerDebug extends Debug {
-        public YAMLManagerDebug(JavaPlugin plugin, String className) {
-            super(plugin, CLASS_NAME, Level.FINE);
-        }
-    }
-
     private void loadConfig() {
         if (!configFile.exists()) {
             plugin.saveResource("announcements.yml", false);
-            debug.info("Created default announcements.yml");
+            logger.info("Created default announcements.yml");
         }
         config = YamlConfiguration.loadConfiguration(configFile);
     }
@@ -52,7 +43,7 @@ public class YAMLManager {
     public List<Announcement> loadAnnouncements() {
         List<Announcement> announcements = new ArrayList<>();
         if (!configFile.exists()) {
-            debug.warning("Config file does not exist: " + configFile.getName());
+            logger.warning("Config file does not exist: " + configFile.getName());
             return announcements;
         }
 
@@ -64,14 +55,14 @@ public class YAMLManager {
                 Announcement announcement = parseAnnouncement(map);
                 if (announcement != null && announcement.getId() != null) {
                     if (usedIds.contains(announcement.getId().toLowerCase())) {
-                        debug.warning("Duplicate announcement ID found: " + announcement.getId());
+                        logger.warning("Duplicate announcement ID found: " + announcement.getId());
                         continue;
                     }
                     usedIds.add(announcement.getId().toLowerCase());
                     announcements.add(announcement);
                 }
             } catch (Exception e) {
-                debug.warning("Error parsing announcement: " + e.getMessage());
+                logger.warning("Error parsing announcement: " + e.getMessage());
             }
         }
         return announcements;
@@ -93,12 +84,12 @@ public class YAMLManager {
 
     public void saveAnnouncements(Collection<Announcement> announcements) {
         List<Map<String, Object>> announcementMaps = new ArrayList<>();
-        debug.info("Saving " + announcements.size() + " announcements to file");
+        logger.info("Saving " + announcements.size() + " announcements to file");
 
         for (Announcement announcement : announcements) {
             try {
                 if (announcement.getId() == null || announcement.getType() == null || announcement.getMessage() == null) {
-                    debug.warning("Skipping invalid announcement: " + announcement.getId());
+                    logger.warning("Skipping invalid announcement: " + announcement.getId());
                     continue;
                 }
 
@@ -130,26 +121,26 @@ public class YAMLManager {
                 map.put("imported", announcement.isImported());
                 announcementMaps.add(map);
             } catch (Exception e) {
-                debug.error("Error saving announcement " + announcement.getId(), e);
+                logger.error("Error saving announcement " + announcement.getId(), e);
             }
         }
 
         try {
             config.set("announcements", announcementMaps);
             config.save(configFile);
-            debug.info("Configuration saved successfully");
+            logger.info("Configuration saved successfully");
         } catch (IOException e) {
-            debug.error("Failed to save announcements", e);
+            logger.error("Failed to save announcements", e);
         }
     }
 
     public void savePreferences(Map<UUID, Set<String>> playerDisabledTypes, Map<UUID, String> preferences) {
         YamlConfiguration prefsConfig = new YamlConfiguration();
-        
+
         for (Map.Entry<UUID, Set<String>> entry : playerDisabledTypes.entrySet()) {
             String key = entry.getKey().toString();
             prefsConfig.set(key + ".disabled_types", new ArrayList<>(entry.getValue()));
-            
+
             String prefs = preferences.get(entry.getKey());
             if (prefs != null) {
                 prefsConfig.set(key + ".preferences", prefs);
@@ -159,7 +150,7 @@ public class YAMLManager {
         try {
             prefsConfig.save(preferencesFile);
         } catch (IOException e) {
-            debug.error("Failed to save preferences to YAML", e);
+            logger.error("Failed to save preferences to YAML", e);
         }
     }
 
@@ -174,7 +165,7 @@ public class YAMLManager {
                 List<String> typesList = prefsConfig.getStringList(key + ".disabled_types");
                 disabledTypes.put(playerId, new HashSet<>(typesList));
             } catch (IllegalArgumentException e) {
-                debug.warning("Invalid UUID in preferences file: " + key);
+                logger.warning("Invalid UUID in preferences file: " + key);
             }
         }
         return disabledTypes;
@@ -193,7 +184,7 @@ public class YAMLManager {
                     preferences.put(playerId, prefs);
                 }
             } catch (IllegalArgumentException e) {
-                debug.warning("Invalid UUID in preferences file: " + key);
+                logger.warning("Invalid UUID in preferences file: " + key);
             }
         }
         return preferences;
@@ -210,7 +201,7 @@ public class YAMLManager {
         String id = (String) map.get("id");
         String text = (String) map.get("text");
         String type = (String) map.get("type");
-        
+
         if (!validateAnnouncement(id, text, type)) {
             return null;
         }
@@ -218,26 +209,26 @@ public class YAMLManager {
         Object recurrence = map.get("recurrence");
         Long recurrenceSeconds = null;
         String originalRecurrence = null;
-        
+
         if (recurrence != null) {
             originalRecurrence = recurrence.toString();
             recurrenceSeconds = parseRecurrence(originalRecurrence);
         }
-        
+
         Announcement announcement = new Announcement();
         announcement.setId(id);
         announcement.setMessage(text);
         announcement.setType(type);
         announcement.setRecurrence(recurrenceSeconds);
         announcement.setRecurrenceString(originalRecurrence);
-        
+
         // Set optional fields
         announcement.setOwner((String) map.get("owner"));
         announcement.setPermission((String) map.get("permission"));
-        
+
         // Parse date/time if present
         setDateAndTime(announcement, (String) map.get("date"), (String) map.get("time"));
-        
+
         // Set imported flag
         if (map.containsKey("imported")) {
             //announcement.setImported((Boolean) map.get("imported"));
@@ -254,10 +245,10 @@ public class YAMLManager {
             if (recStr.equalsIgnoreCase("daily")) {
                 return 86400L;
             }
-            
+
             char unit = recStr.charAt(recStr.length() - 1);
             String number = recStr.substring(0, recStr.length() - 1);
-            
+
             switch (unit) {
                 case 's': return Long.parseLong(number);
                 case 'm': return Long.parseLong(number) * 60;
@@ -266,7 +257,7 @@ public class YAMLManager {
                 default: return Long.parseLong(recStr);
             }
         } catch (NumberFormatException e) {
-            debug.warning("Invalid recurrence format: " + recStr);
+            logger.warning("Invalid recurrence format: " + recStr);
             return null;
         }
     }
@@ -281,30 +272,30 @@ public class YAMLManager {
                 announcement.setTime(LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HHmm")));
             }
         } catch (Exception e) {
-            debug.warning("Error parsing date/time: " + e.getMessage());
+            logger.warning("Error parsing date/time: " + e.getMessage());
         }
     }
 
     public boolean validateAnnouncement(String id, String text, String type) {
         if (id == null || id.isEmpty()) {
-            debug.warning("Invalid announcement: missing ID");
+            logger.warning("Invalid announcement: missing ID");
             return false;
         }
         if (text == null || text.isEmpty()) {
-            debug.warning("Invalid announcement: missing text for ID " + id);
+            logger.warning("Invalid announcement: missing text for ID " + id);
             return false;
         }
         if (type == null || type.isEmpty()) {
-            debug.warning("Invalid announcement: missing type for ID " + id);
+            logger.warning("Invalid announcement: missing type for ID " + id);
             return false;
         }
-        
+
         // Check PlaceholderAPI requirement
         if (text.contains("%") && !usingPlaceholderAPI) {
-            debug.warning("PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
+            logger.warning("PlaceholderAPI not found, unable to parse placeholders in announcement: " + id);
             return false;
         }
-        
+
         return true;
     }
 
@@ -312,8 +303,8 @@ public class YAMLManager {
     public void setAnnouncements(Collection<Announcement> announcements) {
         List<Map<String, Object>> announcementMaps = new ArrayList<>();
         for (Announcement announcement : announcements) {
-            if (validateAnnouncement(announcement.getId(), 
-                                   announcement.getMessage(), 
+            if (validateAnnouncement(announcement.getId(),
+                                   announcement.getMessage(),
                                    announcement.getType())) {
                 announcementMaps.add(convertAnnouncementToMap(announcement));
             }
@@ -327,23 +318,23 @@ public class YAMLManager {
         map.put("id", announcement.getId());
         map.put("text", announcement.getMessage());
         map.put("type", announcement.getType());
-        
+
         if (announcement.getRecurrence() != null) {
-            map.put("recurrence", announcement.getRecurrenceString() != null ? 
-                   announcement.getRecurrenceString() : 
+            map.put("recurrence", announcement.getRecurrenceString() != null ?
+                   announcement.getRecurrenceString() :
                    formatRecurrence(announcement.getRecurrence()));
         }
-        
+
         Optional.ofNullable(announcement.getOwner()).ifPresent(o -> map.put("owner", o));
         Optional.ofNullable(announcement.getPermission()).ifPresent(p -> map.put("permission", p));
-        
+
         if (announcement.getDate() != null) {
             map.put("date", announcement.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
         }
         if (announcement.getTime() != null) {
             map.put("time", announcement.getTime().format(DateTimeFormatter.ofPattern("HHmm")));
         }
-        
+
         map.put("imported", announcement.isImported());
         return map;
     }
@@ -352,7 +343,7 @@ public class YAMLManager {
         try {
             config.save(configFile);
         } catch (IOException e) {
-            debug.error("Failed to save configuration", e);
+            logger.error("Failed to save configuration", e);
         }
     }
 
@@ -362,7 +353,7 @@ public class YAMLManager {
         String prefix = (String) map.get("prefix");
         String suffix = (String) map.get("suffix");
         Double listingFee = map.get("list_fee") == null ? null : (map.get("list_fee") instanceof Integer ? ((Integer) map.get("list_fee")).doubleValue() : (Double) map.get("list_fee"));
-        String permission = (String) map.get("permission");        
+        String permission = (String) map.get("permission");
 
         AnnounceType announceType = new AnnounceType();
         announceType.setId(id);
@@ -379,14 +370,14 @@ public class YAMLManager {
         try {
             if (dateStr.matches("\\d{2}-\\d{2}")) { // MM-dd format
                 // Parse as current year
-                return LocalDate.parse(LocalDate.now().getYear() + "-" + dateStr, 
+                return LocalDate.parse(LocalDate.now().getYear() + "-" + dateStr,
                     DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             } else {
                 // Parse as full date
                 return LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
             }
         } catch (Exception e) {
-            debug.warning("Failed to parse date: " + dateStr);
+            logger.warning("Failed to parse date: " + dateStr);
             return null;
         }
     }

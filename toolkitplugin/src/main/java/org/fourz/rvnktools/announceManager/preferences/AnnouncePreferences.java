@@ -3,17 +3,15 @@ package org.fourz.rvnktools.announceManager.preferences;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.data.DataStoreManager;
 import org.fourz.rvnktools.announceManager.data.YAMLManager;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.*;
-import java.util.logging.Level;
 
 public class AnnouncePreferences {
-    private static final String CLASS_NAME = "AnnouncePreferences";
     private final JavaPlugin plugin;
     private final DataStoreManager dataManager;
     private final YAMLManager yamlManager;
-    private final Debug debug;
+    private final LogManager logger;
     private Map<UUID, Set<String>> playerDisabledTypes;
     private Map<UUID, String> playerPreferences;
     private Map<UUID, Map<String, String>> playerPreferenceMap;  // New field for structured preferences
@@ -22,18 +20,12 @@ public class AnnouncePreferences {
         this.plugin = plugin;
         this.dataManager = dataManager;
         this.yamlManager = new YAMLManager(plugin);
-        this.debug = new AnnouncePreferencesDebug(plugin, CLASS_NAME);
+        this.logger = LogManager.getInstance(plugin, "AnnouncePreferences");
         this.playerDisabledTypes = new HashMap<>();
         this.playerPreferences = new HashMap<>();
         this.playerPreferenceMap = new HashMap<>();
         loadPreferences();
     }
-
-    private class AnnouncePreferencesDebug extends Debug {
-        public AnnouncePreferencesDebug(JavaPlugin plugin, String className) {
-            super(plugin, CLASS_NAME, Level.FINE);
-        }
-    }    
 
     public void loadPreferences() {
         if (dataManager != null && dataManager.isInitialized()) {
@@ -56,13 +48,13 @@ public class AnnouncePreferences {
             
             // Sync to YML backup
             syncToYAML();
-            debug.debug("Loaded preferences from database");
+            logger.debug("Loaded preferences from database");
             return;
         }
 
         // Fallback to YML if no database
         loadFromYAML();
-        debug.debug("Loaded preferences from YAML");
+        logger.debug("Loaded preferences from YAML");
     }
 
     private void loadFromYAML() {

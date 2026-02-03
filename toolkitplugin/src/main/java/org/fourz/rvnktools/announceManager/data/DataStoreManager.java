@@ -4,8 +4,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.Announcement;
 import org.fourz.rvnktools.announceManager.AnnounceType;
-import org.fourz.rvnktools.util.Debug;
-import java.util.logging.Level;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,9 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DataStoreManager {
     private static final String CLASS_NAME = "DataStoreManager";
-    private final Debug debug;
+    private final LogManager logger;
     private final JavaPlugin plugin;
-    private Level logLevel;
     private DataStore dataStore;
     private final ReentrantLock connectionLock = new ReentrantLock();
     private final Map<String, Announcement> announcementCache = new ConcurrentHashMap<>();
@@ -23,21 +21,15 @@ public class DataStoreManager {
     private boolean initialized = false;
     private String storageType;
 
-    private class DataStoreManagerDebug extends Debug {
-        public DataStoreManagerDebug(JavaPlugin plugin, String className) {
-            super(plugin, CLASS_NAME, logLevel);
-        }
-    }
-
     public DataStoreManager(JavaPlugin plugin, FileConfiguration config) {
         this.plugin = plugin;
-        this.debug = new DataStoreManagerDebug(plugin, CLASS_NAME);
+        this.logger = LogManager.getInstance(plugin, CLASS_NAME);
         initializeDataStore(config);
     }
 
     private void initializeDataStore(FileConfiguration config) {
         this.storageType = config.getString("storage.type", "yml").toLowerCase();
-        
+
         if (storageType.equalsIgnoreCase("mysql")) {
             initializeMySQLStore(config);
         } else if (storageType.equalsIgnoreCase("sqlite")) {
@@ -49,7 +41,7 @@ public class DataStoreManager {
                 connectAndInitialize();
                 initialized = true;
             } catch (Exception e) {
-                debug.error("Failed to initialize data store", e);
+                logger.error("Failed to initialize data store", e);
                 dataStore = null;
             }
         }
@@ -76,7 +68,7 @@ public class DataStoreManager {
 
     private void connectAndInitialize() {
         if (!connectionLock.tryLock()) {
-            debug.debug("Connection operation already in progress");
+            logger.debug("Connection operation already in progress");
             return;
         }
 
@@ -108,7 +100,7 @@ public class DataStoreManager {
             // Ensure we return an empty map rather than null
             return prefs != null ? prefs : new HashMap<>();
         } catch (Exception e) {
-            debug.error("Failed to get player preferences", e);
+            logger.error("Failed to get player preferences", e);
             return new HashMap<>();
         }
     }
@@ -123,7 +115,7 @@ public class DataStoreManager {
             announcementCache.put(announcement.getId().toLowerCase(), announcement);
             return true;
         } catch (Exception e) {
-            debug.error("Failed to save announcement: " + announcement.getId(), e);
+            logger.error("Failed to save announcement: " + announcement.getId(), e);
             return false;
         }
     }
@@ -137,7 +129,7 @@ public class DataStoreManager {
             announcementCache.remove(id.toLowerCase());
             return true;
         } catch (Exception e) {
-            debug.error("Failed to delete announcement: " + id, e);
+            logger.error("Failed to delete announcement: " + id, e);
             return false;
         }
     }
@@ -152,14 +144,14 @@ public class DataStoreManager {
             announcements.forEach(a -> announcementCache.put(a.getId().toLowerCase(), a));
             return announcements;
         } catch (Exception e) {
-            debug.error("Failed to load announcements", e);
+            logger.error("Failed to load announcements", e);
             return new ArrayList<>(announcementCache.values());
         }
     }
 
     public boolean announcementExists(String id) {
         if (!isInitialized() || id == null) return false;
-        
+
         String lowerId = id.toLowerCase();
         if (announcementCache.containsKey(lowerId)) {
             return true;
@@ -169,7 +161,7 @@ public class DataStoreManager {
             connectAndInitialize();
             return dataStore.announcementExists(id);
         } catch (Exception e) {
-            debug.error("Failed to check announcement existence: " + id, e);
+            logger.error("Failed to check announcement existence: " + id, e);
             return false;
         }
     }
@@ -184,7 +176,7 @@ public class DataStoreManager {
             announceTypeCache.put(announceType.getId().toLowerCase(), announceType);
             return true;
         } catch (Exception e) {
-            debug.error("Failed to save announce type: " + announceType.getId(), e);
+            logger.error("Failed to save announce type: " + announceType.getId(), e);
             return false;
         }
     }
@@ -199,7 +191,7 @@ public class DataStoreManager {
             types.forEach(t -> announceTypeCache.put(t.getId().toLowerCase(), t));
             return types;
         } catch (Exception e) {
-            debug.error("Failed to load announce types", e);
+            logger.error("Failed to load announce types", e);
             return new ArrayList<>(announceTypeCache.values());
         }
     }
@@ -212,7 +204,7 @@ public class DataStoreManager {
             connectAndInitialize();
             dataStore.savePlayerDisabledType(playerId, type);
         } catch (Exception e) {
-            debug.error("Failed to save player disabled type", e);
+            logger.error("Failed to save player disabled type", e);
         }
     }
 
@@ -223,7 +215,7 @@ public class DataStoreManager {
             connectAndInitialize();
             dataStore.removePlayerDisabledType(playerId, type);
         } catch (Exception e) {
-            debug.error("Failed to remove player disabled type", e);
+            logger.error("Failed to remove player disabled type", e);
         }
     }
 
@@ -234,7 +226,7 @@ public class DataStoreManager {
             connectAndInitialize();
             return dataStore.getPlayerDisabledTypes(playerId);
         } catch (Exception e) {
-            debug.error("Failed to get player disabled types", e);
+            logger.error("Failed to get player disabled types", e);
             return new HashSet<>();
         }
     }
@@ -246,7 +238,7 @@ public class DataStoreManager {
             connectAndInitialize();
             return dataStore.getAllPlayerDisabledTypes();
         } catch (Exception e) {
-            debug.error("Failed to get all player disabled types", e);
+            logger.error("Failed to get all player disabled types", e);
             return new HashMap<>();
         }
     }
@@ -258,7 +250,7 @@ public class DataStoreManager {
             connectAndInitialize();
             dataStore.savePlayerPreferences(playerId, preferences);
         } catch (Exception e) {
-            debug.error("Failed to save player preferences", e);
+            logger.error("Failed to save player preferences", e);
         }
     }
 
@@ -271,7 +263,7 @@ public class DataStoreManager {
             // Ensure we return an empty map rather than null
             return prefs != null ? prefs : new HashMap<>();
         } catch (Exception e) {
-            debug.error("Failed to get player preferences", e);
+            logger.error("Failed to get player preferences", e);
             return new HashMap<>();
         }
     }
@@ -289,7 +281,7 @@ public class DataStoreManager {
             connectAndInitialize();
             return dataStore.getPlayerPreference(playerId, property);
         } catch (Exception e) {
-            debug.error("Failed to get player preference", e);
+            logger.error("Failed to get player preference", e);
             return null;
         }
     }
@@ -307,7 +299,7 @@ public class DataStoreManager {
             connectAndInitialize();
             dataStore.setPlayerPreference(playerId, property, value);
         } catch (Exception e) {
-            debug.error("Failed to set player preference", e);
+            logger.error("Failed to set player preference", e);
         }
     }
 
@@ -318,7 +310,7 @@ public class DataStoreManager {
                 announcementCache.clear();
                 announceTypeCache.clear();
             } catch (Exception e) {
-                debug.error("Error during shutdown", e);
+                logger.error("Error during shutdown", e);
             }
         }
     }
@@ -334,12 +326,12 @@ public class DataStoreManager {
 
     public boolean isEmpty() {
         if (!isInitialized()) return true;
-        
+
         try {
             connectAndInitialize();
             return dataStore.isEmpty();
         } catch (Exception e) {
-            debug.error("Failed to check if data store is empty", e);
+            logger.error("Failed to check if data store is empty", e);
             return true;
         }
     }

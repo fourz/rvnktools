@@ -9,12 +9,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import org.bukkit.plugin.java.JavaPlugin;
-import java.util.logging.Level;
-import org.fourz.rvnktools.util.Debug;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnktools.announceManager.AnnounceType;
 import org.fourz.rvnktools.announceManager.Announcement;
-import org.fourz.rvnktools.announceManager.AnnounceConfig;
 import org.fourz.rvnktools.announceManager.preferences.PreferenceProperty;
 
 public class MySQLDataConnector implements DataStore {
@@ -25,13 +23,13 @@ public class MySQLDataConnector implements DataStore {
     private final String database;
     private final String tablePrefix;
     private Connection connection;
-    private final Debug debug;
+    private final LogManager logger;
     private boolean tablesInitialized = false;
 
     public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, String tablePrefix) {
         // Add connection timeout and validation settings
-        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database + 
-                   "?useSSL=" + useSSL + 
+        this.url = "jdbc:mysql://" + host + ":" + port + "/" + database +
+                   "?useSSL=" + useSSL +
                    "&autoReconnect=true" +
                    "&connectTimeout=5000" +
                    "&socketTimeout=30000" +
@@ -40,15 +38,11 @@ public class MySQLDataConnector implements DataStore {
         this.password = password;
         this.database = database;
         this.tablePrefix = tablePrefix;
-        this.debug = new Debug(plugin, CLASS_NAME, AnnounceConfig.getLogLevel()) {};
+        this.logger = LogManager.getInstance(plugin, CLASS_NAME);
     }
 
     public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL) {
         this(plugin, host, port, database, username, password, useSSL, "");
-    }
-
-    public MySQLDataConnector(JavaPlugin plugin, String host, int port, String database, String username, String password, boolean useSSL, Level level) {
-        this(plugin, host, port, database, username, password, useSSL);
     }
 
     @Override
@@ -63,7 +57,7 @@ public class MySQLDataConnector implements DataStore {
 
     private void ensureConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            debug.debug("Re-establishing lost MySQL connection");
+            logger.debug("Re-establishing lost MySQL connection");
             connect();
             return;
         }
@@ -71,12 +65,12 @@ public class MySQLDataConnector implements DataStore {
         // Test connection validity with a 5 second timeout
         try {
             if (!connection.isValid(5)) {
-                debug.debug("MySQL connection is invalid, reconnecting...");
+                logger.debug("MySQL connection is invalid, reconnecting...");
                 disconnect();
                 connect();
             }
         } catch (SQLException e) {
-            debug.warning("Error testing connection validity, attempting reconnect");
+            logger.warning("Error testing connection validity, attempting reconnect");
             disconnect();
             connect();
         }
@@ -86,18 +80,18 @@ public class MySQLDataConnector implements DataStore {
     public void connect() {
         try {
             if (connection == null || connection.isClosed()) {
-                debug.debug("Establishing MySQL connection...");
+                logger.debug("Establishing MySQL connection...");
                 connection = DriverManager.getConnection(url, username, password);
-                
+
                 // Set additional connection properties
                 connection.setAutoCommit(true);
-                
+
                 // Set a more reasonable timeout for queries
                 try (Statement stmt = connection.createStatement()) {
                     stmt.execute("SET SESSION wait_timeout=28800"); // 8 hours
                     stmt.execute("SET SESSION interactive_timeout=28800");
                 } catch (SQLException e) {
-                    debug.error("Could not set session timeouts", e);
+                    logger.error("Could not set session timeouts", e);
                 }
 
                 if (!areTablesInitialized()) {
@@ -105,7 +99,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Failed to connect to MySQL", e);
+            logger.error("Failed to connect to MySQL", e);
         }
     }
 
@@ -117,13 +111,13 @@ public class MySQLDataConnector implements DataStore {
                     // Reset session state before closing
                     connection.rollback();
                 } catch (SQLException e) {
-                    // Ignore rollback errors on close                    
+                    // Ignore rollback errors on close
                 }
                 connection.close();
-                debug.debug("MySQL connection closed");
+                logger.debug("MySQL connection closed");
             }
         } catch (SQLException e) {
-            debug.error("Error disconnecting from database", e);
+            logger.error("Error disconnecting from database", e);
         } finally {
             connection = null;
         }
@@ -147,7 +141,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error saving announcement: " + announcement.getId(), e);
+            logger.error("Error saving announcement: " + announcement.getId(), e);
         }
     }
 
@@ -161,7 +155,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error deleting announcement: " + id, e);
+            logger.error("Error deleting announcement: " + id, e);
         }
     }
 
@@ -187,9 +181,9 @@ public class MySQLDataConnector implements DataStore {
                     announcements.put(announcement.getId(), announcement);
                 }
             }
-            debug.info("Loaded " + announcements.size() + " announcements from database");
+            logger.info("Loaded " + announcements.size() + " announcements from database");
         } catch (SQLException e) {
-            debug.error("Error loading announcements", e);
+            logger.error("Error loading announcements", e);
         }
         return new ArrayList<>(announcements.values());
     }
@@ -208,7 +202,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error saving announce type: " + announceType.getId(), e);
+            logger.error("Error saving announce type: " + announceType.getId(), e);
         }
     }
 
@@ -231,7 +225,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error loading announce types", e);
+            logger.error("Error loading announce types", e);
         }
         return announceTypes;
     }
@@ -239,7 +233,7 @@ public class MySQLDataConnector implements DataStore {
     @Override
     public void initializeTables() {
         if (areTablesInitialized()) {
-            debug.debug("Tables already initialized, skipping verification");
+            logger.debug("Tables already initialized, skipping verification");
             return;
         }
 
@@ -247,13 +241,13 @@ public class MySQLDataConnector implements DataStore {
             ensureConnection();
             DatabaseMetaData metaData = connection.getMetaData();
             ResultSet tables;
-            
-            debug.debug("Checking and creating necessary MySQL tables");
-            
+
+            logger.debug("Checking and creating necessary MySQL tables");
+
             // Check if announcements table exists
             tables = metaData.getTables(database, null, tablePrefix + "announcements", null);
             if (!tables.next()) {
-                debug.debug("Creating announcements table - table does not exist");
+                logger.debug("Creating announcements table - table does not exist");
                 Statement stmt = connection.createStatement();
                 String createAnnouncementsTable = "CREATE TABLE " + tablePrefix + "announcements (" +
                     "id VARCHAR(64) PRIMARY KEY," +
@@ -267,33 +261,33 @@ public class MySQLDataConnector implements DataStore {
                     "expiration DATETIME" +
                     ")";
                 stmt.executeUpdate(createAnnouncementsTable);
-                debug.debug("announcements table created successfully");
+                logger.debug("announcements table created successfully");
             } else {
-                debug.debug("announcements table already exists");
+                logger.debug("announcements table already exists");
             }
-            
+
             // Check if types table exists
             tables = metaData.getTables(database, null, tablePrefix + "types", null);
             if (!tables.next()) {
-                debug.debug("Creating types table - table does not exist");
+                logger.debug("Creating types table - table does not exist");
                 Statement stmt = connection.createStatement();
                 String createAnnounceTypesTable = "CREATE TABLE " + tablePrefix + "types (" +
                     "id VARCHAR(64) PRIMARY KEY," +
-                    "prefix VARCHAR(128)," + 
+                    "prefix VARCHAR(128)," +
                     "suffix VARCHAR(128)," +
                     "permission VARCHAR(128)," +
                     "listing_fee DOUBLE" +
                     ")";
                 stmt.executeUpdate(createAnnounceTypesTable);
-                debug.debug("types table created successfully");
+                logger.debug("types table created successfully");
             } else {
-                debug.debug("types table already exists");
+                logger.debug("types table already exists");
             }
 
             // Check if disabledtypes table exists
             tables = metaData.getTables(database, null, tablePrefix + "disabledtypes", null);
             if (!tables.next()) {
-                debug.debug("Creating disabledtypes table");
+                logger.debug("Creating disabledtypes table");
                 Statement stmt = connection.createStatement();
                 String createAnnounceDisabledTypesTable = "CREATE TABLE " + tablePrefix + "disabledtypes (" +
                     "player_id VARCHAR(36)," +
@@ -301,15 +295,15 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, type)" +
                     ")";
                 stmt.executeUpdate(createAnnounceDisabledTypesTable);
-                debug.debug("disabledtypes table created successfully");
+                logger.debug("disabledtypes table created successfully");
             } else {
-                debug.debug("disabledtypes table already exists");
+                logger.debug("disabledtypes table already exists");
             }
 
             // Create new preferences table
             tables = metaData.getTables(database, null, tablePrefix + "preferences", null);
             if (!tables.next()) {
-                debug.debug("Creating preferences table");
+                logger.debug("Creating preferences table");
                 Statement stmt = connection.createStatement();
                 String createPreferencesTable = "CREATE TABLE " + tablePrefix + "preferences (" +
                     "player_id VARCHAR(36)," +
@@ -318,29 +312,29 @@ public class MySQLDataConnector implements DataStore {
                     "PRIMARY KEY (player_id, property)" +
                     ")";
                 stmt.executeUpdate(createPreferencesTable);
-                debug.debug("preferences table created successfully");
+                logger.debug("preferences table created successfully");
             }
-            
+
             // Create stored procedure for hash calculation
             try {
                 createHashProcedure();
             } catch (SQLException e) {
-                debug.error("Failed to create hash calculation stored procedure: " + e.getMessage(), e);
+                logger.error("Failed to create hash calculation stored procedure: " + e.getMessage(), e);
             }
-            
-            debug.debug("All database tables verified/created successfully");
+
+            logger.debug("All database tables verified/created successfully");
             setTablesInitialized(true);
-            
+
         } catch (SQLException e) {
-            debug.error("Failed to initialize database tables: " + e.getMessage(), e);
+            logger.error("Failed to initialize database tables: " + e.getMessage(), e);
         }
     }
 
     private void createHashProcedure() throws SQLException {
         Statement dropStmt = connection.createStatement();
         dropStmt.execute("DROP PROCEDURE IF EXISTS CalculateConfigHash");
-        
-        String createHashProcedure = 
+
+        String createHashProcedure =
             "CREATE PROCEDURE CalculateConfigHash(OUT configHash VARCHAR(32)) " +
             "BEGIN " +
             "    DECLARE done INT DEFAULT FALSE; " +
@@ -351,7 +345,7 @@ public class MySQLDataConnector implements DataStore {
             "        FROM " + tablePrefix + "announcements " +
             "        ORDER BY LOWER(id); " +
             "    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE; " +
-            
+
             "    OPEN ann_cur; " +
             "    read_loop: LOOP " +
             "        FETCH ann_cur INTO temp_id; " +
@@ -361,30 +355,30 @@ public class MySQLDataConnector implements DataStore {
             "        SET hash_str = CONCAT(hash_str, temp_id, '\n'); " +
             "    END LOOP; " +
             "    CLOSE ann_cur; " +
-            
+
             "    IF LENGTH(hash_str) = 0 THEN " +
             "        SET configHash = NULL; " +
             "    ELSE " +
             "        SET configHash = MD5(hash_str); " +
             "    END IF; " +
             "END";
-            
+
         Statement createStmt = connection.createStatement();
         createStmt.execute(createHashProcedure);
-        debug.debug("Created hash calculation stored procedure");
+        logger.debug("Created hash calculation stored procedure");
     }
 
     public String calculateDatabaseHash() {
         try {
             ensureConnection();
-            
+
             CallableStatement cStmt = connection.prepareCall("{CALL CalculateConfigHash(?)}");
             cStmt.registerOutParameter(1, Types.VARCHAR);
             cStmt.execute();
             return cStmt.getString(1);
-            
+
         } catch (SQLException e) {
-            debug.error("Error calculating database hash", e);
+            logger.error("Error calculating database hash", e);
             return null;
         }
     }
@@ -403,7 +397,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error checking if announcement exists: " + id, e);
+            logger.error("Error checking if announcement exists: " + id, e);
         }
         return false;
     }
@@ -412,22 +406,22 @@ public class MySQLDataConnector implements DataStore {
     public boolean isEmpty() {
         try {
             ensureConnection();
-            debug.debug("Checking if the database is empty");
-            
+            logger.debug("Checking if the database is empty");
+
             // Check both tables for data
             try (Statement stmt = connection.createStatement()) {
                 ResultSet rs1 = stmt.executeQuery("SELECT COUNT(*) FROM " + tablePrefix + "announcements");
                 rs1.next();
                 int announceCount = rs1.getInt(1);
-                
+
                 ResultSet rs2 = stmt.executeQuery("SELECT COUNT(*) FROM " + tablePrefix + "types");
                 rs2.next();
                 int typeCount = rs2.getInt(1);
-                
+
                 return announceCount == 0 && typeCount == 0;
             }
         } catch (SQLException e) {
-            debug.error("Error checking if database is empty", e);
+            logger.error("Error checking if database is empty", e);
             return true; // Assume empty on error
         }
     }
@@ -443,7 +437,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error saving player disabled type for playerId: " + playerId, e);
+            logger.error("Error saving player disabled type for playerId: " + playerId, e);
         }
     }
 
@@ -458,7 +452,7 @@ public class MySQLDataConnector implements DataStore {
                 statement.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error removing player disabled type for playerId: " + playerId, e);
+            logger.error("Error removing player disabled type for playerId: " + playerId, e);
         }
     }
 
@@ -477,7 +471,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error retrieving disabled types for playerId: " + playerId, e);
+            logger.error("Error retrieving disabled types for playerId: " + playerId, e);
         }
         return types;
     }
@@ -497,14 +491,14 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error retrieving all player disabled types", e);
+            logger.error("Error retrieving all player disabled types", e);
         }
         return allTypes;
     }
 
     @Override
     public void savePlayerPreferences(UUID playerId, String preferences) {
-        debug.warning("Using deprecated savePlayerPreferences method - update to use setPlayerPreference");
+        logger.warning("Using deprecated savePlayerPreferences method - update to use setPlayerPreference");
         // Store as a single 'legacy' property to maintain backwards compatibility
         setPlayerPreference(playerId, "legacy", preferences);
     }
@@ -524,7 +518,7 @@ public class MySQLDataConnector implements DataStore {
                 stmt.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error setting player preference", e);
+            logger.error("Error setting player preference", e);
         }
     }
 
@@ -542,7 +536,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error getting player preference", e);
+            logger.error("Error getting player preference", e);
         }
         return PreferenceProperty.fromKey(property).getDefaultValue();
     }
@@ -561,7 +555,7 @@ public class MySQLDataConnector implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            debug.error("Error getting player preferences", e);
+            logger.error("Error getting player preferences", e);
         }
         return preferences;
     }
@@ -577,7 +571,7 @@ public class MySQLDataConnector implements DataStore {
                 stmt.executeUpdate();
             }
         } catch (SQLException e) {
-            debug.error("Error deleting player preference", e);
+            logger.error("Error deleting player preference", e);
         }
     }
 }

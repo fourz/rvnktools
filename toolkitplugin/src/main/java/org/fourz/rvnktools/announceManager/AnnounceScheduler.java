@@ -3,8 +3,7 @@ package org.fourz.rvnktools.announceManager;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.util.log.LogManager;
-import org.fourz.rvnktools.util.log.RVNKLogger;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -20,7 +19,7 @@ public class AnnounceScheduler {
     private static final long DAILY_RECURRENCE_TICKS = 12 * 60 * 60 * 20L; // 12 hours in ticks
     private static final String ANNUAL_DATE_PATTERN = "\\d{2}-\\d{2}";  // MM-dd pattern
 
-    private final RVNKLogger logger;
+    private final LogManager logger;
     private final JavaPlugin plugin;
     private final AnnounceManager announceManager;
     private Map<Announcement, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();    
