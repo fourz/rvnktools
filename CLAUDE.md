@@ -54,7 +54,15 @@
 - **[archon/docs/](archon/docs/)** — Detailed specifications
 - **[archon/PRPs/](archon/PRPs/)** — Product Requirements Plans
 
-### Parent Ecosystem Standards
+### RVNKCore Board Documents (Internal Implementation)
+
+Documents on RVNKTools/RVNKCore board (`7785e125-4468-44e2-a86c-2fef668fce48`):
+- **RVNKCore ServiceRegistry Reference** - Service interface contracts, registration patterns
+- **RVNKTools Bundling Clarification** - Target architecture (RVNKTools bundled in RVNKCore)
+- **Privacy-Focused Teleport Tracking** - WorldSwap command, player location tracking
+- **Servlet Registration API** - REST endpoint registration patterns
+
+### Parent Ecosystem Standards (Cross-cutting)
 
 Access via Archon RAG or parent repo:
 
@@ -62,6 +70,11 @@ Access via Archon RAG or parent repo:
 - **RVNKCore Integration**: `rag_search_knowledge_base(query="RVNKCore ServiceRegistry")`
 - **Repository Pattern**: `rag_search_knowledge_base(query="Repository pattern database")`
 - **REST API Standards**: `rag_search_knowledge_base(query="REST API standards")`
+
+Parent board documents (`4787f505-e92e-474d-ba54-f5ac7993ccfe`):
+- [Coding Standards](../../docs/standard/coding-standards.md) - Java 17+ conventions (general)
+- [RVNKCore Integration Guide](../../docs/standard/rvnkcore-integration.md) - Integration concepts (general)
+- [Database Patterns](../../docs/standard/database-patterns.md) - Repository pattern, HikariCP
 
 ---
 
