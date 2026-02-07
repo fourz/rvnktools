@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$QueryMethods
--------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImplTest$QueryMethods
