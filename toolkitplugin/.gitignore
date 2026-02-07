@@ -1,8 +1,5 @@
 # Maven
-target/maven-*
-target/classes*
-target/generated-sources*
-target/original-rvnktools-*
+target/
 
 .mvn/
 
