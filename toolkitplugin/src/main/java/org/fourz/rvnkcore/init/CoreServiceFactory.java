@@ -2,18 +2,21 @@ package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
+import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
 import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
+import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
 import org.fourz.rvnkcore.service.world.DefaultWorldService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -31,6 +34,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
  *   <li>{@link PlayerWorldService} - Per-world player tracking</li>
  *   <li>{@link WorldService} - World metadata management</li>
  *   <li>{@link AnnouncementService} - Announcement system</li>
+ *   <li>{@link PlayerPreferencesService} - Player notification preferences</li>
  * </ul>
  *
  * @since 1.4.0
@@ -84,8 +88,11 @@ public class CoreServiceFactory {
         registerAnnouncementService(registry);
         logger.debug("  + AnnouncementService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerPlayerPreferencesService(registry);
+        logger.debug("  + PlayerPreferencesService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService (" + totalTime + "ms)");
+        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService (" + totalTime + "ms)");
     }
 
     /**
@@ -154,6 +161,23 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register AnnouncementService", e);
             throw new RuntimeException("AnnouncementService registration failed", e);
+        }
+    }
+
+    /**
+     * Registers the PlayerPreferencesService for centralized player notification preferences.
+     */
+    private void registerPlayerPreferencesService(ServiceRegistry registry) {
+        try {
+            PlayerPreferencesRepository prefsRepository = new PlayerPreferencesRepository(connectionProvider, plugin);
+            LogManager prefsLogger = LogManager.getInstance(plugin, DefaultPlayerPreferencesService.class);
+            DefaultPlayerPreferencesService prefsService = new DefaultPlayerPreferencesService(prefsRepository, prefsLogger);
+
+            registry.registerService(PlayerPreferencesService.class, prefsService);
+            logger.info("PlayerPreferencesService registered");
+        } catch (Exception e) {
+            logger.error("Failed to register PlayerPreferencesService", e);
+            throw new RuntimeException("PlayerPreferencesService registration failed", e);
         }
     }
 }
