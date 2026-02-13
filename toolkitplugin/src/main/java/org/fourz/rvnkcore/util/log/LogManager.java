@@ -99,6 +99,7 @@ public class LogManager {
 
     /**
      * Gets a LogManager instance for the plugin.
+     * Uses empty prefix since Bukkit already adds [PluginName] automatically.
      *
      * @param plugin The plugin instance
      * @return LogManager instance for the plugin
@@ -106,7 +107,7 @@ public class LogManager {
     public static LogManager getInstance(Plugin plugin) {
         String key = plugin.getName() + ":Main";
         return instances.computeIfAbsent(key, k ->
-            new LogManager(plugin, "[" + plugin.getName() + "] "));
+            new LogManager(plugin, ""));
     }
     
     // ========================================================================
