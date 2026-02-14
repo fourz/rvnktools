@@ -71,10 +71,14 @@ public class CommandManager {
         
         // Create a single shared WorldSwapSubCommand instance to prevent duplicate initialization
         WorldSwapSubCommand sharedWorldSwap = new WorldSwapSubCommand(plugin, null);
-        
+
         // Register teleportation commands with shared instance
-        registerCommand(new TeleportCommand(plugin, sharedWorldSwap));
-        
+        TeleportCommand teleportCommand = new TeleportCommand(plugin, sharedWorldSwap);
+        registerCommand(teleportCommand);
+
+        // Conditionally register /tp alias based on config
+        registerTpAlias(plugin, teleportCommand);
+
         // Register standalone worldswap and event commands that directly use the shared instance
         registerCommand(new WorldSwapCommand(plugin, sharedWorldSwap));
         registerCommand(new EventCommand(plugin, sharedWorldSwap));
@@ -249,8 +253,38 @@ public class CommandManager {
     }
     
     /**
+     * Conditionally registers the /tp alias based on config.
+     * If override is enabled in config, routes /tp to TeleportCommand.
+     * If disabled, /tp remains as vanilla Minecraft behavior.
+     *
+     * @param plugin The RVNKCore plugin instance
+     * @param teleportCommand The TeleportCommand instance to route /tp to
+     */
+    private void registerTpAlias(RVNKCore plugin, TeleportCommand teleportCommand) {
+        boolean shouldOverrideTp = plugin.getConfig().getBoolean("commands.override-vanilla-tp", false);
+
+        if (!shouldOverrideTp) {
+            logger.info("Vanilla /tp override is DISABLED - using vanilla Minecraft teleport");
+            return;
+        }
+
+        // Get the /tp command from plugin.yml
+        PluginCommand tpCommand = plugin.getCommand("tp");
+        if (tpCommand == null) {
+            logger.warning("Failed to register /tp alias - command not found in plugin.yml");
+            return;
+        }
+
+        // Route /tp to TeleportCommand
+        tpCommand.setExecutor(teleportCommand);
+        tpCommand.setTabCompleter(teleportCommand);
+
+        logger.info("Registered /tp command override (vanilla behavior overridden)");
+    }
+
+    /**
      * Register an alias for a command.
-     * 
+     *
      * @param alias The alias name
      * @param commandName The target command name
      * @return true if the alias was registered successfully

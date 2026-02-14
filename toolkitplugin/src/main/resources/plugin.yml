@@ -56,8 +56,11 @@ commands:
   teleport:
     description: Teleportation utilities and world management
     usage: /teleport <subcommand> [args]
-    aliases: [tp]
     permission: rvnktools.command.teleport
+  tp:
+    description: Teleport command (vanilla override - disabled by default)
+    usage: /tp <player|coordinates> [args]
+    permission: rvnktools.command.tp
   cyclegamemode:
     description: Cycle through gamemodes
     usage: /cyclegamemode
@@ -149,6 +152,12 @@ permissions:
     default: op
   rvnktools.command.teleport.worldswap:
     description: Allows teleporting between worlds while preserving locations
+    default: op
+  rvnktools.command.tp:
+    description: Basic teleport permission
+    default: op
+  rvnktools.command.tp.others:
+    description: Allows teleporting other players
     default: op
   rvnktools.command.example:
     description: Allows using the example command

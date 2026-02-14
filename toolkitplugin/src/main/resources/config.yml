@@ -34,6 +34,13 @@ logfilter:
     paper: false         # Show Paper-specific messages
     plugins: true        # Show plugin messages
 
+# Command Configuration
+# Customize command behavior
+commands:
+  override-vanilla-tp: false  # Override /tp with RVNKTools implementation (default: false)
+                              # When false: /tp uses vanilla Minecraft teleport
+                              # When true: /tp uses RVNKTools teleport (player/coords/worldswap)
+
 # Feature Configuration
 # Enable or disable specific RVNKTools features
 features:
