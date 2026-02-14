@@ -3,9 +3,12 @@ package org.fourz.rvnktools.announceManager.preferences;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnktools.announceManager.data.DataStoreManager;
 import org.fourz.rvnktools.announceManager.data.YAMLManager;
+import org.fourz.rvnktools.announceManager.integration.PreferencesServiceAdapter;
+import org.fourz.rvnktools.announceManager.integration.PreferencesServiceLookup;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 public class AnnouncePreferences {
     private final JavaPlugin plugin;
@@ -16,6 +19,10 @@ public class AnnouncePreferences {
     private Map<UUID, String> playerPreferences;
     private Map<UUID, Map<String, String>> playerPreferenceMap;  // New field for structured preferences
 
+    // PlayerPreferencesService integration
+    private PreferencesServiceLookup serviceLookup;
+    private PreferencesServiceAdapter adapter;
+
     public AnnouncePreferences(JavaPlugin plugin, DataStoreManager dataManager) {
         this.plugin = plugin;
         this.dataManager = dataManager;
@@ -24,6 +31,13 @@ public class AnnouncePreferences {
         this.playerDisabledTypes = new HashMap<>();
         this.playerPreferences = new HashMap<>();
         this.playerPreferenceMap = new HashMap<>();
+
+        // Initialize service integration
+        this.serviceLookup = new PreferencesServiceLookup(plugin);
+        if (serviceLookup.isAvailable()) {
+            this.adapter = new PreferencesServiceAdapter(serviceLookup.getService());
+        }
+
         loadPreferences();
     }
 
@@ -182,5 +196,178 @@ public class AnnouncePreferences {
             dataManager.getDataStore().deletePlayerPreference(playerId, property);
         }
         syncToYAML();
+    }
+
+    // ========== ASYNC METHODS (NEW) ==========
+
+    /**
+     * Get a preference asynchronously using PlayerPreferencesService if available
+     *
+     * @param playerId The player's UUID
+     * @param property The preference property key
+     * @return CompletableFuture with preference value
+     */
+    public CompletableFuture<String> getPreferenceAsync(UUID playerId, String property) {
+        // Use service if available
+        if (serviceLookup != null && serviceLookup.isAvailable()) {
+            return adapter.getPreference(playerId, property)
+                .exceptionally(ex -> {
+                    logger.warning("Failed to get preference from service, falling back to DataStore: " + ex.getMessage());
+                    return getPreferenceSync(playerId, property);
+                });
+        }
+
+        // Fallback to synchronous DataStore access
+        return CompletableFuture.completedFuture(getPreferenceSync(playerId, property));
+    }
+
+    /**
+     * Set a preference asynchronously using PlayerPreferencesService if available
+     *
+     * @param playerId The player's UUID
+     * @param property The preference property key
+     * @param value The preference value
+     * @return CompletableFuture that completes when saved
+     */
+    public CompletableFuture<Void> setPreferenceAsync(UUID playerId, String property, String value) {
+        // Update in-memory cache synchronously
+        playerPreferenceMap
+            .computeIfAbsent(playerId, k -> new HashMap<>())
+            .put(property, value);
+
+        // Use service if available
+        if (serviceLookup != null && serviceLookup.isAvailable()) {
+            return adapter.setPreference(playerId, property, value)
+                .exceptionally(ex -> {
+                    logger.warning("Failed to set preference in service, falling back to DataStore: " + ex.getMessage());
+                    // Fallback to DataStore
+                    if (dataManager != null && dataManager.isInitialized()) {
+                        dataManager.getDataStore().setPlayerPreference(playerId, property, value);
+                    }
+                    syncToYAML();
+                    return null;
+                });
+        }
+
+        // Fallback to DataStore
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.getDataStore().setPlayerPreference(playerId, property, value);
+        }
+        syncToYAML();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Get disabled types asynchronously
+     *
+     * @param playerId The player's UUID
+     * @return CompletableFuture with set of disabled types
+     */
+    public CompletableFuture<Set<String>> getDisabledTypesAsync(UUID playerId) {
+        // Use service if available
+        if (serviceLookup != null && serviceLookup.isAvailable()) {
+            return adapter.getDisabledTypes(playerId)
+                .exceptionally(ex -> {
+                    logger.warning("Failed to get disabled types from service, using cache: " + ex.getMessage());
+                    return getDisabledTypes(playerId);
+                });
+        }
+
+        // Fallback to cache
+        return CompletableFuture.completedFuture(getDisabledTypes(playerId));
+    }
+
+    /**
+     * Add a disabled type asynchronously
+     *
+     * @param playerId The player's UUID
+     * @param type The notification type
+     * @return CompletableFuture that completes when saved
+     */
+    public CompletableFuture<Void> addDisabledTypeAsync(UUID playerId, String type) {
+        // Update in-memory cache
+        playerDisabledTypes.computeIfAbsent(playerId, k -> new HashSet<>()).add(type);
+
+        // Use service if available
+        if (serviceLookup != null && serviceLookup.isAvailable()) {
+            return adapter.addDisabledType(playerId, type)
+                .exceptionally(ex -> {
+                    logger.warning("Failed to add disabled type in service, falling back to DataStore: " + ex.getMessage());
+                    // Fallback to DataStore
+                    if (dataManager != null && dataManager.isInitialized()) {
+                        dataManager.savePlayerDisabledType(playerId, type);
+                    }
+                    syncToYAML();
+                    return null;
+                });
+        }
+
+        // Fallback to DataStore
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.savePlayerDisabledType(playerId, type);
+        }
+        syncToYAML();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Remove a disabled type asynchronously
+     *
+     * @param playerId The player's UUID
+     * @param type The notification type
+     * @return CompletableFuture that completes when saved
+     */
+    public CompletableFuture<Void> removeDisabledTypeAsync(UUID playerId, String type) {
+        // Update in-memory cache
+        Set<String> types = playerDisabledTypes.get(playerId);
+        if (types != null) {
+            types.remove(type);
+        }
+
+        // Use service if available
+        if (serviceLookup != null && serviceLookup.isAvailable()) {
+            return adapter.removeDisabledType(playerId, type)
+                .exceptionally(ex -> {
+                    logger.warning("Failed to remove disabled type in service, falling back to DataStore: " + ex.getMessage());
+                    // Fallback to DataStore
+                    if (dataManager != null && dataManager.isInitialized()) {
+                        dataManager.removePlayerDisabledType(playerId, type);
+                    }
+                    syncToYAML();
+                    return null;
+                });
+        }
+
+        // Fallback to DataStore
+        if (dataManager != null && dataManager.isInitialized()) {
+            dataManager.removePlayerDisabledType(playerId, type);
+        }
+        syncToYAML();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Helper method: Get preference synchronously from DataStore
+     */
+    private String getPreferenceSync(UUID playerId, String property) {
+        Map<String, String> prefs = playerPreferenceMap.get(playerId);
+        if (prefs != null && prefs.containsKey(property)) {
+            return prefs.get(property);
+        }
+
+        // Try database if available
+        if (dataManager != null && dataManager.isInitialized()) {
+            String value = dataManager.getDataStore().getPlayerPreference(playerId, property);
+            if (value != null) {
+                // Cache the value
+                playerPreferenceMap
+                    .computeIfAbsent(playerId, k -> new HashMap<>())
+                    .put(property, value);
+                return value;
+            }
+        }
+
+        // Return default value from PreferenceProperty
+        return PreferenceProperty.fromKey(property).getDefaultValue();
     }
 }

@@ -2,6 +2,7 @@ package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -17,6 +18,7 @@ import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
+import org.fourz.rvnkcore.service.teleport.CoreTeleportService;
 import org.fourz.rvnkcore.service.world.DefaultWorldService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -35,6 +37,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
  *   <li>{@link WorldService} - World metadata management</li>
  *   <li>{@link AnnouncementService} - Announcement system</li>
  *   <li>{@link PlayerPreferencesService} - Player notification preferences</li>
+ *   <li>{@link ITeleportService} - Core teleportation service (extensible)</li>
  * </ul>
  *
  * @since 1.4.0
@@ -91,8 +94,11 @@ public class CoreServiceFactory {
         registerPlayerPreferencesService(registry);
         logger.debug("  + PlayerPreferencesService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerTeleportService(registry);
+        logger.debug("  + ITeleportService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService (" + totalTime + "ms)");
+        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService (" + totalTime + "ms)");
     }
 
     /**
@@ -178,6 +184,25 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register PlayerPreferencesService", e);
             throw new RuntimeException("PlayerPreferencesService registration failed", e);
+        }
+    }
+
+    /**
+     * Registers the ITeleportService for core teleport functionality.
+     *
+     * <p>The teleport service provides base teleportation capabilities that
+     * can be extended by other plugins (e.g., RVNKWorlds) for world-specific features.
+     * This service is extensible via the ServiceRegistry pattern.</p>
+     */
+    private void registerTeleportService(ServiceRegistry registry) {
+        try {
+            CoreTeleportService teleportService = new CoreTeleportService(plugin);
+
+            registry.registerService(ITeleportService.class, teleportService);
+            logger.info("ITeleportService (CoreTeleportService) registered - extensible, version: " + teleportService.getServiceVersion());
+        } catch (Exception e) {
+            logger.error("Failed to register ITeleportService", e);
+            throw new RuntimeException("ITeleportService registration failed", e);
         }
     }
 }

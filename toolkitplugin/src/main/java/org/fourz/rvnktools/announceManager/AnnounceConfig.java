@@ -8,9 +8,12 @@ import org.fourz.rvnktools.announceManager.data.DataStore;
 import org.fourz.rvnktools.announceManager.data.DataStoreManager;
 import org.fourz.rvnktools.announceManager.data.YAMLManager;
 import org.fourz.rvnktools.announceManager.preferences.AnnouncePreferences;
+import org.fourz.rvnktools.announceManager.migration.PreferencesMigration;
+import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import org.fourz.rvnkcore.util.log.LogManager;
 import java.util.stream.Collectors;
@@ -120,6 +123,9 @@ public class AnnounceConfig {
 
         // Initialize preferences after dataStore is initialized
         this.preferences = new AnnouncePreferences(plugin, dataManager);
+
+        // Trigger preferences migration from DataStore to PlayerPreferencesService
+        triggerPreferencesMigration();
 
         // If not using database storage, use YAML data directly
         if (!dataManager.isUsingDatabase()) {
@@ -488,6 +494,69 @@ public class AnnounceConfig {
         } catch (Exception e) {
             logger.error("Failed to force update preferences", e);
             return false;
+        }
+    }
+
+    // ========== ASYNC DELEGATION METHODS ==========
+
+    /**
+     * Get a preference asynchronously (delegates to AnnouncePreferences)
+     *
+     * @param playerId The player's UUID
+     * @param property The preference property key
+     * @return CompletableFuture with preference value
+     */
+    public CompletableFuture<String> getPreferenceAsync(UUID playerId, String property) {
+        return preferences.getPreferenceAsync(playerId, property);
+    }
+
+    /**
+     * Set a preference asynchronously (delegates to AnnouncePreferences)
+     *
+     * @param playerId The player's UUID
+     * @param property The preference property key
+     * @param value The preference value
+     * @return CompletableFuture that completes when saved
+     */
+    public CompletableFuture<Void> setPreferenceAsync(UUID playerId, String property, String value) {
+        return preferences.setPreferenceAsync(playerId, property, value);
+    }
+
+    /**
+     * Trigger one-time migration from DataStore to PlayerPreferencesService
+     */
+    private void triggerPreferencesMigration() {
+        try {
+            // Get PlayerPreferencesService if available
+            org.fourz.rvnkcore.RVNKCore core = org.fourz.rvnkcore.RVNKCore.getInstance();
+            if (core == null) {
+                logger.debug("RVNKCore not available - preferences migration skipped");
+                return;
+            }
+
+            PlayerPreferencesService prefService = core.getServiceRegistry()
+                .getService(PlayerPreferencesService.class);
+            if (prefService == null) {
+                logger.debug("PlayerPreferencesService not available - preferences migration skipped");
+                return;
+            }
+
+            // Run migration asynchronously
+            PreferencesMigration migration = new PreferencesMigration(plugin, dataManager, prefService, config);
+            migration.migrate()
+                .thenAccept(success -> {
+                    if (success) {
+                        logger.info("Preferences migration completed successfully");
+                    } else {
+                        logger.warning("Preferences migration failed - preferences will use fallback mode");
+                    }
+                })
+                .exceptionally(ex -> {
+                    logger.error("Preferences migration encountered an error", ex);
+                    return null;
+                });
+        } catch (Exception e) {
+            logger.warning("Could not trigger preferences migration: " + e.getMessage());
         }
     }
 }
