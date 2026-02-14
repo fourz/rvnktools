@@ -22,10 +22,12 @@ public class DefaultWorldRepository implements WorldRepository {
     
     private final ConnectionProvider connectionProvider;
     private final LogManager logger;
-    
+    private final boolean useSQLite;
+
     public DefaultWorldRepository(ConnectionProvider connectionProvider, JavaPlugin plugin) {
         this.connectionProvider = connectionProvider;
         this.logger = LogManager.getInstance(plugin, getClass());
+        this.useSQLite = "sqlite".equalsIgnoreCase(connectionProvider.getDatabaseType());
     }
     
     @Override
@@ -154,18 +156,25 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<Void> save(WorldDTO worldDTO) {
         return CompletableFuture.runAsync(() -> {
-        String query = """
-            INSERT INTO rvnk_worlds (name, display_name, environment, world_type, difficulty, 
-            world_folder, seed, spawn_x, spawn_y, spawn_z, is_active, 
-            player_count, max_players_seen, total_playtime_seconds, created_at, last_accessed) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-            ON DUPLICATE KEY UPDATE 
-            display_name = VALUES(display_name), environment = VALUES(environment), 
-            world_type = VALUES(world_type), difficulty = VALUES(difficulty), 
-            is_active = VALUES(is_active), player_count = VALUES(player_count), 
-            max_players_seen = VALUES(max_players_seen), 
-            total_playtime_seconds = VALUES(total_playtime_seconds), last_accessed = VALUES(last_accessed)
-            """;            try (Connection conn = connectionProvider.getConnection();
+            String query;
+            if (useSQLite) {
+                query = "INSERT OR REPLACE INTO rvnk_worlds (name, display_name, environment, world_type, difficulty, " +
+                        "world_folder, seed, spawn_x, spawn_y, spawn_z, is_active, " +
+                        "player_count, max_players_seen, total_playtime_seconds, created_at, last_accessed) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            } else {
+                query = "INSERT INTO rvnk_worlds (name, display_name, environment, world_type, difficulty, " +
+                        "world_folder, seed, spawn_x, spawn_y, spawn_z, is_active, " +
+                        "player_count, max_players_seen, total_playtime_seconds, created_at, last_accessed) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                        "ON DUPLICATE KEY UPDATE " +
+                        "display_name = VALUES(display_name), environment = VALUES(environment), " +
+                        "world_type = VALUES(world_type), difficulty = VALUES(difficulty), " +
+                        "is_active = VALUES(is_active), player_count = VALUES(player_count), " +
+                        "max_players_seen = VALUES(max_players_seen), " +
+                        "total_playtime_seconds = VALUES(total_playtime_seconds), last_accessed = VALUES(last_accessed)";
+            }
+            try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
                 
                 stmt.setString(1, worldDTO.getName());
@@ -194,15 +203,19 @@ public class DefaultWorldRepository implements WorldRepository {
     }
     
     @Override
-    public CompletableFuture<Void> updateTrackingInfo(String worldName, long totalPlaytimeSeconds, 
+    public CompletableFuture<Void> updateTrackingInfo(String worldName, long totalPlaytimeSeconds,
                                                      int playerCount, int maxPlayersSeen) {
         return CompletableFuture.runAsync(() -> {
-            String query = """
-                UPDATE rvnk_worlds 
-                SET total_playtime_seconds = ?, player_count = ?, 
-                    max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP 
-                WHERE name = ?
-                """;
+            String query;
+            if (useSQLite) {
+                query = "UPDATE rvnk_worlds SET total_playtime_seconds = ?, player_count = ?, " +
+                        "max_players_seen = MAX(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP " +
+                        "WHERE name = ?";
+            } else {
+                query = "UPDATE rvnk_worlds SET total_playtime_seconds = ?, player_count = ?, " +
+                        "max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP " +
+                        "WHERE name = ?";
+            }
             
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -222,7 +235,12 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<Void> updatePlayerCount(String worldName, int playerCount) {
         return CompletableFuture.runAsync(() -> {
-            String query = "UPDATE rvnk_worlds SET player_count = ?, max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
+            String query;
+            if (useSQLite) {
+                query = "UPDATE rvnk_worlds SET player_count = ?, max_players_seen = MAX(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
+            } else {
+                query = "UPDATE rvnk_worlds SET player_count = ?, max_players_seen = GREATEST(max_players_seen, ?), last_accessed = CURRENT_TIMESTAMP WHERE name = ?";
+            }
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
                 
