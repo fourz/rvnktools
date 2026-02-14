@@ -5,6 +5,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
+import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -287,6 +288,15 @@ public class RVNKToolsInitializer {
 
     private void registerBundledComponentCommands() {
         try {
+            // Register PlayerPreferencesCommand
+            CommandManager commandManager = registry.getService(CommandManager.class);
+            if (commandManager != null) {
+                PlayerPreferencesCommand prefCommand = new PlayerPreferencesCommand(plugin);
+                commandManager.registerCommand(prefCommand);
+                logger.info("PlayerPreferencesCommand registered");
+            }
+
+            // Register AnnounceManager commands
             AnnounceManager announceManager = registry.getService(AnnounceManager.class);
             if (announceManager != null) {
                 announceManager.registerCommands();

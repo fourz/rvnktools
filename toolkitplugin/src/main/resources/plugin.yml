@@ -94,6 +94,20 @@ commands:
     description: Manage TrainCarts settings and view help pages
     usage: /trains [enable|disable|modes|examples|links]
     aliases: [train-help]
+  pref:
+    description: Manage your notification preferences
+    usage: |
+      /<command> - Show all preferences
+      /<command> <plugin> - Show plugin preferences
+      /<command> <plugin> toggle - Toggle master on/off
+      /<command> <plugin> enable <type> - Enable notification type
+      /<command> <plugin> disable <type> - Disable notification type
+      /<command> <plugin> quiet <hour1> <hour2> - Set quiet hours (0-23)
+      /<command> <plugin> quiet disable - Disable quiet hours
+      /<command> <plugin> channel <type> <channel> <on|off> - Toggle channel
+      /<command> <plugin> reset - Reset to defaults
+    aliases: [prefs, preferences]
+    permission: rvnkcore.prefs
 
 permissions:
   rvnktools.command:
@@ -170,3 +184,11 @@ permissions:
   rvnktools.admin.test:
     description: Allows using automated test commands
     default: op
+  rvnkcore.prefs:
+    description: Manage notification preferences
+    default: true
+  rvnkcore.prefs.*:
+    description: All preference permissions
+    default: true
+    children:
+      rvnkcore.prefs: true
