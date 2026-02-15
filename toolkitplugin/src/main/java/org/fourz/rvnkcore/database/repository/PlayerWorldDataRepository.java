@@ -1,17 +1,22 @@
 package org.fourz.rvnkcore.database.repository;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.QueryBuilder;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
+import java.lang.reflect.Type;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -25,9 +30,11 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class PlayerWorldDataRepository {
-    
+
     private static final String TABLE_NAME = "rvnk_player_world_data";
-    
+    private static final Gson GSON = new Gson();
+    private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>(){}.getType();
+
     private final ConnectionProvider connectionProvider;
     private final QueryBuilder queryBuilder;
     private final LogManager logger;
@@ -208,6 +215,9 @@ public class PlayerWorldDataRepository {
                     }
                 }
                 
+                // Serialize worldSpecificData to JSON
+                String worldSpecificDataJson = serializeWorldSpecificData(worldData.getWorldSpecificData());
+
                 String query;
                 if (exists) {
                     // Update existing record
@@ -223,6 +233,7 @@ public class PlayerWorldDataRepository {
                         .set("last_pitch", worldData.getLastPitch())
                         .set("last_biome", worldData.getLastBiome())
                         .set("death_count", worldData.getDeathCount())
+                        .set("world_specific_data", "?")  // Placeholder for JSON
                         .set("updated_at", Timestamp.valueOf(LocalDateTime.now()))
                         .where("player_id = ? AND world_name = ?")
                         .build();
@@ -231,8 +242,8 @@ public class PlayerWorldDataRepository {
                     query = queryBuilder.insert(TABLE_NAME)
                         .columns("player_id", "world_name", "first_visit", "last_visit", "visit_count",
                                 "playtime_seconds", "last_x", "last_y", "last_z", "last_yaw", "last_pitch",
-                                "last_biome", "death_count", "created_at", "updated_at")
-                        .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
+                                "last_biome", "death_count", "world_specific_data", "created_at", "updated_at")
+                        .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
                         .build();
                 }
                 
@@ -250,9 +261,10 @@ public class PlayerWorldDataRepository {
                         stmt.setFloat(9, worldData.getLastPitch());
                         stmt.setString(10, worldData.getLastBiome());
                         stmt.setInt(11, worldData.getDeathCount());
-                        stmt.setTimestamp(12, Timestamp.valueOf(LocalDateTime.now()));
-                        stmt.setString(13, worldData.getPlayerId().toString());
-                        stmt.setString(14, worldData.getWorldName());
+                        stmt.setString(12, worldSpecificDataJson);
+                        stmt.setTimestamp(13, Timestamp.valueOf(LocalDateTime.now()));
+                        stmt.setString(14, worldData.getPlayerId().toString());
+                        stmt.setString(15, worldData.getWorldName());
                     } else {
                         // Insert parameters
                         Timestamp now = Timestamp.valueOf(LocalDateTime.now());
@@ -269,10 +281,11 @@ public class PlayerWorldDataRepository {
                         stmt.setFloat(11, worldData.getLastPitch());
                         stmt.setString(12, worldData.getLastBiome());
                         stmt.setInt(13, worldData.getDeathCount());
-                        stmt.setTimestamp(14, now);
+                        stmt.setString(14, worldSpecificDataJson);
                         stmt.setTimestamp(15, now);
+                        stmt.setTimestamp(16, now);
                     }
-                    
+
                     stmt.executeUpdate();
                     return worldData;
                 }
@@ -314,13 +327,13 @@ public class PlayerWorldDataRepository {
     
     /**
      * Maps a ResultSet row to a PlayerWorldDataDTO.
-     * 
+     *
      * @param rs The ResultSet to map
      * @return The mapped PlayerWorldDataDTO
      * @throws SQLException if database access fails
      */
     protected PlayerWorldDataDTO mapResultSet(ResultSet rs) throws SQLException {
-        return new PlayerWorldDataDTO.Builder()
+        PlayerWorldDataDTO.Builder builder = new PlayerWorldDataDTO.Builder()
             .playerId(UUID.fromString(rs.getString("player_id")))
             .worldName(rs.getString("world_name"))
             .firstVisit(rs.getTimestamp("first_visit"))
@@ -335,7 +348,36 @@ public class PlayerWorldDataRepository {
                 rs.getFloat("last_pitch")
             )
             .lastBiome(rs.getString("last_biome"))
-            .deathCount(rs.getInt("death_count"))
-            .build();
+            .deathCount(rs.getInt("death_count"));
+
+        // Parse world_specific_data JSON column
+        String worldSpecificDataJson = rs.getString("world_specific_data");
+        if (worldSpecificDataJson != null && !worldSpecificDataJson.isEmpty()) {
+            try {
+                Map<String, Object> worldSpecificData = GSON.fromJson(worldSpecificDataJson, MAP_TYPE);
+                if (worldSpecificData != null) {
+                    for (Map.Entry<String, Object> entry : worldSpecificData.entrySet()) {
+                        builder.worldData(entry.getKey(), entry.getValue());
+                    }
+                }
+            } catch (Exception e) {
+                logger.warning("Failed to parse world_specific_data JSON for player: " + rs.getString("player_id"));
+            }
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * Serializes worldSpecificData map to JSON string.
+     *
+     * @param worldSpecificData The map to serialize
+     * @return JSON string or null if empty/null
+     */
+    private String serializeWorldSpecificData(Map<String, Object> worldSpecificData) {
+        if (worldSpecificData == null || worldSpecificData.isEmpty()) {
+            return null;
+        }
+        return GSON.toJson(worldSpecificData);
     }
 }

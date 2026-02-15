@@ -97,6 +97,9 @@ public class DatabaseSetup {
             createTables(connection);
             createIndexes(connection);
 
+            // Run migrations to add new columns to existing tables
+            runMigrations(connection);
+
             if (!schemaExists) {
                 logger.info("Database schema initialization completed successfully");
             }
@@ -224,6 +227,7 @@ public class DatabaseSetup {
                 "last_pitch FLOAT DEFAULT 0, " +
                 "last_biome VARCHAR(255), " +
                 "death_count INT DEFAULT 0, " +
+                "world_specific_data TEXT, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
                 "PRIMARY KEY (player_id, world_name), " +
@@ -358,6 +362,7 @@ public class DatabaseSetup {
                 "last_pitch REAL DEFAULT 0, " +
                 "last_biome TEXT, " +
                 "death_count INTEGER DEFAULT 0, " +
+                "world_specific_data TEXT, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "PRIMARY KEY (player_id, world_name), " +
@@ -561,6 +566,70 @@ public class DatabaseSetup {
         }
     }
     
+    /**
+     * Runs database migrations to add new columns to existing tables.
+     * This handles schema evolution for existing databases.
+     */
+    private void runMigrations(Connection connection) throws SQLException {
+        logger.debug("Running database migrations...");
+
+        String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
+
+        // Migration 1: Add world_specific_data column if missing
+        if (!columnExists(connection, playerWorldDataTable, "world_specific_data")) {
+            logger.info("Adding 'world_specific_data' column to " + playerWorldDataTable);
+            try (var stmt = connection.createStatement()) {
+                String alterSql = "ALTER TABLE " + playerWorldDataTable + " ADD COLUMN world_specific_data TEXT";
+                stmt.execute(alterSql);
+                logger.info("Successfully added 'world_specific_data' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add world_specific_data column: " + e.getMessage());
+                // Don't throw - allow startup to continue, feature will just not persist
+            }
+        }
+
+        logger.debug("Database migrations completed");
+    }
+
+    /**
+     * Checks if a column exists in a table.
+     */
+    private boolean columnExists(Connection connection, String tableName, String columnName) {
+        try (var stmt = connection.createStatement()) {
+            String query;
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + tableName + "' " +
+                        "AND COLUMN_NAME = '" + columnName + "'";
+            } else {
+                // SQLite uses PRAGMA table_info
+                query = "PRAGMA table_info(" + tableName + ")";
+            }
+
+            var rs = stmt.executeQuery(query);
+
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                boolean exists = rs.next();
+                rs.close();
+                return exists;
+            } else {
+                // SQLite: iterate through columns to find match
+                while (rs.next()) {
+                    String colName = rs.getString("name");
+                    if (columnName.equalsIgnoreCase(colName)) {
+                        rs.close();
+                        return true;
+                    }
+                }
+                rs.close();
+                return false;
+            }
+        } catch (SQLException e) {
+            logger.debug("Column existence check failed for " + tableName + "." + columnName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     private void verifySchema(Connection connection) throws SQLException {
         logger.debug("Verifying database schema...");
         // Verify critical tables exist (with prefix)

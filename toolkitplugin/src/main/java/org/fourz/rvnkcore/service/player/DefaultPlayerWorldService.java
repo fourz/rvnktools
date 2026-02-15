@@ -153,14 +153,21 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
     }
     
     @Override
-    public CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld, 
+    public CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld,
                                                    double x, double y, double z, float yaw, float pitch) {
+        return recordWorldChange(playerId, fromWorld, toWorld, x, y, z, yaw, pitch, null);
+    }
+
+    @Override
+    public CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld,
+                                                   double x, double y, double z, float yaw, float pitch,
+                                                   Map<String, Object> worldSpecificData) {
         // Update session tracking
         SessionData session = activeSessions.get(playerId);
         if (session != null) {
             session.worldName = toWorld;
         }
-        
+
         // Update global player current world
         CompletableFuture<Void> updateGlobalFuture = getPlayer(playerId)
             .thenCompose(playerOpt -> {
@@ -171,7 +178,7 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
                 }
                 return CompletableFuture.completedFuture(null);
             });
-        
+
         // Create or update world data for the destination world
         CompletableFuture<Void> updateWorldDataFuture = getPlayerWorldData(playerId, toWorld)
             .thenCompose(existingData -> {
@@ -184,10 +191,17 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
                     worldData = new PlayerWorldDataDTO(playerId, toWorld);
                     worldData.updateLocation(x, y, z, yaw, pitch);
                 }
-                
+
+                // Merge world-specific data if provided
+                if (worldSpecificData != null && !worldSpecificData.isEmpty()) {
+                    for (Map.Entry<String, Object> entry : worldSpecificData.entrySet()) {
+                        worldData.setWorldData(entry.getKey(), entry.getValue());
+                    }
+                }
+
                 return worldDataRepository.save(worldData).thenApply(saved -> null);
             });
-        
+
         return CompletableFuture.allOf(updateGlobalFuture, updateWorldDataFuture);
     }
     
