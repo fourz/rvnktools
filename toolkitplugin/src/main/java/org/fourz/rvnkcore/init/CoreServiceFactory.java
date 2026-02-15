@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.api.mojang.MojangAPI;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
@@ -38,6 +39,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
  *   <li>{@link AnnouncementService} - Announcement system</li>
  *   <li>{@link PlayerPreferencesService} - Player notification preferences</li>
  *   <li>{@link ITeleportService} - Core teleportation service (extensible)</li>
+ *   <li>{@link MojangAPI} - Mojang API wrapper with rate limiting (shared instance)</li>
  * </ul>
  *
  * @since 1.4.0
@@ -48,6 +50,9 @@ public class CoreServiceFactory {
     private final ConnectionProvider connectionProvider;
     private final JavaPlugin plugin;
     private final LogManager logger;
+
+    // Track MojangAPI for shutdown
+    private MojangAPI mojangAPI;
 
     /**
      * Creates a new CoreServiceFactory.
@@ -97,8 +102,23 @@ public class CoreServiceFactory {
         registerTeleportService(registry);
         logger.debug("  + ITeleportService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerMojangAPI(registry);
+        logger.debug("  + MojangAPI registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService (" + totalTime + "ms)");
+        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI (" + totalTime + "ms)");
+    }
+
+    /**
+     * Shuts down services that require cleanup.
+     * Call this during plugin disable.
+     */
+    public void shutdown() {
+        if (mojangAPI != null) {
+            mojangAPI.shutdown();
+            mojangAPI = null;
+            logger.info("MojangAPI shutdown complete");
+        }
     }
 
     /**
@@ -203,6 +223,35 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register ITeleportService", e);
             throw new RuntimeException("ITeleportService registration failed", e);
+        }
+    }
+
+    /**
+     * Registers the MojangAPI service for shared Mojang API access.
+     *
+     * <p>The MojangAPI service provides:</p>
+     * <ul>
+     *   <li>Name to UUID resolution with rate limiting</li>
+     *   <li>UUID to name resolution with caching</li>
+     *   <li>Username/UUID verification</li>
+     *   <li>Shared rate limiter across all plugins (60 req/min)</li>
+     * </ul>
+     *
+     * <p>Other plugins can access via:</p>
+     * <pre>
+     * MojangAPI api = registry.getService(MojangAPI.class);
+     * api.getUuidByName("Player").thenAccept(uuid -> ...);
+     * </pre>
+     */
+    private void registerMojangAPI(ServiceRegistry registry) {
+        try {
+            mojangAPI = new MojangAPI(plugin);
+
+            registry.registerService(MojangAPI.class, mojangAPI);
+            logger.info("MojangAPI registered (shared rate limiter: 60 req/min)");
+        } catch (Exception e) {
+            logger.error("Failed to register MojangAPI", e);
+            throw new RuntimeException("MojangAPI registration failed", e);
         }
     }
 }

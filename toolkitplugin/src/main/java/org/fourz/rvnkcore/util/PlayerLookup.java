@@ -5,11 +5,13 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
+import org.fourz.rvnkcore.api.mojang.MojangAPI;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -23,14 +25,49 @@ import java.util.concurrent.TimeUnit;
 public class PlayerLookup {
 
     private final LogManager logger;
+    private final Plugin plugin;
     private final ConcurrentHashMap<UUID, String> nameCache = new ConcurrentHashMap<>();
 
     private PlayerService playerService;
     private boolean rvnkCoreEnabled = false;
+    private MojangAPI mojangAPI;
+    private boolean mojangApiEnabled = false;
 
     public PlayerLookup(Plugin plugin) {
+        this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, "PlayerLookup");
         initPlayerService();
+    }
+
+    /**
+     * Enables Mojang API integration for name/UUID resolution.
+     * Creates a MojangAPI instance with rate limiting.
+     *
+     * @return this PlayerLookup for chaining
+     */
+    public PlayerLookup enableMojangAPI() {
+        if (mojangAPI == null) {
+            mojangAPI = new MojangAPI(plugin);
+            mojangApiEnabled = true;
+            logger.info("MojangAPI integration enabled with rate limiting");
+        }
+        return this;
+    }
+
+    /**
+     * Checks if Mojang API integration is enabled.
+     */
+    public boolean isMojangApiEnabled() {
+        return mojangApiEnabled && mojangAPI != null;
+    }
+
+    /**
+     * Gets the MojangAPI instance if enabled.
+     *
+     * @return Optional containing MojangAPI, or empty if not enabled
+     */
+    public Optional<MojangAPI> getMojangAPI() {
+        return Optional.ofNullable(mojangAPI);
     }
 
     private void initPlayerService() {
@@ -113,5 +150,180 @@ public class PlayerLookup {
      */
     public void clearCache() {
         nameCache.clear();
+        if (mojangAPI != null) {
+            mojangAPI.clearCache();
+        }
+    }
+
+    // ==========================================
+    // Async Methods (with Mojang API support)
+    // ==========================================
+
+    /**
+     * Async version of getPlayerName with Mojang API fallback.
+     *
+     * <p>Resolution order:</p>
+     * <ol>
+     *   <li>Local name cache</li>
+     *   <li>RVNKCore PlayerService (if available)</li>
+     *   <li>Bukkit OfflinePlayer cache</li>
+     *   <li>Mojang API (if enabled, rate limited)</li>
+     * </ol>
+     *
+     * @param uuid The player UUID
+     * @return CompletableFuture containing the player name, or truncated UUID if unknown
+     */
+    public CompletableFuture<String> getPlayerNameAsync(UUID uuid) {
+        if (uuid == null) {
+            return CompletableFuture.completedFuture("Unknown");
+        }
+
+        // Check local cache first
+        String cached = nameCache.get(uuid);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+
+        // Try RVNKCore PlayerService
+        if (rvnkCoreEnabled) {
+            String name = lookupViaPlayerService(uuid);
+            if (name != null) {
+                nameCache.put(uuid, name);
+                return CompletableFuture.completedFuture(name);
+            }
+        }
+
+        // Try Bukkit cache (synchronous, fast)
+        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+        if (player.getName() != null) {
+            nameCache.put(uuid, player.getName());
+            return CompletableFuture.completedFuture(player.getName());
+        }
+
+        // Fallback to Mojang API if enabled
+        if (mojangApiEnabled && mojangAPI != null) {
+            return mojangAPI.getNameByUuid(uuid)
+                .thenApply(opt -> {
+                    String name = opt.orElse(uuid.toString().substring(0, 8));
+                    nameCache.put(uuid, name);
+                    return name;
+                });
+        }
+
+        // Final fallback: truncated UUID
+        String truncated = uuid.toString().substring(0, 8);
+        nameCache.put(uuid, truncated);
+        return CompletableFuture.completedFuture(truncated);
+    }
+
+    /**
+     * Resolves a player name to UUID.
+     *
+     * <p>Resolution order:</p>
+     * <ol>
+     *   <li>Online players</li>
+     *   <li>Bukkit OfflinePlayer cache</li>
+     *   <li>Mojang API (if enabled, rate limited)</li>
+     * </ol>
+     *
+     * @param name The player name to resolve
+     * @return CompletableFuture containing Optional with UUID, or empty if not found
+     */
+    public CompletableFuture<Optional<UUID>> getUuidByName(String name) {
+        if (name == null || name.isEmpty()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        // Check online players first (instant)
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getName().equalsIgnoreCase(name)) {
+                return CompletableFuture.completedFuture(Optional.of(player.getUniqueId()));
+            }
+        }
+
+        // Check Bukkit cache (may still need validation)
+        @SuppressWarnings("deprecation")
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(name);
+        if (offlinePlayer.hasPlayedBefore()) {
+            return CompletableFuture.completedFuture(Optional.of(offlinePlayer.getUniqueId()));
+        }
+
+        // Fallback to Mojang API if enabled
+        if (mojangApiEnabled && mojangAPI != null) {
+            return mojangAPI.getUuidByName(name);
+        }
+
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    /**
+     * Verifies that a UUID exists in Mojang's database.
+     *
+     * @param uuid The UUID to verify
+     * @return CompletableFuture containing true if valid, false otherwise
+     */
+    public CompletableFuture<Boolean> verifyUuid(UUID uuid) {
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        // If player has been seen on this server, UUID is valid
+        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+        if (player.hasPlayedBefore()) {
+            return CompletableFuture.completedFuture(true);
+        }
+
+        // Use Mojang API if enabled
+        if (mojangApiEnabled && mojangAPI != null) {
+            return mojangAPI.verifyUuid(uuid);
+        }
+
+        return CompletableFuture.completedFuture(false);
+    }
+
+    /**
+     * Verifies that a username exists in Mojang's database.
+     *
+     * @param username The username to verify
+     * @return CompletableFuture containing true if valid, false otherwise
+     */
+    public CompletableFuture<Boolean> verifyUsername(String username) {
+        if (!MojangAPI.isValidUsername(username)) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        // Check online players first
+        for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getName().equalsIgnoreCase(username)) {
+                return CompletableFuture.completedFuture(true);
+            }
+        }
+
+        // Check Bukkit cache
+        @SuppressWarnings("deprecation")
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(username);
+        if (offlinePlayer.hasPlayedBefore()) {
+            return CompletableFuture.completedFuture(true);
+        }
+
+        // Use Mojang API if enabled
+        if (mojangApiEnabled && mojangAPI != null) {
+            return mojangAPI.verifyUsername(username);
+        }
+
+        return CompletableFuture.completedFuture(false);
+    }
+
+    /**
+     * Shuts down the PlayerLookup and releases resources.
+     */
+    public void shutdown() {
+        if (mojangAPI != null) {
+            mojangAPI.shutdown();
+            mojangAPI = null;
+            mojangApiEnabled = false;
+        }
+        nameCache.clear();
+        logger.info("PlayerLookup shutdown complete");
     }
 }

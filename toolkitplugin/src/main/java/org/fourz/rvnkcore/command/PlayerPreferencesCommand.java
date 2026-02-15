@@ -293,7 +293,7 @@ public class PlayerPreferencesCommand extends BaseCommand {
      * Set or disable quiet hours
      */
     private void handleQuietHours(Player player, UUID playerUuid, String pluginId, String[] args) {
-        if (args.length == 2) {
+        if (args.length < 3) {
             player.sendMessage(ChatColor.RED + "✖ Usage: /pref " + pluginId + " quiet <hour1> <hour2> or /pref " + pluginId + " quiet disable");
             return;
         }
@@ -306,6 +306,11 @@ public class PlayerPreferencesCommand extends BaseCommand {
                     logger.warning("Error disabling quiet hours", ex);
                     return null;
                 });
+            return;
+        }
+
+        if (args.length < 4) {
+            player.sendMessage(ChatColor.RED + "✖ Usage: /pref " + pluginId + " quiet <hour1> <hour2> or /pref " + pluginId + " quiet disable");
             return;
         }
 
