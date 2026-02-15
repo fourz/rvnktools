@@ -284,7 +284,8 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
     }
 
     private PlayerPreferencesDTO buildDefaultsDTO(String pluginId, Map<String, String> defaults) {
-        boolean masterEnabled = Boolean.parseBoolean(defaults.getOrDefault("master_enabled", "false"));
+        // Default to true so notifications are enabled by default for new players
+        boolean masterEnabled = Boolean.parseBoolean(defaults.getOrDefault("master_enabled", "true"));
 
         int quietStart = -1;
         int quietEnd = -1;
