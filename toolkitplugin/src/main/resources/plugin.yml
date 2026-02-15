@@ -48,6 +48,11 @@ commands:
     usage: /rvnktest <services|db|health|plugins|reload|commands|run> [args]
     permission: rvnktools.admin.test
     default: op
+  mojangtest:
+    description: Test MojangAPI functionality (name/UUID resolution with rate limiting)
+    usage: /mojangtest <name|uuid|verify|stats> <value>
+    permission: rvnktools.admin.mojangtest
+    default: op
   worldswap:
     description: Teleport to your last known location in a specific world
     usage: /worldswap <world_name>

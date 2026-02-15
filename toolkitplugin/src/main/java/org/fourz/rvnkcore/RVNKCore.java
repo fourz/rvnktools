@@ -172,6 +172,11 @@ public class RVNKCore extends JavaPlugin implements Listener {
                 apiInitializer.stop();
             }
 
+            // Shutdown core services (MojangAPI, etc.)
+            if (coreServiceFactory != null) {
+                coreServiceFactory.shutdown();
+            }
+
             // Close database connections
             if (connectionProvider != null) {
                 connectionProvider.close();
