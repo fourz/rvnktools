@@ -221,20 +221,22 @@ public class PlayerWorldDataRepository {
                 String query;
                 if (exists) {
                     // Update existing record
+                    // Use "?" placeholders for all values - QueryBuilder stores values internally
+                    // when actual values are passed, causing parameter count mismatch
                     query = queryBuilder.update(TABLE_NAME)
-                        .set("first_visit", worldData.getFirstVisit())
-                        .set("last_visit", worldData.getLastVisit())
-                        .set("visit_count", worldData.getVisitCount())
-                        .set("playtime_seconds", worldData.getPlaytimeSeconds())
-                        .set("last_x", worldData.getLastX())
-                        .set("last_y", worldData.getLastY())
-                        .set("last_z", worldData.getLastZ())
-                        .set("last_yaw", worldData.getLastYaw())
-                        .set("last_pitch", worldData.getLastPitch())
-                        .set("last_biome", worldData.getLastBiome())
-                        .set("death_count", worldData.getDeathCount())
-                        .set("world_specific_data", "?")  // Placeholder for JSON
-                        .set("updated_at", Timestamp.valueOf(LocalDateTime.now()))
+                        .set("first_visit", "?")
+                        .set("last_visit", "?")
+                        .set("visit_count", "?")
+                        .set("playtime_seconds", "?")
+                        .set("last_x", "?")
+                        .set("last_y", "?")
+                        .set("last_z", "?")
+                        .set("last_yaw", "?")
+                        .set("last_pitch", "?")
+                        .set("last_biome", "?")
+                        .set("death_count", "?")
+                        .set("world_specific_data", "?")
+                        .set("updated_at", "?")
                         .where("player_id = ? AND world_name = ?")
                         .build();
                 } else {
