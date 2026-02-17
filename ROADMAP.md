@@ -1,8 +1,39 @@
 # RVNKTools Development Roadmap
 
-**Last Updated**: January 24, 2026
+**Last Updated**: February 17, 2026
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
+
+## February 17, 2026 Status: Command Consolidation + Logging Standardization
+
+**Command Consolidation** (Feb 16-17, 2026):
+
+- ✅ `RVNKTestCommand.java` (471 lines) and `MojangApiTestCommand.java` (199 lines) merged into single `/rvnkcore` command
+- ✅ `plugin.yml` updated: removed `rvnktest` + `mojangtest` entries, added `rvnkcore`
+- ✅ ~670 lines of duplicate command code removed
+
+**Logging Standardization** (Feb 16, 2026):
+
+- ✅ `config-core.yml`: `logging.level: INFO` → `general.logLevel: WARNING`
+- ✅ Unified with ecosystem-wide `general.logLevel` config path
+
+**SQL Fix** (Feb 16, 2026):
+
+- ✅ SQL parameter binding fix deployed (rvnktools)
+
+**RVNKCore Standalone Deployment** (Feb 16, 2026):
+
+- ✅ RVNKCore deployed as separate plugin (provided scope in all dependents)
+- ✅ Classes loaded once — no more duplication across plugin JARs
+- ✅ ServiceRegistry working: BarterShops registered 4 services successfully
+
+**Feature Gaps / Next Steps**:
+
+- Validate `/rvnkcore` consolidated command on RVNK Dev
+- Database configuration DTO wiring plan created (RVNKLore as template, ready for implementation)
+- deploy-01: Stage RVNKCore + RVNKTools to RVNK Event server
+
+---
 
 ## Current Status
 
