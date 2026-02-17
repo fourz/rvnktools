@@ -5,7 +5,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
 

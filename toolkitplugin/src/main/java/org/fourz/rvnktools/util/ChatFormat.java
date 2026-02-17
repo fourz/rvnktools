@@ -5,6 +5,11 @@ import org.bukkit.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.ChatMessageType;
 
+/**
+ * @deprecated Use {@link org.fourz.rvnkcore.util.ChatFormat} instead.
+ * This class is kept for backwards compatibility only.
+ */
+@Deprecated
 public class ChatFormat {  
 
     // Converts '&' color codes in a string to Minecraft ChatColor

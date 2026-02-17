@@ -13,7 +13,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Random;
 
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 

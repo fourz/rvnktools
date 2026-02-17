@@ -10,6 +10,11 @@ import java.util.Map;
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.chat.TextComponent;
 
+/**
+ * @deprecated Use {@link org.fourz.rvnkcore.util.chat.ChatService} instead.
+ * This class is kept for backwards compatibility only.
+ */
+@Deprecated
 public class ChatService implements ChatServiceInterface {
     private final boolean usingPlaceholderAPI;
 

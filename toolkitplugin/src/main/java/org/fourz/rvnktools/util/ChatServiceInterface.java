@@ -5,6 +5,11 @@ import java.util.Map;
 import org.bukkit.entity.Player;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 
+/**
+ * @deprecated Use {@link org.fourz.rvnkcore.util.chat.ChatServiceInterface} instead.
+ * This interface is kept for backwards compatibility only.
+ */
+@Deprecated
 public interface ChatServiceInterface {
     void sendMessage(Player player, String message);
     void sendMessage(Player player, String message, LinkMaker linkMaker);

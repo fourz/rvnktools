@@ -2,7 +2,7 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.ArrayList;

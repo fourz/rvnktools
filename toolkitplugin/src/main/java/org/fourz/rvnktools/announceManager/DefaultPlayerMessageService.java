@@ -3,7 +3,7 @@ package org.fourz.rvnktools.announceManager;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 import me.clip.placeholderapi.PlaceholderAPI;
 
 public class DefaultPlayerMessageService implements PlayerMessageService {

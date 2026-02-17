@@ -7,9 +7,9 @@ import org.bukkit.command.CommandSender;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import org.fourz.rvnkcore.RVNKCore;
-import org.fourz.rvnktools.util.ChatServiceInterface;
+import org.fourz.rvnkcore.util.chat.ChatServiceInterface;
 import org.fourz.rvnkcore.util.log.LogManager;
-import org.fourz.rvnktools.util.ChatService;
+import org.fourz.rvnkcore.util.chat.ChatService;
 
 import net.md_5.bungee.api.ChatMessageType;
 

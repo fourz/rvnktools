@@ -8,7 +8,7 @@ import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
