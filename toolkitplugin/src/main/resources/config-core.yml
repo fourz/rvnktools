@@ -1,8 +1,9 @@
 # RVNKCore Configuration
 
-# Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
-logging:
-  level: INFO
+# Log level: OFF | SEVERE | WARNING | INFO | FINE | DEBUG
+# Production default: WARNING
+general:
+  logLevel: WARNING
 
 # Database Configuration
 # Supported types: sqlite, mysql

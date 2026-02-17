@@ -43,15 +43,10 @@ commands:
     usage: /pstest <recent|groups|syncgroups> [args...]
     permission: rvnktools.admin.pstest
     default: op
-  rvnktest:
-    description: Automated test commands for RVNK plugin ecosystem
-    usage: /rvnktest <services|db|health|plugins|reload|commands|run> [args]
+  rvnkcore:
+    description: RVNKCore diagnostics, testing, and system information
+    usage: /rvnkcore <debug|services|db|version|reload|plugins|commands|health|test|mojang> [args]
     permission: rvnktools.admin.test
-    default: op
-  mojangtest:
-    description: Test MojangAPI functionality (name/UUID resolution with rate limiting)
-    usage: /mojangtest <name|uuid|verify|stats> <value>
-    permission: rvnktools.admin.mojangtest
     default: op
   worldswap:
     description: Teleport to your last known location in a specific world

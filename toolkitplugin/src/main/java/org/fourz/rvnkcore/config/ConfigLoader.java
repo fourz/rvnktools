@@ -115,7 +115,7 @@ public class ConfigLoader {
      */
     @SuppressWarnings("deprecation")
     private void applyCoreLoggingSettings() {
-        String coreLogLevel = coreConfig.getString("logging.level", "INFO");
+        String coreLogLevel = coreConfig.getString("general.logLevel", "WARNING");
         Level level = LogManager.parseLevel(coreLogLevel);
 
         // Use plugin logger directly to guarantee visibility regardless of LogManager state
@@ -160,8 +160,8 @@ public class ConfigLoader {
         StringBuilder fallbackConfig = new StringBuilder();
         fallbackConfig.append("# RVNKCore Configuration\n");
         fallbackConfig.append("# This file was auto-generated due to missing default configuration\n\n");
-        fallbackConfig.append("logging:\n");
-        fallbackConfig.append("  level: INFO\n\n");
+        fallbackConfig.append("general:\n");
+        fallbackConfig.append("  logLevel: WARNING\n\n");
         fallbackConfig.append("database:\n");
         fallbackConfig.append("  type: sqlite\n");
         fallbackConfig.append("  sqlite:\n");
@@ -318,9 +318,9 @@ public class ConfigLoader {
      * Validates logging configuration with level validation.
      */
     private void validateLoggingConfiguration() {
-        String logLevel = coreConfig.getString("logging.level", "INFO");
-        String[] validLevels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR"};
-        
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
+        String[] validLevels = {"OFF", "SEVERE", "WARNING", "INFO", "FINE", "DEBUG"};
+
         boolean validLevel = false;
         for (String level : validLevels) {
             if (level.equalsIgnoreCase(logLevel)) {
@@ -328,19 +328,19 @@ public class ConfigLoader {
                 break;
             }
         }
-        
+
         if (!validLevel) {
-            logger.warning("Invalid RVNKCore logging level: " + logLevel + " (valid: DEBUG, INFO, WARN, ERROR)");
+            logger.warning("Invalid RVNKCore logging level: " + logLevel + " (valid: OFF, SEVERE, WARNING, INFO, FINE, DEBUG)");
         }
     }
     
     /**
      * Gets the RVNKCore log level from configuration.
-     * 
+     *
      * @return The configured log level
      */
     public Level getCoreLogLevel() {
-        String logLevel = coreConfig.getString("logging.level", "INFO");
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
         return LogManager.parseLevel(logLevel);
     }
     
@@ -375,7 +375,7 @@ public class ConfigLoader {
         }
         
         // Get global log level for API config
-        String globalLogLevel = coreConfig.getString("logging.level", "INFO");
+        String globalLogLevel = coreConfig.getString("general.logLevel", "WARNING");
         
         // Create ApiConfig using static factory method and cache it
         cachedApiConfig = ApiConfig.fromConfigurationSection(plugin, apiSection, globalLogLevel);
@@ -496,7 +496,7 @@ public class ConfigLoader {
         summary.append("RVNKCore Configuration Summary:\n");
         
         // Logging configuration
-        String logLevel = coreConfig.getString("logging.level", "INFO");
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
         summary.append("  Logging Level: ").append(logLevel).append("\n");
         
         // Database configuration

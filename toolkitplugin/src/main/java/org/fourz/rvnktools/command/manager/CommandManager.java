@@ -5,11 +5,10 @@ import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
-import org.fourz.rvnktools.command.manager.commands.MojangApiTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
-import org.fourz.rvnktools.command.manager.commands.RVNKTestCommand;
+import org.fourz.rvnktools.command.manager.commands.RVNKCoreCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
@@ -86,8 +85,7 @@ public class CommandManager {
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));
-        registerCommand(new RVNKTestCommand(plugin));
-        registerCommand(new MojangApiTestCommand(plugin));
+        registerCommand(new RVNKCoreCommand(plugin));
         
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
