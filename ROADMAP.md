@@ -4,34 +4,29 @@
 
 This document outlines the planned features and improvements for the RVNKTools plugin, with a focus on the RVNKCore architectural refactor.
 
-## February 17, 2026 Status: Command Consolidation + Logging Standardization
-
-**Command Consolidation** (Feb 16-17, 2026):
-
-- ✅ `RVNKTestCommand.java` (471 lines) and `MojangApiTestCommand.java` (199 lines) merged into single `/rvnkcore` command
-- ✅ `plugin.yml` updated: removed `rvnktest` + `mojangtest` entries, added `rvnkcore`
-- ✅ ~670 lines of duplicate command code removed
-
-**Logging Standardization** (Feb 16, 2026):
-
-- ✅ `config-core.yml`: `logging.level: INFO` → `general.logLevel: WARNING`
-- ✅ Unified with ecosystem-wide `general.logLevel` config path
-
-**SQL Fix** (Feb 16, 2026):
-
-- ✅ SQL parameter binding fix deployed (rvnktools)
+<!-- Synced from parent ROADMAP.md 2026-02-18 -->
+## February 18, 2026 Status: RVNKCore v1.3.0-alpha Standalone + Command Consolidation
 
 **RVNKCore Standalone Deployment** (Feb 16, 2026):
 
-- ✅ RVNKCore deployed as separate plugin (provided scope in all dependents)
-- ✅ Classes loaded once — no more duplication across plugin JARs
+- ✅ RVNKCore deployed as separate plugin (`provided` scope in all dependents)
+- ✅ Eliminated 43 MB duplication — RVNKQuests: 39 MB → 17 MB, RVNKWorlds: 39 MB → 18 MB
 - ✅ ServiceRegistry working: BarterShops registered 4 services successfully
+- ✅ Zero ClassNotFoundException errors on RVNK Dev
+
+**Command Consolidation** (Feb 16-17, 2026):
+
+- ✅ `RVNKTestCommand.java` + `MojangApiTestCommand.java` merged into single `/rvnkcore` command (~670 lines removed)
+- ✅ `plugin.yml` updated: removed `rvnktest` + `mojangtest` entries, added `rvnkcore`
+- ✅ `general.logLevel: WARNING` unified across all plugins
 
 **Feature Gaps / Next Steps**:
 
-- Validate `/rvnkcore` consolidated command on RVNK Dev
-- Database configuration DTO wiring plan created (RVNKLore as template, ready for implementation)
-- deploy-01: Stage RVNKCore + RVNKTools to RVNK Event server
+- `deploy-01`: Stage RVNKCore + RVNKTools to RVNK Event server (pending)
+- `impl-113/114`: Player Preferences Phase 4/5 (queued)
+- Database configuration DTO wiring plan ready (RVNKLore as template)
+
+*Full ecosystem roadmap: [Ravenkraft Dev ROADMAP.md](../../ROADMAP.md)*
 
 ---
 
