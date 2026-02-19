@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.service.preferences;
 
+import org.fourz.rvnkcore.api.model.NotificationTypeDefinition;
 import org.fourz.rvnkcore.api.model.PlayerPreferencesDTO;
 import org.fourz.rvnkcore.api.model.QuietHoursConfig;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
@@ -31,11 +32,15 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
     /** Admin defaults cache: "pluginId" -> defaults map */
     private final ConcurrentHashMap<String, Map<String, String>> defaultsCache;
 
+    /** Runtime registry: pluginId -> notification type definitions (not persisted) */
+    private final ConcurrentHashMap<String, List<NotificationTypeDefinition>> typeRegistry;
+
     public DefaultPlayerPreferencesService(PlayerPreferencesRepository repository, LogManager logger) {
         this.repository = repository;
         this.logger = logger;
         this.cache = new ConcurrentHashMap<>();
         this.defaultsCache = new ConcurrentHashMap<>();
+        this.typeRegistry = new ConcurrentHashMap<>();
         logger.info("DefaultPlayerPreferencesService initialized");
     }
 
@@ -275,6 +280,24 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
         cache.clear();
         defaultsCache.clear();
         logger.debug("Preference cache cleared");
+    }
+
+    // ========== Notification Type Registry ==========
+
+    @Override
+    public void registerNotificationTypes(String pluginId, List<NotificationTypeDefinition> types) {
+        typeRegistry.put(pluginId, new ArrayList<>(types));
+        logger.info("Registered " + types.size() + " notification types for plugin: " + pluginId);
+    }
+
+    @Override
+    public List<NotificationTypeDefinition> getRegisteredTypes(String pluginId) {
+        return typeRegistry.getOrDefault(pluginId, Collections.emptyList());
+    }
+
+    @Override
+    public Map<String, List<NotificationTypeDefinition>> getAllRegisteredTypes() {
+        return Collections.unmodifiableMap(typeRegistry);
     }
 
     // ========== Internal Helpers ==========

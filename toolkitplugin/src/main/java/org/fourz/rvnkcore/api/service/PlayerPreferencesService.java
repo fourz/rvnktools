@@ -1,8 +1,10 @@
 package org.fourz.rvnkcore.api.service;
 
+import org.fourz.rvnkcore.api.model.NotificationTypeDefinition;
 import org.fourz.rvnkcore.api.model.PlayerPreferencesDTO;
 import org.fourz.rvnkcore.api.model.QuietHoursConfig;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -202,4 +204,32 @@ public interface PlayerPreferencesService {
      * Useful for admin operations or testing.
      */
     void clearCache();
+
+    // ========== Notification Type Registry ==========
+
+    /**
+     * Registers notification types that a plugin supports.
+     * Called during plugin startup to declare available notification types
+     * for player preference management. Replaces any previously registered types
+     * for the given plugin.
+     *
+     * @param pluginId The plugin identifier
+     * @param types    List of notification type definitions (not persisted — runtime state only)
+     */
+    void registerNotificationTypes(String pluginId, List<NotificationTypeDefinition> types);
+
+    /**
+     * Gets all registered notification types for a specific plugin.
+     *
+     * @param pluginId The plugin identifier
+     * @return List of notification type definitions, or empty list if none registered
+     */
+    List<NotificationTypeDefinition> getRegisteredTypes(String pluginId);
+
+    /**
+     * Gets all registered notification types across all plugins.
+     *
+     * @return Unmodifiable map of pluginId to list of notification type definitions
+     */
+    Map<String, List<NotificationTypeDefinition>> getAllRegisteredTypes();
 }

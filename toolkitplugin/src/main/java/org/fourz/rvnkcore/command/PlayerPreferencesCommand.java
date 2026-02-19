@@ -4,11 +4,11 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.model.NotificationTypeDefinition;
 import org.fourz.rvnkcore.api.model.PlayerPreferencesDTO;
 import org.fourz.rvnkcore.api.model.QuietHoursConfig;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnktools.command.manager.BaseCommand;
-import org.fourz.rvnktools.command.manager.SubCommand;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -20,42 +20,28 @@ import java.util.stream.Collectors;
  * <p>Provides a single command interface for players to configure their notification settings:</p>
  * <ul>
  *   <li>/pref - Show summary of all plugin preferences</li>
- *   <li>/pref <plugin> - Show detailed preferences for a plugin</li>
- *   <li>/pref <plugin> toggle - Toggle master on/off</li>
- *   <li>/pref <plugin> enable/disable <type> - Manage notification types</li>
- *   <li>/pref <plugin> quiet <hour1> <hour2> - Set quiet hours</li>
- *   <li>/pref <plugin> channel <type> <channel> <on|off> - Toggle channels</li>
- *   <li>/pref <plugin> reset - Reset to defaults</li>
+ *   <li>/pref &lt;plugin&gt; - Show detailed preferences for a plugin</li>
+ *   <li>/pref &lt;plugin&gt; toggle - Toggle master on/off</li>
+ *   <li>/pref &lt;plugin&gt; enable/disable &lt;type&gt; - Manage notification types</li>
+ *   <li>/pref &lt;plugin&gt; quiet &lt;hour1&gt; &lt;hour2&gt; - Set quiet hours</li>
+ *   <li>/pref &lt;plugin&gt; channel &lt;type&gt; &lt;channel&gt; &lt;on|off&gt; - Toggle channels</li>
+ *   <li>/pref &lt;plugin&gt; reset - Reset to defaults</li>
+ *   <li>/pref admin types [plugin] - View registered notification types (admin)</li>
+ *   <li>/pref admin defaults &lt;plugin&gt; &lt;type&gt; &lt;on|off&gt; - Set default (admin)</li>
  * </ul>
  *
  * @since 1.5.0
  */
 public class PlayerPreferencesCommand extends BaseCommand {
 
-    private static final List<String> SUPPORTED_PLUGINS = Arrays.asList(
+    /** Fallback plugin list used when no types have been registered via the registry yet. */
+    private static final List<String> SUPPORTED_PLUGINS_FALLBACK = Arrays.asList(
         "rvnkquests", "rvnklore", "bartershops", "rvnktools"
     );
 
     private static final List<String> STANDARD_CHANNELS = Arrays.asList(
         "TITLE", "ACTION_BAR", "CHAT", "SOUND", "BOSS_BAR", "DISCORD"
     );
-
-    private static final Map<String, List<String>> PLUGIN_NOTIFICATION_TYPES = new HashMap<>();
-    static {
-        PLUGIN_NOTIFICATION_TYPES.put("rvnkquests", Arrays.asList(
-            "quest_start", "quest_complete", "quest_failed", "objective_progress",
-            "objective_complete", "quest_available", "milestone", "chain_progress"
-        ));
-        PLUGIN_NOTIFICATION_TYPES.put("rvnklore", Arrays.asList(
-            "discovery", "achievement", "collection_completion"
-        ));
-        PLUGIN_NOTIFICATION_TYPES.put("bartershops", Arrays.asList(
-            "trade_complete", "trade_failed", "shop_expired"
-        ));
-        PLUGIN_NOTIFICATION_TYPES.put("rvnktools", Arrays.asList(
-            "announcement", "broadcast"
-        ));
-    }
 
     private final PlayerPreferencesService prefsService;
 
@@ -70,8 +56,22 @@ public class PlayerPreferencesCommand extends BaseCommand {
 
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
+        // Admin subcommand — console and players allowed, checked before player-only guard
+        if (args.length >= 1 && args[0].equalsIgnoreCase("admin")) {
+            if (!sender.hasPermission("rvnkcore.prefs.admin")) {
+                sender.sendMessage(ChatColor.RED + "✖ You don't have permission for admin preference commands");
+                return true;
+            }
+            return handleAdmin(sender, args);
+        }
+
         if (!(sender instanceof Player)) {
             sender.sendMessage(ChatColor.RED + "✖ This command is player-only");
+            return true;
+        }
+
+        if (prefsService == null) {
+            sender.sendMessage(ChatColor.RED + "✖ PlayerPreferencesService is not available");
             return true;
         }
 
@@ -85,9 +85,12 @@ public class PlayerPreferencesCommand extends BaseCommand {
         }
 
         String pluginId = args[0].toLowerCase();
-        if (!SUPPORTED_PLUGINS.contains(pluginId)) {
+
+        // Validate plugin against registry (fallback to static list)
+        List<String> availablePlugins = getAvailablePlugins();
+        if (!availablePlugins.contains(pluginId)) {
             player.sendMessage(ChatColor.RED + "✖ Unknown plugin: " + args[0]);
-            player.sendMessage(ChatColor.GRAY + "Available: " + String.join(", ", SUPPORTED_PLUGINS));
+            player.sendMessage(ChatColor.GRAY + "Available: " + String.join(", ", availablePlugins));
             return true;
         }
 
@@ -142,15 +145,160 @@ public class PlayerPreferencesCommand extends BaseCommand {
         return true;
     }
 
+    // ========== Admin Subcommand ==========
+
+    private boolean handleAdmin(CommandSender sender, String[] args) {
+        // args[0] = "admin"
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.GOLD + "=== Admin Preferences Commands ===");
+            sender.sendMessage(ChatColor.GRAY + "/pref admin types - List all registered notification types");
+            sender.sendMessage(ChatColor.GRAY + "/pref admin types <plugin> - List types for a specific plugin");
+            sender.sendMessage(ChatColor.GRAY + "/pref admin defaults <plugin> <type> <on|off> - Set default value");
+            return true;
+        }
+
+        String subcommand = args[1].toLowerCase();
+        switch (subcommand) {
+            case "types":
+                return handleAdminTypes(sender, args);
+            case "defaults":
+                return handleAdminDefaults(sender, args);
+            default:
+                sender.sendMessage(ChatColor.RED + "✖ Unknown admin subcommand: " + args[1]);
+                sender.sendMessage(ChatColor.GRAY + "Available: types, defaults");
+                return true;
+        }
+    }
+
+    private boolean handleAdminTypes(CommandSender sender, String[] args) {
+        if (prefsService == null) {
+            sender.sendMessage(ChatColor.RED + "✖ PlayerPreferencesService is not available");
+            return true;
+        }
+
+        Map<String, List<NotificationTypeDefinition>> allTypes = prefsService.getAllRegisteredTypes();
+
+        if (allTypes.isEmpty()) {
+            sender.sendMessage(ChatColor.YELLOW + "No notification types registered yet (plugins may not have loaded).");
+            return true;
+        }
+
+        // Filter by plugin if specified
+        if (args.length >= 3) {
+            String pluginFilter = args[2].toLowerCase();
+            List<NotificationTypeDefinition> types = allTypes.get(pluginFilter);
+            if (types == null || types.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "✖ No types registered for plugin: " + pluginFilter);
+                sender.sendMessage(ChatColor.GRAY + "Registered plugins: " + String.join(", ", allTypes.keySet()));
+                return true;
+            }
+            sender.sendMessage(ChatColor.GOLD + "=== Registered Types: " + pluginFilter + " ===");
+            for (NotificationTypeDefinition def : types) {
+                String status = def.defaultEnabled() ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF";
+                sender.sendMessage("  " + ChatColor.GRAY + def.typeId() + ChatColor.RESET
+                        + " (" + status + ChatColor.RESET + ")"
+                        + ChatColor.DARK_GRAY + " - " + def.description());
+            }
+            return true;
+        }
+
+        // Show all plugins and their types
+        sender.sendMessage(ChatColor.GOLD + "=== Registered Notification Types ===");
+        for (Map.Entry<String, List<NotificationTypeDefinition>> entry : allTypes.entrySet()) {
+            String typeList = entry.getValue().stream()
+                    .map(NotificationTypeDefinition::typeId)
+                    .collect(Collectors.joining(", "));
+            sender.sendMessage(ChatColor.YELLOW + "[" + entry.getKey() + "] " + ChatColor.GRAY + typeList);
+        }
+        return true;
+    }
+
+    private boolean handleAdminDefaults(CommandSender sender, String[] args) {
+        if (prefsService == null) {
+            sender.sendMessage(ChatColor.RED + "✖ PlayerPreferencesService is not available");
+            return true;
+        }
+
+        // /pref admin defaults <plugin> <type> <on|off>
+        if (args.length < 4) {
+            sender.sendMessage(ChatColor.RED + "✖ Usage: /pref admin defaults <plugin> <type> <on|off>");
+            return true;
+        }
+
+        String pluginId = args[2].toLowerCase();
+        String type = args[3].toLowerCase();
+
+        // If only 4 args (no on|off), show current defaults for the plugin
+        if (args.length < 5) {
+            sender.sendMessage(ChatColor.GOLD + "=== Defaults: " + pluginId + " ===");
+            prefsService.getDefaultPreferences(pluginId)
+                    .thenAccept(defaults -> {
+                        List<NotificationTypeDefinition> registered = prefsService.getRegisteredTypes(pluginId);
+                        if (registered.isEmpty()) {
+                            // Show just the requested type
+                            Boolean enabled = defaults.getNotificationTypes().getOrDefault(type, true);
+                            String status = enabled ? ChatColor.GREEN + "ON (default)" : ChatColor.RED + "OFF (admin override)";
+                            sender.sendMessage("  " + ChatColor.GRAY + type + ": " + status);
+                        } else {
+                            // Show all registered types with their defaults
+                            for (NotificationTypeDefinition def : registered) {
+                                Boolean enabled = defaults.getNotificationTypes().getOrDefault(def.typeId(), def.defaultEnabled());
+                                boolean isOverride = defaults.getNotificationTypes().containsKey(def.typeId());
+                                String label = isOverride ? " (admin override)" : " (default)";
+                                String status = enabled ? ChatColor.GREEN + "ON" + label : ChatColor.RED + "OFF" + label;
+                                sender.sendMessage("  " + ChatColor.GRAY + def.typeId() + ": " + status);
+                            }
+                        }
+                    })
+                    .exceptionally(ex -> {
+                        sender.sendMessage(ChatColor.RED + "✖ Error loading defaults: " + ex.getMessage());
+                        return null;
+                    });
+            return true;
+        }
+
+        String state = args[4].toLowerCase();
+        if (!state.equals("on") && !state.equals("off")) {
+            sender.sendMessage(ChatColor.RED + "✖ State must be 'on' or 'off'");
+            return true;
+        }
+
+        // Validate type exists in registry
+        List<NotificationTypeDefinition> types = prefsService.getRegisteredTypes(pluginId);
+        if (!types.isEmpty() && types.stream().noneMatch(t -> t.typeId().equals(type))) {
+            sender.sendMessage(ChatColor.RED + "✖ Unknown type '" + type + "' for plugin " + pluginId);
+            String available = types.stream().map(NotificationTypeDefinition::typeId).collect(Collectors.joining(", "));
+            sender.sendMessage(ChatColor.GRAY + "Available: " + available);
+            return true;
+        }
+
+        String value = state.equals("on") ? "true" : "false";
+        prefsService.setDefaultPreference(pluginId, type, value)
+                .thenRun(() -> {
+                    String status = state.equals("on") ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF";
+                    sender.sendMessage(ChatColor.AQUA + "✓ Default for " + pluginId + "/" + type + " set to " + status);
+                })
+                .exceptionally(ex -> {
+                    sender.sendMessage(ChatColor.RED + "✖ Error setting default: " + ex.getMessage());
+                    logger.warning("Error setting admin default preference", ex);
+                    return null;
+                });
+        return true;
+    }
+
+    // ========== Player Preference Display ==========
+
     /**
-     * Display summary of all plugin preferences
+     * Display summary of all plugin preferences.
+     * Shows registered plugins from the type registry, falling back to static list.
      */
     private void showAllPreferences(Player player, UUID playerUuid) {
         player.sendMessage(ChatColor.GOLD + "═══ Your Notification Preferences ═══");
 
-        // Fetch all plugin preferences asynchronously
+        List<String> plugins = getAvailablePlugins();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
-        for (String plugin : SUPPORTED_PLUGINS) {
+
+        for (String plugin : plugins) {
             CompletableFuture<Void> future = prefsService.getPreferences(playerUuid, plugin)
                 .thenAccept(prefs -> {
                     String master = prefs.isMasterEnabled() ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF";
@@ -178,9 +326,8 @@ public class PlayerPreferencesCommand extends BaseCommand {
             futures.add(future);
         }
 
-        // Wait for all futures to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenRun(() -> player.sendMessage(ChatColor.GRAY + "Tip: /pref <plugin> for details"))
+            .thenRun(() -> player.sendMessage(ChatColor.GRAY + "Tip: /pref <plugin> for details | /pref admin types to see all types"))
             .exceptionally(ex -> {
                 logger.warning("Error in showAllPreferences", ex);
                 return null;
@@ -188,7 +335,7 @@ public class PlayerPreferencesCommand extends BaseCommand {
     }
 
     /**
-     * Display detailed plugin preferences
+     * Display detailed plugin preferences, reading types from the registry.
      */
     private void showPluginPreferences(Player player, UUID playerUuid, String pluginId) {
         prefsService.getPreferences(playerUuid, pluginId)
@@ -209,13 +356,15 @@ public class PlayerPreferencesCommand extends BaseCommand {
                 player.sendMessage("");
                 player.sendMessage(ChatColor.GOLD + "Notification Types:");
 
-                List<String> types = PLUGIN_NOTIFICATION_TYPES.getOrDefault(pluginId, Collections.emptyList());
-                for (String type : types) {
-                    Boolean enabled = prefs.getNotificationTypes().getOrDefault(type, true);
-                    String status = enabled ? ChatColor.GREEN + "✓" : ChatColor.RED + "✗";
-                    String channels = String.join(", ", STANDARD_CHANNELS);
-                    player.sendMessage("  " + status + ChatColor.RESET + " " + ChatColor.GRAY + type +
-                                     ChatColor.RESET + " (" + channels + ")");
+                List<String> typeIds = getTypeIds(pluginId);
+                if (typeIds.isEmpty()) {
+                    player.sendMessage(ChatColor.GRAY + "  (no types registered for this plugin)");
+                } else {
+                    for (String type : typeIds) {
+                        Boolean enabled = prefs.getNotificationTypes().getOrDefault(type, true);
+                        String status = enabled ? ChatColor.GREEN + "✓" : ChatColor.RED + "✗";
+                        player.sendMessage("  " + status + ChatColor.RESET + " " + ChatColor.GRAY + type);
+                    }
                 }
 
                 player.sendMessage("");
@@ -228,9 +377,8 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
-    /**
-     * Toggle master on/off for a plugin
-     */
+    // ========== Preference Action Handlers ==========
+
     private void handleToggle(Player player, UUID playerUuid, String pluginId) {
         prefsService.isMasterEnabled(playerUuid, pluginId)
             .thenCompose(currentEnabled -> {
@@ -249,12 +397,9 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
-    /**
-     * Enable a notification type
-     */
     private void handleEnable(Player player, UUID playerUuid, String pluginId, String type) {
-        List<String> validTypes = PLUGIN_NOTIFICATION_TYPES.getOrDefault(pluginId, Collections.emptyList());
-        if (!validTypes.contains(type.toLowerCase())) {
+        List<String> validTypes = getTypeIds(pluginId);
+        if (!validTypes.isEmpty() && !validTypes.contains(type.toLowerCase())) {
             player.sendMessage(ChatColor.RED + "✖ Unknown notification type: " + type);
             player.sendMessage(ChatColor.GRAY + "Available: " + String.join(", ", validTypes));
             return;
@@ -269,12 +414,9 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
-    /**
-     * Disable a notification type
-     */
     private void handleDisable(Player player, UUID playerUuid, String pluginId, String type) {
-        List<String> validTypes = PLUGIN_NOTIFICATION_TYPES.getOrDefault(pluginId, Collections.emptyList());
-        if (!validTypes.contains(type.toLowerCase())) {
+        List<String> validTypes = getTypeIds(pluginId);
+        if (!validTypes.isEmpty() && !validTypes.contains(type.toLowerCase())) {
             player.sendMessage(ChatColor.RED + "✖ Unknown notification type: " + type);
             player.sendMessage(ChatColor.GRAY + "Available: " + String.join(", ", validTypes));
             return;
@@ -289,9 +431,6 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
-    /**
-     * Set or disable quiet hours
-     */
     private void handleQuietHours(Player player, UUID playerUuid, String pluginId, String[] args) {
         if (args.length < 3) {
             player.sendMessage(ChatColor.RED + "✖ Usage: /pref " + pluginId + " quiet <hour1> <hour2> or /pref " + pluginId + " quiet disable");
@@ -335,13 +474,10 @@ public class PlayerPreferencesCommand extends BaseCommand {
         }
     }
 
-    /**
-     * Toggle a specific channel for a notification type
-     */
     private void handleChannel(Player player, UUID playerUuid, String pluginId,
                               String type, String channel, String state) {
-        List<String> validTypes = PLUGIN_NOTIFICATION_TYPES.getOrDefault(pluginId, Collections.emptyList());
-        if (!validTypes.contains(type.toLowerCase())) {
+        List<String> validTypes = getTypeIds(pluginId);
+        if (!validTypes.isEmpty() && !validTypes.contains(type.toLowerCase())) {
             player.sendMessage(ChatColor.RED + "✖ Unknown notification type: " + type);
             player.sendMessage(ChatColor.GRAY + "Available: " + String.join(", ", validTypes));
             return;
@@ -354,12 +490,12 @@ public class PlayerPreferencesCommand extends BaseCommand {
             return;
         }
 
-        boolean enabled = state.equalsIgnoreCase("on");
         if (!state.equalsIgnoreCase("on") && !state.equalsIgnoreCase("off")) {
             player.sendMessage(ChatColor.RED + "✖ State must be 'on' or 'off'");
             return;
         }
 
+        boolean enabled = state.equalsIgnoreCase("on");
         prefsService.setChannelEnabled(playerUuid, pluginId, type, channelUpper, enabled)
             .thenRun(() -> {
                 String status = enabled ? ChatColor.GREEN + "enabled" : ChatColor.RED + "disabled";
@@ -372,9 +508,6 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
-    /**
-     * Reset preferences to defaults
-     */
     private void handleReset(Player player, UUID playerUuid, String pluginId) {
         prefsService.resetPreferences(playerUuid, pluginId)
             .thenRun(() -> player.sendMessage(ChatColor.AQUA + "✓ Preferences reset to defaults"))
@@ -385,29 +518,37 @@ public class PlayerPreferencesCommand extends BaseCommand {
             });
     }
 
+    // ========== Tab Completion ==========
+
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) {
-            return Collections.emptyList();
-        }
-
         if (args.length == 0) {
             return Collections.emptyList();
         }
 
-        // Tab complete plugin names
+        // Admin completions
+        if (args[0].equalsIgnoreCase("admin") && args.length > 1) {
+            return tabCompleteAdmin(sender, args);
+        }
+
+        // First arg: plugin IDs + "admin" (for admins)
         if (args.length == 1) {
-            return SUPPORTED_PLUGINS.stream()
+            List<String> options = new ArrayList<>(getAvailablePlugins());
+            if (sender.hasPermission("rvnkcore.prefs.admin")) {
+                options.add("admin");
+            }
+            return options.stream()
                 .filter(p -> p.startsWith(args[0].toLowerCase()))
                 .collect(Collectors.toList());
         }
 
         String pluginId = args[0].toLowerCase();
-        if (!SUPPORTED_PLUGINS.contains(pluginId)) {
+        List<String> availablePlugins = getAvailablePlugins();
+        if (!availablePlugins.contains(pluginId)) {
             return Collections.emptyList();
         }
 
-        // Tab complete actions
+        // Second arg: actions
         if (args.length == 2) {
             List<String> actions = Arrays.asList("toggle", "enable", "disable", "quiet", "channel", "reset");
             return actions.stream()
@@ -417,35 +558,95 @@ public class PlayerPreferencesCommand extends BaseCommand {
 
         String action = args[1].toLowerCase();
 
-        // Tab complete notification types
+        // Notification type completion
         if ((action.equals("enable") || action.equals("disable") || action.equals("channel")) && args.length == 3) {
-            List<String> types = PLUGIN_NOTIFICATION_TYPES.getOrDefault(pluginId, Collections.emptyList());
-            return types.stream()
+            return getTypeIds(pluginId).stream()
                 .filter(t -> t.startsWith(args[2].toLowerCase()))
                 .collect(Collectors.toList());
         }
 
-        // Tab complete channels
+        // Channel name completion
         if (action.equals("channel") && args.length == 4) {
             return STANDARD_CHANNELS.stream()
                 .filter(c -> c.startsWith(args[3].toUpperCase()))
                 .collect(Collectors.toList());
         }
 
-        // Tab complete on/off
+        // Channel on/off completion
         if (action.equals("channel") && args.length == 5) {
             return Arrays.asList("on", "off").stream()
                 .filter(s -> s.startsWith(args[4].toLowerCase()))
                 .collect(Collectors.toList());
         }
 
-        // Tab complete quiet hours disable option
+        // Quiet hours disable option
         if (action.equals("quiet") && args.length == 3) {
-            return Arrays.asList("disable").stream()
+            return Collections.singletonList("disable").stream()
                 .filter(s -> s.startsWith(args[2].toLowerCase()))
                 .collect(Collectors.toList());
         }
 
         return Collections.emptyList();
+    }
+
+    private List<String> tabCompleteAdmin(CommandSender sender, String[] args) {
+        // args[0] = "admin", args[1+] = subcommand and its args
+        if (args.length == 2) {
+            return Arrays.asList("types", "defaults").stream()
+                .filter(s -> s.startsWith(args[1].toLowerCase()))
+                .collect(Collectors.toList());
+        }
+
+        if (args.length == 3) {
+            // Plugin IDs from registry
+            if (prefsService != null) {
+                return new ArrayList<>(prefsService.getAllRegisteredTypes().keySet()).stream()
+                    .filter(p -> p.startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
+            }
+        }
+
+        if (args[1].equalsIgnoreCase("defaults") && args.length == 4 && prefsService != null) {
+            String pluginId = args[2].toLowerCase();
+            return prefsService.getRegisteredTypes(pluginId).stream()
+                .map(NotificationTypeDefinition::typeId)
+                .filter(t -> t.startsWith(args[3].toLowerCase()))
+                .collect(Collectors.toList());
+        }
+
+        if (args[1].equalsIgnoreCase("defaults") && args.length == 5) {
+            return Arrays.asList("on", "off").stream()
+                .filter(s -> s.startsWith(args[4].toLowerCase()))
+                .collect(Collectors.toList());
+        }
+
+        return Collections.emptyList();
+    }
+
+    // ========== Registry Helpers ==========
+
+    /**
+     * Returns the list of plugins to show in preference commands.
+     * Uses the type registry if populated; falls back to the static list.
+     */
+    private List<String> getAvailablePlugins() {
+        if (prefsService == null) {
+            return SUPPORTED_PLUGINS_FALLBACK;
+        }
+        Map<String, List<NotificationTypeDefinition>> registered = prefsService.getAllRegisteredTypes();
+        return registered.isEmpty() ? SUPPORTED_PLUGINS_FALLBACK : new ArrayList<>(registered.keySet());
+    }
+
+    /**
+     * Returns the list of type IDs for a plugin.
+     * Uses the type registry if populated; returns empty list otherwise (no validation).
+     */
+    private List<String> getTypeIds(String pluginId) {
+        if (prefsService == null) {
+            return Collections.emptyList();
+        }
+        return prefsService.getRegisteredTypes(pluginId).stream()
+            .map(NotificationTypeDefinition::typeId)
+            .collect(Collectors.toList());
     }
 }
