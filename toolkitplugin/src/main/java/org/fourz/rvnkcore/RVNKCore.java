@@ -289,6 +289,35 @@ public class RVNKCore extends JavaPlugin implements Listener {
     }
 
     /**
+     * Safely retrieves a service from the ServiceRegistry without throwing.
+     *
+     * <p>Returns null if RVNKCore is not initialized, the registry is unavailable,
+     * the service is not registered, or any exception occurs. Use this in place of
+     * per-plugin PreferencesServiceLookup wrappers for null-safe service access.</p>
+     *
+     * <pre>
+     * PlayerPreferencesService prefs = RVNKCore.getServiceSafe(PlayerPreferencesService.class);
+     * if (prefs == null) { return; } // service unavailable
+     * prefs.doSomething();
+     * </pre>
+     *
+     * @param serviceClass The service interface class
+     * @param <T>          The service type
+     * @return The service instance, or null if unavailable
+     */
+    public static <T> T getServiceSafe(Class<T> serviceClass) {
+        try {
+            RVNKCore core = getInstance();
+            if (core == null) return null;
+            ServiceRegistry registry = core.getServiceRegistry();
+            if (registry == null || !registry.hasService(serviceClass)) return null;
+            return registry.getService(serviceClass);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Checks if a service is available.
      *
      * @param serviceClass The service interface class

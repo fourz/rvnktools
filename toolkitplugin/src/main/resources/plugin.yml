@@ -1,5 +1,5 @@
 name: RVNKCore
-version: 1.3.0-alpha
+version: '${project.version}'
 author: fourz
 main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
