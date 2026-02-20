@@ -588,7 +588,34 @@ public class DatabaseSetup {
             }
         }
 
+        // Migration 2: Seed rvnk_players for any preference records with no matching player row
+        migrateOrphanedPreferenceUsers(connection);
+
         logger.debug("Database migrations completed");
+    }
+
+    /**
+     * Seeds rvnk_players rows for any player_id values in rvnk_player_preferences
+     * that have no corresponding rvnk_players entry. This handles databases that were
+     * set up before rvnk_players existed or had FK constraints dropped and recreated.
+     *
+     * MySQL-only: SQLite uses no FK constraints on preference tables.
+     */
+    private void migrateOrphanedPreferenceUsers(Connection connection) {
+        if (!"MySQL".equalsIgnoreCase(databaseType)) return;
+        String sql = "INSERT IGNORE INTO " + table(TABLE_PLAYERS) +
+            " (id, current_name, first_join, last_seen)" +
+            " SELECT DISTINCT player_id, 'migrated', NOW(), NOW()" +
+            " FROM " + table(TABLE_PLAYER_PREFERENCES) +
+            " WHERE player_id NOT IN (SELECT id FROM " + table(TABLE_PLAYERS) + ")";
+        try (var stmt = connection.createStatement()) {
+            int rows = stmt.executeUpdate(sql);
+            if (rows > 0) {
+                logger.info("Seeded " + rows + " rvnk_players row(s) from orphaned preference data");
+            }
+        } catch (SQLException e) {
+            logger.warning("migrateOrphanedPreferenceUsers failed: " + e.getMessage());
+        }
     }
 
     /**
