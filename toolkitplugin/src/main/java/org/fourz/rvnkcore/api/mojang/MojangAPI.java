@@ -60,7 +60,7 @@ public class MojangAPI {
     private static final int REQUESTS_PER_MINUTE = 60; // Conservative: 60/min = 600/10min
 
     // Cache settings
-    private static final long CACHE_EXPIRY_MS = TimeUnit.HOURS.toMillis(6);
+    private static final long CACHE_EXPIRY_MS = TimeUnit.HOURS.toMillis(8);
     private static final long NEGATIVE_CACHE_EXPIRY_MS = TimeUnit.MINUTES.toMillis(15);
 
     private final LogManager logger;
@@ -86,7 +86,7 @@ public class MojangAPI {
             t.setDaemon(true);
             return t;
         });
-        cleanupExecutor.scheduleAtFixedRate(this::cleanupExpiredCache, 10, 10, TimeUnit.MINUTES);
+        cleanupExecutor.scheduleAtFixedRate(this::cleanupExpiredCache, 67, 67, TimeUnit.MINUTES);
 
         logger.info("MojangAPI initialized with rate limiting (" + REQUESTS_PER_MINUTE + " req/min)");
     }

@@ -9,6 +9,9 @@ import org.fourz.rvnkcore.api.mojang.MojangAPI;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -21,12 +24,20 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>This utility lives in RVNKCore so consumer plugins (BarterShops, RVNKLore, etc.)
  * can use it without duplicating reflection-based lookups.</p>
+ *
+ * <p>Cache entries use a TTL-based expiry:</p>
+ * <ul>
+ *   <li>Online players → permanent (evicted on next miss after they leave)</li>
+ *   <li>DB / Mojang resolutions → 8-hour TTL, background stale re-check triggers Mojang</li>
+ * </ul>
  */
 public class PlayerLookup {
 
+    private static final long CACHE_TTL_MS = TimeUnit.HOURS.toMillis(8);
+
     private final LogManager logger;
     private final Plugin plugin;
-    private final ConcurrentHashMap<UUID, String> nameCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, TimedName> nameCache = new ConcurrentHashMap<>();
 
     private PlayerService playerService;
     private boolean rvnkCoreEnabled = false;
@@ -96,7 +107,8 @@ public class PlayerLookup {
     }
 
     /**
-     * Gets a player name by UUID. Tries RVNKCore cache first, falls back to Bukkit.
+     * Gets a player name by UUID. Tries cache, online players, RVNKCore DB, then Bukkit.
+     * Cache entries expire after 8 hours; expired entries are removed on access.
      *
      * @param uuid The player UUID
      * @return The player name, or a truncated UUID if unknown
@@ -104,14 +116,26 @@ public class PlayerLookup {
     public String getPlayerName(UUID uuid) {
         if (uuid == null) return "Unknown";
 
-        String cached = nameCache.get(uuid);
-        if (cached != null) return cached;
+        // Check TTL-aware cache
+        TimedName cached = nameCache.get(uuid);
+        if (cached != null) {
+            if (!cached.isExpired()) return cached.name();
+            nameCache.remove(uuid);
+        }
 
-        // Try RVNKCore PlayerService
+        // Check online players first (most reliable)
+        org.bukkit.entity.Player onlinePlayer = Bukkit.getPlayer(uuid);
+        if (onlinePlayer != null) {
+            String name = onlinePlayer.getName();
+            nameCache.put(uuid, TimedName.permanent(name));
+            return name;
+        }
+
+        // Try RVNKCore PlayerService (sync, 2s timeout)
         if (rvnkCoreEnabled) {
             String name = lookupViaPlayerService(uuid);
             if (name != null) {
-                nameCache.put(uuid, name);
+                nameCache.put(uuid, TimedName.expiring(name));
                 return name;
             }
         }
@@ -122,7 +146,7 @@ public class PlayerLookup {
         if (name == null) {
             name = uuid.toString().substring(0, 8);
         }
-        nameCache.put(uuid, name);
+        nameCache.put(uuid, TimedName.expiring(name));
         return name;
     }
 
@@ -130,7 +154,19 @@ public class PlayerLookup {
         try {
             Optional<PlayerDTO> result = playerService.getPlayer(uuid).get(2, TimeUnit.SECONDS);
             if (result.isPresent()) {
-                return result.get().getCurrentName();
+                PlayerDTO p = result.get();
+                String name = p.getCurrentName();
+                if (name != null) {
+                    // Background stale check — Mojang re-validates if last seen > 8h ago
+                    boolean isStale = p.getLastSeen() != null &&
+                        (System.currentTimeMillis() - p.getLastSeen().getTime()) > CACHE_TTL_MS;
+                    if (isStale && mojangApiEnabled) {
+                        mojangAPI.getNameByUuid(uuid).thenAccept(opt ->
+                            opt.ifPresent(freshName -> persistExternalPlayer(uuid, freshName))
+                        );
+                    }
+                    return name;
+                }
             }
         } catch (Exception e) {
             logger.debug("RVNKCore lookup failed for " + uuid + ": " + e.getMessage());
@@ -155,6 +191,28 @@ public class PlayerLookup {
         }
     }
 
+    /**
+     * Pre-loads all known player names from the RVNKCore database into the local cache.
+     * Called once at startup so cross-server players (never joined this server) resolve fast.
+     * Runs asynchronously and does not block startup.
+     */
+    public void preloadFromDatabase() {
+        if (!rvnkCoreEnabled) return;
+        playerService.getAllPlayers().thenAccept(players -> {
+            int loaded = 0;
+            for (PlayerDTO player : players) {
+                if (player.getId() != null && player.getCurrentName() != null) {
+                    nameCache.put(player.getId(), TimedName.expiring(player.getCurrentName()));
+                    loaded++;
+                }
+            }
+            logger.info("Pre-loaded " + loaded + " player names from database");
+        }).exceptionally(e -> {
+            logger.debug("Failed to pre-load player names: " + e.getMessage());
+            return null;
+        });
+    }
+
     // ==========================================
     // Async Methods (with Mojang API support)
     // ==========================================
@@ -164,10 +222,11 @@ public class PlayerLookup {
      *
      * <p>Resolution order:</p>
      * <ol>
-     *   <li>Local name cache</li>
-     *   <li>RVNKCore PlayerService (if available)</li>
-     *   <li>Bukkit OfflinePlayer cache</li>
-     *   <li>Mojang API (if enabled, rate limited)</li>
+     *   <li>Local TTL-aware name cache</li>
+     *   <li>Online player (authoritative, permanent cache)</li>
+     *   <li>RVNKCore PlayerService async (expiring cache; background staleness re-check)</li>
+     *   <li>Bukkit OfflinePlayer cache (expiring cache)</li>
+     *   <li>Mojang API (if enabled, rate limited; triggers DB write-back)</li>
      * </ol>
      *
      * @param uuid The player UUID
@@ -178,42 +237,122 @@ public class PlayerLookup {
             return CompletableFuture.completedFuture("Unknown");
         }
 
-        // Check local cache first
-        String cached = nameCache.get(uuid);
+        // Check TTL-aware cache
+        TimedName cached = nameCache.get(uuid);
         if (cached != null) {
-            return CompletableFuture.completedFuture(cached);
+            if (!cached.isExpired()) return CompletableFuture.completedFuture(cached.name());
+            nameCache.remove(uuid);
         }
 
-        // Try RVNKCore PlayerService
+        // Online player (sync, authoritative — permanent TTL)
+        org.bukkit.entity.Player onlinePlayer = Bukkit.getPlayer(uuid);
+        if (onlinePlayer != null) {
+            String name = onlinePlayer.getName();
+            nameCache.put(uuid, TimedName.permanent(name));
+            return CompletableFuture.completedFuture(name);
+        }
+
+        // RVNKCore PlayerService (async — expiring TTL + background stale check)
         if (rvnkCoreEnabled) {
-            String name = lookupViaPlayerService(uuid);
-            if (name != null) {
-                nameCache.put(uuid, name);
-                return CompletableFuture.completedFuture(name);
-            }
+            return playerService.getPlayer(uuid).thenCompose(result -> {
+                if (result.isPresent()) {
+                    PlayerDTO p = result.get();
+                    String dbName = p.getCurrentName();
+                    if (dbName != null) {
+                        boolean isStale = p.getLastSeen() != null &&
+                            (System.currentTimeMillis() - p.getLastSeen().getTime()) > CACHE_TTL_MS;
+                        if (isStale && mojangApiEnabled) {
+                            mojangAPI.getNameByUuid(uuid).thenAccept(opt ->
+                                opt.ifPresent(freshName -> persistExternalPlayer(uuid, freshName))
+                            );
+                        }
+                        nameCache.put(uuid, TimedName.expiring(dbName));
+                        return CompletableFuture.completedFuture(dbName);
+                    }
+                }
+                return resolveExternally(uuid);
+            }).exceptionally(e -> {
+                logger.debug("RVNKCore async lookup failed for " + uuid + ": " + e.getMessage());
+                OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+                String name = player.getName() != null ? player.getName() : uuid.toString().substring(0, 8);
+                nameCache.put(uuid, TimedName.expiring(name));
+                return name;
+            });
         }
 
-        // Try Bukkit cache (synchronous, fast)
+        return resolveExternally(uuid);
+    }
+
+    /**
+     * Resolves a player name from Bukkit cache or Mojang API.
+     * Used as a fallback when the DB is unavailable or has no record.
+     */
+    private CompletableFuture<String> resolveExternally(UUID uuid) {
+        // Bukkit offline cache (sync, fast)
         OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
         if (player.getName() != null) {
-            nameCache.put(uuid, player.getName());
+            nameCache.put(uuid, TimedName.permanent(player.getName()));
             return CompletableFuture.completedFuture(player.getName());
         }
 
-        // Fallback to Mojang API if enabled
+        // Mojang API fallback (async, rate-limited; triggers DB write-back)
         if (mojangApiEnabled && mojangAPI != null) {
-            return mojangAPI.getNameByUuid(uuid)
-                .thenApply(opt -> {
-                    String name = opt.orElse(uuid.toString().substring(0, 8));
-                    nameCache.put(uuid, name);
-                    return name;
-                });
+            return mojangAPI.getNameByUuid(uuid).thenApply(opt -> {
+                if (opt.isPresent()) {
+                    String mojangName = opt.get();
+                    nameCache.put(uuid, TimedName.expiring(mojangName));
+                    persistExternalPlayer(uuid, mojangName);
+                    return mojangName;
+                }
+                String truncated = uuid.toString().substring(0, 8);
+                nameCache.put(uuid, TimedName.expiring(truncated));
+                return truncated;
+            });
         }
 
         // Final fallback: truncated UUID
         String truncated = uuid.toString().substring(0, 8);
-        nameCache.put(uuid, truncated);
+        nameCache.put(uuid, TimedName.expiring(truncated));
         return CompletableFuture.completedFuture(truncated);
+    }
+
+    /**
+     * Writes a Mojang-resolved player to the RVNKCore database and detects name changes.
+     * Called asynchronously after Mojang resolution — never blocks the caller.
+     */
+    private void persistExternalPlayer(UUID uuid, String mojangName) {
+        if (!rvnkCoreEnabled) return;
+        playerService.getPlayer(uuid).thenAccept(existing -> {
+            if (existing.isPresent()) {
+                String storedName = existing.get().getCurrentName();
+                if (!storedName.equalsIgnoreCase(mojangName)) {
+                    logger.info("Name change detected: " + storedName + " -> " + mojangName + " (" + uuid + ")");
+                    playerService.updatePlayerName(uuid, mojangName)
+                        .exceptionally(e -> {
+                            logger.debug("Failed to update player name: " + e.getMessage());
+                            return null;
+                        });
+                }
+                // else: name unchanged, DB already correct — no-op
+            } else {
+                // Player unknown to DB — create minimal external-player row
+                Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                PlayerDTO newPlayer = new PlayerDTO.Builder()
+                    .id(uuid)
+                    .currentName(mojangName)
+                    .firstJoin(now)
+                    .lastSeen(now)
+                    .build();
+                playerService.savePlayer(newPlayer)
+                    .exceptionally(e -> {
+                        logger.debug("Failed to persist external player: " + e.getMessage());
+                        return null;
+                    });
+            }
+        }).exceptionally(e -> {
+            logger.debug("Failed to check existing player for write-back: " + e.getMessage());
+            return null;
+        });
     }
 
     /**
@@ -325,5 +464,27 @@ public class PlayerLookup {
         }
         nameCache.clear();
         logger.info("PlayerLookup shutdown complete");
+    }
+
+    // ==========================================
+    // Internal Cache Entry
+    // ==========================================
+
+    /**
+     * A cached player name entry with optional TTL expiry.
+     * Permanent entries (online players) never expire. Expiring entries (DB / Mojang) use 8h TTL.
+     */
+    private record TimedName(String name, long expiryMs) {
+        boolean isExpired() {
+            return expiryMs > 0 && System.currentTimeMillis() > expiryMs;
+        }
+
+        static TimedName permanent(String name) {
+            return new TimedName(name, 0);
+        }
+
+        static TimedName expiring(String name) {
+            return new TimedName(name, System.currentTimeMillis() + CACHE_TTL_MS);
+        }
     }
 }
