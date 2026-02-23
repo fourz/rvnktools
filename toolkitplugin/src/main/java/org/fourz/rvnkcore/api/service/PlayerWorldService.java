@@ -149,8 +149,27 @@ public interface PlayerWorldService {
                                                float yaw, float pitch, String biome);
     
     /**
+     * Updates a player's location, bypassing the rate limiter.
+     * Use this for critical saves (player quit, server shutdown) where the location
+     * must be persisted regardless of how recently it was last written.
+     *
+     * @param playerId  The player's UUID
+     * @param worldName The current world name
+     * @param x         The X coordinate
+     * @param y         The Y coordinate
+     * @param z         The Z coordinate
+     * @param yaw       The view yaw
+     * @param pitch     The view pitch
+     * @param biome     The current biome (optional)
+     * @return CompletableFuture indicating completion
+     */
+    CompletableFuture<Void> forceUpdatePlayerLocation(UUID playerId, String worldName,
+                                                      double x, double y, double z,
+                                                      float yaw, float pitch, String biome);
+
+    /**
      * Records a player death in a specific world.
-     * 
+     *
      * @param playerId The player's UUID
      * @param worldName The world where the death occurred
      * @return CompletableFuture indicating completion

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
+import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.query.QueryBuilder;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -14,7 +15,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,7 +63,7 @@ public class PlayerWorldDataRepository {
      */
     public CompletableFuture<Optional<PlayerWorldDataDTO>> findByPlayerAndWorld(UUID playerId, String worldName) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            String query = BasicSQLQueryBuilder.create().select("*")
                 .from(TABLE_NAME)
                 .where("player_id = ? AND world_name = ?")
                 .build();
@@ -95,7 +95,7 @@ public class PlayerWorldDataRepository {
      */
     public CompletableFuture<List<PlayerWorldDataDTO>> findAllByPlayer(UUID playerId) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            String query = BasicSQLQueryBuilder.create().select("*")
                 .from(TABLE_NAME)
                 .where("player_id = ?")
                 .orderBy("last_visit", false)
@@ -128,7 +128,7 @@ public class PlayerWorldDataRepository {
      */
     public CompletableFuture<List<PlayerWorldDataDTO>> findAllByWorld(String worldName) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            String query = BasicSQLQueryBuilder.create().select("*")
                 .from(TABLE_NAME)
                 .where("world_name = ?")
                 .orderBy("last_visit", false)
@@ -162,7 +162,7 @@ public class PlayerWorldDataRepository {
      */
     public CompletableFuture<List<PlayerWorldDataDTO>> findRecentVisitors(String worldName, int hoursAgo) {
         return CompletableFuture.supplyAsync(() -> {
-            String query = queryBuilder.select("*")
+            String query = BasicSQLQueryBuilder.create().select("*")
                 .from(TABLE_NAME)
                 .where("world_name = ? AND last_visit > ?")
                 .orderBy("last_visit", false)
@@ -198,7 +198,7 @@ public class PlayerWorldDataRepository {
     public CompletableFuture<PlayerWorldDataDTO> save(PlayerWorldDataDTO worldData) {
         return CompletableFuture.supplyAsync(() -> {
             // Check if record exists
-            String checkQuery = queryBuilder.select("COUNT(*)")
+            String checkQuery = BasicSQLQueryBuilder.create().select("COUNT(*)")
                 .from(TABLE_NAME)
                 .where("player_id = ? AND world_name = ?")
                 .build();
@@ -221,9 +221,7 @@ public class PlayerWorldDataRepository {
                 String query;
                 if (exists) {
                     // Update existing record
-                    // Use "?" placeholders for all values - QueryBuilder stores values internally
-                    // when actual values are passed, causing parameter count mismatch
-                    query = queryBuilder.update(TABLE_NAME)
+                    query = BasicSQLQueryBuilder.create().update(TABLE_NAME)
                         .set("first_visit", "?")
                         .set("last_visit", "?")
                         .set("visit_count", "?")
@@ -241,7 +239,7 @@ public class PlayerWorldDataRepository {
                         .build();
                 } else {
                     // Insert new record
-                    query = queryBuilder.insert(TABLE_NAME)
+                    query = BasicSQLQueryBuilder.create().insert(TABLE_NAME)
                         .columns("player_id", "world_name", "first_visit", "last_visit", "visit_count",
                                 "playtime_seconds", "last_x", "last_y", "last_z", "last_yaw", "last_pitch",
                                 "last_biome", "death_count", "world_specific_data", "created_at", "updated_at")
@@ -308,7 +306,7 @@ public class PlayerWorldDataRepository {
      */
     public CompletableFuture<Void> deleteByPlayerAndWorld(UUID playerId, String worldName) {
         return CompletableFuture.runAsync(() -> {
-            String query = queryBuilder.delete()
+            String query = BasicSQLQueryBuilder.create().delete()
                 .from(TABLE_NAME)
                 .where("player_id = ? AND world_name = ?")
                 .build();

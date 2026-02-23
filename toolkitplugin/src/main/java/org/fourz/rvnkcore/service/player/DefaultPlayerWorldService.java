@@ -240,6 +240,29 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
     }
     
     @Override
+    public CompletableFuture<Void> forceUpdatePlayerLocation(UUID playerId, String worldName,
+                                                             double x, double y, double z,
+                                                             float yaw, float pitch, String biome) {
+        // Bypass rate limiter — always write (used for quit/shutdown saves)
+        lastLocationUpdate.put(playerId + ":" + worldName, System.currentTimeMillis());
+
+        return getPlayerWorldData(playerId, worldName)
+            .thenCompose(existingData -> {
+                PlayerWorldDataDTO worldData;
+                if (existingData.isPresent()) {
+                    worldData = existingData.get();
+                } else {
+                    worldData = new PlayerWorldDataDTO(playerId, worldName);
+                }
+                worldData.updateLocation(x, y, z, yaw, pitch);
+                if (biome != null) {
+                    worldData.setLastBiome(biome);
+                }
+                return worldDataRepository.save(worldData).thenApply(saved -> null);
+            });
+    }
+
+    @Override
     public CompletableFuture<Void> recordPlayerDeath(UUID playerId, String worldName) {
         return getPlayerWorldData(playerId, worldName)
             .thenCompose(existingData -> {
