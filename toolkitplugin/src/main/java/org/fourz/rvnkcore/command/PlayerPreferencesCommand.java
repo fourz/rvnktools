@@ -36,7 +36,15 @@ public class PlayerPreferencesCommand extends BaseCommand {
 
     /** Fallback plugin list used when no types have been registered via the registry yet. */
     private static final List<String> SUPPORTED_PLUGINS_FALLBACK = Arrays.asList(
-        "rvnkquests", "rvnklore", "bartershops", "rvnktools"
+        "rvnkquests", "rvnklore", "rvnktools"
+    );
+
+    /**
+     * Plugins that own their preference UX via a dedicated command.
+     * Excluded from /pref — players are redirected to the plugin's own command.
+     */
+    private static final Map<String, String> EXTERNALLY_MANAGED_PLUGINS = Map.of(
+        "bartershops", "/shop notifications"
     );
 
     private static final List<String> STANDARD_CHANNELS = Arrays.asList(
@@ -85,6 +93,13 @@ public class PlayerPreferencesCommand extends BaseCommand {
         }
 
         String pluginId = args[0].toLowerCase();
+
+        // Redirect plugins that own their preference UX
+        if (EXTERNALLY_MANAGED_PLUGINS.containsKey(pluginId)) {
+            player.sendMessage(ChatColor.YELLOW + "[" + pluginId + "] preferences are managed by: "
+                    + ChatColor.WHITE + EXTERNALLY_MANAGED_PLUGINS.get(pluginId));
+            return true;
+        }
 
         // Validate plugin against registry (fallback to static list)
         List<String> availablePlugins = getAvailablePlugins();
@@ -630,11 +645,16 @@ public class PlayerPreferencesCommand extends BaseCommand {
      * Uses the type registry if populated; falls back to the static list.
      */
     private List<String> getAvailablePlugins() {
+        List<String> base;
         if (prefsService == null) {
-            return SUPPORTED_PLUGINS_FALLBACK;
+            base = SUPPORTED_PLUGINS_FALLBACK;
+        } else {
+            Map<String, List<NotificationTypeDefinition>> registered = prefsService.getAllRegisteredTypes();
+            base = registered.isEmpty() ? SUPPORTED_PLUGINS_FALLBACK : new ArrayList<>(registered.keySet());
         }
-        Map<String, List<NotificationTypeDefinition>> registered = prefsService.getAllRegisteredTypes();
-        return registered.isEmpty() ? SUPPORTED_PLUGINS_FALLBACK : new ArrayList<>(registered.keySet());
+        return base.stream()
+                .filter(p -> !EXTERNALLY_MANAGED_PLUGINS.containsKey(p))
+                .collect(Collectors.toList());
     }
 
     /**
