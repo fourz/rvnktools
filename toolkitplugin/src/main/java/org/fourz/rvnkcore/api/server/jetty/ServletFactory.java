@@ -1,13 +1,16 @@
 package org.fourz.rvnkcore.api.server.jetty;
 
 import com.google.gson.Gson;
+import jakarta.servlet.DispatcherType;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
 import org.fourz.rvnkcore.api.controller.WorldController;
+import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -15,6 +18,7 @@ import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
+import java.util.EnumSet;
 
 /**
  * Factory for creating and configuring servlet contexts for the RVNKCore API server.
@@ -82,14 +86,15 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerSecurityFilters(ServletContextHandler context) {
-        // Add authentication filter for all API endpoints with debug logging configured
-        AuthFilter authFilter = new AuthFilter(config, plugin);
-        context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
-
-        // Add CORS filter if enabled
+        // CORS must be registered before auth so OPTIONS preflight requests
+        // receive CORS headers before any auth check runs
         if (config.isCorsEnabled()) {
             registerCorsFilter(context);
         }
+
+        // Add authentication filter for all v1 API endpoints
+        AuthFilter authFilter = new AuthFilter(config, plugin);
+        context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
     }
 
     /**
@@ -159,6 +164,9 @@ public class ServletFactory {
 
         // Health check endpoint
         registerHealthCheckEndpoint(context);
+
+        // OpenAPI documentation at /api/docs
+        registerOpenApiDocs(context);
     }
 
     /**
@@ -168,19 +176,26 @@ public class ServletFactory {
      */
     private void registerCorsFilter(ServletContextHandler context) {
         try {
-            // Note: This would require adding the CORS filter dependency
-            // For now, we'll log the intention
-            logger.info("CORS filter would be registered here");
-            logger.info("  - Allowed Origins: " + config.getCorsAllowedOrigins());
-            logger.info("  - Allowed Methods: " + config.getCorsAllowedMethods());
-            
-            // Future implementation:
-            // CrossOriginFilter corsFilter = new CrossOriginFilter();
-            // FilterHolder corsFilterHolder = new FilterHolder(corsFilter);
-            // corsFilterHolder.setInitParameter("allowedOrigins", config.getCorsAllowedOrigins());
-            // corsFilterHolder.setInitParameter("allowedMethods", config.getCorsAllowedMethods());
-            // context.addFilter(corsFilterHolder, "/*", null);
-            
+            CrossOriginFilter corsFilter = new CrossOriginFilter();
+            FilterHolder corsHolder = new FilterHolder(corsFilter);
+
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_ORIGINS_PARAM,
+                    config.getCorsAllowedOrigins());
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_METHODS_PARAM,
+                    config.getCorsAllowedMethods());
+            // X-API-Key must be in allowedHeaders or browsers will block preflight
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_HEADERS_PARAM,
+                    "Content-Type,Authorization,X-API-Key,X-Requested-With,Accept");
+            corsHolder.setInitParameter(CrossOriginFilter.EXPOSED_HEADERS_PARAM,
+                    "Content-Type");
+            // Do not chain preflight OPTIONS — let CrossOriginFilter respond directly
+            corsHolder.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, "false");
+
+            context.addFilter(corsHolder, "/*",
+                    EnumSet.of(DispatcherType.REQUEST, DispatcherType.ASYNC));
+
+            logger.info("CORS filter registered - Origins: " + config.getCorsAllowedOrigins()
+                    + ", Methods: " + config.getCorsAllowedMethods());
         } catch (Exception e) {
             logger.warning("Failed to register CORS filter: " + e.getMessage());
         }
@@ -207,6 +222,16 @@ public class ServletFactory {
         // Future implementation for health check
         // HealthCheckServlet healthServlet = new HealthCheckServlet();
         // context.addServlet(new ServletHolder(healthServlet), "/health");
+    }
+
+    /**
+     * Registers the OpenAPI documentation handler at /docs/*.
+     * Serves the spec JSON at /api/docs/spec.json and Swagger UI at /api/docs/ui.
+     */
+    private void registerOpenApiDocs(ServletContextHandler context) {
+        OpenApiHandler docsHandler = new OpenApiHandler();
+        context.addServlet(new ServletHolder(docsHandler), "/docs/*");
+        logger.info("OpenAPI docs registered at " + config.getContextPath() + "/docs/ui");
     }
 
     /**

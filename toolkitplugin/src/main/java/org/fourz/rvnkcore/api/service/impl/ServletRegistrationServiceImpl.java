@@ -1,13 +1,17 @@
 package org.fourz.rvnkcore.api.service.impl;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServlet;
 import org.bukkit.plugin.Plugin;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,6 +36,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
 
     private final LogManager logger;
     private final ApiConfig config;
+    private final Plugin plugin;
     
     // Thread-safe registry of external servlets
     private final Map<String, ServletRegistration> registeredServlets = new ConcurrentHashMap<>();
@@ -67,6 +72,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
      */
     public ServletRegistrationServiceImpl(ApiConfig config, Plugin plugin) {
         this.config = config;
+        this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         logger.debug("ServletRegistrationService initialized");
     }
@@ -190,20 +196,31 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
 
     /**
      * Applies a single servlet registration to the context.
+     * When requireAuth is true, an AuthFilter is added for the servlet's path.
      */
     private boolean applyRegistration(String pathSpec, ServletRegistration registration) {
         try {
             ServletHolder holder = new ServletHolder(registration.servlet());
             holder.setName(registration.displayName() + "_" + pathSpec.hashCode());
-            
+
             servletContext.addServlet(holder, pathSpec);
-            
+
+            if (registration.requireAuth()) {
+                AuthFilter authFilter = new AuthFilter(config, plugin);
+                FilterHolder filterHolder = new FilterHolder(authFilter);
+                filterHolder.setName("auth_" + registration.displayName() + "_" + pathSpec.hashCode());
+                servletContext.addFilter(filterHolder, pathSpec,
+                        EnumSet.of(DispatcherType.REQUEST, DispatcherType.ASYNC));
+                logger.debug("Auth filter applied for: " + pathSpec);
+            }
+
             // Update registration as applied
             registeredServlets.put(pathSpec, registration.withApplied(true));
-            
-            logger.debug("Applied servlet registration: " + pathSpec);
+
+            logger.debug("Applied servlet registration: " + registration.displayName() + " at " + pathSpec +
+                    (registration.requireAuth() ? " (authenticated)" : " (public)"));
             return true;
-            
+
         } catch (Exception e) {
             logger.error("Failed to apply servlet registration: " + pathSpec, e);
             return false;
