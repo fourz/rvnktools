@@ -35,7 +35,7 @@
 
 ### Primary References (Always Check First)
 
-- **Docker MCP** — For RVNKCore/RVNKTools status and history: `search_nodes("RVNKCore")` or `search_nodes("RVNKTools")`
+- **GraphQL-Memdock** — For RVNKCore/RVNKTools status and history: `search_nodes("RVNKCore")` or `search_nodes("RVNKTools")`
 - **[README.md](README.md)** — Project overview, architecture diagrams, features
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** — Instruction file navigation hub
 
