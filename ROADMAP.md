@@ -1,3 +1,7 @@
+> **DEPRECATED — March 2026**: Status is now tracked in Docker MCP knowledge graph
+> (`mcp__MCP_DOCKER__search_nodes("RVNKCore")`). Open tasks tracked in GitHub Issues (`board:rvnkcore`).
+> This file is preserved as historical reference only and is no longer actively maintained.
+
 # RVNKTools Development Roadmap
 
 **Last Updated**: February 17, 2026

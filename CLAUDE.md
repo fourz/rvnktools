@@ -35,7 +35,7 @@
 
 ### Primary References (Always Check First)
 
-- **[ROADMAP.md](ROADMAP.md)** — Current status, milestones, RVNKCore extraction progress
+- **Docker MCP** — For RVNKCore/RVNKTools status and history: `search_nodes("RVNKCore")` or `search_nodes("RVNKTools")`
 - **[README.md](README.md)** — Project overview, architecture diagrams, features
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** — Instruction file navigation hub
 

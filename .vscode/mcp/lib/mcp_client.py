@@ -26,9 +26,9 @@ from enum import Enum
 
 
 # MCP Server configuration
-MCP_EXECUTABLE = r"c:\tools\_PROJECTS\Ravenkaft Dev\repos\rvnkdev-mcp-server\rvnkdev-fastmcp-server\.venv\Scripts\rvnkdev-mcp.exe"
-MCP_CONFIG_PATH = r"c:/tools/_PROJECTS/Ravenkaft Dev/repos/rvnkdev-mcp-server/rvnkdev-fastmcp-server/config.yaml"
-MCP_JSON_PATH = r"c:\tools\_PROJECTS\Ravenkaft Dev\.mcp.json"
+MCP_EXECUTABLE = r"c:\tools\_PROJECTS\Ravenkraft-Dev\repos\rvnkdev-mcp-server\rvnkdev-fastmcp-server\.venv\Scripts\rvnkdev-mcp.exe"
+MCP_CONFIG_PATH = r"c:/tools/_PROJECTS/Ravenkraft-Dev/repos/rvnkdev-mcp-server/rvnkdev-fastmcp-server/config.yaml"
+MCP_JSON_PATH = r"c:\tools\_PROJECTS\Ravenkraft-Dev\.mcp.json"
 
 
 def _load_mcp_env() -> Dict[str, str]:
