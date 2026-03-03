@@ -35,7 +35,7 @@
 
 ### Primary References (Always Check First)
 
-- **GraphQL-Memdock** — For RVNKCore/RVNKTools status and history: `search_nodes("RVNKCore")` or `search_nodes("RVNKTools")`
+- **Graph Memory** — For RVNKCore/RVNKTools status and history: `search_nodes("RVNKCore")` or `search_nodes("RVNKTools")`
 - **[README.md](README.md)** — Project overview, architecture diagrams, features
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** — Instruction file navigation hub
 
@@ -218,3 +218,4 @@ database.queryAsync(sql)
 **Last Updated**: January 2026
 
 **Note**: This file is for AI guidance and project context. For transient project status, see ROADMAP.md and Archon only.
+
