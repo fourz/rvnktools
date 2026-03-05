@@ -135,7 +135,7 @@ public class ServletFactory {
         LogManager announcementControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.AnnouncementController.class);
         
-        AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger);
+        AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger, gson);
         context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
     }
 

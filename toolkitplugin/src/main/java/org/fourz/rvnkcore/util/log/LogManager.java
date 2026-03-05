@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 public class LogManager {
 
     private static final ConcurrentMap<String, LogManager> instances = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, Level> pluginDefaultLevels = new ConcurrentHashMap<>();
 
     /** Level string aliases for config file compatibility */
     private static final Map<String, Level> LEVEL_ALIASES = Map.of(
@@ -80,8 +81,12 @@ public class LogManager {
      */
     public static LogManager getInstance(Plugin plugin, Class<?> clazz) {
         String key = plugin.getName() + ":" + clazz.getSimpleName();
-        return instances.computeIfAbsent(key, k -> 
-            new LogManager(plugin, "[" + clazz.getSimpleName() + "] "));
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "[" + clazz.getSimpleName() + "] ");
+            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
     
     /**
@@ -93,8 +98,12 @@ public class LogManager {
      */
     public static LogManager getInstance(Plugin plugin, String className) {
         String key = plugin.getName() + ":" + className;
-        return instances.computeIfAbsent(key, k ->
-            new LogManager(plugin, "[" + className + "] "));
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "[" + className + "] ");
+            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
 
     /**
@@ -106,8 +115,12 @@ public class LogManager {
      */
     public static LogManager getInstance(Plugin plugin) {
         String key = plugin.getName() + ":Main";
-        return instances.computeIfAbsent(key, k ->
-            new LogManager(plugin, ""));
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "");
+            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
     
     // ========================================================================
@@ -297,6 +310,7 @@ public class LogManager {
      */
     public static void setPluginLogLevel(Plugin plugin, Level level) {
         String pluginPrefix = plugin.getName() + ":";
+        pluginDefaultLevels.put(plugin.getName(), level);
         instances.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(pluginPrefix))
             .forEach(entry -> entry.getValue().setLogLevel(level));
@@ -311,6 +325,7 @@ public class LogManager {
     public static void clearLoggers(Plugin plugin) {
         String pluginPrefix = plugin.getName() + ":";
         instances.keySet().removeIf(key -> key.startsWith(pluginPrefix));
+        pluginDefaultLevels.remove(plugin.getName());
     }
     
     /**

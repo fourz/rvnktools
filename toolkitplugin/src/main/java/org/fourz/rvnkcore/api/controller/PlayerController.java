@@ -7,11 +7,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.model.response.CountResponse;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
-import org.fourz.rvnkcore.api.model.response.StatusResponse;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
@@ -350,7 +350,7 @@ public class PlayerController extends HttpServlet {
         try {
             playerService.updatePlayerLocation(uuid, request.getWorld(), request.getX(), request.getY(), request.getZ())
                      .get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, StatusResponse.success("Location updated successfully"));
+            sendResponse(resp, 200, java.util.Map.of("message", "Location updated successfully"));
         } catch (Exception ex) {
             logger.error("Error updating player location", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to update location");
@@ -364,7 +364,7 @@ public class PlayerController extends HttpServlet {
         try {
             playerService.updatePlayerGroups(uuid, primary, request.getGroups())
                      .get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, StatusResponse.success("Groups updated successfully"));
+            sendResponse(resp, 200, java.util.Map.of("message", "Groups updated successfully"));
         } catch (Exception ex) {
             logger.error("Error updating player groups", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to update groups");
@@ -590,7 +590,7 @@ public class PlayerController extends HttpServlet {
     private void sendResponse(HttpServletResponse resp, int status, Object data) {
         try {
             resp.setStatus(status);
-            resp.getWriter().write(gson.toJson(data));
+            resp.getWriter().write(gson.toJson(ApiResponse.success(data)));
         } catch (IOException e) {
             logger.error("Error sending response", e);
         }
@@ -599,8 +599,14 @@ public class PlayerController extends HttpServlet {
     private void sendError(HttpServletResponse resp, int status, String message) {
         try {
             resp.setStatus(status);
-            StatusResponse error = StatusResponse.error(message, status);
-            resp.getWriter().write(gson.toJson(error));
+            String code = switch (status) {
+                case 400 -> "BAD_REQUEST";
+                case 401 -> "UNAUTHORIZED";
+                case 404 -> "NOT_FOUND";
+                case 500 -> "INTERNAL_ERROR";
+                default -> "ERROR";
+            };
+            resp.getWriter().write(gson.toJson(ApiResponse.error(code, message)));
         } catch (IOException e) {
             logger.error("Error sending error response", e);
         }

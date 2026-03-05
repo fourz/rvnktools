@@ -1,8 +1,10 @@
 package org.fourz.rvnkcore.api.controller;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.util.log.LogManager;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -27,16 +29,19 @@ public class AnnouncementController extends HttpServlet {
     
     private final AnnouncementService announcementService;
     private final LogManager logger;
-    
+    private final Gson gson;
+
     /**
      * Constructor for AnnouncementController.
-     * 
+     *
      * @param announcementService The announcement service for business logic
      * @param logger The logger instance
+     * @param gson JSON serializer instance
      */
-    public AnnouncementController(AnnouncementService announcementService, LogManager logger) {
+    public AnnouncementController(AnnouncementService announcementService, LogManager logger, Gson gson) {
         this.announcementService = announcementService;
         this.logger = logger;
+        this.gson = gson;
     }
     
     @Override
@@ -719,13 +724,19 @@ public class AnnouncementController extends HttpServlet {
     }
     
     /**
-     * Sends an error response with the specified status code and message.
+     * Sends an error response using the canonical ApiResponse envelope.
      */
     private void sendErrorResponse(HttpServletResponse response, int statusCode, String message) throws IOException {
         response.setStatus(statusCode);
+        String code = switch (statusCode) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 404 -> "NOT_FOUND";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
         PrintWriter writer = response.getWriter();
-        String json = String.format("{\"error\":\"%s\"}", escapeJson(message));
-        writer.write(json);
+        writer.write(gson.toJson(ApiResponse.error(code, message)));
         writer.flush();
     }
     
