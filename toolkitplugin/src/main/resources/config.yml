@@ -50,7 +50,9 @@ api:
     enabled: false
     port: 8081
     keystore-path: "keystore.jks"
-    keystore-password: "changeme"
+    keystore-password: ""          # Leave empty to auto-generate a secure password on first start
+    san-hostnames: ""              # Extra hostnames for TLS cert SANs (comma-separated, e.g. "myhost.local,api.example.com")
+                                   # api.host is always included automatically if not localhost
   cors:
     enabled: true
     allowed-origins: "*"

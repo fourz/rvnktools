@@ -13,6 +13,9 @@ import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * RVNKCoreSSLFactory: Handles SSL/TLS configuration and HTTPS connector setup for RVNKCore API server.
@@ -32,6 +35,7 @@ public class ServerSSLFactory {
     private final ApiConfig config;
     private final Plugin plugin;
     private final LogManager logger;
+    private String resolvedPassword;
 
     /**
      * Creates a new RVNKCoreSSLFactory instance.
@@ -96,44 +100,82 @@ public class ServerSSLFactory {
     }
 
     /**
-     * Ensures the keystore file exists, generating it if necessary.
-     * Used by RVNKCoreSSLFactory for HTTPS setup.
+     * Ensures the keystore file exists with correct SANs, generating or regenerating as needed.
+     * If the keystore password is empty or "changeme", a secure password is generated and
+     * persisted back to config.yml so subsequent restarts use the same password.
      *
      * @return The keystore file, or null if creation failed
      */
     private File ensureKeystoreExists() {
-        File keystoreFile = new File(plugin.getDataFolder(), config.getKeystorePath());
-        
-        if (!keystoreFile.exists()) {
-            logger.info("Keystore file does not exist, generating new keystore...");
-            logger.info("Generating keystore at: " + keystoreFile.getAbsolutePath());
-            
-            try {
-                // Ensure parent directory exists
-                keystoreFile.getParentFile().mkdirs();
+        // Auto-generate keystore password if not configured
+        this.resolvedPassword = resolveKeystorePassword();
+        String password = this.resolvedPassword;
 
-                // Include configured host and any extra SAN hostnames in the certificate
-                String[] extraHostnames = config.getSanHostnames();
-                KeyStoreGenerator.generateKeyStore(
-                    keystoreFile.getAbsolutePath(),
-                    config.getKeystorePassword(),
-                    "jetty",
-                    extraHostnames
-                );
-                logger.info("Keystore generated successfully at: " + keystoreFile.getAbsolutePath());
-                if (extraHostnames.length > 0) {
-                    logger.info("Certificate SANs include: localhost, " + String.join(", ", extraHostnames));
-                }
-            } catch (Exception e) {
-                logger.error("Failed to generate keystore", e);
-                logger.error("HTTPS setup aborted due to keystore generation failure");
-                return null;
+        File keystoreFile = new File(plugin.getDataFolder(), config.getKeystorePath());
+        String[] extraHostnames = config.getSanHostnames();
+
+        if (keystoreFile.exists()) {
+            // Check if cert SANs still match the configured hostnames
+            if (sanHostnamesMatch(keystoreFile, password, extraHostnames)) {
+                logger.info("Using existing keystore: " + keystoreFile.getAbsolutePath());
+                return keystoreFile;
             }
-        } else {
-            logger.info("Using existing keystore: " + keystoreFile.getAbsolutePath());
+            // SANs changed — delete and regenerate
+            logger.info("Configured hostnames changed — regenerating TLS certificate");
+            keystoreFile.delete();
         }
-        
-        return keystoreFile;
+
+        return generateKeystore(keystoreFile, password, extraHostnames);
+    }
+
+    /**
+     * Resolves the keystore password. If the configured password is empty or the
+     * default "changeme", generates a secure random password and saves it to config.yml.
+     */
+    private String resolveKeystorePassword() {
+        String password = config.getKeystorePassword();
+        if (password == null || password.isEmpty() || "changeme".equals(password)) {
+            password = KeyStoreGenerator.generateSecurePassword();
+            plugin.getConfig().set("api.https.keystore-password", password);
+            plugin.saveConfig();
+            logger.info("Generated secure keystore password (saved to config.yml)");
+        }
+        return password;
+    }
+
+    /**
+     * Checks whether the cert's DNS SANs match the currently configured hostnames.
+     */
+    private boolean sanHostnamesMatch(File keystoreFile, String password, String[] configuredHostnames) {
+        Set<String> certSans = KeyStoreGenerator.readCertSanHostnames(
+            keystoreFile.getAbsolutePath(), password, "jetty");
+        Set<String> configuredSet = new TreeSet<>(Arrays.asList(configuredHostnames));
+        return certSans.equals(configuredSet);
+    }
+
+    /**
+     * Generates a new keystore with the given password and SAN hostnames.
+     */
+    private File generateKeystore(File keystoreFile, String password, String[] extraHostnames) {
+        logger.info("Generating keystore at: " + keystoreFile.getAbsolutePath());
+        try {
+            keystoreFile.getParentFile().mkdirs();
+            KeyStoreGenerator.generateKeyStore(
+                keystoreFile.getAbsolutePath(),
+                password,
+                "jetty",
+                extraHostnames
+            );
+            logger.info("Keystore generated successfully");
+            if (extraHostnames.length > 0) {
+                logger.info("Certificate SANs: localhost, " + String.join(", ", extraHostnames));
+            }
+            return keystoreFile;
+        } catch (Exception e) {
+            logger.error("Failed to generate keystore", e);
+            logger.error("HTTPS setup aborted due to keystore generation failure");
+            return null;
+        }
     }
 
     /**
@@ -145,7 +187,7 @@ public class ServerSSLFactory {
     private SslContextFactory.Server createSslContextFactory(File keystoreFile) {
         SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
         sslContextFactory.setKeyStorePath(keystoreFile.getAbsolutePath());
-        sslContextFactory.setKeyStorePassword(config.getKeystorePassword());
+        sslContextFactory.setKeyStorePassword(resolvedPassword);
         
         // Additional SSL security configurations
         sslContextFactory.setExcludeProtocols("SSLv3", "TLSv1", "TLSv1.1");
@@ -188,10 +230,6 @@ public class ServerSSLFactory {
         if (config.getKeystorePath().isEmpty()) {
             logger.error("HTTPS enabled but keystore path is empty");
             return false;
-        }
-
-        if (config.getKeystorePassword().isEmpty()) {
-            logger.warning("HTTPS enabled but keystore password is empty - using default");
         }
 
         if (config.getHttpsPort() <= 0 || config.getHttpsPort() > 65535) {

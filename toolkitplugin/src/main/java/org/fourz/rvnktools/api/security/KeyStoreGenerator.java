@@ -1,6 +1,7 @@
 package org.fourz.rvnktools.api.security;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -8,8 +9,14 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.security.cert.Certificate;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Calendar;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -104,5 +111,42 @@ public class KeyStoreGenerator {
             result.append(String.format("%02x", b));
         }
         return result.toString();
+    }
+
+    /**
+     * Reads the DNS SAN hostnames from an existing keystore's certificate.
+     * Returns a sorted set of DNS names (excludes localhost and IP addresses).
+     *
+     * @param keystorePath     Path to the JKS keystore
+     * @param keystorePassword Keystore password
+     * @param keyAlias         Key alias inside the store
+     * @return Sorted set of non-localhost DNS SAN hostnames, or empty set on error
+     */
+    public static Set<String> readCertSanHostnames(String keystorePath, String keystorePassword, String keyAlias) {
+        Set<String> hostnames = new TreeSet<>();
+        try (FileInputStream fis = new FileInputStream(keystorePath)) {
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(fis, keystorePassword.toCharArray());
+            Certificate cert = ks.getCertificate(keyAlias);
+            if (!(cert instanceof X509Certificate)) {
+                return hostnames;
+            }
+            Collection<List<?>> sans = ((X509Certificate) cert).getSubjectAlternativeNames();
+            if (sans == null) {
+                return hostnames;
+            }
+            for (List<?> san : sans) {
+                // type 2 = dNSName
+                if (san.size() >= 2 && Integer.valueOf(2).equals(san.get(0))) {
+                    String dnsName = san.get(1).toString().trim();
+                    if (!dnsName.isEmpty() && !"localhost".equalsIgnoreCase(dnsName)) {
+                        hostnames.add(dnsName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Cannot read cert — treat as empty (will trigger regeneration)
+        }
+        return hostnames;
     }
 }
