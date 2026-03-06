@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * REST API controller for world management and tracking operations.
@@ -65,7 +66,7 @@ public class WorldController extends HttpServlet {
             } else if (pathInfo.startsWith("/recent")) {
                 // GET /api/v1/worlds/recent - Get recently accessed worlds
                 handleGetRecentWorlds(request, response);
-            } else if (pathInfo.startsWith("/") && !pathInfo.contains("/")) {
+            } else if (!pathInfo.substring(1).contains("/")) {
                 // GET /api/v1/worlds/{worldName} - Get world by name (direct world name)
                 String worldName = pathInfo.substring(1); // Remove leading "/"
                 handleGetWorldByName(worldName, request, response);
@@ -82,58 +83,56 @@ public class WorldController extends HttpServlet {
      * Handles GET /api/worlds - Get all worlds with metadata
      */
     private void handleGetAllWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getAllWorlds()
-            .thenAccept(worlds -> sendResponse(response, worlds))
-            .exceptionally(throwable -> {
-                logger.error("Failed to get all worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds");
-                return null;
-            });
+        try {
+            var worlds = worldService.getAllWorlds().get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get all worlds", e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds");
+        }
     }
 
     /**
      * Handles GET /api/v1/worlds/with-players - Get worlds that currently have players
      */
     private void handleGetWorldsWithPlayers(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldsWithPlayers()
-            .thenAccept(worlds -> sendResponse(response, worlds))
-            .exceptionally(throwable -> {
-                logger.error("Failed to get worlds with players", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds with players");
-                return null;
-            });
+        try {
+            var worlds = worldService.getWorldsWithPlayers().get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get worlds with players", e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds with players");
+        }
     }
 
     /**
      * Handles GET /api/v1/worlds/statistics - Get overall world statistics
      */
     private void handleGetWorldStatistics(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getAllWorlds()
-            .thenAccept(worlds -> {
-                Map<String, Object> stats = new HashMap<>();
-                stats.put("totalWorlds", worlds.size());
-                stats.put("activeWorlds", worlds.stream().filter(w -> w.getPlayerCount() != null && w.getPlayerCount() > 0).count());
-                stats.put("totalPlayers", worlds.stream().mapToInt(w -> w.getPlayerCount() != null ? w.getPlayerCount() : 0).sum());
-                sendResponse(response, stats);
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world statistics", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world statistics");
-                return null;
-            });
+        try {
+            var worlds = worldService.getAllWorlds().get(30, TimeUnit.SECONDS);
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalWorlds", worlds.size());
+            stats.put("activeWorlds", worlds.stream().filter(w -> w.getPlayerCount() != null && w.getPlayerCount() > 0).count());
+            stats.put("totalPlayers", worlds.stream().mapToInt(w -> w.getPlayerCount() != null ? w.getPlayerCount() : 0).sum());
+            sendResponse(response, stats);
+        } catch (Exception e) {
+            logger.error("Failed to get world statistics", e);
+            sendErrorResponse(response, 500, "Failed to retrieve world statistics");
+        }
     }
 
     /**
      * Handles GET /api/v1/worlds/environment/{environment} - Get worlds by environment type
      */
     private void handleGetWorldsByEnvironment(String environment, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldsByEnvironment(environment)
-            .thenAccept(worlds -> sendResponse(response, worlds))
-            .exceptionally(throwable -> {
-                logger.error("Failed to get worlds by environment: " + environment, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds by environment");
-                return null;
-            });
+        try {
+            var worlds = worldService.getWorldsByEnvironment(environment).get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get worlds by environment: " + environment, e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds by environment");
+        }
     }
 
     /**
@@ -161,45 +160,43 @@ public class WorldController extends HttpServlet {
      * Handles GET /api/v1/worlds/recent - Get recently accessed worlds
      */
     private void handleGetRecentWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getRecentlyAccessedWorlds(10)
-            .thenAccept(worlds -> sendResponse(response, worlds))
-            .exceptionally(throwable -> {
-                logger.error("Failed to get recent worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve recent worlds");
-                return null;
-            });
+        try {
+            var worlds = worldService.getRecentlyAccessedWorlds(10).get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get recent worlds", e);
+            sendErrorResponse(response, 500, "Failed to retrieve recent worlds");
+        }
     }
 
     /**
      * Handles GET /api/worlds/name/{name} - Get world by name
      */
     private void handleGetWorldByName(String worldName, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorld(worldName)
-            .thenAccept(world -> {
-                if (world.isPresent()) {
-                    sendResponse(response, world.get());
-                } else {
-                    sendErrorResponse(response, 404, "World not found with name: " + worldName);
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world by name: " + worldName, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world");
-                return null;
-            });
+        try {
+            var world = worldService.getWorld(worldName).get(30, TimeUnit.SECONDS);
+            if (world.isPresent()) {
+                sendResponse(response, world.get());
+            } else {
+                sendErrorResponse(response, 404, "World not found with name: " + worldName);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to get world by name: " + worldName, e);
+            sendErrorResponse(response, 500, "Failed to retrieve world");
+        }
     }
 
     /**
      * Handles GET /api/worlds/active - Get active worlds only
      */
     private void handleGetActiveWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getActiveWorlds()
-            .thenAccept(worlds -> sendResponse(response, worlds))
-            .exceptionally(throwable -> {
-                logger.error("Failed to get active worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve active worlds");
-                return null;
-            });
+        try {
+            var worlds = worldService.getActiveWorlds().get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get active worlds", e);
+            sendErrorResponse(response, 500, "Failed to retrieve active worlds");
+        }
     }
 
     /**

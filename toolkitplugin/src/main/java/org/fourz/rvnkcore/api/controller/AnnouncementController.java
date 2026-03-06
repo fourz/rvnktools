@@ -16,6 +16,7 @@ import java.io.PrintWriter;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * REST API controller for announcement management.
@@ -190,51 +191,28 @@ public class AnnouncementController extends HttpServlet {
      * Handles GET /api/v1/announcements - List all announcements
      */
     private void handleGetAllAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        logger.info("Starting handleGetAllAnnouncements request");
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.getAllAnnouncements();
-        
-        future.thenAccept(announcements -> {
-            try {
-                logger.info("Received " + announcements.size() + " announcements from service");
-                String json = buildAnnouncementListResponse(announcements);
-                logger.info("Built JSON response of length: " + json.length());
-                sendSuccessResponse(response, json);
-                logger.info("Sent successful response for getAllAnnouncements");
-            } catch (IOException e) {
-                logger.error("Error sending announcement list response", e);
-            }
-        }).exceptionally(ex -> {
-            logger.error("Exception in getAllAnnouncements future", ex);
-            try {
-                sendErrorResponse(response, 500, "Internal server error: " + ex.getMessage());
-            } catch (IOException ioEx) {
-                logger.error("Error sending error response", ioEx);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.getAllAnnouncements().get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error retrieving all announcements", e);
+            sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
+        }
     }
     
     /**
      * Handles GET /api/v1/announcements/active - Get active announcements
      */
     private void handleGetActiveAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.getActiveAnnouncements();
-        
-        future.thenAccept(announcements -> {
-            try {
-                String json = buildAnnouncementListResponse(announcements);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending active announcements response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to retrieve active announcements: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.getActiveAnnouncements().get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error retrieving active announcements", e);
+            sendErrorResponse(response, 500, "Failed to retrieve active announcements: " + e.getMessage());
+        }
     }
     
     /**
@@ -261,92 +239,56 @@ public class AnnouncementController extends HttpServlet {
      * Handles GET /api/v1/announcements/count - Get total count
      */
     private void handleGetAnnouncementCount(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Long> future = announcementService.getAnnouncementCount();
-        
-        future.thenAccept(count -> {
-            try {
-                String json = String.format("{\"count\": %d}", count);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending count response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to get announcement count: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            long count = announcementService.getAnnouncementCount().get(15, TimeUnit.SECONDS);
+            String json = String.format("{\"count\": %d}", count);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error getting announcement count", e);
+            sendErrorResponse(response, 500, "Failed to get announcement count: " + e.getMessage());
+        }
     }
     
     /**
      * Handles GET /api/v1/announcements/count/active - Get active count
      */
     private void handleGetActiveAnnouncementCount(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Long> future = announcementService.getActiveAnnouncementCount();
-        
-        future.thenAccept(count -> {
-            try {
-                String json = String.format("{\"count\": %d}", count);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending active count response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to get active announcement count: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            long count = announcementService.getActiveAnnouncementCount().get(15, TimeUnit.SECONDS);
+            String json = String.format("{\"count\": %d}", count);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error getting active announcement count", e);
+            sendErrorResponse(response, 500, "Failed to get active announcement count: " + e.getMessage());
+        }
     }
     
     /**
      * Handles GET /api/v1/announcements/type/{type} - Get announcements by type
      */
     private void handleGetAnnouncementsByType(String type, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.getAnnouncementsByType(type);
-        
-        future.thenAccept(announcements -> {
-            try {
-                String json = buildAnnouncementListResponse(announcements);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending announcements by type response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to retrieve announcements by type: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.getAnnouncementsByType(type).get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error retrieving announcements by type: " + type, e);
+            sendErrorResponse(response, 500, "Failed to retrieve announcements by type: " + e.getMessage());
+        }
     }
     
     /**
      * Handles search announcements
      */
     private void handleSearchAnnouncements(String query, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.searchAnnouncements(query);
-        
-        future.thenAccept(announcements -> {
-            try {
-                String json = buildAnnouncementListResponse(announcements);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending search announcements response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to search announcements: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.searchAnnouncements(query).get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error searching announcements: " + query, e);
+            sendErrorResponse(response, 500, "Failed to search announcements: " + e.getMessage());
+        }
     }
     
     /**
@@ -384,46 +326,28 @@ public class AnnouncementController extends HttpServlet {
      * Handles GET /api/v1/announcements/world/{world} - Get announcements for world
      */
     private void handleGetAnnouncementsForWorld(String world, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.getAnnouncementsForWorld(world);
-        
-        future.thenAccept(announcements -> {
-            try {
-                String json = buildAnnouncementListResponse(announcements);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending announcements for world response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to retrieve announcements for world: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.getAnnouncementsForWorld(world).get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error retrieving announcements for world: " + world, e);
+            sendErrorResponse(response, 500, "Failed to retrieve announcements for world: " + e.getMessage());
+        }
     }
     
     /**
      * Handles GET /api/v1/announcements/group/{group} - Get announcements for group
      */
     private void handleGetAnnouncementsForGroup(String group, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<List<AnnouncementDTO>> future = announcementService.getAnnouncementsForGroup(group);
-        
-        future.thenAccept(announcements -> {
-            try {
-                String json = buildAnnouncementListResponse(announcements);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending announcements for group response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to retrieve announcements for group: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            List<AnnouncementDTO> announcements = announcementService.getAnnouncementsForGroup(group).get(15, TimeUnit.SECONDS);
+            String json = buildAnnouncementListResponse(announcements);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error retrieving announcements for group: " + group, e);
+            sendErrorResponse(response, 500, "Failed to retrieve announcements for group: " + e.getMessage());
+        }
     }
     
     /**

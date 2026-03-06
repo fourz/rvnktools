@@ -239,19 +239,17 @@ public class PlayerController extends HttpServlet {
 
     private void handleGetRecentPlayers(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         int hours = getIntParam(req, "hours", 24);
-        
-        playerService.getRecentPlayers(hours)
-                .thenAccept(players -> {
-                    List<PlayerResponse> responses = players.stream()
-                            .map(this::convertToResponse)
-                            .collect(Collectors.toList());
-                    sendResponse(resp, 200, responses);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving recent players", ex);
-                    sendError(resp, 500, "Failed to retrieve recent players");
-                    return null;
-                });
+
+        try {
+            List<PlayerDTO> players = playerService.getRecentPlayers(hours).get(15, TimeUnit.SECONDS);
+            List<PlayerResponse> responses = players.stream()
+                    .map(this::convertToResponse)
+                    .collect(Collectors.toList());
+            sendResponse(resp, 200, responses);
+        } catch (Exception ex) {
+            logger.error("Error retrieving recent players", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve recent players");
+        }
     }
 
     private void handleGetPlayer(UUID uuid, HttpServletResponse resp) throws IOException {
