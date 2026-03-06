@@ -116,7 +116,7 @@ public class DefaultWorldRepository implements WorldRepository {
     @Override
     public CompletableFuture<List<WorldDTO>> findWorldsWithPlayers() {
         return CompletableFuture.supplyAsync(() -> {
-            String query = "SELECT * FROM rvnk_worlds WHERE current_players > 0";
+            String query = "SELECT * FROM rvnk_worlds WHERE player_count > 0";
             List<WorldDTO> worlds = new ArrayList<>();
             try (Connection conn = connectionProvider.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(query)) {
