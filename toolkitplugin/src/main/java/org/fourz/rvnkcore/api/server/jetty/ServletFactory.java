@@ -157,7 +157,7 @@ public class ServletFactory {
         LogManager worldControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.WorldController.class);
         
-        WorldController worldController = new WorldController(worldService, gson, worldControllerLogger);
+        WorldController worldController = new WorldController(worldService, playerWorldService, gson, worldControllerLogger);
         context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
     }
 

@@ -2,6 +2,8 @@ package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -11,8 +13,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * REST API controller for world management and tracking operations.
@@ -23,11 +28,13 @@ import java.util.concurrent.TimeUnit;
 public class WorldController extends HttpServlet {
     
     private final WorldService worldService;
+    private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
 
-    public WorldController(WorldService worldService, Gson gson, LogManager logger) {
+    public WorldController(WorldService worldService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
         this.worldService = worldService;
+        this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
     }
@@ -139,21 +146,59 @@ public class WorldController extends HttpServlet {
      * Handles GET /api/v1/worlds/player/{playerUuid} - Get worlds visited by specific player
      */
     private void handleGetWorldsForPlayer(String playerUuid, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // For now, return empty list since this requires PlayerWorld correlation
-        sendResponse(response, java.util.Collections.emptyList());
+        try {
+            UUID uuid = UUID.fromString(playerUuid);
+            List<String> worlds = playerWorldService.getPlayerVisitedWorlds(uuid).get(15, TimeUnit.SECONDS);
+            Map<String, Object> result = new HashMap<>();
+            result.put("playerUuid", playerUuid);
+            result.put("worldCount", worlds.size());
+            result.put("worlds", worlds);
+            sendResponse(response, result);
+        } catch (IllegalArgumentException e) {
+            sendErrorResponse(response, 400, "Invalid UUID format: " + playerUuid);
+        } catch (Exception e) {
+            logger.error("Failed to get worlds for player: " + playerUuid, e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds for player");
+        }
     }
 
     /**
      * Handles GET /api/v1/worlds/correlation/{playerUuid} - Get world-player correlation data
      */
     private void handleGetWorldPlayerCorrelation(String playerUuid, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // For now, return empty correlation data
-        Map<String, Object> correlationData = new HashMap<>();
-        correlationData.put("playerUuid", playerUuid);
-        correlationData.put("worldsVisited", 0);
-        correlationData.put("totalPlaytime", 0);
-        correlationData.put("worlds", java.util.Collections.emptyList());
-        sendResponse(response, correlationData);
+        try {
+            UUID uuid = UUID.fromString(playerUuid);
+            List<PlayerWorldDataDTO> allData = playerWorldService.getAllPlayerWorldData(uuid).get(15, TimeUnit.SECONDS);
+            List<PlayerWorldDataDTO> mostVisited = playerWorldService.getPlayerMostVisitedWorlds(uuid, 5).get(15, TimeUnit.SECONDS);
+
+            long totalPlaytime = allData.stream().mapToLong(PlayerWorldDataDTO::getPlaytimeSeconds).sum();
+            int totalDeaths = allData.stream().mapToInt(PlayerWorldDataDTO::getDeathCount).sum();
+            int totalVisits = allData.stream().mapToInt(PlayerWorldDataDTO::getVisitCount).sum();
+            String favoriteWorld = mostVisited.isEmpty() ? null : mostVisited.get(0).getWorldName();
+
+            Map<String, Object> correlationData = new HashMap<>();
+            correlationData.put("playerUuid", playerUuid);
+            correlationData.put("worldsVisited", allData.size());
+            correlationData.put("totalPlaytimeSeconds", totalPlaytime);
+            correlationData.put("totalDeaths", totalDeaths);
+            correlationData.put("totalVisits", totalVisits);
+            correlationData.put("favoriteWorld", favoriteWorld != null ? favoriteWorld : "none");
+            correlationData.put("worlds", allData.stream().map(d -> {
+                Map<String, Object> world = new HashMap<>();
+                world.put("worldName", d.getWorldName());
+                world.put("visitCount", d.getVisitCount());
+                world.put("playtimeSeconds", d.getPlaytimeSeconds());
+                world.put("deathCount", d.getDeathCount());
+                world.put("lastVisit", d.getLastVisit());
+                return world;
+            }).collect(Collectors.toList()));
+            sendResponse(response, correlationData);
+        } catch (IllegalArgumentException e) {
+            sendErrorResponse(response, 400, "Invalid UUID format: " + playerUuid);
+        } catch (Exception e) {
+            logger.error("Failed to get world-player correlation: " + playerUuid, e);
+            sendErrorResponse(response, 500, "Failed to retrieve world-player correlation");
+        }
     }
 
     /**
