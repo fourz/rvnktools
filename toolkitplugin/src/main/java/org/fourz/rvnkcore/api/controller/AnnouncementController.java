@@ -640,7 +640,10 @@ public class AnnouncementController extends HttpServlet {
                 announcement.setTitle(title);
             }
             
-            if (json.contains("\"message\":")) {
+            if (json.contains("\"content\":")) {
+                String message = extractJsonValue(json, "content");
+                announcement.setMessage(message);
+            } else if (json.contains("\"message\":")) {
                 String message = extractJsonValue(json, "message");
                 announcement.setMessage(message);
             }

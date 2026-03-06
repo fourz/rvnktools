@@ -418,12 +418,12 @@ public class DefaultAnnouncementService implements AnnouncementService {
             
             for (AnnouncementDTO announcement : announcements) {
                 try {
-                    // Check if already exists
-                    if (announcementExists(announcement.getId()).join()) {
+                    // Check if already exists (skip for new announcements without ID)
+                    if (announcement.getId() != null && announcementExists(announcement.getId()).join()) {
                         logger.debug("Skipping existing announcement: " + announcement.getId());
                         continue;
                     }
-                    
+
                     // Create the announcement
                     createAnnouncement(announcement).join();
                     imported.incrementAndGet();
