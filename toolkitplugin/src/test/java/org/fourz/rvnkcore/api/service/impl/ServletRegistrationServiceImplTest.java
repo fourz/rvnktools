@@ -58,7 +58,7 @@ class ServletRegistrationServiceImplTest {
         // Setup mock plugin with logger
         when(mockPlugin.getLogger()).thenReturn(Logger.getLogger("TestPlugin"));
 
-        service = new ServletRegistrationServiceImpl(mockConfig, mockPlugin);
+        service = new ServletRegistrationServiceImpl(mockConfig, mockPlugin, new com.google.gson.Gson());
     }
 
     // ==================== Registration Before Server Start ====================

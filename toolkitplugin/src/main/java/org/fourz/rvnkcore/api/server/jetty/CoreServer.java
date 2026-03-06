@@ -83,7 +83,7 @@ public class CoreServer {
         this.serverLifecycle = new ServerLifecycle(config, logger);
         
         // Initialize external servlet registration service
-        this.servletRegistrationService = new ServletRegistrationServiceImpl(config, plugin);
+        this.servletRegistrationService = new ServletRegistrationServiceImpl(config, plugin, gson);
     }
 
     /**

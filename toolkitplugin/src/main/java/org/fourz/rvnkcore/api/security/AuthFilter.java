@@ -1,9 +1,12 @@
 package org.fourz.rvnkcore.api.security;
 
+import com.google.gson.Gson;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
@@ -21,18 +24,21 @@ public class AuthFilter implements Filter {
     private final Set<String> allowedIPs;
     private final LogManager logger;
     private final boolean ipWhitelistEnabled;
+    private final Gson gson;
 
     /**
      * Creates an AuthFilter with API key authentication.
      *
      * @param config API configuration containing security settings
      * @param plugin Plugin instance for logging
+     * @param gson   JSON serializer for canonical error responses
      */
-    public AuthFilter(ApiConfig config, Plugin plugin) {
+    public AuthFilter(ApiConfig config, Plugin plugin, Gson gson) {
         this.apiKey = config.getApiKey();
         this.allowedIPs = config.getAllowedIPs() != null ? new HashSet<>(Arrays.asList(config.getAllowedIPs())) : new HashSet<>();
         this.ipWhitelistEnabled = !this.allowedIPs.isEmpty();
         this.logger = LogManager.getInstance(plugin, getClass());
+        this.gson = gson;
         
         // Debug logging is configured globally in RVNKCoreBootstrap
         
@@ -51,7 +57,7 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         
-        String clientIP = getClientIP(httpRequest);
+        String clientIP = ApiUtils.getClientIP(httpRequest);
         String method = httpRequest.getMethod();
         String requestURI = httpRequest.getRequestURI();
         
@@ -79,8 +85,8 @@ public class AuthFilter implements Filter {
         }
         
         if (!apiKey.equals(providedKey)) {
-            logger.warning("API access denied - Invalid API key '" + providedKey + "' from IP: " + clientIP);
-            logger.debug("API key comparison: expected='" + apiKey + "', provided='" + providedKey + "'");
+            logger.warning("API access denied - Invalid API key from IP: " + clientIP);
+            logger.debug("API key mismatch: provided key length=" + (providedKey != null ? providedKey.length() : 0));
             sendUnauthorized(httpResponse, "Invalid API key");
             return;
         }
@@ -93,29 +99,13 @@ public class AuthFilter implements Filter {
     }
 
     /**
-     * Extracts client IP address, handling forwarded headers.
-     */
-    private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        
-        String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty()) {
-            return xRealIP;
-        }
-        
-        return request.getRemoteAddr();
-    }
-
-    /**
-     * Sends unauthorized response with error message.
+     * Sends unauthorized response using the canonical ApiResponse envelope.
      */
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\": \"" + message + "\", \"status\": 401}");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(gson.toJson(ApiResponse.error("UNAUTHORIZED", message)));
     }
 
     @Override

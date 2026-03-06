@@ -95,13 +95,12 @@ public class ServletFactory {
             registerCorsFilter(context);
         }
 
-        // Add authentication filter for all API endpoints
-        AuthFilter authFilter = new AuthFilter(config, plugin);
-        context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
-        // Plugin controller paths (context-relative — external URL is /api/bartershops/*, etc.)
-        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/bartershops/*", null);
-        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/lore/*", null);
-        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/rvnkworlds/*", null);
+        // Add authentication filter for all API endpoints (single shared instance)
+        FilterHolder authHolder = new FilterHolder(new AuthFilter(config, plugin, gson));
+        context.addFilter(authHolder, "/v1/*", null);
+        context.addFilter(authHolder, "/bartershops/*", null);
+        context.addFilter(authHolder, "/lore/*", null);
+        context.addFilter(authHolder, "/rvnkworlds/*", null);
     }
 
     /**

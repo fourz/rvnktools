@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.api.service.impl;
 
+import com.google.gson.Gson;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServlet;
 import org.bukkit.plugin.Plugin;
@@ -37,6 +38,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
     private final LogManager logger;
     private final ApiConfig config;
     private final Plugin plugin;
+    private final Gson gson;
     
     // Thread-safe registry of external servlets
     private final Map<String, ServletRegistration> registeredServlets = new ConcurrentHashMap<>();
@@ -69,10 +71,12 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
      *
      * @param config The API configuration
      * @param plugin The plugin instance for logging
+     * @param gson   JSON serializer for auth filter responses
      */
-    public ServletRegistrationServiceImpl(ApiConfig config, Plugin plugin) {
+    public ServletRegistrationServiceImpl(ApiConfig config, Plugin plugin, Gson gson) {
         this.config = config;
         this.plugin = plugin;
+        this.gson = gson;
         this.logger = LogManager.getInstance(plugin, getClass());
         logger.debug("ServletRegistrationService initialized");
     }
@@ -206,7 +210,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
             servletContext.addServlet(holder, pathSpec);
 
             if (registration.requireAuth()) {
-                AuthFilter authFilter = new AuthFilter(config, plugin);
+                AuthFilter authFilter = new AuthFilter(config, plugin, gson);
                 FilterHolder filterHolder = new FilterHolder(authFilter);
                 filterHolder.setName("auth_" + registration.displayName() + "_" + pathSpec.hashCode());
                 servletContext.addFilter(filterHolder, pathSpec,
