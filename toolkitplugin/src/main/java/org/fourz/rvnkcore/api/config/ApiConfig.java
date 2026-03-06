@@ -31,6 +31,7 @@ public class ApiConfig {
     private final int connectionTimeout;
     private final boolean useForwardedHeaders;
     private final String[] allowedIPs;
+    private final String[] sanHostnames;
     private final Level apiLogLevel;
     private final Level globalLogLevel;
     
@@ -75,13 +76,16 @@ public class ApiConfig {
         // Parse allowed IPs
         String allowedIPsStr = config.getString("api.security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
-        
+
+        // Parse SAN hostnames for TLS cert generation (includes api.host if not localhost)
+        this.sanHostnames = parseSanHostnames(host, config.getString("api.https.san-hostnames", ""));
+
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(logLevelStr) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + 
-                   ", Global Log Level: " + logLevelStr + 
-                   ", API Log Level: " + apiLogStr + 
-                   ", HTTP Port: " + httpPort + 
+        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+                   ", Global Log Level: " + logLevelStr +
+                   ", API Log Level: " + apiLogStr +
+                   ", HTTP Port: " + httpPort +
                    ", HTTPS Port: " + httpsPort);
     }
 
@@ -137,13 +141,16 @@ public class ApiConfig {
         // Parse allowed IPs
         String allowedIPsStr = apiSection.getString("security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
-        
+
+        // Parse SAN hostnames for TLS cert generation (includes api.host if not localhost)
+        this.sanHostnames = parseSanHostnames(host, apiSection.getString("https.san-hostnames", ""));
+
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(globalLogLevel.getName()) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled + 
-                   ", Global Log Level: " + globalLogLevel.getName() + 
-                   ", API Log Level: " + apiLogStr + 
-                   ", HTTP Port: " + httpPort + 
+        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+                   ", Global Log Level: " + globalLogLevel.getName() +
+                   ", API Log Level: " + apiLogStr +
+                   ", HTTP Port: " + httpPort +
                    ", HTTPS Port: " + httpsPort);
     }
 
@@ -169,6 +176,25 @@ public class ApiConfig {
     public int getConnectionTimeout() { return connectionTimeout; }
     public boolean isUseForwardedHeaders() { return useForwardedHeaders; }
     public String[] getAllowedIPs() { return allowedIPs; }
+    public String[] getSanHostnames() { return sanHostnames; }
+
+    /**
+     * Builds the SAN hostname list from the configured host and explicit san-hostnames value.
+     */
+    private static String[] parseSanHostnames(String host, String sanHostnamesStr) {
+        java.util.Set<String> hostnames = new java.util.LinkedHashSet<>();
+        if (host != null && !host.trim().isEmpty() && !"localhost".equalsIgnoreCase(host.trim())) {
+            hostnames.add(host.trim());
+        }
+        if (sanHostnamesStr != null && !sanHostnamesStr.trim().isEmpty()) {
+            for (String h : sanHostnamesStr.split(",")) {
+                if (!h.trim().isEmpty() && !"localhost".equalsIgnoreCase(h.trim())) {
+                    hostnames.add(h.trim());
+                }
+            }
+        }
+        return hostnames.toArray(new String[0]);
+    }
 
     /**
      * Validates the configuration and logs any issues.

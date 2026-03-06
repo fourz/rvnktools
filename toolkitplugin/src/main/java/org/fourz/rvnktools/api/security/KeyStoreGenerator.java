@@ -19,7 +19,22 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import java.security.SecureRandom;
 
 public class KeyStoreGenerator {
+    /**
+     * Generates a self-signed keystore for localhost only (legacy).
+     */
     public static void generateKeyStore(String keystorePath, String keystorePassword, String keyAlias) throws Exception {
+        generateKeyStore(keystorePath, keystorePassword, keyAlias, new String[0]);
+    }
+
+    /**
+     * Generates a self-signed keystore with optional extra hostnames in the SAN list.
+     *
+     * @param keystorePath      Path to write the JKS keystore
+     * @param keystorePassword  Keystore password
+     * @param keyAlias          Key alias inside the store
+     * @param extraHostnames    Additional DNS names to include as SANs (e.g. internal hostnames)
+     */
+    public static void generateKeyStore(String keystorePath, String keystorePassword, String keyAlias, String[] extraHostnames) throws Exception {
         // Generate key pair
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
@@ -28,7 +43,7 @@ public class KeyStoreGenerator {
         // Generate self-signed certificate with SAN extensions
         X500Name dnName = new X500Name("CN=localhost, O=RVNKCore, OU=API Server");
         BigInteger certSerialNumber = BigInteger.valueOf(System.currentTimeMillis());
-        
+
         Calendar calendar = Calendar.getInstance();
         Date startDate = calendar.getTime();
         calendar.add(Calendar.YEAR, 1);
@@ -36,15 +51,21 @@ public class KeyStoreGenerator {
 
         X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
             dnName, certSerialNumber, startDate, endDate, dnName, keyPair.getPublic());
-        
+
         // Add Subject Alternative Names for better compatibility
         try {
-            org.bouncycastle.asn1.x509.GeneralNames subjectAltNames = new org.bouncycastle.asn1.x509.GeneralNames(
-                new org.bouncycastle.asn1.x509.GeneralName[] {
-                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, "localhost"),
-                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "127.0.0.1"),
-                    new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "::1")
+            // Build SAN list: localhost + loopback IPs + any extra hostnames
+            java.util.List<org.bouncycastle.asn1.x509.GeneralName> sanList = new java.util.ArrayList<>();
+            sanList.add(new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, "localhost"));
+            sanList.add(new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "127.0.0.1"));
+            sanList.add(new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.iPAddress, "::1"));
+            for (String hostname : extraHostnames) {
+                if (hostname != null && !hostname.trim().isEmpty() && !"localhost".equals(hostname.trim())) {
+                    sanList.add(new org.bouncycastle.asn1.x509.GeneralName(org.bouncycastle.asn1.x509.GeneralName.dNSName, hostname.trim()));
                 }
+            }
+            org.bouncycastle.asn1.x509.GeneralNames subjectAltNames = new org.bouncycastle.asn1.x509.GeneralNames(
+                sanList.toArray(new org.bouncycastle.asn1.x509.GeneralName[0])
             );
             certBuilder.addExtension(org.bouncycastle.asn1.x509.Extension.subjectAlternativeName, false, subjectAltNames);
         } catch (Exception sanEx) {

@@ -111,13 +111,19 @@ public class ServerSSLFactory {
             try {
                 // Ensure parent directory exists
                 keystoreFile.getParentFile().mkdirs();
-                
+
+                // Include configured host and any extra SAN hostnames in the certificate
+                String[] extraHostnames = config.getSanHostnames();
                 KeyStoreGenerator.generateKeyStore(
-                    keystoreFile.getAbsolutePath(), 
-                    config.getKeystorePassword(), 
-                    "jetty"
+                    keystoreFile.getAbsolutePath(),
+                    config.getKeystorePassword(),
+                    "jetty",
+                    extraHostnames
                 );
                 logger.info("Keystore generated successfully at: " + keystoreFile.getAbsolutePath());
+                if (extraHostnames.length > 0) {
+                    logger.info("Certificate SANs include: localhost, " + String.join(", ", extraHostnames));
+                }
             } catch (Exception e) {
                 logger.error("Failed to generate keystore", e);
                 logger.error("HTTPS setup aborted due to keystore generation failure");
