@@ -13,8 +13,6 @@ import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -68,17 +66,17 @@ public class LoreController extends HttpServlet {
             CompletableFuture<ApiResponse<?>> future;
 
             if (pathInfo.equals("/") || pathInfo.equals("/entries")) {
-                future = apiService.getEntries(extractQueryParams(req));
+                future = apiService.getEntries(ApiUtils.extractQueryParams(req));
             } else if (pathInfo.equals("/entries/search")) {
                 String query = req.getParameter("q");
                 if (query == null || query.trim().isEmpty()) {
                     sendError(resp, 400, "INVALID_REQUEST", "Search query 'q' is required");
                     return;
                 }
-                future = apiService.searchEntries(query, extractQueryParams(req));
+                future = apiService.searchEntries(query, ApiUtils.extractQueryParams(req));
             } else if (pathInfo.matches("^/entries/type/[^/]+$")) {
                 String type = pathInfo.substring("/entries/type/".length());
-                future = apiService.getEntriesByType(type, extractQueryParams(req));
+                future = apiService.getEntriesByType(type, ApiUtils.extractQueryParams(req));
             } else if (pathInfo.matches("^/entries/[^/]+$")) {
                 String id = pathInfo.substring("/entries/".length());
                 future = apiService.getEntryById(id);
@@ -140,34 +138,13 @@ public class LoreController extends HttpServlet {
         resp.setStatus(HttpServletResponse.SC_OK);
     }
 
-    private Map<String, String> extractQueryParams(HttpServletRequest req) {
-        Map<String, String> params = new HashMap<>();
-        req.getParameterMap().forEach((key, values) -> {
-            if (values != null && values.length > 0) {
-                params.put(key, values[0]);
-            }
-        });
-        return params;
-    }
-
     private void sendApiResponse(HttpServletResponse resp, ApiResponse<?> response) {
         int httpStatus = response.success() ? 200
             : (response.error() != null ? response.error().suggestedHttpStatus() : 400);
-        sendJson(resp, httpStatus, response);
+        ApiUtils.sendJson(resp, gson, httpStatus, response);
     }
 
     private void sendError(HttpServletResponse resp, int status, String code, String message) {
-        sendJson(resp, status, ApiResponse.error(code, message));
-    }
-
-    private void sendJson(HttpServletResponse resp, int status, Object data) {
-        try {
-            resp.setStatus(status);
-            resp.setContentType("application/json");
-            resp.setCharacterEncoding("UTF-8");
-            resp.getWriter().write(gson.toJson(data));
-        } catch (IOException e) {
-            logger.error("Error writing API response", e);
-        }
+        ApiUtils.sendError(resp, gson, status, code, message);
     }
 }

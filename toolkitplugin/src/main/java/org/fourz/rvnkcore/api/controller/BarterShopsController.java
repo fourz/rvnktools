@@ -6,14 +6,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.service.IBarterShopsApiService;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -73,7 +72,7 @@ public class BarterShopsController extends HttpServlet {
             CompletableFuture<ApiResponse<?>> future;
 
             if (pathInfo.equals("/shops")) {
-                future = apiService.getShops(extractQueryParams(req));
+                future = apiService.getShops(ApiUtils.extractQueryParams(req));
             } else if (pathInfo.equals("/shops/nearby")) {
                 future = handleShopsNearby(req, resp);
                 if (future == null) return; // error already sent
@@ -160,34 +159,13 @@ public class BarterShopsController extends HttpServlet {
         return getApiService().getRecentTrades(limit, shopId, playerUuid);
     }
 
-    private Map<String, String> extractQueryParams(HttpServletRequest req) {
-        Map<String, String> params = new HashMap<>();
-        req.getParameterMap().forEach((key, values) -> {
-            if (values != null && values.length > 0) {
-                params.put(key, values[0]);
-            }
-        });
-        return params;
-    }
-
     private void sendApiResponse(HttpServletResponse resp, ApiResponse<?> response) {
         int httpStatus = response.success() ? 200
             : (response.error() != null ? response.error().suggestedHttpStatus() : 400);
-        sendJson(resp, httpStatus, response);
+        ApiUtils.sendJson(resp, gson, httpStatus, response);
     }
 
     private void sendError(HttpServletResponse resp, int status, String code, String message) {
-        sendJson(resp, status, ApiResponse.error(code, message));
-    }
-
-    private void sendJson(HttpServletResponse resp, int status, Object data) {
-        try {
-            resp.setStatus(status);
-            resp.setContentType("application/json");
-            resp.setCharacterEncoding("UTF-8");
-            resp.getWriter().write(gson.toJson(data));
-        } catch (IOException e) {
-            logger.error("Error writing API response", e);
-        }
+        ApiUtils.sendError(resp, gson, status, code, message);
     }
 }

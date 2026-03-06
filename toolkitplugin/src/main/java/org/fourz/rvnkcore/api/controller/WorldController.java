@@ -5,13 +5,13 @@ import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -244,38 +244,18 @@ public class WorldController extends HttpServlet {
         }
     }
 
-    /**
-     * Sends a successful JSON response wrapped in the canonical ApiResponse envelope.
-     */
     private void sendResponse(HttpServletResponse response, Object data) {
-        try {
-            response.setStatus(200);
-            PrintWriter writer = response.getWriter();
-            writer.write(gson.toJson(ApiResponse.success(data)));
-            writer.flush();
-        } catch (IOException e) {
-            logger.error("Failed to send response", e);
-        }
+        ApiUtils.sendSuccess(response, gson, data);
     }
 
-    /**
-     * Sends an error response using the canonical ApiResponse envelope.
-     */
     private void sendErrorResponse(HttpServletResponse response, int statusCode, String message) {
-        try {
-            response.setStatus(statusCode);
-            String code = switch (statusCode) {
-                case 400 -> "BAD_REQUEST";
-                case 401 -> "UNAUTHORIZED";
-                case 404 -> "NOT_FOUND";
-                case 500 -> "INTERNAL_ERROR";
-                default -> "ERROR";
-            };
-            PrintWriter writer = response.getWriter();
-            writer.write(gson.toJson(ApiResponse.error(code, message)));
-            writer.flush();
-        } catch (IOException e) {
-            logger.error("Failed to send error response", e);
-        }
+        String code = switch (statusCode) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 404 -> "NOT_FOUND";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        ApiUtils.sendError(response, gson, statusCode, code, message);
     }
 }

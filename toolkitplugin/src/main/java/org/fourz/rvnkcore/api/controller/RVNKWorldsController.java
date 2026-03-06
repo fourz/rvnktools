@@ -187,21 +187,10 @@ public class RVNKWorldsController extends HttpServlet {
     private void sendApiResponse(HttpServletResponse resp, ApiResponse<?> response) {
         int httpStatus = response.success() ? 200
             : (response.error() != null ? response.error().suggestedHttpStatus() : 400);
-        sendJson(resp, httpStatus, response);
+        ApiUtils.sendJson(resp, gson, httpStatus, response);
     }
 
     private void sendError(HttpServletResponse resp, int status, String code, String message) {
-        sendJson(resp, status, ApiResponse.error(code, message));
-    }
-
-    private void sendJson(HttpServletResponse resp, int status, Object data) {
-        try {
-            resp.setStatus(status);
-            resp.setContentType("application/json");
-            resp.setCharacterEncoding("UTF-8");
-            resp.getWriter().write(gson.toJson(data));
-        } catch (IOException e) {
-            logger.error("Error writing API response", e);
-        }
+        ApiUtils.sendError(resp, gson, status, code, message);
     }
 }

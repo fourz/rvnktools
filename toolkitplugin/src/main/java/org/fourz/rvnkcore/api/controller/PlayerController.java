@@ -7,13 +7,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
-import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.model.response.CountResponse;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.model.response.PlayerWorldDataResponse;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -51,7 +50,7 @@ public class PlayerController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
-        String clientIP = getClientIP(req);
+        String clientIP = ApiUtils.getClientIP(req);
         String queryString = req.getQueryString();
         
         // Move request logging to debug level to reduce verbosity
@@ -115,7 +114,7 @@ public class PlayerController extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error handling GET request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            logger.error("Error handling GET request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
             sendError(resp, 500, "Internal server error: " + e.getMessage());
         }
     }
@@ -169,7 +168,7 @@ public class PlayerController extends HttpServlet {
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
-        String clientIP = getClientIP(req);
+        String clientIP = ApiUtils.getClientIP(req);
         
         // Move request logging to debug level to reduce verbosity
         logger.debug("PlayerController PUT request: " + pathInfo + " from IP: " + clientIP);
@@ -207,7 +206,7 @@ public class PlayerController extends HttpServlet {
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, "Invalid UUID format");
         } catch (Exception e) {
-            logger.error("Error handling PUT request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            logger.error("Error handling PUT request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
             sendError(resp, 500, "Internal server error: " + e.getMessage());
         }
     }
@@ -343,7 +342,7 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleUpdateLocation(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        LocationUpdateRequest request = gson.fromJson(readRequestBody(req), LocationUpdateRequest.class);
+        LocationUpdateRequest request = gson.fromJson(ApiUtils.readRequestBody(req), LocationUpdateRequest.class);
         if (!request.isValid()) { sendError(resp, 400, "Invalid location update request"); return; }
         try {
             playerService.updatePlayerLocation(uuid, request.getWorld(), request.getX(), request.getY(), request.getZ())
@@ -356,7 +355,7 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleUpdateGroups(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        GroupUpdateRequest request = gson.fromJson(readRequestBody(req), GroupUpdateRequest.class);
+        GroupUpdateRequest request = gson.fromJson(ApiUtils.readRequestBody(req), GroupUpdateRequest.class);
         if (!request.isValid()) { sendError(resp, 400, "Invalid group update request"); return; }
         String primary = request.getGroups().isEmpty() ? "" : request.getGroups().get(0);
         try {
@@ -586,63 +585,21 @@ public class PlayerController extends HttpServlet {
     }
 
     private void sendResponse(HttpServletResponse resp, int status, Object data) {
-        try {
-            resp.setStatus(status);
-            resp.getWriter().write(gson.toJson(ApiResponse.success(data)));
-        } catch (IOException e) {
-            logger.error("Error sending response", e);
-        }
+        ApiUtils.sendSuccess(resp, gson, data);
     }
 
     private void sendError(HttpServletResponse resp, int status, String message) {
-        try {
-            resp.setStatus(status);
-            String code = switch (status) {
-                case 400 -> "BAD_REQUEST";
-                case 401 -> "UNAUTHORIZED";
-                case 404 -> "NOT_FOUND";
-                case 500 -> "INTERNAL_ERROR";
-                default -> "ERROR";
-            };
-            resp.getWriter().write(gson.toJson(ApiResponse.error(code, message)));
-        } catch (IOException e) {
-            logger.error("Error sending error response", e);
-        }
+        String code = switch (status) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 404 -> "NOT_FOUND";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        ApiUtils.sendError(resp, gson, status, code, message);
     }
 
     private int getIntParam(HttpServletRequest req, String name, int defaultValue) {
-        String value = req.getParameter(name);
-        if (value == null) return defaultValue;
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * Extracts client IP address, handling forwarded headers.
-     */
-    private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        
-        String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty()) {
-            return xRealIP;
-        }
-        
-        return request.getRemoteAddr();
-    }
-
-    private String readRequestBody(HttpServletRequest req) throws IOException {
-        StringBuilder body = new StringBuilder();
-        String line;
-        while ((line = req.getReader().readLine()) != null) {
-            body.append(line);
-        }
-        return body.toString();
+        return ApiUtils.getIntParam(req, name, defaultValue);
     }
 }

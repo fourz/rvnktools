@@ -1,9 +1,14 @@
 package org.fourz.rvnkcore.api.util;
 
+import com.google.gson.Gson;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Shared HTTP utility helpers for RVNKCore API servlets.
@@ -92,6 +97,66 @@ public final class ApiUtils {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             return defaultValue;
+        }
+    }
+
+    /**
+     * Extracts all query parameters from the request as a single-value map.
+     * When a parameter has multiple values, only the first is kept.
+     *
+     * @param req The incoming HTTP request
+     * @return Map of parameter name to first value
+     */
+    public static Map<String, String> extractQueryParams(HttpServletRequest req) {
+        Map<String, String> params = new HashMap<>();
+        req.getParameterMap().forEach((key, values) -> {
+            if (values != null && values.length > 0) {
+                params.put(key, values[0]);
+            }
+        });
+        return params;
+    }
+
+    /**
+     * Sends a successful JSON response wrapped in the canonical {@link ApiResponse} envelope.
+     *
+     * @param resp HTTP response
+     * @param gson JSON serializer
+     * @param data Payload to wrap in {@code ApiResponse.success(data)}
+     */
+    public static void sendSuccess(HttpServletResponse resp, Gson gson, Object data) {
+        sendJson(resp, gson, 200, ApiResponse.success(data));
+    }
+
+    /**
+     * Sends an error JSON response wrapped in the canonical {@link ApiResponse} envelope.
+     *
+     * @param resp    HTTP response
+     * @param gson    JSON serializer
+     * @param status  HTTP status code
+     * @param code    Machine-readable error code (e.g. {@code "NOT_FOUND"})
+     * @param message Human-readable error description
+     */
+    public static void sendError(HttpServletResponse resp, Gson gson, int status, String code, String message) {
+        sendJson(resp, gson, status, ApiResponse.error(code, message));
+    }
+
+    /**
+     * Writes an arbitrary object as JSON to the response with the given HTTP status.
+     *
+     * @param resp   HTTP response
+     * @param gson   JSON serializer
+     * @param status HTTP status code
+     * @param data   Object to serialize
+     */
+    public static void sendJson(HttpServletResponse resp, Gson gson, int status, Object data) {
+        try {
+            resp.setStatus(status);
+            resp.setContentType("application/json");
+            resp.setCharacterEncoding("UTF-8");
+            resp.getWriter().write(gson.toJson(data));
+        } catch (IOException e) {
+            // Cannot recover — response stream is broken
         }
     }
 }
