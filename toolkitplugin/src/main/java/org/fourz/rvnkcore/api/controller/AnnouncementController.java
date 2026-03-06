@@ -412,69 +412,41 @@ public class AnnouncementController extends HttpServlet {
      * Handles DELETE /api/v1/announcements/{id} - Delete announcement
      */
     private void handleDeleteAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Void> future = announcementService.deleteAnnouncement(id);
-        
-        future.thenRun(() -> {
-            try {
-                response.setStatus(204); // No Content
-                response.getWriter().flush();
-            } catch (IOException e) {
-                logger.error("Error sending delete response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to delete announcement: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            announcementService.deleteAnnouncement(id).get(15, TimeUnit.SECONDS);
+            response.setStatus(204);
+        } catch (Exception e) {
+            logger.error("Error deleting announcement: " + id, e);
+            sendErrorResponse(response, 500, "Failed to delete announcement: " + e.getMessage());
+        }
     }
     
     /**
      * Handles PUT /api/v1/announcements/{id}/activate - Activate announcement
      */
     private void handleActivateAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Void> future = announcementService.activateAnnouncement(id);
-        
-        future.thenRun(() -> {
-            try {
-                String json = String.format("{\"status\": \"success\", \"message\": \"Announcement %s activated\"}", id);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending activate response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to activate announcement: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            announcementService.activateAnnouncement(id).get(15, TimeUnit.SECONDS);
+            String json = String.format("{\"status\": \"success\", \"message\": \"Announcement %s activated\"}", id);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error activating announcement: " + id, e);
+            sendErrorResponse(response, 500, "Failed to activate announcement: " + e.getMessage());
+        }
     }
     
     /**
      * Handles PUT /api/v1/announcements/{id}/deactivate - Deactivate announcement
      */
     private void handleDeactivateAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        CompletableFuture<Void> future = announcementService.deactivateAnnouncement(id);
-        
-        future.thenRun(() -> {
-            try {
-                String json = String.format("{\"status\": \"success\", \"message\": \"Announcement %s deactivated\"}", id);
-                sendSuccessResponse(response, json);
-            } catch (IOException e) {
-                logger.error("Error sending deactivate response", e);
-            }
-        }).exceptionally(ex -> {
-            try {
-                sendErrorResponse(response, 500, "Failed to deactivate announcement: " + ex.getMessage());
-            } catch (IOException e) {
-                logger.error("Error sending error response", e);
-            }
-            return null;
-        });
+        try {
+            announcementService.deactivateAnnouncement(id).get(15, TimeUnit.SECONDS);
+            String json = String.format("{\"status\": \"success\", \"message\": \"Announcement %s deactivated\"}", id);
+            sendSuccessResponse(response, json);
+        } catch (Exception e) {
+            logger.error("Error deactivating announcement: " + id, e);
+            sendErrorResponse(response, 500, "Failed to deactivate announcement: " + e.getMessage());
+        }
     }
     
     /**
@@ -500,24 +472,10 @@ public class AnnouncementController extends HttpServlet {
             // Create AnnouncementDTO from JSON - simplified parsing
             AnnouncementDTO announcement = parseAnnouncementFromJson(json, id);
             
-            CompletableFuture<AnnouncementDTO> future = announcementService.updateAnnouncement(announcement);
-            future.whenComplete((updatedAnnouncement, throwable) -> {
-                try {
-                    if (throwable != null) {
-                        logger.error("Error updating announcement: " + id, throwable);
-                        if (throwable.getCause() instanceof IllegalArgumentException) {
-                            sendErrorResponse(response, 400, "Invalid announcement data: " + throwable.getMessage());
-                        } else {
-                            sendErrorResponse(response, 500, "Failed to update announcement: " + throwable.getMessage());
-                        }
-                    } else {
-                        response.setStatus(200);
-                        response.getWriter().write(buildAnnouncementResponse(updatedAnnouncement));
-                    }
-                } catch (IOException e) {
-                    logger.error("Error writing update response", e);
-                }
-            });
+            AnnouncementDTO updatedAnnouncement = announcementService.updateAnnouncement(announcement)
+                .get(15, TimeUnit.SECONDS);
+            response.setStatus(200);
+            response.getWriter().write(buildAnnouncementResponse(updatedAnnouncement));
             
         } catch (Exception e) {
             logger.error("Error handling update announcement request for ID: " + id, e);
@@ -548,24 +506,20 @@ public class AnnouncementController extends HttpServlet {
             List<AnnouncementDTO> announcements = parseAnnouncementListFromJson(json);
             
             CompletableFuture<Integer> future = announcementService.bulkImportAnnouncements(announcements);
-            future.whenComplete((importedCount, throwable) -> {
-                try {
-                    if (throwable != null) {
-                        logger.error("Error bulk importing announcements", throwable);
-                        if (throwable.getCause() instanceof IllegalArgumentException) {
-                            sendErrorResponse(response, 400, "Invalid announcement data: " + throwable.getMessage());
-                        } else {
-                            sendErrorResponse(response, 500, "Failed to import announcements: " + throwable.getMessage());
-                        }
-                    } else {
-                        response.setStatus(201);
-                        String result = "{\"imported_count\":" + importedCount + ",\"message\":\"Successfully imported " + importedCount + " announcements\"}";
-                        response.getWriter().write(result);
-                    }
-                } catch (IOException e) {
-                    logger.error("Error writing bulk import response", e);
+            try {
+                Integer importedCount = future.get(15, java.util.concurrent.TimeUnit.SECONDS);
+                response.setStatus(201);
+                String result = "{\"imported_count\":" + importedCount + ",\"message\":\"Successfully imported " + importedCount + " announcements\"}";
+                response.getWriter().write(result);
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                logger.error("Error bulk importing announcements", e);
+                if (cause instanceof IllegalArgumentException) {
+                    sendErrorResponse(response, 400, "Invalid announcement data: " + cause.getMessage());
+                } else {
+                    sendErrorResponse(response, 500, "Failed to import announcements: " + cause.getMessage());
                 }
-            });
+            }
             
         } catch (Exception e) {
             logger.error("Error handling bulk import request", e);
@@ -579,19 +533,14 @@ public class AnnouncementController extends HttpServlet {
     private void handleGetAnnouncementMetrics(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             CompletableFuture<java.util.Map<String, Object>> future = announcementService.getAnnouncementMetrics();
-            future.whenComplete((metrics, throwable) -> {
-                try {
-                    if (throwable != null) {
-                        logger.error("Error retrieving announcement metrics", throwable);
-                        sendErrorResponse(response, 500, "Failed to retrieve metrics: " + throwable.getMessage());
-                    } else {
-                        response.setStatus(200);
-                        response.getWriter().write(buildMetricsResponse(metrics));
-                    }
-                } catch (IOException e) {
-                    logger.error("Error writing metrics response", e);
-                }
-            });
+            try {
+                java.util.Map<String, Object> metrics = future.get(15, java.util.concurrent.TimeUnit.SECONDS);
+                response.setStatus(200);
+                response.getWriter().write(buildMetricsResponse(metrics));
+            } catch (Exception e) {
+                logger.error("Error retrieving announcement metrics", e);
+                sendErrorResponse(response, 500, "Failed to retrieve metrics: " + e.getMessage());
+            }
             
         } catch (Exception e) {
             logger.error("Error handling metrics request", e);
@@ -1022,46 +971,41 @@ public class AnnouncementController extends HttpServlet {
                 })
                 .collect(java.util.stream.Collectors.toList());
             
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).whenComplete((result, throwable) -> {
-                try {
-                    List<BulkOperationResult> results = futures.stream()
-                        .map(CompletableFuture::join)
-                        .collect(java.util.stream.Collectors.toList());
-                    
-                    long successful = results.stream().filter(r -> r.success).count();
-                    long failed = results.stream().filter(r -> !r.success).count();
-                    
-                    response.setStatus(200);
-                    
-                    // Build detailed response
-                    StringBuilder jsonResponse = new StringBuilder();
-                    jsonResponse.append("{");
-                    jsonResponse.append("\"message\":\"Bulk activation completed\",");
-                    jsonResponse.append("\"total\":").append(ids.size()).append(",");
-                    jsonResponse.append("\"successful\":").append(successful).append(",");
-                    jsonResponse.append("\"failed\":").append(failed).append(",");
-                    jsonResponse.append("\"results\":[");
-                    
-                    for (int i = 0; i < results.size(); i++) {
-                        BulkOperationResult r = results.get(i);
-                        jsonResponse.append("{");
-                        jsonResponse.append("\"id\":\"").append(r.id).append("\",");
-                        jsonResponse.append("\"success\":").append(r.success);
-                        if (r.error != null) {
-                            jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
-                        }
-                        jsonResponse.append("}");
-                        if (i < results.size() - 1) jsonResponse.append(",");
-                    }
-                    
-                    jsonResponse.append("]}");
-                    response.getWriter().write(jsonResponse.toString());
-                    
-                } catch (IOException e) {
-                    logger.error("Error writing bulk activation response", e);
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            List<BulkOperationResult> results = futures.stream()
+                .map(CompletableFuture::join)
+                .collect(java.util.stream.Collectors.toList());
+
+            long successful = results.stream().filter(r -> r.success).count();
+            long failed = results.stream().filter(r -> !r.success).count();
+
+            response.setStatus(200);
+
+            // Build detailed response
+            StringBuilder jsonResponse = new StringBuilder();
+            jsonResponse.append("{");
+            jsonResponse.append("\"message\":\"Bulk activation completed\",");
+            jsonResponse.append("\"total\":").append(ids.size()).append(",");
+            jsonResponse.append("\"successful\":").append(successful).append(",");
+            jsonResponse.append("\"failed\":").append(failed).append(",");
+            jsonResponse.append("\"results\":[");
+
+            for (int i = 0; i < results.size(); i++) {
+                BulkOperationResult r = results.get(i);
+                jsonResponse.append("{");
+                jsonResponse.append("\"id\":\"").append(r.id).append("\",");
+                jsonResponse.append("\"success\":").append(r.success);
+                if (r.error != null) {
+                    jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
                 }
-            });
-            
+                jsonResponse.append("}");
+                if (i < results.size() - 1) jsonResponse.append(",");
+            }
+
+            jsonResponse.append("]}");
+            response.getWriter().write(jsonResponse.toString());
+
         } catch (Exception e) {
             logger.error("Error handling bulk activation request", e);
             sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
@@ -1117,46 +1061,41 @@ public class AnnouncementController extends HttpServlet {
                 )
                 .collect(java.util.stream.Collectors.toList());
             
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).whenComplete((result, throwable) -> {
-                try {
-                    List<BulkOperationResult> results = futures.stream()
-                        .map(CompletableFuture::join)
-                        .collect(java.util.stream.Collectors.toList());
-                    
-                    long successful = results.stream().filter(r -> r.success).count();
-                    long failed = results.stream().filter(r -> !r.success).count();
-                    
-                    response.setStatus(200);
-                    
-                    // Build detailed response
-                    StringBuilder jsonResponse = new StringBuilder();
-                    jsonResponse.append("{");
-                    jsonResponse.append("\"message\":\"Bulk deactivation completed\",");
-                    jsonResponse.append("\"total\":").append(ids.size()).append(",");
-                    jsonResponse.append("\"successful\":").append(successful).append(",");
-                    jsonResponse.append("\"failed\":").append(failed).append(",");
-                    jsonResponse.append("\"results\":[");
-                    
-                    for (int i = 0; i < results.size(); i++) {
-                        BulkOperationResult r = results.get(i);
-                        jsonResponse.append("{");
-                        jsonResponse.append("\"id\":\"").append(r.id).append("\",");
-                        jsonResponse.append("\"success\":").append(r.success);
-                        if (r.error != null) {
-                            jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
-                        }
-                        jsonResponse.append("}");
-                        if (i < results.size() - 1) jsonResponse.append(",");
-                    }
-                    
-                    jsonResponse.append("]}");
-                    response.getWriter().write(jsonResponse.toString());
-                    
-                } catch (IOException e) {
-                    logger.error("Error writing bulk deactivation response", e);
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            List<BulkOperationResult> results = futures.stream()
+                .map(CompletableFuture::join)
+                .collect(java.util.stream.Collectors.toList());
+
+            long successful = results.stream().filter(r -> r.success).count();
+            long failed = results.stream().filter(r -> !r.success).count();
+
+            response.setStatus(200);
+
+            // Build detailed response
+            StringBuilder jsonResponse = new StringBuilder();
+            jsonResponse.append("{");
+            jsonResponse.append("\"message\":\"Bulk deactivation completed\",");
+            jsonResponse.append("\"total\":").append(ids.size()).append(",");
+            jsonResponse.append("\"successful\":").append(successful).append(",");
+            jsonResponse.append("\"failed\":").append(failed).append(",");
+            jsonResponse.append("\"results\":[");
+
+            for (int i = 0; i < results.size(); i++) {
+                BulkOperationResult r = results.get(i);
+                jsonResponse.append("{");
+                jsonResponse.append("\"id\":\"").append(r.id).append("\",");
+                jsonResponse.append("\"success\":").append(r.success);
+                if (r.error != null) {
+                    jsonResponse.append(",\"error\":\"").append(r.error.replace("\"", "\\\"")).append("\"");
                 }
-            });
-            
+                jsonResponse.append("}");
+                if (i < results.size() - 1) jsonResponse.append(",");
+            }
+
+            jsonResponse.append("]}");
+            response.getWriter().write(jsonResponse.toString());
+
         } catch (Exception e) {
             logger.error("Error handling bulk deactivation request", e);
             sendErrorResponse(response, 500, "Internal server error: " + e.getMessage());
