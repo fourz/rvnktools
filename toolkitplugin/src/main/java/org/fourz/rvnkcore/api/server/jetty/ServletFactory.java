@@ -7,6 +7,9 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.LoreController;
+import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
 import org.fourz.rvnkcore.api.controller.WorldController;
@@ -92,9 +95,13 @@ public class ServletFactory {
             registerCorsFilter(context);
         }
 
-        // Add authentication filter for all v1 API endpoints
+        // Add authentication filter for all API endpoints
         AuthFilter authFilter = new AuthFilter(config, plugin);
         context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
+        // Plugin controller paths (context-relative — external URL is /api/bartershops/*, etc.)
+        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/bartershops/*", null);
+        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/lore/*", null);
+        context.addFilter(new FilterHolder(new AuthFilter(config, plugin)), "/rvnkworlds/*", null);
     }
 
     /**
@@ -120,9 +127,10 @@ public class ServletFactory {
         // Register world controller
         registerWorldController(context);
         
-        // Future controllers can be registered here
-        // registerShopController(context);
-        // registerLoreController(context);
+        // Plugin controllers — registered if their API service is available in ServiceRegistry
+        registerBarterShopsController(context);
+        registerLoreController(context);
+        registerRVNKWorldsController(context);
     }
 
     /**
@@ -151,6 +159,51 @@ public class ServletFactory {
         
         WorldController worldController = new WorldController(worldService, gson, worldControllerLogger);
         context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
+    }
+
+    /**
+     * Registers the BarterShops controller if IBarterShopsApiService is available in ServiceRegistry.
+     * The service is registered by the BarterShops plugin at startup.
+     */
+    private void registerBarterShopsController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, BarterShopsController.class);
+            BarterShopsController controller = new BarterShopsController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/bartershops/*");
+            logger.info("BarterShops API controller registered at /bartershops/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("BarterShops API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the RVNKWorlds controller if IRVNKWorldsApiService is available in ServiceRegistry.
+     * The service is registered by the RVNKWorlds plugin at startup.
+     */
+    private void registerRVNKWorldsController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, RVNKWorldsController.class);
+            RVNKWorldsController controller = new RVNKWorldsController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/rvnkworlds/*");
+            logger.info("RVNKWorlds API controller registered at /rvnkworlds/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("RVNKWorlds API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the RVNKLore controller if ILoreApiService is available in ServiceRegistry.
+     * The service is registered by the RVNKLore plugin at startup.
+     */
+    private void registerLoreController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, LoreController.class);
+            LoreController controller = new LoreController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/lore/*");
+            logger.info("RVNKLore API controller registered at /lore/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("RVNKLore API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
     }
 
     /**
