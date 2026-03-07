@@ -8,7 +8,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.fourz.rvnkcore.api.config.ApiConfig;
-import org.fourz.rvnktools.api.security.KeyStoreGenerator;
+import org.fourz.rvnkcore.api.security.KeyStoreGenerator;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 

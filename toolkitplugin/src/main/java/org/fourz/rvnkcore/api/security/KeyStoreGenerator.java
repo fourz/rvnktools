@@ -1,4 +1,4 @@
-package org.fourz.rvnktools.api.security;
+package org.fourz.rvnkcore.api.security;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -89,7 +89,7 @@ public class KeyStoreGenerator {
         // Create keystore and store keys
         KeyStore keyStore = KeyStore.getInstance("JKS");
         keyStore.load(null, null);
-        keyStore.setKeyEntry(keyAlias, keyPair.getPrivate(), 
+        keyStore.setKeyEntry(keyAlias, keyPair.getPrivate(),
             keystorePassword.toCharArray(), new Certificate[]{cert});
 
         // Save to file

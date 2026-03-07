@@ -10,7 +10,7 @@ import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnktools.announceManager.AnnounceManager;
-import org.fourz.rvnktools.api.RVNKToolsAPI;
+
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.listener.JoinListener;
@@ -37,6 +37,7 @@ import net.milkbowl.vault.economy.Economy;
  *   <li>{@link CommandManager} - Command framework</li>
  *   <li>{@link LogFilter} - Log filtering</li>
  *   <li>{@link Economy} - Vault economy integration (optional)</li>
+ *   <li>{@link LogFilter} - Log filtering</li>
  * </ul>
  *
  * <p>All components are registered in the ServiceRegistry for dependency injection.</p>
@@ -51,7 +52,6 @@ public class RVNKToolsInitializer {
     private final LogManager logger;
 
     // Component references for shutdown
-    private RVNKToolsAPI api;
     private LuckPermsIntegrationListener luckPermsListener;
 
     /**
@@ -91,9 +91,6 @@ public class RVNKToolsInitializer {
         initializeAnnounceManager();
         logger.debug("  + AnnounceManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
-        initializeAPI();
-        logger.debug("  + API initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
-
         checkPlaceholderAPI();
         logger.debug("  + PlaceholderAPI checked (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -111,7 +108,7 @@ public class RVNKToolsInitializer {
         logger.debug("  + Bundled commands registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, AnnounceManager, API, Events, LogFilter, CommandManager (" + totalTime + "ms)");
+        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, AnnounceManager, Events, LogFilter, CommandManager (" + totalTime + "ms)");
     }
 
     /**
@@ -119,12 +116,6 @@ public class RVNKToolsInitializer {
      */
     public void shutdownAll() {
         logger.info("Shutting down RVNKTools components...");
-
-        // Shutdown API
-        if (api != null) {
-            api.stop();
-            api = null;
-        }
 
         // Shutdown AnnounceManager
         try {
@@ -215,17 +206,6 @@ public class RVNKToolsInitializer {
             logger.info("AnnounceManager registered");
         } catch (Exception e) {
             logger.error("Failed to initialize AnnounceManager", e);
-        }
-    }
-
-    private void initializeAPI() {
-        try {
-            AnnounceManager announceManager = registry.getService(AnnounceManager.class);
-            api = new RVNKToolsAPI(plugin, announceManager);
-            registry.registerService(RVNKToolsAPI.class, api);
-            logger.info("RVNKToolsAPI registered");
-        } catch (Exception e) {
-            logger.error("Failed to initialize API", e);
         }
     }
 
