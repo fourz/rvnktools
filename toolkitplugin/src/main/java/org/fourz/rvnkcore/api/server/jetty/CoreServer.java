@@ -18,6 +18,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -118,6 +119,16 @@ public class CoreServer {
     private Gson createGson() {
         return new GsonBuilder()
                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+                .registerTypeAdapter(Instant.class, new TypeAdapter<Instant>() {
+                    @Override
+                    public void write(JsonWriter out, Instant value) throws IOException {
+                        out.value(value != null ? value.toString() : null);
+                    }
+                    @Override
+                    public Instant read(JsonReader in) throws IOException {
+                        return Instant.parse(in.nextString());
+                    }
+                })
                 .setPrettyPrinting()
                 .create();
     }
