@@ -1,0 +1,121 @@
+# RVNKCore Configuration
+# Combined configuration for RVNKCore and RVNKTools features
+
+# Log level: OFF | SEVERE | WARNING | INFO | FINE | DEBUG
+# Production default: WARNING
+general:
+  logLevel: WARNING
+
+# Database Configuration
+# Supported types: sqlite, mysql
+database:
+  type: sqlite
+
+  # SQLite Configuration (default)
+  sqlite:
+    file: rvnkcore.db
+    pool:
+      maxConnections: 5
+      minIdleConnections: 1
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 0
+
+  # MySQL Configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: rvnkcore
+    username: root
+    password: ""
+    useSSL: true
+    connectionParameters: allowPublicKeyRetrieval=true
+    pool:
+      maxConnections: 20
+      minIdleConnections: 5
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 60000
+
+# API Configuration
+api:
+  enabled: false
+  host: localhost
+  context-path: /api
+  http:
+    port: 8080
+  https:
+    enabled: false
+    port: 8081
+    keystore-path: "keystore.jks"
+    keystore-password: ""          # Leave empty to auto-generate a secure password on first start
+    san-hostnames: ""              # Extra hostnames for TLS cert SANs (comma-separated, e.g. "myhost.local,api.example.com")
+                                   # api.host is always included automatically if not localhost
+  cors:
+    enabled: true
+    allowed-origins: "*"
+    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  auth:
+    key: "changeme"
+  server:
+    max-threads: 50
+    idle-timeout: 30000
+    connection-timeout: 60000
+    send-version: false
+    use-forwarded-headers: true
+  security:
+    allowed-ips: ""
+
+# ──────────────────────────────────────────
+# RVNKTools Settings
+# ──────────────────────────────────────────
+
+# RVNKTools log levels: DEBUG (verbose), INFO (default), WARN, ERROR
+logging:
+  level: INFO
+
+# Storage configuration for RVNKCore database tables
+storage:
+  # Storage type: sqlite (default) or mysql
+  type: sqlite
+  sqlite:
+    # Table prefix for shared database hosting (e.g., "core_" creates "core_rvnk_players")
+    # Leave empty for no prefix (default)
+    tablePrefix: ""
+  mysql:
+    host: localhost
+    port: 3306
+    database: minecraft
+    username: root
+    password: ""
+    useSSL: false
+    # Table prefix for shared database hosting
+    tablePrefix: ""
+
+# Log Filter Configuration
+# Controls which types of server messages are displayed in console
+logfilter:
+  enabled: true
+  show:
+    spigot: false        # Show Spigot framework messages
+    bukkit: false        # Show Bukkit framework messages
+    craftbukkit: false   # Show CraftBukkit implementation messages
+    paper: false         # Show Paper-specific messages
+    plugins: true        # Show plugin messages
+
+# Command Configuration
+# Customize command behavior
+commands:
+  override-vanilla-tp: false  # Override /tp with RVNKTools implementation (default: false)
+                              # When false: /tp uses vanilla Minecraft teleport
+                              # When true: /tp uses RVNKTools teleport (player/coords/worldswap)
+
+# Feature Configuration
+# Enable or disable specific RVNKTools features
+features:
+  announcements: true    # Announcement system
+  hat-command: true      # /hat command for cosmetic items
+  link-command: true     # /link command for clickable links
+  world-swap: true       # World switching with location tracking

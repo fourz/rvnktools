@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Server configuration for MCP-based scripts. Credentials are managed by the MCP server.",
+  "servers": {
+    "rvnk-test": {
+      "id": "b2bc4d7e",
+      "name": "RVNK Test",
+      "provider": "sparkedhost",
+      "type": "test",
+      "description": "Development and testing server (SparkedHost)"
+    },
+    "rvnk-dev": {
+      "id": "1eb313b1-40f7-4209-aa9d-352128214206",
+      "name": "RVNK Dev",
+      "provider": "mcss",
+      "type": "test",
+      "description": "Local development server (MCSS)"
+    },
+    "rvnk-prod": {
+      "id": "140324c4",
+      "name": "Ravenkraft",
+      "provider": "sparkedhost",
+      "type": "production",
+      "description": "Production server - read-only operations only"
+    }
+  },
+  "defaults": {
+    "server": "rvnk-test",
+    "timeout": 30000,
+    "consoleLines": 50
+  },
+  "providerInfo": {
+    "sparkedhost": {
+      "name": "SparkedHost",
+      "consoleMethod": "websocket",
+      "notes": "Console streaming requires WebSocket connection via panel"
+    },
+    "mcss": {
+      "name": "MCSS (Minecraft Server Control Suite)",
+      "consoleMethod": "rest",
+      "notes": "Full REST API support for all operations"
+    }
+  }
+}

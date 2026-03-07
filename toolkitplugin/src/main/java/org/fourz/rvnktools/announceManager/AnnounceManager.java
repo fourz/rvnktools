@@ -1,0 +1,547 @@
+package org.fourz.rvnktools.announceManager;
+
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.util.chat.ChatServiceInterface;
+import org.fourz.rvnkcore.util.log.LogManager;
+import org.fourz.rvnkcore.util.chat.ChatService;
+
+import net.md_5.bungee.api.ChatMessageType;
+
+import java.util.logging.Level;
+
+public class AnnounceManager {
+    private static final String CLASS_NAME = "AnnounceManager";
+    private final LogManager logger;
+    private enum CheckCondition {
+        ANNOUNCEMENT_EXISTS,
+        SAVE_ANNOUNCEMENT,
+        ADD_ANNOUNCEMENT
+    }
+
+    private final RVNKCore plugin;
+    private final AnnounceConfig announceConfig;
+    private final AnnounceScheduler announceScheduler;
+    private final ChatServiceInterface chatService;    
+    private final Map<String, Announcement> announcements = new ConcurrentHashMap<>();
+    private boolean usingPlaceholderAPI;    
+
+    public AnnounceManager(RVNKCore plugin) {
+        this.logger = LogManager.getInstance(plugin, getClass());
+        logger.info("Enabling AnnounceManager.");
+        this.plugin = plugin;
+        this.chatService = new ChatService();
+        this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
+        this.announceConfig = new AnnounceConfig(plugin, this);
+        this.announceConfig.initializeDataStore();
+        this.announceScheduler = new AnnounceScheduler(plugin, this);
+
+        announceScheduler.scheduleAnnouncements();
+    }
+
+    public void registerCommands() {
+        // This is called after plugin.yml commands are registered by Paper
+        if (plugin.getCommand("announce") != null) {
+            plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
+            plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
+            logger.info("Announce command registered successfully");
+        } else {
+            logger.warning("Announce command not found in plugin.yml");
+        }
+    }
+
+    // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
+    public boolean addAnnouncement(Announcement announcement) {
+        if (announcement == null || announcement.getId() == null) {
+            logger.warning("Cannot add invalid announcement");
+            return false;
+        }
+
+        String id = announcement.getId().toLowerCase();
+        // Check for existing announcement in memory first
+        if (announcements.containsKey(id)) {
+            logger.warning("Announcement with ID '" + id + "' already exists in memory");
+            return false;
+        }
+
+        try {
+            // Only save to database if not imported and database exists
+            if (announceConfig.getDataStore() != null && !announcement.isImported()) {
+                // Check database before saving
+                if (announceConfig.getDataStore().announcementExists(id)) {
+            logger.warning("Announcement with ID '" + id + "' already exists in database");
+                    return false;
+                }
+                announceConfig.getDataStore().saveAnnouncement(announcement);
+                announcement.setImported();
+                logger.debug("Saved announcement to database: " + id);
+            }
+            
+            announcements.put(id, announcement);
+            logger.debug("Added announcement to memory: " + id);
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to add announcement: " + id, e);
+            return false;
+        }
+    }
+
+    // Add an announcement to the announcements list, used by AnnounceCommand
+    public boolean addAnnouncement(CommandSender sender, String input) {
+
+        // extract id, type, and text from input
+        String[] args = input.split(" ", 3);
+        Player player = null;
+        
+        if (sender instanceof Player) {
+            player = (Player) sender;        
+        }
+        
+        if (args.length < 3) {
+            if (player != null) {
+                chatService.sendMessage(player, "Invalid announcement format. Usage: <type> <id> <message>");
+            } else {
+                plugin.getLogger().warning("Invalid announcement format. Usage: <type> <id> <message>");
+            }
+            return false;
+        }
+        
+        String type = args[0];
+        String id = args[1];
+        String text = args[2];
+
+        // Check if announcement already exists
+        if (announceConfig.isDataStoreAvailable()) {  // Changed this line
+            if (announcementExists(id)) {
+                if (player != null) {
+                    chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
+                } else {
+                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
+                }
+            }
+        }
+
+        if (!validateAnnounceType(type)) {
+            plugin.getLogger().warning("Invalid announcement type: " + type);
+            return false;
+        }
+
+        if (player != null) {
+            if (!player.hasPermission("rvnktools.command.announce.add." + type)) {
+                player.sendMessage("You do not have permission to add announcements.");
+                return false;
+            } else {
+                // Parse announcement as player. Set owner to player
+                player.sendMessage("Announcement added: " + id + " (" + type + ")");
+                return announceConfig.parseAnnouncement(id, type, text, player.getName());
+            }
+        }        
+        // Parse announcement as console        
+
+        if (announceConfig.getDataStore() != null) {
+            announceConfig.getDataStore().connect();            
+            Boolean result = announceConfig.parseAnnouncement(id, type, text);
+            announceConfig.getDataStore().disconnect();
+            return result;
+        } 
+        return announceConfig.parseAnnouncement(id, type, text);       
+    }
+
+    private boolean checkAnnounceExist(String id) {
+        return announceConfig.getDataStore().announcementExists(id);
+    }
+
+    public void broadcastAnnouncement(Announcement announcement) {      
+        if (announcement == null) {
+            logger.warning("Cannot broadcast null announcement");
+            return;
+        }
+
+        String announcementType = announcement.getType();
+        if (announcementType == null || announcementType.isEmpty()) {
+            logger.warning("Announcement has null or empty type");
+            return;
+        }
+                
+        AnnounceType type = announceConfig.getAnnounceTypes().get(announcementType);        
+        if (type == null) {
+            logger.warning("Could not find announcement type '" + announcementType +
+                "' in config. Available types: " + String.join(", ", announceConfig.getAnnounceTypes().keySet()));
+            return;
+        }
+
+        // Only construct message after all null checks have passed
+        String prefix = type.getPrefix() != null ? type.getPrefix() : "";
+        String suffix = type.getSuffix() != null ? type.getSuffix() : "";
+        String message = prefix + announcement.getMessage() + suffix;
+
+        // Pre-fetch preferences for all online players
+        Map<Player, PlayerPreferences> playerPrefs = new HashMap<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (this.shouldReceiveAnnouncement(player, announcement)) {
+                String locationPref = announceConfig.getPreference(player.getUniqueId(), "location");
+                String soundPref = announceConfig.getPreference(player.getUniqueId(), "sound");
+                playerPrefs.put(player, new PlayerPreferences(
+                    locationPref != null ? locationPref : "chat",
+                    soundPref != null ? soundPref : "none"
+                ));
+            }
+        }
+
+        // Broadcast to all players using pre-fetched preferences
+        for (Map.Entry<Player, PlayerPreferences> entry : playerPrefs.entrySet()) {
+            Player player = entry.getKey();
+            PlayerPreferences prefs = entry.getValue();
+            
+            // Send message based on location preference
+            switch (prefs.location.toLowerCase()) {
+                case "title":
+                    player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
+                    break;
+                case "action-bar":
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
+                    break;
+                default: // "chat"
+                    chatService.sendMessage(player, message, plugin.getLinkMaker());
+                    break;
+            }
+            
+            // Play sound if configured
+            if (!prefs.sound.equalsIgnoreCase("none")) {
+                try {
+                    org.bukkit.Sound sound = org.bukkit.Sound.valueOf(prefs.sound.toUpperCase());
+                    player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+                } catch (IllegalArgumentException e) {
+                    logger.warning("Invalid sound preference for player " + player.getName() + ": " + prefs.sound);
+                }
+            }
+            
+            logger.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + prefs.location + ")");
+        }
+    }
+
+    // Helper class to store pre-fetched preferences
+    private static class PlayerPreferences {
+        final String location;
+        final String sound;
+
+        PlayerPreferences(String location, String sound) {
+            this.location = location;
+            this.sound = sound;
+        }
+    }
+
+    public void cleanup() {
+        // Clear any cached data or temporary collections
+        announceScheduler.cleanup();
+        
+        // Suggest garbage collection for this manager        
+        Runtime.getRuntime().gc();
+    }
+
+    public boolean deleteAnnouncement(String id) {
+        if (id == null) {
+            plugin.getLogger().warning("Cannot delete announcement with null ID");
+            return false;
+        }
+
+        try {
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().deleteAnnouncement(id);
+            }
+            announcements.remove(id);
+            logger.debug("Deleted announcement: " + id);
+            return true;
+        } catch (Exception e) {
+            logger.info("Failed to delete announcement: " + id);
+            return false;
+        }
+    }
+
+    public void toggleAnnouncementType(Player player, String type) {
+        UUID playerId = player.getUniqueId();
+        type = type.toLowerCase();
+        if (player.hasPermission("rvnktools.command.announce.toggle." + type)) {
+            Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().getOrDefault(playerId, new HashSet<>());
+
+            if (disabledTypes.contains(type)) {
+                disabledTypes.remove(type);
+                announceConfig.removePlayerDisabledType(playerId, type);
+                chatService.sendMessage(player, "Announcements of type '" + type + "' enabled.");
+            } else {
+                disabledTypes.add(type);
+                announceConfig.addPlayerDisabledType(playerId, type);
+                chatService.sendMessage(player, "Announcements of type '" + type + "' disabled.");
+            }
+            announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
+        } else {
+            chatService.sendMessage(player, "You do not have permission to toggle announcements of this type.");
+        }
+    }
+
+    public void reloadConfig() {
+        announceConfig.reloadConfig();
+        announceScheduler.scheduleAnnouncements();
+    }
+
+    public void saveConfig() {
+        announceConfig.saveConfig();
+        logger.info("Saved AnnounceManager configuration.");
+    }    
+
+    public void shutdown() {
+        // Ensure we have all announcements in memory
+        if (announceConfig.getDataStore() != null) {
+            setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
+        }        
+        announceScheduler.shutdown();
+        logger.info("Saving announcements before shutdown...");        
+        announceConfig.shutdown();
+        logger.info("AnnounceManager shutdown complete.");
+    }
+
+    public boolean validateAnnounceType(String type) {
+        return announceConfig.getAnnounceTypes().containsKey(type);
+    }
+
+    public boolean shouldReceiveAnnouncement(Player player, Announcement announcement) {
+
+        //check if player has permission to receive this type of announcement
+        if (!player.hasPermission("rvnktools.announce.type." + announcement.getType().toLowerCase())) {
+            return false;
+        }
+
+        //check if player has permission to receive this announcement
+        if (announcement.getPermission() != null && !player.hasPermission(announcement.getPermission())) {
+            return false;
+        }
+
+        //check if player has disabled this type of announcement
+        Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
+        if (disabledTypes != null && disabledTypes.contains(announcement.getType().toLowerCase())) {
+            return false;
+        }
+
+        // default to true
+        return true;
+    }
+
+    // get disabled types for a player
+    public boolean getPlayerDisabledTypes(Player player, String type) {
+        Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
+        return disabledTypes != null && disabledTypes.contains(type);
+    }
+
+    // get disabled types for a player
+    public String[] getPlayerDisabledAnnouncementTypes(Player player)  {
+        Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
+        if (disabledTypes == null) {
+            return new String[0];
+        }
+        return disabledTypes.toArray(new String[0]);
+    }
+
+    public Set<String> getAnnounceTypes() {
+        return announceConfig.getAnnounceTypes().keySet();
+    }
+
+    public Set<String> getAnnouncementIds() {
+        return announcements.keySet();
+    }
+
+    public List<Announcement> getAnnouncements() {
+        return new ArrayList<>(announcements.values());
+    }
+
+    public List<Announcement> getAnnouncements(String type) {
+        List<Announcement> typeAnnouncements = new ArrayList<>();
+        for (Announcement announcement : announcements.values()) {
+            if (type.equalsIgnoreCase(announcement.getType())) {
+                typeAnnouncements.add(announcement);
+            }
+        }
+        return typeAnnouncements;
+    }
+
+    public void setAnnouncements(List<Announcement> announcementList) {
+        if (announcementList == null) {
+            logger.warning("Skipping null announcement list");
+            return;
+        }
+        announcements.clear();
+        for (Announcement announcement : announcementList) {
+            if (announcement.getId() == null) {
+                logger.warning("Skipping announcement with null ID");
+                continue;
+            }
+            announcements.put(announcement.getId(), announcement);
+        }
+        logger.debug("Set " + announcements.size() + " announcements");
+    }
+
+    public void savePlayerDisabledTypes() {
+        announceConfig.savePlayerDisabledTypes();
+    }
+
+    public boolean sendAnnouncementNow(CommandSender sender, String id) {
+        if (sender instanceof Player) {
+            Player player = (Player) sender;
+            if (!player.hasPermission("rvnktools.command.announce.now")) {
+                chatService.sendMessage(player, "You do not have permission to send announcements now.");
+                return false;
+            }
+        }           
+        
+        Announcement announcement = announcements.get(id);
+        if (announcement == null) {
+            if (sender instanceof Player) {
+                chatService.sendMessage((Player)sender, "Invalid announcement ID: " + id);
+            } else {
+                plugin.getLogger().warning("Cannot send announcement: No announcement found with ID " + id);
+            }
+            return false;
+        }
+        broadcastAnnouncement(announcement);
+        return true;
+    }
+
+    public AnnounceType getAnnounceType(String type) {
+        return announceConfig.getAnnounceTypes().get(type); 
+    }
+
+    public boolean announcementExists(String id) {
+        // First check in memory
+        if (announcements.containsKey(id)) {
+            logger.debug("Announcement with ID '" + id + "' found in memory");
+            return true;
+        }
+
+        // Then check in database if available
+        if (announceConfig.isDataStoreAvailable()) {
+            return announceConfig.getDataStore().announcementExists(id);
+        }
+
+        return false;
+    }
+
+    public void setAnnouncementImported(String id) {
+        Announcement announcement = announcements.get(id);
+        if (announcement != null) {
+            announcement.setImported();
+        }
+    }
+
+    public void setAnnouncementsImported() {
+        for (Announcement announcement : announcements.values()) {
+            announcement.setImported();
+        }
+    }
+
+    public boolean isAnnouncementImported(String id) {
+        Announcement announcement = announcements.get(id);
+        return announcement != null && announcement.isImported();
+    }
+
+    public Announcement getAnnouncement(String id) {
+        if (id == null) {
+            plugin.getLogger().warning("Cannot get announcement with null ID");
+            return null;
+        }
+        return announcements.get(id);
+    }
+
+    public AnnounceConfig getConfig() {
+        return announceConfig;
+    }
+
+    /**
+     * Sets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @param value The value to set
+     */
+    public void setPreference(UUID playerId, String property, String value) {
+        announceConfig.setPreference(playerId, property, value);
+    }
+
+    /**
+     * Gets a preference for a player
+     * @param playerId The UUID of the player
+     * @param property The preference property key
+     * @return The preference value, or default if not set
+     */
+    public String getPreference(UUID playerId, String property) {
+        return announceConfig.getPreference(playerId, property);
+    }
+
+    /**
+     * Gets all preferences for a player
+     * @param playerId The UUID of the player
+     * @return Map of preference properties and their values
+     */
+    public Map<String, String> getPreferences(UUID playerId) {
+        return announceConfig.getAllPreferences(playerId);
+    }
+
+    public boolean updateAnnouncement(String id, String newMessage) {
+        if (id == null || newMessage == null) {
+            logger.warning("Cannot update announcement: ID or message is null");
+            return false;
+        }
+
+        Announcement oldAnnouncement = announcements.get(id);
+        if (oldAnnouncement == null) {
+            logger.warning("Cannot update announcement: No announcement found with ID " + id);
+            return false;
+        }
+
+        try {
+            // Unschedule the old announcement first
+            announceScheduler.unscheduleAnnouncement(oldAnnouncement);
+
+            // Create new announcement with updated message but keeping other properties
+            Announcement updatedAnnouncement = new Announcement();
+            updatedAnnouncement.setId(oldAnnouncement.getId());
+            updatedAnnouncement.setType(oldAnnouncement.getType());
+            updatedAnnouncement.setMessage(newMessage);
+            updatedAnnouncement.setPermission(oldAnnouncement.getPermission());
+            updatedAnnouncement.setOwner(oldAnnouncement.getOwner());
+            updatedAnnouncement.setDate(oldAnnouncement.getDate());
+            updatedAnnouncement.setTime(oldAnnouncement.getTime());
+            updatedAnnouncement.setExpiration(oldAnnouncement.getExpiration());
+            updatedAnnouncement.setRecurrence(oldAnnouncement.getRecurrence());
+            
+            // Remove old announcement
+            announcements.remove(id);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().deleteAnnouncement(id);
+            }
+            
+            // Add updated announcement
+            announcements.put(id, updatedAnnouncement);
+            if (announceConfig.isDataStoreAvailable()) {
+                announceConfig.getDataStore().saveAnnouncement(updatedAnnouncement);
+            }
+
+            // Reschedule the updated announcement
+            announceScheduler.scheduleAnnouncement(updatedAnnouncement);
+            
+            logger.debug("Updated and rescheduled announcement: " + id);
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to update announcement: " + id, e);
+            // Attempt to restore old announcement on failure
+            if (!announcements.containsKey(id)) {
+                announcements.put(id, oldAnnouncement);
+                // Try to reschedule the old announcement
+                announceScheduler.scheduleAnnouncement(oldAnnouncement);
+            }
+            return false;
+        }
+    }
+}

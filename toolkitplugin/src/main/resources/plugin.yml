@@ -1,14 +1,194 @@
-name: RVNKToolKit 
-version: 1.0-SNAPSHOT
-author: wizard
-main: org.fourz.Main
-description: RVNK Admin Toolkit
+name: RVNKCore
+version: '${project.version}'
+author: fourz
+main: org.fourz.rvnkcore.RVNKCore
+description: Core unified library for Ravenkraft Minecraft plugins
 api-version: 1.21
+website: http://www.fourz.org
+softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault]
 
 commands:
-  ping:
-    description: Shows your current ping.
-    usage: /ping
+  rvnktools:
+    description: Main command for RVNK Tools
+    usage: /rvnktools <subcommand> [args]
+    aliases: [tools]
+    permission: rvnktools.command
+  puthat:
+    description: Applies a custom Jack-o-Lantern to the nearest mob
+    usage: /puthat <customModelData>
+    permission: rvnktools.command.puthat
   tps:
-    description: Shows the server's current TPS.
+    description: Shows the server's current TPS and performance information
     usage: /tps
+    aliases: [ping]
+  events:
+    description: Provides information about scheduled events
+    usage: /events
+  discord:
+    description: Provides information about the server's discord
+    usage: /discord
+  announce:
+    description: Manages announcements
+    usage: /announce <toggle|list|add|delete> [args]
+    aliases: [announcement]
+    permission: rvnktools.command.announce
+    default: op
+  broadcast:
+    description: Broadcasts a message to all players
+    usage: /broadcast <message>
+    permission: rvnktools.command.broadcast
+    default: op
+  pstest:
+    description: Test PlayerService functionality
+    usage: /pstest <recent|groups|syncgroups> [args...]
+    permission: rvnktools.admin.pstest
+    default: op
+  rvnkcore:
+    description: RVNKCore diagnostics, testing, and system information
+    usage: /rvnkcore <debug|services|db|version|reload|plugins|commands|health|test|mojang> [args]
+    permission: rvnktools.admin.test
+    default: op
+  worldswap:
+    description: Teleport to your last known location in a specific world
+    usage: /worldswap <world_name>
+    aliases: [ws]
+    permission: rvnktools.command.worldswap
+  teleport:
+    description: Teleportation utilities and world management
+    usage: /teleport <subcommand> [args]
+    permission: rvnktools.command.teleport
+  tp:
+    description: Teleport command (vanilla override - disabled by default)
+    usage: /tp <player|coordinates> [args]
+    permission: rvnktools.command.tp
+  cyclegamemode:
+    description: Cycle through gamemodes
+    usage: /cyclegamemode
+    permission: rvnktools.command.cyclegamemode
+    aliases: [gmc]
+    default: op
+  railroad:
+    description: Cycle through instruction sets
+    usage: /railroad
+    aliases: [cycletrainmode]
+    permission: rvnktools.command.railroad
+  event:
+    description: Teleport between worlds preserving location history
+    usage: /event [world]
+    permission: rvnktools.command.worldswap
+    aliases: [worldswap]
+  countdown:
+    description: Countdown for restarting the server
+    usage: /countdown
+    permission: rvnktools.command.countdown
+    default: op
+  logfilter:
+    description: Manage log filtering for server plugins
+    usage: /logfilter <status|reload|enable|disable|add|remove|list> [args]
+    permission: rvnktools.command.logfilter
+    default: op
+  announcer:
+    description: Enable or disable announcements feature
+    usage: /announcer
+  trains:
+    description: Manage TrainCarts settings and view help pages
+    usage: /trains [enable|disable|modes|examples|links]
+    aliases: [train-help]
+  pref:
+    description: Manage your notification preferences
+    usage: |
+      /<command> - Show all preferences
+      /<command> <plugin> - Show plugin preferences
+      /<command> <plugin> toggle - Toggle master on/off
+      /<command> <plugin> enable <type> - Enable notification type
+      /<command> <plugin> disable <type> - Disable notification type
+      /<command> <plugin> quiet <hour1> <hour2> - Set quiet hours (0-23)
+      /<command> <plugin> quiet disable - Disable quiet hours
+      /<command> <plugin> channel <type> <channel> <on|off> - Toggle channel
+      /<command> <plugin> reset - Reset to defaults
+    aliases: [prefs, preferences]
+    permission: rvnkcore.prefs
+
+permissions:
+  rvnktools.command:
+    description: Allows use of rvnktools commands
+    default: op
+  rvnktools.command.event:
+    description: Allows teleporting to event worlds
+    default: op
+  rvnktools.command.return:
+    description: Allows returning from event worlds
+    default: op
+  rvnktools.command.broadcast:
+    description: Allows the player to use the broadcast command
+    default: op
+  rvnktools.welcome:
+    description: Allows the player to get welcome messages
+  rvnktools.welcome.newplayer:
+    description: Sends a welcome message to new players
+  rvnktools.command.cyclegamemode:
+    description: Allows the player to use the gmc command
+  rvnktools.command.cycletrainmode:
+    description: Allows the player to use cycle railroad modes
+  rvnktools.command.countdown:
+    description: Allows the player to use the countdown command
+  rvnktools.command.announce:
+    description: Allows the player to use the announce command
+  rvnktools.command.trains:
+    description: Allows access to train commands
+  rvnktools.command.trains.enable:
+    description: Allows player enabling TrainCarts mode
+  rvnktools.command.trains.disable:
+    description: Allows disabling TrainCarts mode
+  rvnktools.command.railroad:
+    description: Allows the player to toggle between minecart modes
+  rvnktools.announce.help:
+    description: Allows the player to access announcement help
+  rvnktools.command.puthat:
+    description: Allows the player to use the puthat command
+  rvnktools.links:
+    description: Allows access to links commands
+    default: op
+  rvnktools.links.reload:
+    description: Allows reloading links configuration
+    default: op
+  rvnktools.cycle:
+    description: Allows access to cycle commands
+    default: op
+  rvnktools.cycle.reload:
+    description: Allows reloading cycle commands configuration
+    default: op
+  rvnktools.command.worldswap:
+    description: Allows swapping between worlds while maintaining location history
+    default: op
+  rvnktools.command.teleport:
+    description: Allows access to teleportation utilities
+    default: op
+  rvnktools.command.teleport.worldswap:
+    description: Allows teleporting between worlds while preserving locations
+    default: op
+  rvnktools.command.tp:
+    description: Basic teleport permission
+    default: op
+  rvnktools.command.tp.others:
+    description: Allows teleporting other players
+    default: op
+  rvnktools.command.example:
+    description: Allows using the example command
+  rvnktools.command.logfilter:
+    description: Allows managing log filtering for server plugins
+    default: op
+  rvnktools.admin.pstest:
+    description: Allows using player service test command
+    default: op
+  rvnktools.admin.test:
+    description: Allows using automated test commands
+    default: op
+  rvnkcore.prefs:
+    description: Manage notification preferences
+    default: true
+  rvnkcore.prefs.*:
+    description: All preference permissions
+    default: true
+    children:
+      rvnkcore.prefs: true

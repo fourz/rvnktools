@@ -1,0 +1,38 @@
+[
+    {
+        "key": "ctrl+shift+oem_minus",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Copy to Dev Server",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+shift+oem_2",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Restart Dev Server",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+shift+oem_plus",
+        "command": "workbench.action.tasks.runTask",
+        "args": "Build and Deploy To Test Server",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+alt+c",
+        "command": "workbench.action.tasks.runTask",
+        "args": "MCP: Query Console",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+alt+s",
+        "command": "workbench.action.tasks.runTask",
+        "args": "MCP: Query Status",
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "ctrl+alt+r",
+        "command": "workbench.action.tasks.runTask",
+        "args": "MCP: Restart Server",
+        "when": "editorTextFocus"
+    }
+]

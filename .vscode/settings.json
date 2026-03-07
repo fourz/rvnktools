@@ -1,4 +1,13 @@
 {
+    "java.compile.nullAnalysis.mode": "automatic",
     "java.configuration.updateBuildConfiguration": "interactive",
-    "java.compile.nullAnalysis.mode": "automatic"
+    "cSpell.words": [
+        "disabledtypes",
+        "flatfile",
+        "rvnktools"
+    ],
+    "yaml.schemas": {
+        "https://www.schemastore.org/bukkit-plugin.json": "file:///c%3A/tools/rvnktools/toolkitplugin/src/main/resources/plugin.yml"
+    },
+    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable"
 }
