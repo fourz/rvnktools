@@ -142,9 +142,15 @@ public class DefaultAnnouncementService implements AnnouncementService {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
+                // Fetch existing record to preserve fields not in the update request
+                AnnouncementDTO existing = repository.findById(announcement.getId()).join().orElse(null);
+                if (existing != null && announcement.getCreatedAt() == null) {
+                    announcement.setCreatedAt(existing.getCreatedAt());
+                }
+
                 // Update timestamp
                 announcement.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
-                
+
                 return repository.save(announcement)
                     .thenApply(updatedAnnouncement -> {
                         // Update cache
@@ -153,7 +159,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
                         return updatedAnnouncement;
                     })
                     .join();
-                    
+
             } catch (Exception e) {
                 logger.error("Failed to update announcement: " + announcement.getId(), e);
                 throw new org.fourz.rvnkcore.api.exception.ServiceException("Announcement update failed", e);
