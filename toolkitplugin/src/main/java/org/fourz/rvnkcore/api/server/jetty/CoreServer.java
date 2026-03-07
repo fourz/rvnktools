@@ -129,6 +129,16 @@ public class CoreServer {
                         return Instant.parse(in.nextString());
                     }
                 })
+                .registerTypeAdapter(java.sql.Timestamp.class, new TypeAdapter<java.sql.Timestamp>() {
+                    @Override
+                    public void write(JsonWriter out, java.sql.Timestamp value) throws IOException {
+                        out.value(value != null ? value.toInstant().toString() : null);
+                    }
+                    @Override
+                    public java.sql.Timestamp read(JsonReader in) throws IOException {
+                        return java.sql.Timestamp.from(Instant.parse(in.nextString()));
+                    }
+                })
                 .setPrettyPrinting()
                 .create();
     }
