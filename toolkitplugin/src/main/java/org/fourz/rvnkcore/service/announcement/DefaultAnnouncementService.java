@@ -144,8 +144,19 @@ public class DefaultAnnouncementService implements AnnouncementService {
             try {
                 // Fetch existing record to preserve fields not in the update request
                 AnnouncementDTO existing = repository.findById(announcement.getId()).join().orElse(null);
-                if (existing != null && announcement.getCreatedAt() == null) {
-                    announcement.setCreatedAt(existing.getCreatedAt());
+                if (existing != null) {
+                    if (announcement.getCreatedAt() == null) {
+                        announcement.setCreatedAt(existing.getCreatedAt());
+                    }
+                    if (announcement.getType() == null) {
+                        announcement.setType(existing.getType());
+                    }
+                    if (announcement.getMessage() == null) {
+                        announcement.setMessage(existing.getMessage());
+                    }
+                    if (announcement.getTitle() == null) {
+                        announcement.setTitle(existing.getTitle());
+                    }
                 }
 
                 // Update timestamp
