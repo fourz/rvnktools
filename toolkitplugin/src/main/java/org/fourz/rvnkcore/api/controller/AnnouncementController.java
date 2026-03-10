@@ -245,7 +245,11 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-            String query = json.has("query") ? json.get("query").getAsString() : "test";
+            if (!json.has("query") || json.get("query").getAsString().trim().isEmpty()) {
+                sendError(response, 400, "Missing required field: query");
+                return;
+            }
+            String query = json.get("query").getAsString();
             handleSearchAnnouncements(query, request, response);
         } catch (Exception e) {
             logger.error("Error parsing JSON in search announcement request", e);
@@ -295,15 +299,15 @@ public class AnnouncementController extends HttpServlet {
 
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
 
-            String title = json.has("title") ? json.get("title").getAsString() : "Test Announcement";
+            String title = json.has("title") ? json.get("title").getAsString() : null;
             String message = json.has("content") ? json.get("content").getAsString() :
                            json.has("message") ? json.get("message").getAsString() : null;
             String type = json.has("type") ? json.get("type").getAsString() : null;
             boolean active = json.has("isActive") ? json.get("isActive").getAsBoolean() :
                            json.has("active") ? json.get("active").getAsBoolean() : true;
 
-            if (message == null || type == null) {
-                sendError(response, 400, "Missing required parameters: message/content and type");
+            if (title == null || title.trim().isEmpty() || message == null || type == null) {
+                sendError(response, 400, "Missing required parameters: title, message/content, and type");
                 return;
             }
 

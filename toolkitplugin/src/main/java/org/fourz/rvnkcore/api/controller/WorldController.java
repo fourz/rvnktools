@@ -182,7 +182,7 @@ public class WorldController extends HttpServlet {
             correlationData.put("totalPlaytimeSeconds", totalPlaytime);
             correlationData.put("totalDeaths", totalDeaths);
             correlationData.put("totalVisits", totalVisits);
-            correlationData.put("favoriteWorld", favoriteWorld != null ? favoriteWorld : "none");
+            correlationData.put("favoriteWorld", favoriteWorld);
             correlationData.put("worlds", allData.stream().map(d -> {
                 Map<String, Object> world = new HashMap<>();
                 world.put("worldName", d.getWorldName());
