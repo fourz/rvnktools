@@ -165,9 +165,8 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             try (var conn = connectionProvider.getConnection();
                  var stmt = conn.prepareStatement(query)) {
                 
-                String pattern = "%" + namePattern + "%";
-                stmt.setString(1, pattern);
-                stmt.setString(2, pattern);
+                stmt.setString(1, namePattern);
+                stmt.setString(2, namePattern);
                 
                 try (ResultSet rs = stmt.executeQuery()) {
                     List<PlayerDTO> results = new ArrayList<>();
