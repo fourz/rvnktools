@@ -38,26 +38,31 @@ public class WorldSwapSubCommand extends BaseSubCommand {
               "rvnktools.command.teleport.worldswap", true);
 
         this.rvnkCore = plugin;
+        // IWorldService lookup deferred to first use (RVNKWorlds registers after RVNKCore)
+    }
 
-        // Try to get IWorldService from ServiceRegistry (provided by RVNKWorlds)
+    /**
+     * Lazily resolves IWorldService from ServiceRegistry on first use.
+     * Deferred because RVNKWorlds registers its services after RVNKCore enables.
+     */
+    private void ensureWorldService() {
+        if (worldServiceAvailable) return;
         try {
-            // Dynamically look up IWorldService without hard compile-time dependency
             Class<?> iWorldServiceClass = Class.forName("org.fourz.RVNKWorlds.service.IWorldService");
-            ServiceRegistry registry = plugin.getServiceRegistry();
+            ServiceRegistry registry = rvnkCore.getServiceRegistry();
             this.worldService = registry.getService(iWorldServiceClass);
             this.worldServiceAvailable = true;
-            logger.info("WorldSwap integrated with RVNKWorlds IWorldService");
+            logger.debug("WorldSwap integrated with RVNKWorlds IWorldService");
         } catch (ClassNotFoundException e) {
-            logger.warning("RVNKWorlds not found in classpath. World swap will use fallback world detection.");
-            this.worldServiceAvailable = false;
+            // RVNKWorlds not in classpath — fallback to Bukkit
         } catch (Exception e) {
-            logger.warning("IWorldService not available in ServiceRegistry. World swap features will be limited. " + e.getMessage());
-            this.worldServiceAvailable = false;
+            logger.debug("IWorldService not yet available: " + e.getMessage());
         }
     }
     
     @Override
     protected boolean executeSubCommand(CommandSender sender, String[] args) {
+        ensureWorldService();
         Player player = (Player) sender; // Already validated as player-only
 
         String currentWorld = player.getWorld().getName();
@@ -182,6 +187,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
     
     @Override
     protected List<String> getTabCompletions(CommandSender sender, String[] args) {
+        ensureWorldService();
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             List<String> worlds = new ArrayList<>();

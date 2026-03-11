@@ -454,16 +454,15 @@ public class PlayerController extends HttpServlet {
             Optional<PlayerWorldDataDTO> worldData = playerWorldService.getLastKnownLocation(playerId, worldName).get(15, TimeUnit.SECONDS);
             if (worldData.isPresent()) {
                 PlayerWorldDataDTO data = worldData.get();
-                Map<String, Object> location = Map.of(
-                        "worldName", data.getWorldName(),
-                        "x", data.getLastX(),
-                        "y", data.getLastY(),
-                        "z", data.getLastZ(),
-                        "yaw", data.getLastYaw(),
-                        "pitch", data.getLastPitch(),
-                        "biome", data.getLastBiome() != null ? data.getLastBiome() : "unknown",
-                        "lastVisit", data.getLastVisit()
-                );
+                Map<String, Object> location = new java.util.HashMap<>();
+                location.put("worldName", data.getWorldName());
+                location.put("x", data.getLastX());
+                location.put("y", data.getLastY());
+                location.put("z", data.getLastZ());
+                location.put("yaw", data.getLastYaw());
+                location.put("pitch", data.getLastPitch());
+                location.put("biome", data.getLastBiome());
+                location.put("lastVisit", data.getLastVisit());
                 sendResponse(resp, 200, location);
             } else {
                 sendError(resp, 404, "Player has not visited world: " + worldName);
@@ -500,22 +499,21 @@ public class PlayerController extends HttpServlet {
             
             String favoriteWorld = mostVisited.isEmpty() ? null : mostVisited.get(0).getWorldName();
             
-            Map<String, Object> stats = Map.of(
-                    "playerId", playerId,
-                    "totalWorlds", allWorldData.size(),
-                    "totalPlaytimeMinutes", totalPlaytimeSeconds / 60,
-                    "totalDeaths", totalDeaths,
-                    "totalVisits", totalVisits,
-                    "favoriteWorld", favoriteWorld != null ? favoriteWorld : "none",
-                    "mostVisitedWorlds", mostVisited.stream()
-                            .map(data -> Map.of(
-                                    "worldName", data.getWorldName(),
-                                    "visitCount", data.getVisitCount(),
-                                    "playtimeMinutes", data.getPlaytimeSeconds() / 60,
-                                    "deathCount", data.getDeathCount()
-                            ))
-                            .collect(Collectors.toList())
-            );
+            Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("playerId", playerId);
+            stats.put("totalWorlds", allWorldData.size());
+            stats.put("totalPlaytimeMinutes", totalPlaytimeSeconds / 60);
+            stats.put("totalDeaths", totalDeaths);
+            stats.put("totalVisits", totalVisits);
+            stats.put("favoriteWorld", favoriteWorld);
+            stats.put("mostVisitedWorlds", mostVisited.stream()
+                    .map(data -> Map.of(
+                            "worldName", data.getWorldName(),
+                            "visitCount", data.getVisitCount(),
+                            "playtimeMinutes", data.getPlaytimeSeconds() / 60,
+                            "deathCount", data.getDeathCount()
+                    ))
+                    .collect(Collectors.toList()));
             sendResponse(resp, 200, stats);
         } catch (Exception ex) {
             logger.error("Error retrieving player world statistics", ex instanceof CompletionException ? ex.getCause() : ex);
@@ -570,7 +568,7 @@ public class PlayerController extends HttpServlet {
 
         return PlayerWorldDataResponse.builder()
                 .playerId(worldData.getPlayerId())
-                .playerName(playerName != null ? playerName : "unknown")
+                .playerName(playerName)
                 .worldName(worldData.getWorldName())
                 .firstVisit(worldData.getFirstVisit() != null ? worldData.getFirstVisit().toLocalDateTime() : null)
                 .lastVisit(worldData.getLastVisit() != null ? worldData.getLastVisit().toLocalDateTime() : null)
