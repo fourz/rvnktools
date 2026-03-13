@@ -313,22 +313,29 @@ public class PlayerController extends HttpServlet {
 
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
         try {
-            long count = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
-            int onlineCount = Bukkit.getOnlinePlayers().size();
-            int maxPlayers = Bukkit.getMaxPlayers();
-            String version = Bukkit.getVersion();
+            long registeredCount = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
 
-            Runtime runtime = Runtime.getRuntime();
-            long usedMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
-            long maxMB = runtime.maxMemory() / (1024 * 1024);
+            // Live online data from Bukkit
+            java.util.Collection<? extends Player> onlinePlayers = Bukkit.getOnlinePlayers();
+            int onlineCount = onlinePlayers.size();
+            int maxPlayers = Bukkit.getMaxPlayers();
+
+            // Group online players by world
+            Map<String, List<Map<String, Object>>> worldGroups = new java.util.LinkedHashMap<>();
+            for (Player p : onlinePlayers) {
+                String worldName = p.getWorld().getName();
+                worldGroups.computeIfAbsent(worldName, k -> new java.util.ArrayList<>())
+                        .add(Map.of(
+                                "name", p.getName(),
+                                "uuid", p.getUniqueId().toString()
+                        ));
+            }
 
             Map<String, Object> data = new java.util.LinkedHashMap<>();
-            data.put("count", count);
-            data.put("description", "Total registered players");
-            data.put("onlineCount", onlineCount);
-            data.put("maxPlayers", maxPlayers);
-            data.put("version", version);
-            data.put("memoryUsage", Map.of("used", usedMB, "max", maxMB));
+            data.put("registered", registeredCount);
+            data.put("online", onlineCount);
+            data.put("max", maxPlayers);
+            data.put("worlds", worldGroups);
 
             sendResponse(resp, 200, data);
         } catch (Exception ex) {

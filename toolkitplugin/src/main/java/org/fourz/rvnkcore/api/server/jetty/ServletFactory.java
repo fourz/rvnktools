@@ -8,6 +8,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
@@ -266,14 +267,14 @@ public class ServletFactory {
     }
 
     /**
-     * Registers a health check endpoint for monitoring.
+     * Registers the health check endpoint for monitoring.
      *
      * @param context The servlet context to configure
      */
     private void registerHealthCheckEndpoint(ServletContextHandler context) {
-        // Future implementation for health check
-        // HealthCheckServlet healthServlet = new HealthCheckServlet();
-        // context.addServlet(new ServletHolder(healthServlet), "/health");
+        LogManager healthLogger = LogManager.getInstance(plugin, HealthController.class);
+        HealthController healthController = new HealthController(gson, healthLogger);
+        context.addServlet(new ServletHolder(healthController), "/v1/health/*");
     }
 
     /**

@@ -11,6 +11,9 @@ import org.fourz.rvnkcore.util.log.LogManager;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -114,14 +117,29 @@ public class WorldController extends HttpServlet {
 
     /**
      * Handles GET /api/v1/worlds/statistics - Get overall world statistics
+     * Uses live Bukkit data for player counts, not stale DB values.
      */
     private void handleGetWorldStatistics(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            var worlds = worldService.getAllWorlds().get(30, TimeUnit.SECONDS);
+            List<World> loadedWorlds = Bukkit.getWorlds();
+            int totalOnline = Bukkit.getOnlinePlayers().size();
+
+            List<Map<String, Object>> worldStats = loadedWorlds.stream()
+                    .map(w -> {
+                        Map<String, Object> ws = new HashMap<>();
+                        ws.put("name", w.getName());
+                        ws.put("environment", w.getEnvironment().toString());
+                        ws.put("playerCount", w.getPlayers().size());
+                        return ws;
+                    })
+                    .collect(Collectors.toList());
+
             Map<String, Object> stats = new HashMap<>();
-            stats.put("totalWorlds", worlds.size());
-            stats.put("activeWorlds", worlds.stream().filter(w -> w.getPlayerCount() != null && w.getPlayerCount() > 0).count());
-            stats.put("totalPlayers", worlds.stream().mapToInt(w -> w.getPlayerCount() != null ? w.getPlayerCount() : 0).sum());
+            stats.put("totalWorlds", loadedWorlds.size());
+            stats.put("activeWorlds", loadedWorlds.stream().filter(w -> !w.getPlayers().isEmpty()).count());
+            stats.put("totalPlayers", totalOnline);
+            stats.put("maxPlayers", Bukkit.getMaxPlayers());
+            stats.put("worlds", worldStats);
             sendResponse(response, stats);
         } catch (Exception e) {
             logger.error("Failed to get world statistics", e);
