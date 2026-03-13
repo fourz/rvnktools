@@ -52,12 +52,10 @@ public class AnnounceCommand implements CommandExecutor {
         String subcommand = args[0].toLowerCase();
         AnnounceSubCommand handler = subcommands.get(subcommand);        
         
-        if (handler != null) {            
+        if (handler != null) {
             return handler.execute(sender, args);
         } else {
-            if (sender instanceof Player) {
-                sendUsage((Player) sender);
-            }
+            sendUsage(sender);
             return false;
         }
     }
