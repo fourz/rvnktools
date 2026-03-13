@@ -314,7 +314,23 @@ public class PlayerController extends HttpServlet {
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
         try {
             long count = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, new CountResponse(count, "Total registered players"));
+            int onlineCount = Bukkit.getOnlinePlayers().size();
+            int maxPlayers = Bukkit.getMaxPlayers();
+            String version = Bukkit.getVersion();
+
+            Runtime runtime = Runtime.getRuntime();
+            long usedMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
+            long maxMB = runtime.maxMemory() / (1024 * 1024);
+
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("count", count);
+            data.put("description", "Total registered players");
+            data.put("onlineCount", onlineCount);
+            data.put("maxPlayers", maxPlayers);
+            data.put("version", version);
+            data.put("memoryUsage", Map.of("used", usedMB, "max", maxMB));
+
+            sendResponse(resp, 200, data);
         } catch (Exception ex) {
             logger.error("Error retrieving player count", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to retrieve player count");
