@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.service.announcement;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
+import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -531,6 +532,24 @@ public class DefaultAnnouncementService implements AnnouncementService {
         });
     }
     
+    @Override
+    public CompletableFuture<List<AnnouncementTypeDTO>> getAnnouncementTypes() {
+        return getAllAnnouncements().thenApply(announcements -> {
+            java.util.Map<String, AnnouncementTypeDTO> typeMap = new java.util.LinkedHashMap<>();
+            for (AnnouncementDTO a : announcements) {
+                String type = a.getType();
+                if (type != null && !type.isEmpty() && !typeMap.containsKey(type)) {
+                    AnnouncementTypeDTO dto = new AnnouncementTypeDTO.Builder()
+                        .id(type)
+                        .name(type.substring(0, 1).toUpperCase() + type.substring(1))
+                        .build();
+                    typeMap.put(type, dto);
+                }
+            }
+            return new ArrayList<>(typeMap.values());
+        });
+    }
+
     /**
      * Generates a unique announcement ID.
      * 

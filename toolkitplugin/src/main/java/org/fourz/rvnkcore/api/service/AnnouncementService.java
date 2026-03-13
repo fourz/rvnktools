@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.api.service;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
+import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 
 import java.util.List;
 import java.util.Optional;
@@ -235,4 +236,16 @@ public interface AnnouncementService {
      * @since 1.0.0
      */
     CompletableFuture<java.util.Map<String, Object>> getAnnouncementMetrics();
+
+    /**
+     * Retrieves all available announcement types.
+     *
+     * Returns the distinct types derived from existing announcements,
+     * each with an ID and display name.
+     *
+     * @return CompletableFuture containing list of announcement type definitions
+     * @throws org.fourz.rvnkcore.api.exception.ServiceException if retrieval fails
+     * @since 1.3.0
+     */
+    CompletableFuture<List<AnnouncementTypeDTO>> getAnnouncementTypes();
 }

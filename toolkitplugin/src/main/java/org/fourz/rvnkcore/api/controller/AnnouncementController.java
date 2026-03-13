@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.api.controller;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
+import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -73,6 +74,8 @@ public class AnnouncementController extends HttpServlet {
                 } else {
                     sendError(response, 400, "Missing required parameter: q");
                 }
+            } else if (pathInfo.equals("/types")) {
+                handleGetAnnouncementTypes(request, response);
             } else if (pathInfo.equals("/metrics")) {
                 handleGetAnnouncementMetrics(request, response);
             } else if (pathInfo.startsWith("/")) {
@@ -274,6 +277,16 @@ public class AnnouncementController extends HttpServlet {
         } catch (Exception e) {
             logger.error("Error retrieving announcements for group: " + group, e);
             sendError(response, 500, "Failed to retrieve announcements for group: " + e.getMessage());
+        }
+    }
+
+    private void handleGetAnnouncementTypes(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            List<AnnouncementTypeDTO> types = announcementService.getAnnouncementTypes().get(15, TimeUnit.SECONDS);
+            ApiUtils.sendSuccess(response, gson, types);
+        } catch (Exception e) {
+            logger.error("Error retrieving announcement types", e);
+            sendError(response, 500, "Failed to retrieve announcement types: " + e.getMessage());
         }
     }
 
