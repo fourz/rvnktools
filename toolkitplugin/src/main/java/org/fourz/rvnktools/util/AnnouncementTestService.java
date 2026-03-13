@@ -47,8 +47,8 @@ public class AnnouncementTestService {
      */
     public CompletableFuture<Integer> createDefaultAnnouncementTypes() {
         return CompletableFuture.supplyAsync(() -> {
-            logger.info("Available announcement types: info, warning, alert, system, event");
-            return 5; // We have 5 predefined types
+            logger.info("Available announcement types: server, scheduled, motd, news, help, advert, guide");
+            return 7; // We have 7 predefined types
         });
     }
 
@@ -64,11 +64,11 @@ public class AnnouncementTestService {
 
                 // Define test announcements
                 List<TestAnnouncement> testAnnouncements = Arrays.asList(
-                    new TestAnnouncement("welcome", "Welcome to the server!", "Welcome Message", "info", true),
-                    new TestAnnouncement("maintenance", "Server maintenance scheduled", "Maintenance Notice", "warning", true),
-                    new TestAnnouncement("emergency", "Emergency maintenance in progress", "Emergency Alert", "alert", true),
-                    new TestAnnouncement("backup", "Daily backup starting", "System Notification", "system", false),
-                    new TestAnnouncement("holiday-event", "Special holiday event this weekend!", "Holiday Event", "event", true)
+                    new TestAnnouncement("welcome", "Welcome to the server!", "Welcome Message", "server", true),
+                    new TestAnnouncement("maintenance", "Server maintenance scheduled", "Maintenance Notice", "scheduled", true),
+                    new TestAnnouncement("daily-motd", "Message of the day: Have fun!", "Daily MOTD", "motd", true),
+                    new TestAnnouncement("patch-notes", "New features deployed this week", "Patch Notes", "news", false),
+                    new TestAnnouncement("holiday-event", "Special holiday event this weekend!", "Holiday Event", "scheduled", true)
                 );
 
                 logger.info("Creating " + testAnnouncements.size() + " test announcements...");
@@ -148,11 +148,11 @@ public class AnnouncementTestService {
                 }
 
                 // Validate announcement type (basic validation for known types)
-                List<String> validTypes = Arrays.asList("info", "warning", "alert", "system", "event");
-                String finalType = type;
-                if (!validTypes.contains(type)) {
-                    logger.warning("Unknown announcement type '" + type + "'. Using 'info' instead.");
-                    finalType = "info";
+                List<String> validTypes = Arrays.asList("server", "scheduled", "motd", "news", "help", "advert", "guide");
+                String finalType = type != null ? type.toLowerCase() : "server";
+                if (!validTypes.contains(finalType)) {
+                    logger.warning("Unknown announcement type '" + type + "'. Using 'server' instead.");
+                    finalType = "server";
                 }
 
                 // Create the announcement
@@ -191,7 +191,7 @@ public class AnnouncementTestService {
      * @return List of announcement type IDs
      */
     public List<String> getAvailableTypes() {
-        return Arrays.asList("info", "warning", "alert", "system", "event");
+        return Arrays.asList("server", "scheduled", "motd", "news", "help", "advert", "guide");
     }
 
     /**

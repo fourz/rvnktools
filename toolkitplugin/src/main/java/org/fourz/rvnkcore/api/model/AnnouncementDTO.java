@@ -82,7 +82,7 @@ public class AnnouncementDTO {
     }
     
     public void setType(String type) {
-        this.type = type;
+        this.type = type != null ? type.toLowerCase() : null;
     }
     
     public boolean isActive() {
@@ -248,7 +248,7 @@ public class AnnouncementDTO {
         }
         
         public Builder type(String type) {
-            dto.type = type;
+            dto.type = type != null ? type.toLowerCase() : null;
             return this;
         }
         

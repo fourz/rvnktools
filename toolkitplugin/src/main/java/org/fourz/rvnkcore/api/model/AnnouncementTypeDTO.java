@@ -51,7 +51,7 @@ public class AnnouncementTypeDTO {
     }
     
     public void setId(String id) {
-        this.id = id;
+        this.id = id != null ? id.toLowerCase() : null;
     }
     
     public String getName() {
@@ -200,7 +200,7 @@ public class AnnouncementTypeDTO {
         private final AnnouncementTypeDTO dto = new AnnouncementTypeDTO();
         
         public Builder id(String id) {
-            dto.id = id;
+            dto.id = id != null ? id.toLowerCase() : null;
             return this;
         }
         
