@@ -55,7 +55,8 @@ class ServletRegistrationServiceImplTest {
         when(mockConfig.getHttpsPort()).thenReturn(8443);
         when(mockConfig.isHttpsEnabled()).thenReturn(false);
 
-        // Setup mock plugin with logger
+        // Setup mock plugin with logger and name
+        when(mockPlugin.getName()).thenReturn("TestPlugin");
         when(mockPlugin.getLogger()).thenReturn(Logger.getLogger("TestPlugin"));
 
         service = new ServletRegistrationServiceImpl(mockConfig, mockPlugin, new com.google.gson.Gson());
