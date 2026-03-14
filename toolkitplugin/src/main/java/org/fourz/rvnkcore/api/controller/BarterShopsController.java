@@ -31,8 +31,8 @@ public class BarterShopsController extends HttpServlet {
     private final Gson gson;
     private final LogManager logger;
 
-    private static final Pattern SHOP_BY_ID_PATTERN = Pattern.compile("^/shops/([0-9]+)$");
-    private static final Pattern TRADE_BY_ID_PATTERN = Pattern.compile("^/trades/([0-9a-f-]+)$");
+    private static final Pattern SHOP_BY_ID_PATTERN = Pattern.compile("^/shops/([^/]+)$");
+    private static final Pattern TRADE_BY_ID_PATTERN = Pattern.compile("^/trades/([^/]+)$");
     private static final Pattern STATS_SHOPS_PATTERN = Pattern.compile("^/stats/shops/?(.*)$");
 
     public BarterShopsController(IBarterShopsApiService ignored, Gson gson, LogManager logger) {
