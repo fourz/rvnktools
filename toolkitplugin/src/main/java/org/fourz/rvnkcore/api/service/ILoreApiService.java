@@ -33,4 +33,6 @@ public interface ILoreApiService {
     CompletableFuture<ApiResponse<?>> getStats();
 
     CompletableFuture<ApiResponse<?>> getHealthStatus();
+
+    CompletableFuture<ApiResponse<?>> getCategories();
 }
