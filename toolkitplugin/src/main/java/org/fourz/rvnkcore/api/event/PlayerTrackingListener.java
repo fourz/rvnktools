@@ -12,6 +12,7 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
+import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Timestamp;
@@ -125,6 +126,7 @@ public class PlayerTrackingListener implements Listener {
                         logger.error("Failed to update player data for: " + player.getName(), throwable);
                     } else {
                         logger.debug("Successfully updated player data for: " + player.getName());
+                        notifyWebhook();
                     }
                 });
                 
@@ -183,6 +185,7 @@ public class PlayerTrackingListener implements Listener {
                     } else {
                         logger.debug("Updated player data on quit: " + player.getName() +
                                    " (session: " + finalSessionSeconds + "s)");
+                        notifyWebhook();
                     }
                 });
 
@@ -242,6 +245,21 @@ public class PlayerTrackingListener implements Listener {
             
         } catch (Exception e) {
             logger.error("Failed to get services for world change event", e);
+        }
+    }
+
+    /**
+     * Fires a webhook notification for player change events.
+     * Fails silently if WebhookNotifier is not registered (webhooks disabled).
+     */
+    private void notifyWebhook() {
+        try {
+            WebhookNotifier notifier = rvnkCore.getService(WebhookNotifier.class);
+            if (notifier != null) {
+                notifier.notifyPlayerChange();
+            }
+        } catch (Exception ignored) {
+            // Webhook is optional — never disrupt player tracking
         }
     }
 }

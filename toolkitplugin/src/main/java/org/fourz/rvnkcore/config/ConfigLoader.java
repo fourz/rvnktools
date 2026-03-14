@@ -5,6 +5,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
 import java.io.File;
@@ -32,6 +33,7 @@ public class ConfigLoader {
     // Cached configurations to prevent duplicate loading
     private DatabaseConfig cachedDatabaseConfig;
     private ApiConfig cachedApiConfig;
+    private WebhookConfig cachedWebhookConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -314,7 +316,27 @@ public class ConfigLoader {
         logger.debug("API configuration loaded and cached");
         return cachedApiConfig;
     }
-    
+
+    /**
+     * Gets the webhook configuration instance with caching.
+     *
+     * @return WebhookConfig instance
+     */
+    public WebhookConfig getWebhookConfig() {
+        if (cachedWebhookConfig != null) {
+            return cachedWebhookConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection webhookSection = coreConfig.getConfigurationSection("webhook");
+        cachedWebhookConfig = WebhookConfig.fromConfigurationSection(webhookSection);
+        logger.debug("Webhook configuration loaded and cached");
+        return cachedWebhookConfig;
+    }
+
     /**
      * Gets the database configuration instance with caching.
      * 
@@ -387,6 +409,7 @@ public class ConfigLoader {
         // Invalidate caches so subsequent calls re-parse from the fresh config
         cachedApiConfig = null;
         cachedDatabaseConfig = null;
+        cachedWebhookConfig = null;
     }
     
     /**

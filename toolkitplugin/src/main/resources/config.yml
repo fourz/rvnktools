@@ -68,6 +68,17 @@ api:
   security:
     allowed-ips: ""
 
+# Webhook Configuration
+# Fires HTTP POST to a URL when player events occur (join/quit)
+# Used to trigger cache revalidation in external systems (e.g., WebUI)
+webhook:
+  enabled: false
+  url: ""
+  secret: ""
+  server-id: ""            # Identifies this server to the WebUI (must match servers.ts name: "dev", "event", "prod")
+  debounce-seconds: 10
+  timeout-ms: 5000
+
 # ──────────────────────────────────────────
 # RVNKTools Settings
 # ──────────────────────────────────────────
