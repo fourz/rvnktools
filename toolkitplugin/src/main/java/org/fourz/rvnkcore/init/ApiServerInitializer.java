@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
@@ -93,6 +94,11 @@ public class ApiServerInitializer {
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
 
+            // Create AuthTokenStore and register as a service (used by LinkCommand + AuthController)
+            AuthTokenStore authTokenStore = new AuthTokenStore(plugin);
+            registry.registerService(AuthTokenStore.class, authTokenStore);
+            logger.debug("  + AuthTokenStore created and registered");
+
             logger.debug("REST API: Creating CoreServer instance on port " + apiConfig.getHttpsPort());
             apiServer = new CoreServer(
                 apiConfig,
@@ -100,6 +106,7 @@ public class ApiServerInitializer {
                 playerWorldService,
                 announcementService,
                 worldService,
+                authTokenStore,
                 plugin
             );
 

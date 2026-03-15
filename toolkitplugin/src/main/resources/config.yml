@@ -123,6 +123,12 @@ commands:
                               # When false: /tp uses vanilla Minecraft teleport
                               # When true: /tp uses RVNKTools teleport (player/coords/worldswap)
 
+# Authentication
+# Web portal magic link configuration
+auth:
+  callback-url: ""       # Web portal callback URL for /link login (e.g. https://dev.fourz.org/auth/callback)
+                          # If empty, defaults to http://localhost:3000/auth/callback (local dev)
+
 # Feature Configuration
 # Enable or disable specific RVNKTools features
 features:

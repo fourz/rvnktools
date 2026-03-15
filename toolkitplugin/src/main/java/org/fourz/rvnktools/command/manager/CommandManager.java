@@ -2,6 +2,8 @@ package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.PluginCommand;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
@@ -13,6 +15,7 @@ import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
+import org.fourz.rvnktools.link.LinkCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
@@ -93,12 +96,34 @@ public class CommandManager {
         // Register DH log filter command
         registerCommand(new LogFilterCommand(plugin));
 
+        // Register link command (magic link auth)
+        registerLinkCommand();
+
         // Register cycle commands
         cycleCommands.registerCommands();
 
         logger.info("Command initialization complete!");
     }
     
+    /**
+     * Registers the /link command if AuthTokenStore is available in ServiceRegistry.
+     * AuthTokenStore is created by ApiServerInitializer — if the API server is disabled,
+     * the /link command will not be registered.
+     */
+    private void registerLinkCommand() {
+        try {
+            ServiceRegistry registry = plugin.getServiceRegistry();
+            if (registry.hasService(AuthTokenStore.class)) {
+                AuthTokenStore authTokenStore = registry.getService(AuthTokenStore.class);
+                registerCommand(new LinkCommand(plugin, authTokenStore));
+            } else {
+                logger.info("AuthTokenStore not available — /link command not registered (API server may be disabled)");
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to register /link command: " + e.getMessage());
+        }
+    }
+
     /**
      * Get the CommandManager instance (singleton pattern).
      *

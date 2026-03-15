@@ -94,6 +94,10 @@ commands:
     description: Manage TrainCarts settings and view help pages
     usage: /trains [enable|disable|modes|examples|links]
     aliases: [train-help]
+  link:
+    description: Link your account to external services
+    usage: /link <login|matrix|discord>
+    permission: rvnktools.link
   pref:
     description: Manage your notification preferences
     usage: |
@@ -184,6 +188,9 @@ permissions:
   rvnktools.admin.test:
     description: Allows using automated test commands
     default: op
+  rvnktools.link:
+    description: Allows linking account to external services
+    default: true
   rvnkcore.prefs:
     description: Manage notification preferences
     default: true
