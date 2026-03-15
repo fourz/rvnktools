@@ -2,9 +2,14 @@ package org.fourz.rvnkcore.api.controller;
 
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
+import org.fourz.rvnkcore.api.model.PlayerPreferencesDTO;
+import org.fourz.rvnkcore.api.model.QuietHoursConfig;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
+import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -16,18 +21,26 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * REST API controller for announcement management.
  *
  * Provides comprehensive REST endpoints for announcement CRUD operations,
- * search functionality, and administrative management.
+ * search functionality, user preferences, permission checks, and
+ * administrative management.
  *
  * @since 1.0.0
  */
@@ -37,10 +50,42 @@ public class AnnouncementController extends HttpServlet {
     private final LogManager logger;
     private final Gson gson;
 
+    private static final String PLUGIN_ID = "announcements";
+    private static final Pattern USER_PREFS_PATTERN = Pattern.compile("^/user/([0-9a-fA-F-]{36})/preferences$");
+    private static final Pattern PERMISSIONS_PATTERN = Pattern.compile("^/permissions/([0-9a-fA-F-]{36})$");
+
+    // Permission check cache: UUID -> { permissions map, expiry timestamp }
+    private static final long PERMISSION_CACHE_TTL_MS = 300_000; // 5 min
+    private final ConcurrentHashMap<UUID, CachedPermissions> permissionCache = new ConcurrentHashMap<>();
+
+    private static class CachedPermissions {
+        final Map<String, Boolean> permissions;
+        final long expiresAt;
+        CachedPermissions(Map<String, Boolean> permissions) {
+            this.permissions = permissions;
+            this.expiresAt = System.currentTimeMillis() + PERMISSION_CACHE_TTL_MS;
+        }
+        boolean isExpired() { return System.currentTimeMillis() > expiresAt; }
+    }
+
     public AnnouncementController(AnnouncementService announcementService, LogManager logger, Gson gson) {
         this.announcementService = announcementService;
         this.logger = logger;
         this.gson = gson;
+    }
+
+    /**
+     * Lazily resolves PlayerPreferencesService from ServiceRegistry.
+     */
+    private PlayerPreferencesService getPreferencesService() {
+        RVNKCore core = RVNKCore.getInstance();
+        if (core != null) {
+            ServiceRegistry registry = core.getServiceRegistry();
+            if (registry != null && registry.hasService(PlayerPreferencesService.class)) {
+                return registry.getService(PlayerPreferencesService.class);
+            }
+        }
+        return null;
     }
 
     @Override
@@ -78,11 +123,20 @@ public class AnnouncementController extends HttpServlet {
                 handleGetAnnouncementTypes(request, response);
             } else if (pathInfo.equals("/metrics")) {
                 handleGetAnnouncementMetrics(request, response);
-            } else if (pathInfo.startsWith("/")) {
-                String id = pathInfo.substring(1);
-                handleGetAnnouncementById(id, request, response);
             } else {
-                sendError(response, 404, "Endpoint not found");
+                // Check user preferences and permissions patterns
+                Matcher prefsMatcher = USER_PREFS_PATTERN.matcher(pathInfo);
+                Matcher permsMatcher = PERMISSIONS_PATTERN.matcher(pathInfo);
+                if (prefsMatcher.matches()) {
+                    handleGetUserPreferences(prefsMatcher.group(1), request, response);
+                } else if (permsMatcher.matches()) {
+                    handleGetPermissions(permsMatcher.group(1), request, response);
+                } else if (pathInfo.startsWith("/")) {
+                    String id = pathInfo.substring(1);
+                    handleGetAnnouncementById(id, request, response);
+                } else {
+                    sendError(response, 404, "Endpoint not found");
+                }
             }
         } catch (Exception e) {
             logger.error("Error handling GET request: " + pathInfo, e);
@@ -122,6 +176,13 @@ public class AnnouncementController extends HttpServlet {
 
         try {
             if (pathInfo != null && pathInfo.startsWith("/")) {
+                // Check user preferences pattern first
+                Matcher prefsMatcher = USER_PREFS_PATTERN.matcher(pathInfo);
+                if (prefsMatcher.matches()) {
+                    handlePutUserPreferences(prefsMatcher.group(1), request, response);
+                    return;
+                }
+
                 String[] parts = pathInfo.substring(1).split("/");
                 if (parts.length == 1) {
                     handleUpdateAnnouncement(parts[0], request, response);
@@ -162,6 +223,174 @@ public class AnnouncementController extends HttpServlet {
             logger.error("Error handling DELETE request: " + pathInfo, e);
             sendError(response, 500, "Internal server error: " + e.getMessage());
         }
+    }
+
+    // ====== User Preferences handlers (#539) ======
+
+    private void handleGetUserPreferences(String uuidStr, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        PlayerPreferencesService prefsService = getPreferencesService();
+        if (prefsService == null) {
+            sendError(response, 503, "Preferences service unavailable");
+            return;
+        }
+
+        try {
+            UUID uuid = UUID.fromString(uuidStr);
+            PlayerPreferencesDTO prefs = prefsService.getPreferences(uuid, PLUGIN_ID).get(15, TimeUnit.SECONDS);
+            Set<String> mutedTypes = prefsService.getDisabledTypes(uuid, PLUGIN_ID).get(15, TimeUnit.SECONDS);
+
+            // Build response in the issue-specified format
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("enabled", prefs.isMasterEnabled());
+            data.put("filter", getFilterFromMetadata(prefs));
+            data.put("mutedTypes", mutedTypes);
+
+            ApiUtils.sendSuccess(response, gson, data);
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID: " + uuidStr);
+        } catch (Exception e) {
+            logger.error("Error retrieving user preferences: " + uuidStr, e);
+            sendError(response, 500, "Failed to retrieve preferences: " + e.getMessage());
+        }
+    }
+
+    private void handlePutUserPreferences(String uuidStr, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        PlayerPreferencesService prefsService = getPreferencesService();
+        if (prefsService == null) {
+            sendError(response, 503, "Preferences service unavailable");
+            return;
+        }
+
+        try {
+            UUID uuid = UUID.fromString(uuidStr);
+
+            String body = ApiUtils.readRequestBody(request);
+            if (body.isEmpty()) {
+                sendError(response, 400, "Request body is empty");
+                return;
+            }
+
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+
+            // Get or create preferences
+            PlayerPreferencesDTO prefs = prefsService.getPreferences(uuid, PLUGIN_ID).get(15, TimeUnit.SECONDS);
+
+            // Update enabled
+            if (json.has("enabled")) {
+                prefs.setMasterEnabled(json.get("enabled").getAsBoolean());
+            }
+
+            // Update filter via metadata
+            if (json.has("filter")) {
+                String filter = json.get("filter").getAsString();
+                Map<String, String> metadata = prefs.getMetadata();
+                if (metadata == null) {
+                    metadata = new HashMap<>();
+                }
+                metadata.put("filter", filter);
+                prefs.setMetadata(metadata);
+            }
+
+            // Save core preferences
+            prefsService.savePreferences(prefs).get(15, TimeUnit.SECONDS);
+
+            // Update muted types
+            if (json.has("mutedTypes") && json.get("mutedTypes").isJsonArray()) {
+                JsonArray mutedArray = json.get("mutedTypes").getAsJsonArray();
+                // First, get current disabled types and re-enable them
+                Set<String> currentMuted = prefsService.getDisabledTypes(uuid, PLUGIN_ID).get(15, TimeUnit.SECONDS);
+                for (String type : currentMuted) {
+                    prefsService.setNotificationEnabled(uuid, PLUGIN_ID, type, true).get(15, TimeUnit.SECONDS);
+                }
+                // Then disable the requested types
+                for (JsonElement el : mutedArray) {
+                    String type = el.getAsString();
+                    prefsService.setNotificationEnabled(uuid, PLUGIN_ID, type, false).get(15, TimeUnit.SECONDS);
+                }
+            }
+
+            // Return the updated state
+            Set<String> mutedTypes = prefsService.getDisabledTypes(uuid, PLUGIN_ID).get(15, TimeUnit.SECONDS);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("enabled", prefs.isMasterEnabled());
+            data.put("filter", getFilterFromMetadata(prefs));
+            data.put("mutedTypes", mutedTypes);
+
+            ApiUtils.sendSuccess(response, gson, data);
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID or request data: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error saving user preferences: " + uuidStr, e);
+            sendError(response, 500, "Failed to save preferences: " + e.getMessage());
+        }
+    }
+
+    private String getFilterFromMetadata(PlayerPreferencesDTO prefs) {
+        if (prefs.getMetadata() != null && prefs.getMetadata().containsKey("filter")) {
+            return prefs.getMetadata().get("filter");
+        }
+        return "all";
+    }
+
+    // ====== Permission Check handler (#540) ======
+
+    private void handleGetPermissions(String uuidStr, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            UUID uuid = UUID.fromString(uuidStr);
+
+            // Check cache first
+            CachedPermissions cached = permissionCache.get(uuid);
+            if (cached != null && !cached.isExpired()) {
+                ApiUtils.sendSuccess(response, gson, cached.permissions);
+                return;
+            }
+
+            // Resolve permissions via LuckPerms
+            Map<String, Boolean> permissions = resolvePermissions(uuid);
+
+            // Cache the result
+            permissionCache.put(uuid, new CachedPermissions(permissions));
+
+            // Evict expired entries periodically (lazy cleanup)
+            if (permissionCache.size() > 500) {
+                permissionCache.entrySet().removeIf(e -> e.getValue().isExpired());
+            }
+
+            ApiUtils.sendSuccess(response, gson, permissions);
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID: " + uuidStr);
+        } catch (Exception e) {
+            logger.error("Error checking permissions: " + uuidStr, e);
+            sendError(response, 500, "Failed to check permissions: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Resolves announcement permissions for a UUID via LuckPerms.
+     * Falls back to all-false if LuckPerms is unavailable.
+     */
+    private Map<String, Boolean> resolvePermissions(UUID uuid) {
+        Map<String, Boolean> perms = new LinkedHashMap<>();
+        perms.put("canCreate", false);
+        perms.put("canEdit", false);
+        perms.put("canDelete", false);
+        perms.put("canPin", false);
+
+        try {
+            net.luckperms.api.LuckPerms lp = org.fourz.rvnktools.permission.LuckPermsManager.getLuckPerms();
+            net.luckperms.api.model.user.User user = lp.getUserManager().loadUser(uuid).join();
+            if (user == null) return perms;
+
+            net.luckperms.api.cacheddata.CachedPermissionData permData = user.getCachedData().getPermissionData();
+            perms.put("canCreate", permData.checkPermission("rvnk.announcements.create").asBoolean());
+            perms.put("canEdit", permData.checkPermission("rvnk.announcements.edit").asBoolean());
+            perms.put("canDelete", permData.checkPermission("rvnk.announcements.delete").asBoolean());
+            perms.put("canPin", permData.checkPermission("rvnk.announcements.pin").asBoolean());
+        } catch (Exception e) {
+            logger.warning("LuckPerms unavailable for permission check: " + e.getMessage());
+        }
+
+        return perms;
     }
 
     // ====== GET handlers ======
@@ -557,6 +786,7 @@ public class AnnouncementController extends HttpServlet {
             case 400 -> "BAD_REQUEST";
             case 401 -> "UNAUTHORIZED";
             case 404 -> "NOT_FOUND";
+            case 503 -> "SERVICE_UNAVAILABLE";
             case 500 -> "INTERNAL_ERROR";
             default -> "ERROR";
         };
