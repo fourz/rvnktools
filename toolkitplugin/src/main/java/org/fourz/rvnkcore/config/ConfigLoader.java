@@ -113,8 +113,7 @@ public class ConfigLoader {
         // Apply to rvnkcore LogManager (primary - used by all plugins)
         LogManager.setGlobalLogLevel(level);
 
-        // Apply to deprecated rvnktools LogManager (for any remaining legacy instances)
-        org.fourz.rvnktools.util.log.LogManager.setGlobalLogLevel(level);
+        // Legacy rvnktools LogManager removed — all callers migrated to rvnkcore.util.log.LogManager
     }
     
     /**
