@@ -13,6 +13,7 @@ public class Announcement {
     private Long recurrence;
     private String recurrenceString;
     private String owner;
+    private String ownerUuid;
     private String permission;
     private LocalDate date;
     private LocalTime time;
@@ -79,6 +80,12 @@ public class Announcement {
     }
     public void setOwner(String owner) {
         this.owner = owner;
+    }
+    public String getOwnerUuid() {
+        return ownerUuid;
+    }
+    public void setOwnerUuid(String ownerUuid) {
+        this.ownerUuid = ownerUuid;
     }
     public String getPermission() {
         return permission;

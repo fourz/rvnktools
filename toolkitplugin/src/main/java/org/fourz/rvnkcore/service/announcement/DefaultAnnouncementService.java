@@ -191,6 +191,9 @@ public class DefaultAnnouncementService implements AnnouncementService {
                     if (announcement.getTitle() == null) {
                         announcement.setTitle(existing.getTitle());
                     }
+                    if (announcement.getOwnerUuid() == null) {
+                        announcement.setOwnerUuid(existing.getOwnerUuid());
+                    }
                 }
 
                 // Update timestamp
@@ -645,6 +648,30 @@ public class DefaultAnnouncementService implements AnnouncementService {
                            cache.size(), hits, misses, hitRate);
     }
     
+    /**
+     * Deactivates an announcement due to payment depletion.
+     * Sets active=false and adds deactivation_reason=payment_depleted to metadata.
+     *
+     * @param id The announcement ID
+     * @return CompletableFuture that completes when deactivation is finished
+     */
+    public CompletableFuture<Void> deactivateForPayment(String id) {
+        return deactivateAnnouncement(id)
+            .thenCompose(v -> updateAnnouncementMetadata(id, "deactivation_reason", "payment_depleted"));
+    }
+
+    /**
+     * Reactivates an announcement that was deactivated for payment.
+     * Sets active=true and clears the deactivation_reason metadata.
+     *
+     * @param id The announcement ID
+     * @return CompletableFuture that completes when reactivation is finished
+     */
+    public CompletableFuture<Void> reactivateFromPayment(String id) {
+        return activateAnnouncement(id)
+            .thenCompose(v -> updateAnnouncementMetadata(id, "deactivation_reason", ""));
+    }
+
     /**
      * Clears the announcement cache.
      */

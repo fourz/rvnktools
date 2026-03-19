@@ -34,6 +34,7 @@ public class AnnounceManager {
     private final Map<String, Announcement> announcements = new ConcurrentHashMap<>();
     private boolean usingPlaceholderAPI;
     private AnnouncementService announcementService;
+    private AnnouncementFeeCollector feeCollector;
 
     public AnnounceManager(RVNKCore plugin) {
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -52,6 +53,35 @@ public class AnnounceManager {
 
         this.announceScheduler = new AnnounceScheduler(plugin, this);
         announceScheduler.scheduleAnnouncements();
+
+        // Initialize weekly fee collector if Vault economy is available
+        initializeFeeCollector();
+    }
+
+    private void initializeFeeCollector() {
+        try {
+            org.bukkit.plugin.RegisteredServiceProvider<net.milkbowl.vault.economy.Economy> rsp =
+                plugin.getServer().getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
+            if (rsp == null) {
+                logger.info("Vault economy not found — fee collector disabled");
+                return;
+            }
+            net.milkbowl.vault.economy.Economy economy = rsp.getProvider();
+            this.feeCollector = new AnnouncementFeeCollector(announcementService, economy, logger);
+
+            // Run weekly: 20 ticks/sec * 60 * 60 * 24 * 7 = 12,096,000 ticks
+            // Initial delay: 5 minutes (6000 ticks) to let server stabilize
+            long weeklyTicks = 20L * 60 * 60 * 24 * 7;
+            feeCollector.runTaskTimerAsynchronously(plugin, 6000L, weeklyTicks);
+
+            // Register login listener for payment notifications
+            AnnouncementFeeLoginListener loginListener = new AnnouncementFeeLoginListener(feeCollector, logger);
+            plugin.getServer().getPluginManager().registerEvents(loginListener, plugin);
+
+            logger.info("AnnouncementFeeCollector initialized (weekly cycle, Vault economy)");
+        } catch (Exception e) {
+            logger.warning("Failed to initialize fee collector: " + e.getMessage());
+        }
     }
 
     private void resolveAnnouncementService() {
@@ -206,7 +236,24 @@ public class AnnounceManager {
                 return false;
             }
             player.sendMessage("Announcement added: " + id + " (" + type + ")");
-            return announceConfig.parseAnnouncement(id, type, text, player.getName());
+            boolean result = announceConfig.parseAnnouncement(id, type, text, player.getName());
+            // Set ownerUuid on the newly created announcement
+            if (result) {
+                Announcement ann = announcements.get(id.toLowerCase());
+                if (ann != null) {
+                    ann.setOwnerUuid(player.getUniqueId().toString());
+                    // Persist ownerUuid to DB
+                    if (announcementService != null) {
+                        try {
+                            AnnouncementDTO dto = convertToDTO(ann);
+                            announcementService.updateAnnouncement(dto).join();
+                        } catch (Exception e) {
+                            logger.warning("Failed to persist ownerUuid for announcement: " + id);
+                        }
+                    }
+                }
+            }
+            return result;
         }
 
         return announceConfig.parseAnnouncement(id, type, text);
@@ -342,6 +389,14 @@ public class AnnounceManager {
 
     public void shutdown() {
         announceScheduler.shutdown();
+        if (feeCollector != null) {
+            try {
+                feeCollector.cancel();
+                logger.info("AnnouncementFeeCollector cancelled");
+            } catch (Exception e) {
+                logger.debug("Fee collector already cancelled");
+            }
+        }
         logger.info("Saving preferences before shutdown...");
         announceConfig.shutdown();
         logger.info("AnnounceManager shutdown complete.");
@@ -524,6 +579,7 @@ public class AnnounceManager {
             updatedAnnouncement.setMessage(newMessage);
             updatedAnnouncement.setPermission(oldAnnouncement.getPermission());
             updatedAnnouncement.setOwner(oldAnnouncement.getOwner());
+            updatedAnnouncement.setOwnerUuid(oldAnnouncement.getOwnerUuid());
             updatedAnnouncement.setDate(oldAnnouncement.getDate());
             updatedAnnouncement.setTime(oldAnnouncement.getTime());
             updatedAnnouncement.setExpiration(oldAnnouncement.getExpiration());
@@ -573,6 +629,11 @@ public class AnnounceManager {
             ann.setExpiration(dto.getExpiresAt().toLocalDateTime());
         }
 
+        // Set ownerUuid from first-class column
+        if (dto.getOwnerUuid() != null) {
+            ann.setOwnerUuid(dto.getOwnerUuid());
+        }
+
         Map<String, Object> metadata = dto.getMetadata();
         if (metadata != null) {
             Object permission = metadata.get("permission");
@@ -606,6 +667,10 @@ public class AnnounceManager {
 
         if (ann.getExpiration() != null) {
             builder.expiresAt(Timestamp.valueOf(ann.getExpiration()));
+        }
+
+        if (ann.getOwnerUuid() != null) {
+            builder.ownerUuid(ann.getOwnerUuid());
         }
 
         if (ann.getPermission() != null) {

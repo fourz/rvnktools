@@ -666,7 +666,76 @@ public class DatabaseSetup {
             }
         }
 
+        // Migration 5: Add owner_uuid column to announcements table
+        if (!columnExists(connection, announcementsTable, "owner_uuid")) {
+            logger.info("Adding 'owner_uuid' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN owner_uuid VARCHAR(36) NULL");
+                } else {
+                    stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN owner_uuid TEXT NULL");
+                }
+                logger.info("Successfully added 'owner_uuid' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add owner_uuid column: " + e.getMessage());
+            }
+
+            // Create index on owner_uuid for lookup queries
+            try (var stmt = connection.createStatement()) {
+                String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_owner_uuid ON " + announcementsTable + "(owner_uuid)");
+                logger.info("Created index on owner_uuid");
+            } catch (SQLException e) {
+                logger.warning("Failed to create owner_uuid index: " + e.getMessage());
+            }
+
+            // Best-effort backfill: resolve owner names from metadata to UUIDs via rvnk_players
+            backfillOwnerUuids(connection, announcementsTable);
+        }
+
         logger.debug("Database migrations completed");
+    }
+
+    /**
+     * Backfills owner_uuid from metadata owner= entries by looking up rvnk_players.
+     * Best-effort: unresolvable names stay NULL.
+     */
+    private void backfillOwnerUuids(Connection connection, String announcementsTable) {
+        String playersTable = table(TABLE_PLAYERS);
+        try {
+            // Extract owner name from metadata (format: "owner=Name,key=val" or "raw_metadata=owner=Name,...")
+            // and join against rvnk_players to resolve UUID
+            String sql;
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                // MySQL: use SUBSTRING_INDEX to extract owner value from metadata
+                sql = "UPDATE " + announcementsTable + " a " +
+                    "INNER JOIN " + playersTable + " p ON p.current_name = " +
+                    "TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(a.metadata, 'owner=', -1), ',', 1)) " +
+                    "SET a.owner_uuid = p.id " +
+                    "WHERE a.owner_uuid IS NULL AND a.metadata LIKE '%owner=%'";
+            } else {
+                // SQLite: simpler approach — only handle direct owner=Name metadata format
+                sql = "UPDATE " + announcementsTable + " SET owner_uuid = (" +
+                    "SELECT p.id FROM " + playersTable + " p " +
+                    "WHERE p.current_name = TRIM(REPLACE(SUBSTR(" +
+                    announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), " +
+                    "SUBSTR(SUBSTR(" + announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), " +
+                    "INSTR(SUBSTR(" + announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), ',')), '')) " +
+                    "LIMIT 1) " +
+                    "WHERE owner_uuid IS NULL AND metadata LIKE '%owner=%'";
+            }
+
+            try (var stmt = connection.createStatement()) {
+                int rows = stmt.executeUpdate(sql);
+                if (rows > 0) {
+                    logger.info("Backfilled owner_uuid for " + rows + " announcement(s)");
+                } else {
+                    logger.info("No announcements needed owner_uuid backfill");
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("owner_uuid backfill failed (non-fatal): " + e.getMessage());
+        }
     }
 
     /**
