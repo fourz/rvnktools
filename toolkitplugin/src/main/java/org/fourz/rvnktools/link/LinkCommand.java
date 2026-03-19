@@ -4,6 +4,8 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.user.User;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
@@ -15,13 +17,16 @@ import org.fourz.rvnktools.permission.LuckPermsManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Subcommand dispatcher for {@code /link <login|matrix|discord>}.
  * MVP implements {@code login} — generates a one-time magic link URL
  * for web portal authentication.
+ *
+ * <p>Console usage: {@code link login <player>} — generates a token for
+ * the named player (offline or online) and prints the URL to console.</p>
  *
  * @since 1.5.0
  */
@@ -55,7 +60,7 @@ public class LinkCommand extends BaseCommand {
         String subCommand = args[0].toLowerCase();
 
         switch (subCommand) {
-            case "login" -> handleLogin(sender);
+            case "login" -> handleLogin(sender, args);
             case "matrix" -> sender.sendMessage(ChatFormat.colorize("&7[Link] &eMatrix linking is coming soon!"));
             case "discord" -> sender.sendMessage(ChatFormat.colorize("&7[Link] &eDiscord linking is coming soon!"));
             default -> sendUnknownSubCommandMessage(sender, subCommand);
@@ -64,40 +69,81 @@ public class LinkCommand extends BaseCommand {
         return true;
     }
 
-    private void handleLogin(CommandSender sender) {
-        if (!validatePlayer(sender)) {
-            return;
+    private void handleLogin(CommandSender sender, String[] args) {
+        if (sender instanceof Player player) {
+            // Player usage: /link login (no args needed)
+            handlePlayerLogin(sender, player);
+        } else {
+            // Console usage: /link login <player>
+            if (args.length < 2) {
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7[Link] &cConsole usage: /link login <player>"));
+                return;
+            }
+            handleConsoleLogin(sender, args[1]);
         }
+    }
 
-        Player player = (Player) sender;
-
-        // Rate limit check
+    private void handlePlayerLogin(CommandSender sender, Player player) {
         if (authTokenStore.isRateLimited(player)) {
             sender.sendMessage(ChatFormat.colorize(
                     "&7[Link] &cPlease wait before generating another login link."));
             return;
         }
 
-        // Resolve player groups from LuckPerms
         List<String> groups = resolveGroups(player);
-
-        // Generate token and build URL
         String token = authTokenStore.generateToken(player, groups);
         String url = callbackUrl + "?token=" + token;
 
-        // Send clickable link to player
         sender.sendMessage(ChatFormat.colorize("&7[Link] &aClick the link below to log in to the web portal:"));
-
         TextComponent linkComponent = new TextComponent(ChatFormat.colorize("&b&n" + url));
         linkComponent.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url));
         player.spigot().sendMessage(linkComponent);
-
         sender.sendMessage(ChatFormat.colorize("&7This link expires in &f15 minutes &7and can only be used once."));
     }
 
+    @SuppressWarnings("deprecation")
+    private void handleConsoleLogin(CommandSender sender, String playerName) {
+        // Resolve player UUID — check online first, then offline cache
+        Player online = Bukkit.getPlayerExact(playerName);
+        UUID uuid;
+        String resolvedName;
+
+        if (online != null) {
+            uuid = online.getUniqueId();
+            resolvedName = online.getName();
+        } else {
+            OfflinePlayer offline = Bukkit.getOfflinePlayer(playerName);
+            if (!offline.hasPlayedBefore()) {
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7[Link] &cPlayer '" + playerName + "' not found."));
+                return;
+            }
+            uuid = offline.getUniqueId();
+            resolvedName = offline.getName() != null ? offline.getName() : playerName;
+        }
+
+        if (authTokenStore.isRateLimited(uuid)) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7[Link] &cPlayer is rate-limited. Wait before generating another token."));
+            return;
+        }
+
+        List<String> groups = resolveGroupsByUuid(uuid, resolvedName);
+        String token = authTokenStore.generateToken(uuid, resolvedName, groups);
+        String url = callbackUrl + "?token=" + token;
+
+        sender.sendMessage(ChatFormat.colorize(
+                "&7[Link] &aGenerated login link for &f" + resolvedName + "&a:"));
+        sender.sendMessage(url);
+        sender.sendMessage(ChatFormat.colorize(
+                "&7Groups: &f" + String.join(", ", groups)));
+        sender.sendMessage(ChatFormat.colorize(
+                "&7This link expires in &f15 minutes &7and can only be used once."));
+    }
+
     /**
-     * Resolves the player's permission groups via LuckPerms.
-     * Returns a list with at least "default" if LuckPerms is unavailable.
+     * Resolves the player's permission groups via LuckPerms (online player).
      */
     private List<String> resolveGroups(Player player) {
         try {
@@ -108,7 +154,6 @@ public class LinkCommand extends BaseCommand {
             List<String> groups = new ArrayList<>();
             groups.add(primaryGroup);
 
-            // Add inherited groups (excluding the primary to avoid duplicates)
             user.getInheritedGroups(user.getQueryOptions()).stream()
                     .map(g -> g.getName())
                     .filter(name -> !name.equals(primaryGroup))
@@ -121,12 +166,45 @@ public class LinkCommand extends BaseCommand {
         }
     }
 
+    /**
+     * Resolves permission groups by UUID via LuckPerms UserManager.
+     * Works for both online and offline players.
+     */
+    private List<String> resolveGroupsByUuid(UUID uuid, String playerName) {
+        try {
+            LuckPerms lp = LuckPermsManager.getLuckPerms();
+            User user = lp.getUserManager().loadUser(uuid).join();
+            String primaryGroup = user.getPrimaryGroup();
+
+            List<String> groups = new ArrayList<>();
+            groups.add(primaryGroup);
+
+            user.getInheritedGroups(user.getQueryOptions()).stream()
+                    .map(g -> g.getName())
+                    .filter(name -> !name.equals(primaryGroup))
+                    .forEach(groups::add);
+
+            return groups;
+        } catch (Exception e) {
+            logger.warning("Failed to resolve LuckPerms groups for " + playerName + ": " + e.getMessage());
+            return List.of("default");
+        }
+    }
+
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             return SUBCOMMANDS.stream()
                     .filter(s -> s.startsWith(partial))
+                    .collect(Collectors.toList());
+        }
+        // Tab-complete player names for console "link login <player>"
+        if (args.length == 2 && args[0].equalsIgnoreCase("login") && !(sender instanceof Player)) {
+            String partial = args[1].toLowerCase();
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(name -> name.toLowerCase().startsWith(partial))
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();

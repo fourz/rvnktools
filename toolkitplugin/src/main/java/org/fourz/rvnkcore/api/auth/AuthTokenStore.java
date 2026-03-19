@@ -61,7 +61,17 @@ public class AuthTokenStore {
      * @return true if the player must wait before generating another token
      */
     public boolean isRateLimited(Player player) {
-        Instant last = lastGenerated.get(player.getUniqueId());
+        return isRateLimited(player.getUniqueId());
+    }
+
+    /**
+     * Checks whether a player UUID is rate-limited from generating a new token.
+     *
+     * @param playerUuid the player's UUID
+     * @return true if the player must wait before generating another token
+     */
+    public boolean isRateLimited(UUID playerUuid) {
+        Instant last = lastGenerated.get(playerUuid);
         if (last == null) return false;
         return Instant.now().isBefore(last.plusSeconds(RATE_LIMIT_SECONDS));
     }
@@ -74,19 +84,32 @@ public class AuthTokenStore {
      * @return the token string (UUID format)
      */
     public String generateToken(Player player, List<String> groups) {
+        return generateToken(player.getUniqueId(), player.getName(), groups);
+    }
+
+    /**
+     * Generates a one-time token for a player by UUID and name.
+     * Supports console-initiated token generation for offline players.
+     *
+     * @param playerUuid the player's UUID
+     * @param playerName the player's name
+     * @param groups     the player's permission groups
+     * @return the token string (UUID format)
+     */
+    public String generateToken(UUID playerUuid, String playerName, List<String> groups) {
         String token = UUID.randomUUID().toString();
         Instant now = Instant.now();
 
         tokens.put(token, new AuthToken(
-                player.getUniqueId(),
-                player.getName(),
+                playerUuid,
+                playerName,
                 groups,
                 now,
                 now.plusSeconds(TOKEN_TTL_SECONDS)
         ));
-        lastGenerated.put(player.getUniqueId(), now);
+        lastGenerated.put(playerUuid, now);
 
-        logger.debug("Token generated for " + player.getName() + " (expires in " + TOKEN_TTL_SECONDS + "s)");
+        logger.debug("Token generated for " + playerName + " (expires in " + TOKEN_TTL_SECONDS + "s)");
         return token;
     }
 
