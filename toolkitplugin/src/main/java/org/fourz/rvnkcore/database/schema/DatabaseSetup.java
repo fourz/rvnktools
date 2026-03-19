@@ -34,6 +34,7 @@ public class DatabaseSetup {
     public static final String TABLE_PLAYER_NOTIFICATION_TYPES = "rvnk_player_notification_types";
     public static final String TABLE_PLAYER_NOTIFICATION_CHANNELS = "rvnk_player_notification_channels";
     public static final String TABLE_PREFERENCE_DEFAULTS = "rvnk_preference_defaults";
+    public static final String TABLE_ANNOUNCEMENT_TYPES = "rvnk_announcement_types";
     public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
 
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
@@ -181,6 +182,7 @@ public class DatabaseSetup {
         String playersTable = table(TABLE_PLAYERS);
         String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
         String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
         String playerPreferencesTable = table(TABLE_PLAYER_PREFERENCES);
         String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
@@ -190,6 +192,7 @@ public class DatabaseSetup {
         String createPlayerWorldDataTable;
         String createWorldsTable;
         String createAnnouncementsTable;
+        String createAnnouncementTypesTable;
         String createPlayerPreferencesTable;
         String createNotificationTypesTable;
         String createNotificationChannelsTable;
@@ -274,6 +277,7 @@ public class DatabaseSetup {
                 "message TEXT NOT NULL, " +
                 "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
                 "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
                 "scheduled_for TIMESTAMP NULL, " +
@@ -282,6 +286,21 @@ public class DatabaseSetup {
                 "target_worlds TEXT, " +
                 "target_groups TEXT, " +
                 "metadata TEXT" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id VARCHAR(50) PRIMARY KEY, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "prefix VARCHAR(200), " +
+                "suffix VARCHAR(200), " +
+                "permission VARCHAR(200), " +
+                "list_fee INT DEFAULT 0, " +
+                "weekly_fee INT DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
@@ -409,6 +428,7 @@ public class DatabaseSetup {
                 "message TEXT NOT NULL, " +
                 "type TEXT NOT NULL DEFAULT 'general', " +
                 "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "scheduled_for TIMESTAMP NULL, " +
@@ -417,6 +437,21 @@ public class DatabaseSetup {
                 "target_worlds TEXT, " +
                 "target_groups TEXT, " +
                 "metadata TEXT" +
+                ")";
+
+            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id TEXT PRIMARY KEY, " +
+                "name TEXT NOT NULL, " +
+                "prefix TEXT, " +
+                "suffix TEXT, " +
+                "permission TEXT, " +
+                "list_fee INTEGER DEFAULT 0, " +
+                "weekly_fee INTEGER DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context TEXT NOT NULL DEFAULT 'both'" +
                 ")";
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
@@ -469,6 +504,8 @@ public class DatabaseSetup {
             stmt.execute(createPlayerWorldDataTable);
             logger.debug("Creating " + announcementsTable + " table...");
             stmt.execute(createAnnouncementsTable);
+            logger.debug("Creating " + announcementTypesTable + " table...");
+            stmt.execute(createAnnouncementTypesTable);
             logger.debug("Creating " + playerPreferencesTable + " table...");
             stmt.execute(createPlayerPreferencesTable);
             logger.debug("Creating " + notificationTypesTable + " table...");
@@ -588,8 +625,46 @@ public class DatabaseSetup {
             }
         }
 
-        // Migration 2: Seed rvnk_players for any preference records with no matching player row
+        // Migration 2: Add pinned column to announcements table if missing
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        if (!columnExists(connection, announcementsTable, "pinned")) {
+            logger.info("Adding 'pinned' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN pinned BOOLEAN DEFAULT FALSE");
+                logger.info("Successfully added 'pinned' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add pinned column: " + e.getMessage());
+            }
+        }
+
+        // Migration 3: Seed rvnk_players for any preference records with no matching player row
         migrateOrphanedPreferenceUsers(connection);
+
+        // Migration 4: Add display_context column to announcement_types table
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        if (!columnExists(connection, announcementTypesTable, "display_context")) {
+            logger.info("Adding 'display_context' column to " + announcementTypesTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementTypesTable
+                    + " ADD COLUMN display_context VARCHAR(10) NOT NULL DEFAULT 'both'");
+                logger.info("Successfully added 'display_context' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add display_context column: " + e.getMessage());
+            }
+            // Set in-game-only types
+            try (var stmt = connection.prepareStatement(
+                    "UPDATE " + announcementTypesTable + " SET display_context = 'ingame' WHERE id IN (?, ?, ?, ?, ?)")) {
+                stmt.setString(1, "help");
+                stmt.setString(2, "guide");
+                stmt.setString(3, "info");
+                stmt.setString(4, "motd");
+                stmt.setString(5, "advert");
+                stmt.executeUpdate();
+                logger.info("Set display_context for in-game-only announcement types");
+            } catch (SQLException e) {
+                logger.warning("Failed to set display_context values: " + e.getMessage());
+            }
+        }
 
         logger.debug("Database migrations completed");
     }

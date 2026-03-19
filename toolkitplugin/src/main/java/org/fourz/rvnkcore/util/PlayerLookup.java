@@ -143,9 +143,27 @@ public class PlayerLookup {
         // Fallback to Bukkit
         OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
         String name = player.getName();
-        if (name == null) {
-            name = uuid.toString().substring(0, 8);
+        if (name != null) {
+            nameCache.put(uuid, TimedName.expiring(name));
+            return name;
         }
+
+        // Last resort: Mojang API (sync, safe on non-main threads like Jetty)
+        if (mojangApiEnabled) {
+            try {
+                Optional<String> mojangName = mojangAPI.getNameByUuid(uuid).get(3, TimeUnit.SECONDS);
+                if (mojangName.isPresent()) {
+                    nameCache.put(uuid, TimedName.expiring(mojangName.get()));
+                    persistExternalPlayer(uuid, mojangName.get());
+                    return mojangName.get();
+                }
+            } catch (Exception e) {
+                logger.debug("Mojang API lookup failed for " + uuid + ": " + e.getMessage());
+            }
+        }
+
+        // Final fallback: short UUID
+        name = uuid.toString().substring(0, 8);
         nameCache.put(uuid, TimedName.expiring(name));
         return name;
     }

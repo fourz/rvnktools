@@ -3,7 +3,10 @@ package org.fourz.rvnkcore.service.announcement;
 import org.fourz.rvnkcore.api.model.AnnouncementDTO;
 import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
+import org.fourz.rvnkcore.database.repository.AnnouncementTypeRepository;
+import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Timestamp;
@@ -28,26 +31,55 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DefaultAnnouncementService implements AnnouncementService {
     
     private final AnnouncementRepository repository;
+    private final AnnouncementTypeRepository typeRepository;
     private final LogManager logger;
-    
+    private final ServiceRegistry serviceRegistry;
+
     // Cache for frequently accessed announcements
     private final ConcurrentHashMap<String, AnnouncementDTO> cache;
     private final AtomicInteger cacheHits;
     private final AtomicInteger cacheMisses;
-    
+
     /**
      * Constructor for DefaultAnnouncementService.
-     * 
+     *
      * @param repository The announcement repository for database operations
      * @param logger The logger instance
      */
     public DefaultAnnouncementService(AnnouncementRepository repository, LogManager logger) {
+        this(repository, null, logger, null);
+    }
+
+    /**
+     * Constructor with ServiceRegistry for lazy webhook resolution.
+     * WebhookNotifier is resolved lazily because it is registered after core services.
+     *
+     * @param repository The announcement repository for database operations
+     * @param logger The logger instance
+     * @param serviceRegistry ServiceRegistry for resolving WebhookNotifier at call time (may be null)
+     */
+    public DefaultAnnouncementService(AnnouncementRepository repository, LogManager logger, ServiceRegistry serviceRegistry) {
+        this(repository, null, logger, serviceRegistry);
+    }
+
+    /**
+     * Full constructor with type repository support.
+     *
+     * @param repository The announcement repository for database operations
+     * @param typeRepository The announcement type repository (may be null for backwards compatibility)
+     * @param logger The logger instance
+     * @param serviceRegistry ServiceRegistry for resolving WebhookNotifier at call time (may be null)
+     */
+    public DefaultAnnouncementService(AnnouncementRepository repository, AnnouncementTypeRepository typeRepository,
+                                      LogManager logger, ServiceRegistry serviceRegistry) {
         this.repository = repository;
+        this.typeRepository = typeRepository;
         this.logger = logger;
+        this.serviceRegistry = serviceRegistry;
         this.cache = new ConcurrentHashMap<>();
         this.cacheHits = new AtomicInteger(0);
         this.cacheMisses = new AtomicInteger(0);
-        
+
         logger.info("DefaultAnnouncementService initialized");
     }
     
@@ -90,10 +122,11 @@ public class DefaultAnnouncementService implements AnnouncementService {
                         // Update cache
                         cache.put(savedAnnouncement.getId(), savedAnnouncement);
                         logger.info("Created announcement: " + savedAnnouncement.getId());
+                        notifyWebhook(savedAnnouncement.getId());
                         return savedAnnouncement;
                     })
                     .join();
-                    
+
             } catch (Exception e) {
                 logger.error("Failed to create announcement", e);
                 throw new org.fourz.rvnkcore.api.exception.ServiceException("Announcement creation failed", e);
@@ -168,6 +201,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
                         // Update cache
                         cache.put(updatedAnnouncement.getId(), updatedAnnouncement);
                         logger.info("Updated announcement: " + updatedAnnouncement.getId());
+                        notifyWebhook(updatedAnnouncement.getId());
                         return updatedAnnouncement;
                     })
                     .join();
@@ -190,6 +224,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
                 // Remove from cache
                 cache.remove(id);
                 logger.info("Deleted announcement: " + id);
+                notifyWebhook(id);
             })
             .exceptionally(ex -> {
                 logger.error("Failed to delete announcement: " + id, ex);
@@ -327,6 +362,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
                     cached.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
                 }
                 logger.info("Activated announcement: " + id);
+                notifyWebhook(id);
             })
             .exceptionally(ex -> {
                 // Handle "not found" errors more gracefully than system errors
@@ -356,6 +392,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
                     cached.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
                 }
                 logger.info("Deactivated announcement: " + id);
+                notifyWebhook(id);
             })
             .exceptionally(ex -> {
                 // Handle "not found" errors more gracefully than system errors
@@ -534,7 +571,38 @@ public class DefaultAnnouncementService implements AnnouncementService {
     
     @Override
     public CompletableFuture<List<AnnouncementTypeDTO>> getAnnouncementTypes() {
-        return getAllAnnouncements().thenApply(announcements -> {
+        // Use type repository if available (DB-backed types)
+        if (typeRepository != null) {
+            return typeRepository.findAll()
+                .thenApply(types -> {
+                    if (!types.isEmpty()) {
+                        return types;
+                    }
+                    // Fallback: derive types from existing announcements if types table is empty
+                    return deriveTypesFromAnnouncements();
+                })
+                .exceptionally(ex -> {
+                    logger.warning("Failed to load types from DB, deriving from announcements: " + ex.getMessage());
+                    return deriveTypesFromAnnouncements();
+                });
+        }
+
+        // Legacy fallback: derive types dynamically from announcements
+        return CompletableFuture.completedFuture(deriveTypesFromAnnouncements());
+    }
+
+    /**
+     * Gets the type repository for direct access (used by AnnounceManager for migration).
+     *
+     * @return The AnnouncementTypeRepository, or null if not configured
+     */
+    public AnnouncementTypeRepository getTypeRepository() {
+        return typeRepository;
+    }
+
+    private List<AnnouncementTypeDTO> deriveTypesFromAnnouncements() {
+        try {
+            List<AnnouncementDTO> announcements = getAllAnnouncements().join();
             java.util.Map<String, AnnouncementTypeDTO> typeMap = new java.util.LinkedHashMap<>();
             for (AnnouncementDTO a : announcements) {
                 String type = a.getType();
@@ -547,7 +615,10 @@ public class DefaultAnnouncementService implements AnnouncementService {
                 }
             }
             return new ArrayList<>(typeMap.values());
-        });
+        } catch (Exception e) {
+            logger.error("Failed to derive types from announcements", e);
+            return new ArrayList<>();
+        }
     }
 
     /**
@@ -582,5 +653,20 @@ public class DefaultAnnouncementService implements AnnouncementService {
         cacheHits.set(0);
         cacheMisses.set(0);
         logger.info("Announcement cache cleared");
+    }
+
+    /**
+     * Notifies the webhook of an announcement change if configured.
+     * Resolves WebhookNotifier lazily from ServiceRegistry since it is
+     * registered after core services during initialization.
+     *
+     * @param announcementId The ID of the changed announcement for targeted cache invalidation
+     */
+    private void notifyWebhook(String announcementId) {
+        if (serviceRegistry == null) return;
+        WebhookNotifier notifier = serviceRegistry.getService(WebhookNotifier.class);
+        if (notifier != null) {
+            notifier.notifyAnnouncementChange(announcementId);
+        }
     }
 }

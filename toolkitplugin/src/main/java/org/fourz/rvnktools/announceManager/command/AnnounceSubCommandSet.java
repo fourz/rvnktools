@@ -98,7 +98,6 @@ public class AnnounceSubCommandSet extends AnnounceSubCommand {
                 return false;
         }
 
-        announceManager.saveConfig();
         return true;
     }
 

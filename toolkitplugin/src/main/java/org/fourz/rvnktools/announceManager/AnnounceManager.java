@@ -4,9 +4,17 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.command.CommandSender;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.model.AnnouncementDTO;
+import org.fourz.rvnkcore.api.model.AnnouncementTypeDTO;
+import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
+import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.chat.ChatServiceInterface;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.util.chat.ChatService;
@@ -18,18 +26,14 @@ import java.util.logging.Level;
 public class AnnounceManager {
     private static final String CLASS_NAME = "AnnounceManager";
     private final LogManager logger;
-    private enum CheckCondition {
-        ANNOUNCEMENT_EXISTS,
-        SAVE_ANNOUNCEMENT,
-        ADD_ANNOUNCEMENT
-    }
 
     private final RVNKCore plugin;
     private final AnnounceConfig announceConfig;
     private final AnnounceScheduler announceScheduler;
-    private final ChatServiceInterface chatService;    
+    private final ChatServiceInterface chatService;
     private final Map<String, Announcement> announcements = new ConcurrentHashMap<>();
-    private boolean usingPlaceholderAPI;    
+    private boolean usingPlaceholderAPI;
+    private AnnouncementService announcementService;
 
     public AnnounceManager(RVNKCore plugin) {
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -38,14 +42,91 @@ public class AnnounceManager {
         this.chatService = new ChatService();
         this.usingPlaceholderAPI = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null;
         this.announceConfig = new AnnounceConfig(plugin, this);
-        this.announceConfig.initializeDataStore();
-        this.announceScheduler = new AnnounceScheduler(plugin, this);
 
+        // Resolve AnnouncementService (required)
+        resolveAnnouncementService();
+        loadFromDatabase();
+
+        // Initialize MOTD after announcements are loaded
+        announceConfig.initializeMotd(getAnnouncements("motd"));
+
+        this.announceScheduler = new AnnounceScheduler(plugin, this);
         announceScheduler.scheduleAnnouncements();
     }
 
+    private void resolveAnnouncementService() {
+        try {
+            ServiceRegistry registry = plugin.getServiceRegistry();
+            if (registry != null) {
+                this.announcementService = registry.getService(AnnouncementService.class);
+                if (this.announcementService != null) {
+                    logger.info("AnnounceManager connected to AnnouncementService (DB-backed)");
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to resolve AnnouncementService: " + e.getMessage());
+        }
+        logger.error("AnnouncementService unavailable — AnnounceManager requires database");
+    }
+
+    private void loadFromDatabase() {
+        if (announcementService == null) {
+            logger.error("Cannot load announcements — AnnouncementService is null");
+            return;
+        }
+
+        try {
+            // Ensure announce types are available from YAML seed
+            Map<String, AnnounceType> yamlTypes = announceConfig.getYmlTypes();
+            if (yamlTypes != null && !yamlTypes.isEmpty()) {
+                announceConfig.setAnnounceTypes(yamlTypes);
+            }
+
+            List<AnnouncementDTO> dtos = announcementService.getAllAnnouncements().join();
+
+            if (dtos.isEmpty()) {
+                // DB is empty — run one-time migration from YAML seed
+                migrateYamlToDatabase();
+                dtos = announcementService.getAllAnnouncements().join();
+            }
+
+            List<Announcement> loaded = new ArrayList<>();
+            for (AnnouncementDTO dto : dtos) {
+                loaded.add(convertFromDTO(dto));
+            }
+            setAnnouncements(loaded);
+            logger.info("Loaded " + loaded.size() + " announcements from database");
+        } catch (Exception e) {
+            logger.error("Failed to load from database", e);
+        }
+    }
+
+    /**
+     * Reloads announcements from the database.
+     * Called when a webhook notification indicates announcements have changed.
+     */
+    public void reloadFromDatabase() {
+        if (announcementService == null) {
+            logger.warning("Cannot reload from database — service unavailable");
+            return;
+        }
+
+        try {
+            List<AnnouncementDTO> dtos = announcementService.getAllAnnouncements().join();
+            List<Announcement> loaded = new ArrayList<>();
+            for (AnnouncementDTO dto : dtos) {
+                loaded.add(convertFromDTO(dto));
+            }
+            setAnnouncements(loaded);
+            announceScheduler.scheduleAnnouncements();
+            logger.info("Reloaded " + loaded.size() + " announcements from database (webhook trigger)");
+        } catch (Exception e) {
+            logger.error("Failed to reload from database", e);
+        }
+    }
+
     public void registerCommands() {
-        // This is called after plugin.yml commands are registered by Paper
         if (plugin.getCommand("announce") != null) {
             plugin.getCommand("announce").setExecutor(new AnnounceCommand(this, plugin));
             plugin.getCommand("announce").setTabCompleter(new AnnounceTabCompleter(this));
@@ -55,7 +136,6 @@ public class AnnounceManager {
         }
     }
 
-    // Add an announcement to the announcements list, used by AnnounceConfig and AnnounceManager.parseAnnouncement()
     public boolean addAnnouncement(Announcement announcement) {
         if (announcement == null || announcement.getId() == null) {
             logger.warning("Cannot add invalid announcement");
@@ -63,25 +143,19 @@ public class AnnounceManager {
         }
 
         String id = announcement.getId().toLowerCase();
-        // Check for existing announcement in memory first
         if (announcements.containsKey(id)) {
             logger.warning("Announcement with ID '" + id + "' already exists in memory");
             return false;
         }
 
         try {
-            // Only save to database if not imported and database exists
-            if (announceConfig.getDataStore() != null && !announcement.isImported()) {
-                // Check database before saving
-                if (announceConfig.getDataStore().announcementExists(id)) {
-            logger.warning("Announcement with ID '" + id + "' already exists in database");
-                    return false;
-                }
-                announceConfig.getDataStore().saveAnnouncement(announcement);
+            if (announcementService != null && !announcement.isImported()) {
+                AnnouncementDTO dto = convertToDTO(announcement);
+                announcementService.createAnnouncement(dto).join();
                 announcement.setImported();
-                logger.debug("Saved announcement to database: " + id);
+                logger.debug("Saved announcement to DB: " + id);
             }
-            
+
             announcements.put(id, announcement);
             logger.debug("Added announcement to memory: " + id);
             return true;
@@ -91,17 +165,14 @@ public class AnnounceManager {
         }
     }
 
-    // Add an announcement to the announcements list, used by AnnounceCommand
     public boolean addAnnouncement(CommandSender sender, String input) {
-
-        // extract id, type, and text from input
         String[] args = input.split(" ", 3);
         Player player = null;
-        
+
         if (sender instanceof Player) {
-            player = (Player) sender;        
+            player = (Player) sender;
         }
-        
+
         if (args.length < 3) {
             if (player != null) {
                 chatService.sendMessage(player, "Invalid announcement format. Usage: <type> <id> <message>");
@@ -110,20 +181,18 @@ public class AnnounceManager {
             }
             return false;
         }
-        
+
         String type = args[0];
         String id = args[1];
         String text = args[2];
 
-        // Check if announcement already exists
-        if (announceConfig.isDataStoreAvailable()) {  // Changed this line
-            if (announcementExists(id)) {
-                if (player != null) {
-                    chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
-                } else {
-                    plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
-                }
+        if (announcementExists(id)) {
+            if (player != null) {
+                chatService.sendMessage(player, "An announcement with ID '" + id + "' already exists");
+            } else {
+                plugin.getLogger().warning("An announcement with ID '" + id + "' already exists");
             }
+            return false;
         }
 
         if (!validateAnnounceType(type)) {
@@ -135,28 +204,15 @@ public class AnnounceManager {
             if (!player.hasPermission("rvnktools.command.announce.add." + type)) {
                 player.sendMessage("You do not have permission to add announcements.");
                 return false;
-            } else {
-                // Parse announcement as player. Set owner to player
-                player.sendMessage("Announcement added: " + id + " (" + type + ")");
-                return announceConfig.parseAnnouncement(id, type, text, player.getName());
             }
-        }        
-        // Parse announcement as console        
+            player.sendMessage("Announcement added: " + id + " (" + type + ")");
+            return announceConfig.parseAnnouncement(id, type, text, player.getName());
+        }
 
-        if (announceConfig.getDataStore() != null) {
-            announceConfig.getDataStore().connect();            
-            Boolean result = announceConfig.parseAnnouncement(id, type, text);
-            announceConfig.getDataStore().disconnect();
-            return result;
-        } 
-        return announceConfig.parseAnnouncement(id, type, text);       
+        return announceConfig.parseAnnouncement(id, type, text);
     }
 
-    private boolean checkAnnounceExist(String id) {
-        return announceConfig.getDataStore().announcementExists(id);
-    }
-
-    public void broadcastAnnouncement(Announcement announcement) {      
+    public void broadcastAnnouncement(Announcement announcement) {
         if (announcement == null) {
             logger.warning("Cannot broadcast null announcement");
             return;
@@ -167,20 +223,18 @@ public class AnnounceManager {
             logger.warning("Announcement has null or empty type");
             return;
         }
-                
-        AnnounceType type = announceConfig.getAnnounceTypes().get(announcementType);        
+
+        AnnounceType type = announceConfig.getAnnounceTypes().get(announcementType);
         if (type == null) {
             logger.warning("Could not find announcement type '" + announcementType +
                 "' in config. Available types: " + String.join(", ", announceConfig.getAnnounceTypes().keySet()));
             return;
         }
 
-        // Only construct message after all null checks have passed
         String prefix = type.getPrefix() != null ? type.getPrefix() : "";
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
         String message = prefix + announcement.getMessage() + suffix;
 
-        // Pre-fetch preferences for all online players
         Map<Player, PlayerPreferences> playerPrefs = new HashMap<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (this.shouldReceiveAnnouncement(player, announcement)) {
@@ -193,12 +247,10 @@ public class AnnounceManager {
             }
         }
 
-        // Broadcast to all players using pre-fetched preferences
         for (Map.Entry<Player, PlayerPreferences> entry : playerPrefs.entrySet()) {
             Player player = entry.getKey();
             PlayerPreferences prefs = entry.getValue();
-            
-            // Send message based on location preference
+
             switch (prefs.location.toLowerCase()) {
                 case "title":
                     player.sendTitle(chatService.parseTitle(message), "", 10, 100, 20);
@@ -206,12 +258,11 @@ public class AnnounceManager {
                 case "action-bar":
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, chatService.parseActionBar(message));
                     break;
-                default: // "chat"
+                default:
                     chatService.sendMessage(player, message, plugin.getLinkMaker());
                     break;
             }
-            
-            // Play sound if configured
+
             if (!prefs.sound.equalsIgnoreCase("none")) {
                 try {
                     org.bukkit.Sound sound = org.bukkit.Sound.valueOf(prefs.sound.toUpperCase());
@@ -220,12 +271,11 @@ public class AnnounceManager {
                     logger.warning("Invalid sound preference for player " + player.getName() + ": " + prefs.sound);
                 }
             }
-            
+
             logger.debug("Broadcasting to " + player.getName() + ": " + message + " (location: " + prefs.location + ")");
         }
     }
 
-    // Helper class to store pre-fetched preferences
     private static class PlayerPreferences {
         final String location;
         final String sound;
@@ -237,10 +287,7 @@ public class AnnounceManager {
     }
 
     public void cleanup() {
-        // Clear any cached data or temporary collections
         announceScheduler.cleanup();
-        
-        // Suggest garbage collection for this manager        
         Runtime.getRuntime().gc();
     }
 
@@ -251,8 +298,8 @@ public class AnnounceManager {
         }
 
         try {
-            if (announceConfig.isDataStoreAvailable()) {
-                announceConfig.getDataStore().deleteAnnouncement(id);
+            if (announcementService != null) {
+                announcementService.deleteAnnouncement(id).join();
             }
             announcements.remove(id);
             logger.debug("Deleted announcement: " + id);
@@ -285,22 +332,17 @@ public class AnnounceManager {
     }
 
     public void reloadConfig() {
-        announceConfig.reloadConfig();
-        announceScheduler.scheduleAnnouncements();
+        if (announcementService != null) {
+            reloadFromDatabase();
+        } else {
+            announceConfig.reloadConfig();
+            announceScheduler.scheduleAnnouncements();
+        }
     }
 
-    public void saveConfig() {
-        announceConfig.saveConfig();
-        logger.info("Saved AnnounceManager configuration.");
-    }    
-
     public void shutdown() {
-        // Ensure we have all announcements in memory
-        if (announceConfig.getDataStore() != null) {
-            setAnnouncements(announceConfig.getDataStore().loadAnnouncements());
-        }        
         announceScheduler.shutdown();
-        logger.info("Saving announcements before shutdown...");        
+        logger.info("Saving preferences before shutdown...");
         announceConfig.shutdown();
         logger.info("AnnounceManager shutdown complete.");
     }
@@ -310,35 +352,28 @@ public class AnnounceManager {
     }
 
     public boolean shouldReceiveAnnouncement(Player player, Announcement announcement) {
-
-        //check if player has permission to receive this type of announcement
         if (!player.hasPermission("rvnktools.announce.type." + announcement.getType().toLowerCase())) {
             return false;
         }
 
-        //check if player has permission to receive this announcement
         if (announcement.getPermission() != null && !player.hasPermission(announcement.getPermission())) {
             return false;
         }
 
-        //check if player has disabled this type of announcement
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
         if (disabledTypes != null && disabledTypes.contains(announcement.getType().toLowerCase())) {
             return false;
         }
 
-        // default to true
         return true;
     }
 
-    // get disabled types for a player
     public boolean getPlayerDisabledTypes(Player player, String type) {
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
         return disabledTypes != null && disabledTypes.contains(type);
     }
 
-    // get disabled types for a player
-    public String[] getPlayerDisabledAnnouncementTypes(Player player)  {
+    public String[] getPlayerDisabledAnnouncementTypes(Player player) {
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
         if (disabledTypes == null) {
             return new String[0];
@@ -395,8 +430,8 @@ public class AnnounceManager {
                 chatService.sendMessage(player, "You do not have permission to send announcements now.");
                 return false;
             }
-        }           
-        
+        }
+
         Announcement announcement = announcements.get(id);
         if (announcement == null) {
             if (sender instanceof Player) {
@@ -411,22 +446,11 @@ public class AnnounceManager {
     }
 
     public AnnounceType getAnnounceType(String type) {
-        return announceConfig.getAnnounceTypes().get(type); 
+        return announceConfig.getAnnounceTypes().get(type);
     }
 
     public boolean announcementExists(String id) {
-        // First check in memory
-        if (announcements.containsKey(id)) {
-            logger.debug("Announcement with ID '" + id + "' found in memory");
-            return true;
-        }
-
-        // Then check in database if available
-        if (announceConfig.isDataStoreAvailable()) {
-            return announceConfig.getDataStore().announcementExists(id);
-        }
-
-        return false;
+        return announcements.containsKey(id);
     }
 
     public void setAnnouncementImported(String id) {
@@ -459,31 +483,22 @@ public class AnnounceManager {
         return announceConfig;
     }
 
-    /**
-     * Sets a preference for a player
-     * @param playerId The UUID of the player
-     * @param property The preference property key
-     * @param value The value to set
-     */
+    public boolean isDatabaseAvailable() {
+        return announcementService != null;
+    }
+
+    public AnnouncementService getAnnouncementService() {
+        return announcementService;
+    }
+
     public void setPreference(UUID playerId, String property, String value) {
         announceConfig.setPreference(playerId, property, value);
     }
 
-    /**
-     * Gets a preference for a player
-     * @param playerId The UUID of the player
-     * @param property The preference property key
-     * @return The preference value, or default if not set
-     */
     public String getPreference(UUID playerId, String property) {
         return announceConfig.getPreference(playerId, property);
     }
 
-    /**
-     * Gets all preferences for a player
-     * @param playerId The UUID of the player
-     * @return Map of preference properties and their values
-     */
     public Map<String, String> getPreferences(UUID playerId) {
         return announceConfig.getAllPreferences(playerId);
     }
@@ -501,10 +516,8 @@ public class AnnounceManager {
         }
 
         try {
-            // Unschedule the old announcement first
             announceScheduler.unscheduleAnnouncement(oldAnnouncement);
 
-            // Create new announcement with updated message but keeping other properties
             Announcement updatedAnnouncement = new Announcement();
             updatedAnnouncement.setId(oldAnnouncement.getId());
             updatedAnnouncement.setType(oldAnnouncement.getType());
@@ -515,33 +528,164 @@ public class AnnounceManager {
             updatedAnnouncement.setTime(oldAnnouncement.getTime());
             updatedAnnouncement.setExpiration(oldAnnouncement.getExpiration());
             updatedAnnouncement.setRecurrence(oldAnnouncement.getRecurrence());
-            
-            // Remove old announcement
-            announcements.remove(id);
-            if (announceConfig.isDataStoreAvailable()) {
-                announceConfig.getDataStore().deleteAnnouncement(id);
-            }
-            
-            // Add updated announcement
-            announcements.put(id, updatedAnnouncement);
-            if (announceConfig.isDataStoreAvailable()) {
-                announceConfig.getDataStore().saveAnnouncement(updatedAnnouncement);
+
+            if (announcementService != null) {
+                AnnouncementDTO dto = convertToDTO(updatedAnnouncement);
+                announcementService.updateAnnouncement(dto).join();
             }
 
-            // Reschedule the updated announcement
+            announcements.remove(id);
+            announcements.put(id, updatedAnnouncement);
             announceScheduler.scheduleAnnouncement(updatedAnnouncement);
-            
+
             logger.debug("Updated and rescheduled announcement: " + id);
             return true;
         } catch (Exception e) {
             logger.error("Failed to update announcement: " + id, e);
-            // Attempt to restore old announcement on failure
             if (!announcements.containsKey(id)) {
                 announcements.put(id, oldAnnouncement);
-                // Try to reschedule the old announcement
                 announceScheduler.scheduleAnnouncement(oldAnnouncement);
             }
             return false;
+        }
+    }
+
+    // ========== DTO Conversion Methods ==========
+
+    static Announcement convertFromDTO(AnnouncementDTO dto) {
+        Announcement ann = new Announcement();
+        ann.setId(dto.getId());
+        ann.setMessage(dto.getMessage());
+        ann.setType(dto.getType());
+        ann.setEnabled(dto.isActive());
+        ann.setImported();
+
+        if (dto.getIntervalSeconds() > 0) {
+            ann.setRecurrence((long) dto.getIntervalSeconds());
+        }
+
+        if (dto.getScheduledFor() != null) {
+            ann.setDate(dto.getScheduledFor().toLocalDateTime().toLocalDate());
+            ann.setTime(dto.getScheduledFor().toLocalDateTime().toLocalTime());
+        }
+
+        if (dto.getExpiresAt() != null) {
+            ann.setExpiration(dto.getExpiresAt().toLocalDateTime());
+        }
+
+        Map<String, Object> metadata = dto.getMetadata();
+        if (metadata != null) {
+            Object permission = metadata.get("permission");
+            if (permission != null) {
+                ann.setPermission(permission.toString());
+            }
+            Object owner = metadata.get("owner");
+            if (owner != null) {
+                ann.setOwner(owner.toString());
+            }
+        }
+
+        return ann;
+    }
+
+    static AnnouncementDTO convertToDTO(Announcement ann) {
+        AnnouncementDTO.Builder builder = new AnnouncementDTO.Builder()
+            .id(ann.getId())
+            .message(ann.getMessage())
+            .type(ann.getType())
+            .active(ann.isEnabled())
+            .title(ann.getId());
+
+        if (ann.getRecurrence() != null && ann.getRecurrence() > 0) {
+            builder.intervalSeconds(ann.getRecurrence().intValue());
+        }
+
+        if (ann.getDate() != null && ann.getTime() != null) {
+            builder.scheduledFor(Timestamp.valueOf(LocalDateTime.of(ann.getDate(), ann.getTime())));
+        }
+
+        if (ann.getExpiration() != null) {
+            builder.expiresAt(Timestamp.valueOf(ann.getExpiration()));
+        }
+
+        if (ann.getPermission() != null) {
+            builder.metadata("permission", ann.getPermission());
+        }
+        if (ann.getOwner() != null) {
+            builder.metadata("owner", ann.getOwner());
+        }
+
+        return builder.build();
+    }
+
+    // ========== YAML -> DB Migration ==========
+
+    private void migrateYamlToDatabase() {
+        logger.info("Starting one-time YAML -> DB migration for announcements...");
+
+        try {
+            List<Announcement> yamlAnnouncements = announceConfig.getYmlAnnouncements();
+
+            if (yamlAnnouncements == null || yamlAnnouncements.isEmpty()) {
+                logger.info("No YAML announcements to migrate");
+                return;
+            }
+
+            List<AnnouncementDTO> dtos = new ArrayList<>();
+            for (Announcement ann : yamlAnnouncements) {
+                dtos.add(convertToDTO(ann));
+            }
+
+            int imported = announcementService.bulkImportAnnouncements(dtos).join();
+            logger.info("Migrated " + imported + " announcements from YAML to database");
+
+            migrateTypesToDatabase();
+
+        } catch (Exception e) {
+            logger.error("YAML -> DB migration failed", e);
+        }
+    }
+
+    private void migrateTypesToDatabase() {
+        if (!(announcementService instanceof DefaultAnnouncementService)) {
+            return;
+        }
+
+        DefaultAnnouncementService defaultService = (DefaultAnnouncementService) announcementService;
+        var typeRepo = defaultService.getTypeRepository();
+        if (typeRepo == null) {
+            return;
+        }
+
+        Map<String, AnnounceType> yamlTypes = announceConfig.getAnnounceTypes();
+        if (yamlTypes == null || yamlTypes.isEmpty()) {
+            return;
+        }
+
+        List<AnnouncementTypeDTO> typeDTOs = new ArrayList<>();
+        Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+        for (AnnounceType type : yamlTypes.values()) {
+            Integer listFee = type.getListingFee() != null ? type.getListingFee().intValue() : 0;
+            AnnouncementTypeDTO dto = new AnnouncementTypeDTO.Builder()
+                .id(type.getId().toLowerCase())
+                .name(type.getId().substring(0, 1).toUpperCase() + type.getId().substring(1))
+                .prefix(type.getPrefix())
+                .suffix(type.getSuffix())
+                .permission(type.getPermission())
+                .listFee(listFee)
+                .weeklyFee(0)
+                .active(true)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+            typeDTOs.add(dto);
+        }
+
+        try {
+            int count = typeRepo.insertAll(typeDTOs).join();
+            logger.info("Migrated " + count + " announcement types from YAML to database");
+        } catch (Exception e) {
+            logger.error("Failed to migrate announcement types to database", e);
         }
     }
 }
