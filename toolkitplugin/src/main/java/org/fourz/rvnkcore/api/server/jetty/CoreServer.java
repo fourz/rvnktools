@@ -7,6 +7,7 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
@@ -62,10 +63,12 @@ public class CoreServer {
      * @param playerWorldService Player world service for world-specific data operations
      * @param announcementService Announcement service for data operations
      * @param worldService World service for world tracking and management
+     * @param authTokenStore Authentication token store for magic link flow
      * @param plugin Plugin instance
      */
-    public CoreServer(ApiConfig config, PlayerService playerService, PlayerWorldService playerWorldService, 
-                                    AnnouncementService announcementService, WorldService worldService, Plugin plugin) {
+    public CoreServer(ApiConfig config, PlayerService playerService, PlayerWorldService playerWorldService,
+                                    AnnouncementService announcementService, WorldService worldService,
+                                    AuthTokenStore authTokenStore, Plugin plugin) {
         this.config = config;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
@@ -74,15 +77,15 @@ public class CoreServer {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
         this.gson = createGson();
-        
+
         // Configure Jetty logging to be silent
         configureJettyLogging();
-        
+
         // Initialize specialized factories
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
-        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, gson);
+        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, authTokenStore, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
-        
+
         // Initialize external servlet registration service
         this.servletRegistrationService = new ServletRegistrationServiceImpl(config, plugin, gson);
     }

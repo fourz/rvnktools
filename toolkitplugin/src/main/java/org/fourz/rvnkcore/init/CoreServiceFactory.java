@@ -11,6 +11,7 @@ import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
+import org.fourz.rvnkcore.database.repository.AnnouncementTypeRepository;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
@@ -179,11 +180,13 @@ public class CoreServiceFactory {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
             AnnouncementRepository announcementRepository = new AnnouncementRepository(connectionProvider, queryBuilder, plugin);
+            AnnouncementTypeRepository typeRepository = new AnnouncementTypeRepository(connectionProvider, queryBuilder, plugin);
             LogManager announcementLogger = LogManager.getInstance(plugin, DefaultAnnouncementService.class);
-            DefaultAnnouncementService announcementService = new DefaultAnnouncementService(announcementRepository, announcementLogger);
+            DefaultAnnouncementService announcementService = new DefaultAnnouncementService(
+                announcementRepository, typeRepository, announcementLogger, registry);
 
             registry.registerService(AnnouncementService.class, announcementService);
-            logger.info("AnnouncementService registered");
+            logger.info("AnnouncementService registered (with type repository)");
         } catch (Exception e) {
             logger.error("Failed to register AnnouncementService", e);
             throw new RuntimeException("AnnouncementService registration failed", e);

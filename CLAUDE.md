@@ -42,7 +42,7 @@ mvn clean package -DskipTests  # Skip tests
 - [RVNKCore Integration Guide](../../docs/standard/rvnkcore-integration.md) — ServiceRegistry, Repository, DTO patterns
 - [Database Patterns](../../docs/standard/database-patterns.md) — Repository pattern, HikariCP
 - [REST API Standards](../../docs/standard/rest-api-standards.md) — Endpoint design, JSON structure
-- [REST Endpoint Reference](../../docs/api/rest-endpoint-reference.md) — All 78 endpoints
+- [REST Endpoint Reference](../../docs/api/rest-endpoint-reference.md) — All 80 endpoints
 
 ### Copilot Instruction Modules
 
@@ -87,7 +87,7 @@ Registered in ServiceRegistry by `CoreServiceFactory`:
 
 ### REST API
 
-- 78 endpoints across 7 controllers (4 native + 3 plugin-delegated)
+- 80 endpoints across 7 controllers (4 native + 3 plugin-delegated)
 - Auth: `X-API-Key` header via `AuthFilter` on `/v1/*`, `/bartershops/*`, `/lore/*`, `/rvnkworlds/*`
 - Response envelope: `ApiResponse.success(data)` / `ApiResponse.error(code, message)`
 - Plugin controllers resolve services lazily from ServiceRegistry

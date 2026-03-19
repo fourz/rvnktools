@@ -1,8 +1,11 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
+import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
@@ -91,6 +94,11 @@ public class ApiServerInitializer {
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
 
+            // Create AuthTokenStore and register as a service (used by LinkCommand + AuthController)
+            AuthTokenStore authTokenStore = new AuthTokenStore(plugin);
+            registry.registerService(AuthTokenStore.class, authTokenStore);
+            logger.debug("  + AuthTokenStore created and registered");
+
             logger.debug("REST API: Creating CoreServer instance on port " + apiConfig.getHttpsPort());
             apiServer = new CoreServer(
                 apiConfig,
@@ -98,6 +106,7 @@ public class ApiServerInitializer {
                 playerWorldService,
                 announcementService,
                 worldService,
+                authTokenStore,
                 plugin
             );
 
@@ -108,6 +117,14 @@ public class ApiServerInitializer {
             logger.debug("REST API: Registering IServletRegistrationService...");
             registry.registerService(IServletRegistrationService.class, apiServer.getServletRegistrationService());
             logger.debug("  + IServletRegistrationService registered");
+
+            // Initialize webhook notifier if configured
+            WebhookConfig webhookConfig = configLoader.getWebhookConfig();
+            if (webhookConfig.isEnabled() && webhookConfig.validate(logger)) {
+                WebhookNotifier notifier = new WebhookNotifier(webhookConfig, logger);
+                registry.registerService(WebhookNotifier.class, notifier);
+                logger.info("Webhook notifier registered — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            }
 
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " with 30 endpoints (" + totalTime + "ms)");
@@ -122,9 +139,11 @@ public class ApiServerInitializer {
     public void stop() {
         if (apiServer != null) {
             try {
+                // Unregister webhook notifier
+                registry.unregisterService(WebhookNotifier.class);
                 // Unregister servlet registration service
                 registry.unregisterService(IServletRegistrationService.class);
-                
+
                 apiServer.stop();
                 logger.info("REST API server stopped");
             } catch (Exception e) {

@@ -21,6 +21,7 @@ public class AnnouncementDTO {
     private String message;
     private String type;
     private boolean active;
+    private boolean pinned;
     private Timestamp createdAt;
     private Timestamp updatedAt;
     private Timestamp scheduledFor;
@@ -82,7 +83,7 @@ public class AnnouncementDTO {
     }
     
     public void setType(String type) {
-        this.type = type;
+        this.type = type != null ? type.toLowerCase() : null;
     }
     
     public boolean isActive() {
@@ -92,7 +93,15 @@ public class AnnouncementDTO {
     public void setActive(boolean active) {
         this.active = active;
     }
-    
+
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
+
     // Timestamp tracking
     
     public Timestamp getCreatedAt() {
@@ -248,7 +257,7 @@ public class AnnouncementDTO {
         }
         
         public Builder type(String type) {
-            dto.type = type;
+            dto.type = type != null ? type.toLowerCase() : null;
             return this;
         }
         
@@ -256,7 +265,12 @@ public class AnnouncementDTO {
             dto.active = active;
             return this;
         }
-        
+
+        public Builder pinned(boolean pinned) {
+            dto.pinned = pinned;
+            return this;
+        }
+
         public Builder createdAt(Timestamp createdAt) {
             dto.createdAt = createdAt;
             return this;

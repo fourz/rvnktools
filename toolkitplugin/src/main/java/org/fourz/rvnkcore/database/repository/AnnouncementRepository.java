@@ -298,6 +298,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
                 .message(message)
                 .type(rs.getString("type"))
                 .active(rs.getBoolean("active"))
+                .pinned(rs.getBoolean("pinned"))
                 .createdAt(rs.getTimestamp("created_at"))
                 .updatedAt(rs.getTimestamp("updated_at"))
                 .scheduledFor(rs.getTimestamp("scheduled_for"))
@@ -355,9 +356,9 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         // Create a new QueryBuilder instance for thread safety
         QueryBuilder builder = createQueryBuilder();
         return builder.insert(tableName)
-            .columns("id", "title", "message", "type", "active", "created_at", "updated_at", 
+            .columns("id", "title", "message", "type", "active", "pinned", "created_at", "updated_at",
                     "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata")
-            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
+            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
     
@@ -370,6 +371,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
             .set("message", "?")
             .set("type", "?")
             .set("active", "?")
+            .set("pinned", "?")
             .set("updated_at", "?")
             .set("scheduled_for", "?")
             .set("expires_at", "?")
@@ -388,21 +390,22 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         stmt.setString(3, entity.getMessage());
         stmt.setString(4, entity.getType());
         stmt.setBoolean(5, entity.isActive());
-        stmt.setTimestamp(6, entity.getCreatedAt());
-        stmt.setTimestamp(7, entity.getUpdatedAt());
-        stmt.setTimestamp(8, entity.getScheduledFor());
-        stmt.setTimestamp(9, entity.getExpiresAt());
-        stmt.setInt(10, entity.getIntervalSeconds());
-        stmt.setString(11, String.join(",", entity.getTargetWorlds()));
-        stmt.setString(12, String.join(",", entity.getTargetGroups()));
-        
+        stmt.setBoolean(6, entity.isPinned());
+        stmt.setTimestamp(7, entity.getCreatedAt());
+        stmt.setTimestamp(8, entity.getUpdatedAt());
+        stmt.setTimestamp(9, entity.getScheduledFor());
+        stmt.setTimestamp(10, entity.getExpiresAt());
+        stmt.setInt(11, entity.getIntervalSeconds());
+        stmt.setString(12, String.join(",", entity.getTargetWorlds()));
+        stmt.setString(13, String.join(",", entity.getTargetGroups()));
+
         // Serialize metadata (simplified implementation)
         StringBuilder metadataStr = new StringBuilder();
         for (Map.Entry<String, Object> entry : entity.getMetadata().entrySet()) {
             if (metadataStr.length() > 0) metadataStr.append(",");
             metadataStr.append(entry.getKey()).append("=").append(entry.getValue());
         }
-        stmt.setString(13, metadataStr.toString());
+        stmt.setString(14, metadataStr.toString());
     }
     
     @Override
@@ -411,21 +414,22 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         stmt.setString(2, entity.getMessage());
         stmt.setString(3, entity.getType());
         stmt.setBoolean(4, entity.isActive());
-        stmt.setTimestamp(5, Timestamp.valueOf(LocalDateTime.now())); // Always update timestamp
-        stmt.setTimestamp(6, entity.getScheduledFor());
-        stmt.setTimestamp(7, entity.getExpiresAt());
-        stmt.setInt(8, entity.getIntervalSeconds());
-        stmt.setString(9, String.join(",", entity.getTargetWorlds()));
-        stmt.setString(10, String.join(",", entity.getTargetGroups()));
-        
+        stmt.setBoolean(5, entity.isPinned());
+        stmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now())); // Always update timestamp
+        stmt.setTimestamp(7, entity.getScheduledFor());
+        stmt.setTimestamp(8, entity.getExpiresAt());
+        stmt.setInt(9, entity.getIntervalSeconds());
+        stmt.setString(10, String.join(",", entity.getTargetWorlds()));
+        stmt.setString(11, String.join(",", entity.getTargetGroups()));
+
         // Serialize metadata (simplified implementation)
         StringBuilder metadataStr = new StringBuilder();
         for (Map.Entry<String, Object> entry : entity.getMetadata().entrySet()) {
             if (metadataStr.length() > 0) metadataStr.append(",");
             metadataStr.append(entry.getKey()).append("=").append(entry.getValue());
         }
-        stmt.setString(11, metadataStr.toString());
-        stmt.setString(12, entity.getId()); // WHERE clause
+        stmt.setString(12, metadataStr.toString());
+        stmt.setString(13, entity.getId()); // WHERE clause
     }
     
     // === Additional methods required by service ===

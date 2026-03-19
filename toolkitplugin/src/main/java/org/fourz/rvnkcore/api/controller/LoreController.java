@@ -87,6 +87,8 @@ public class LoreController extends HttpServlet {
                 future = apiService.getCollections();
             } else if (pathInfo.equals("/types")) {
                 future = apiService.getTypes();
+            } else if (pathInfo.equals("/categories")) {
+                future = apiService.getCategories();
             } else if (pathInfo.equals("/stats")) {
                 future = apiService.getStats();
             } else if (pathInfo.equals("/health")) {

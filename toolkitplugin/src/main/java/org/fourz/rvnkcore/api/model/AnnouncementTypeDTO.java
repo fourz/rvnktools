@@ -25,7 +25,8 @@ public class AnnouncementTypeDTO {
     private Timestamp createdAt;
     private Timestamp updatedAt;
     private Map<String, Object> metadata;
-    
+    private String displayContext = "both";
+
     /**
      * Creates a new AnnouncementTypeDTO with default values.
      */
@@ -51,7 +52,7 @@ public class AnnouncementTypeDTO {
     }
     
     public void setId(String id) {
-        this.id = id;
+        this.id = id != null ? id.toLowerCase() : null;
     }
     
     public String getName() {
@@ -164,12 +165,20 @@ public class AnnouncementTypeDTO {
     
     /**
      * Sets a metadata value.
-     * 
+     *
      * @param key The metadata key
      * @param value The metadata value
      */
     public void setMetadata(String key, Object value) {
         metadata.put(key, value);
+    }
+
+    public String getDisplayContext() {
+        return displayContext;
+    }
+
+    public void setDisplayContext(String displayContext) {
+        this.displayContext = displayContext != null ? displayContext : "both";
     }
     
     /**
@@ -200,7 +209,7 @@ public class AnnouncementTypeDTO {
         private final AnnouncementTypeDTO dto = new AnnouncementTypeDTO();
         
         public Builder id(String id) {
-            dto.id = id;
+            dto.id = id != null ? id.toLowerCase() : null;
             return this;
         }
         
@@ -253,6 +262,11 @@ public class AnnouncementTypeDTO {
             dto.metadata.put(key, value);
             return this;
         }
+
+        public Builder displayContext(String displayContext) {
+            dto.displayContext = displayContext != null ? displayContext : "both";
+            return this;
+        }
         
         public AnnouncementTypeDTO build() {
             return dto;
@@ -270,6 +284,7 @@ public class AnnouncementTypeDTO {
                 ", listFee=" + listFee +
                 ", weeklyFee=" + weeklyFee +
                 ", active=" + active +
+                ", displayContext='" + displayContext + '\'' +
                 '}';
     }
 }

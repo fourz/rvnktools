@@ -19,7 +19,6 @@ public class AnnounceSubCommandReload extends AnnounceSubCommand {
             }
         }        
 
-        announceManager.saveConfig();
         announceManager.reloadConfig();
         messageSender(sender, "Announcements configuration reloaded successfully");
         return true;

@@ -7,7 +7,10 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.api.controller.AuthController;
 import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
@@ -35,6 +38,7 @@ public class ServletFactory {
     private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
     private final WorldService worldService;
+    private final AuthTokenStore authTokenStore;
     private final Gson gson;
 
     /**
@@ -47,11 +51,13 @@ public class ServletFactory {
      * @param playerWorldService Player world service for world-specific data operations
      * @param announcementService Announcement service for data operations
      * @param worldService World service for world tracking and management
+     * @param authTokenStore Authentication token store for magic link flow
      * @param gson JSON serializer instance
      */
-    public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger, 
-                                 PlayerService playerService, PlayerWorldService playerWorldService, 
-                                 AnnouncementService announcementService, WorldService worldService, Gson gson) {
+    public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger,
+                                 PlayerService playerService, PlayerWorldService playerWorldService,
+                                 AnnouncementService announcementService, WorldService worldService,
+                                 AuthTokenStore authTokenStore, Gson gson) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
@@ -59,6 +65,7 @@ public class ServletFactory {
         this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
         this.worldService = worldService;
+        this.authTokenStore = authTokenStore;
         this.gson = gson;
     }
 
@@ -126,6 +133,9 @@ public class ServletFactory {
         // Register world controller
         registerWorldController(context);
         
+        // Register auth controller
+        registerAuthController(context);
+
         // Plugin controllers — registered if their API service is available in ServiceRegistry
         registerBarterShopsController(context);
         registerLoreController(context);
@@ -158,6 +168,18 @@ public class ServletFactory {
         
         WorldController worldController = new WorldController(worldService, playerWorldService, gson, worldControllerLogger);
         context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
+    }
+
+    /**
+     * Registers the authentication controller for magic link token verification.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerAuthController(ServletContextHandler context) {
+        LogManager authLogger = LogManager.getInstance(plugin, AuthController.class);
+        AuthController authController = new AuthController(authTokenStore, gson, authLogger);
+        context.addServlet(new ServletHolder(authController), "/v1/auth/*");
+        logger.info("Auth API controller registered at /v1/auth/*");
     }
 
     /**
@@ -266,14 +288,14 @@ public class ServletFactory {
     }
 
     /**
-     * Registers a health check endpoint for monitoring.
+     * Registers the health check endpoint for monitoring.
      *
      * @param context The servlet context to configure
      */
     private void registerHealthCheckEndpoint(ServletContextHandler context) {
-        // Future implementation for health check
-        // HealthCheckServlet healthServlet = new HealthCheckServlet();
-        // context.addServlet(new ServletHolder(healthServlet), "/health");
+        LogManager healthLogger = LogManager.getInstance(plugin, HealthController.class);
+        HealthController healthController = new HealthController(gson, healthLogger);
+        context.addServlet(new ServletHolder(healthController), "/v1/health/*");
     }
 
     /**

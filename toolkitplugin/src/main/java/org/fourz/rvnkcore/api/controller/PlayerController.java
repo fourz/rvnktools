@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
-import org.fourz.rvnkcore.api.model.response.CountResponse;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
@@ -313,8 +312,31 @@ public class PlayerController extends HttpServlet {
 
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
         try {
-            long count = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, new CountResponse(count, "Total registered players"));
+            long registeredCount = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
+
+            // Live online data from Bukkit
+            java.util.Collection<? extends Player> onlinePlayers = Bukkit.getOnlinePlayers();
+            int onlineCount = onlinePlayers.size();
+            int maxPlayers = Bukkit.getMaxPlayers();
+
+            // Group online players by world
+            Map<String, List<Map<String, Object>>> worldGroups = new java.util.LinkedHashMap<>();
+            for (Player p : onlinePlayers) {
+                String worldName = p.getWorld().getName();
+                worldGroups.computeIfAbsent(worldName, k -> new java.util.ArrayList<>())
+                        .add(Map.of(
+                                "name", p.getName(),
+                                "uuid", p.getUniqueId().toString()
+                        ));
+            }
+
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("registered", registeredCount);
+            data.put("online", onlineCount);
+            data.put("max", maxPlayers);
+            data.put("worlds", worldGroups);
+
+            sendResponse(resp, 200, data);
         } catch (Exception ex) {
             logger.error("Error retrieving player count", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to retrieve player count");

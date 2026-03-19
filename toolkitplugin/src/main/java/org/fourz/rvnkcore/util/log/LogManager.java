@@ -67,9 +67,10 @@ public class LogManager {
      * @param prefix The log message prefix
      */
     private LogManager(Plugin plugin, String prefix) {
-        this.logger = plugin.getLogger();
+        Logger pluginLogger = plugin.getLogger();
+        this.logger = pluginLogger != null ? pluginLogger : Logger.getLogger("RVNKCore");
         this.prefix = prefix;
-        this.pluginName = plugin.getName();
+        this.pluginName = plugin.getName() != null ? plugin.getName() : "Unknown";
     }
     
     /**
@@ -80,10 +81,11 @@ public class LogManager {
      * @return LogManager instance for the class
      */
     public static LogManager getInstance(Plugin plugin, Class<?> clazz) {
-        String key = plugin.getName() + ":" + clazz.getSimpleName();
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":" + clazz.getSimpleName();
         return instances.computeIfAbsent(key, k -> {
             LogManager lm = new LogManager(plugin, "[" + clazz.getSimpleName() + "] ");
-            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            Level pluginLevel = pluginDefaultLevels.get(name);
             if (pluginLevel != null) lm.setLogLevel(pluginLevel);
             return lm;
         });
@@ -97,10 +99,11 @@ public class LogManager {
      * @return LogManager instance for the class
      */
     public static LogManager getInstance(Plugin plugin, String className) {
-        String key = plugin.getName() + ":" + className;
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":" + className;
         return instances.computeIfAbsent(key, k -> {
             LogManager lm = new LogManager(plugin, "[" + className + "] ");
-            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            Level pluginLevel = pluginDefaultLevels.get(name);
             if (pluginLevel != null) lm.setLogLevel(pluginLevel);
             return lm;
         });
@@ -114,10 +117,11 @@ public class LogManager {
      * @return LogManager instance for the plugin
      */
     public static LogManager getInstance(Plugin plugin) {
-        String key = plugin.getName() + ":Main";
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":Main";
         return instances.computeIfAbsent(key, k -> {
             LogManager lm = new LogManager(plugin, "");
-            Level pluginLevel = pluginDefaultLevels.get(plugin.getName());
+            Level pluginLevel = pluginDefaultLevels.get(name);
             if (pluginLevel != null) lm.setLogLevel(pluginLevel);
             return lm;
         });
