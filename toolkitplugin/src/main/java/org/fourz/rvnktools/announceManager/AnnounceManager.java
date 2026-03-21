@@ -278,6 +278,10 @@ public class AnnounceManager {
             return;
         }
 
+        if ("webonly".equals(type.getDisplayContext())) {
+            return; // webonly types are not broadcast in-game
+        }
+
         String prefix = type.getPrefix() != null ? type.getPrefix() : "";
         String suffix = type.getSuffix() != null ? type.getSuffix() : "";
         String message = prefix + announcement.getMessage() + suffix;
@@ -737,6 +741,7 @@ public class AnnounceManager {
                 .prefix(type.getPrefix())
                 .suffix(type.getSuffix())
                 .permission(type.getPermission())
+                .displayContext(type.getDisplayContext())
                 .listFee(listFee)
                 .weeklyFee(0)
                 .active(true)
