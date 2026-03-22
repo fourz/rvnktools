@@ -136,3 +136,13 @@ features:
   hat-command: true      # /hat command for cosmetic items
   link-command: true     # /link command for clickable links
   world-swap: true       # World switching with location tracking
+  tpa-commands: true     # /tpa, /tpahere, /tpaccept, /tpdeny, /back
+
+# Teleport Request Configuration
+teleport:
+  # TPA request expiry in seconds (how long target has to accept/deny)
+  request-expire-seconds: 60
+  # Warmup delay before teleport executes (seconds, 0 to disable)
+  warmup-seconds: 3
+  # Cooldown between TPA requests (seconds)
+  cooldown-seconds: 10

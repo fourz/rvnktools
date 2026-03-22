@@ -94,6 +94,26 @@ commands:
     description: Manage TrainCarts settings and view help pages
     usage: /trains [enable|disable|modes|examples|links]
     aliases: [train-help]
+  tpa:
+    description: Request to teleport to another player
+    usage: /tpa <player>
+    permission: rvnktools.command.tpa
+  tpahere:
+    description: Request another player teleport to you
+    usage: /tpahere <player>
+    permission: rvnktools.command.tpahere
+  tpaccept:
+    description: Accept a pending teleport request
+    usage: /tpaccept
+    permission: rvnktools.command.tpaccept
+  tpdeny:
+    description: Deny a pending teleport request
+    usage: /tpdeny
+    permission: rvnktools.command.tpdeny
+  back:
+    description: Teleport to your previous location
+    usage: /back
+    permission: rvnktools.command.back
   link:
     description: Link your account to external services
     usage: /link <login|matrix|discord>
@@ -191,6 +211,27 @@ permissions:
   rvnktools.link:
     description: Allows linking account to external services
     default: true
+  rvnktools.command.tpa:
+    description: Allows sending teleport requests
+    default: true
+  rvnktools.command.tpahere:
+    description: Allows sending teleport-here requests
+    default: true
+  rvnktools.command.tpaccept:
+    description: Allows accepting teleport requests
+    default: true
+  rvnktools.command.tpdeny:
+    description: Allows denying teleport requests
+    default: true
+  rvnktools.command.back:
+    description: Allows teleporting to previous location
+    default: true
+  rvnktools.tpa.bypass.cooldown:
+    description: Bypass TPA cooldown timer
+    default: op
+  rvnktools.tpa.bypass.warmup:
+    description: Bypass TPA warmup timer
+    default: op
   rvnkcore.prefs:
     description: Manage notification preferences
     default: true
