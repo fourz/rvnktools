@@ -12,6 +12,7 @@ import org.fourz.rvnkcore.api.controller.AuthController;
 import org.fourz.rvnkcore.api.controller.BarterShopsController;
 import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
+import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
@@ -20,6 +21,7 @@ import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -136,6 +138,9 @@ public class ServletFactory {
         // Register auth controller
         registerAuthController(context);
 
+        // Register notification controller
+        registerNotificationController(context);
+
         // Plugin controllers — registered if their API service is available in ServiceRegistry
         registerBarterShopsController(context);
         registerLoreController(context);
@@ -177,9 +182,22 @@ public class ServletFactory {
      */
     private void registerAuthController(ServletContextHandler context) {
         LogManager authLogger = LogManager.getInstance(plugin, AuthController.class);
-        AuthController authController = new AuthController(authTokenStore, gson, authLogger);
+        AuthController authController = new AuthController(authTokenStore, playerService, gson, authLogger);
         context.addServlet(new ServletHolder(authController), "/v1/auth/*");
         logger.info("Auth API controller registered at /v1/auth/*");
+    }
+
+    /**
+     * Registers the notification controller for push subscription management.
+     * The controller resolves PushSubscriptionService lazily from ServiceRegistry at request time.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerNotificationController(ServletContextHandler context) {
+        LogManager notifLogger = LogManager.getInstance(plugin, NotificationController.class);
+        NotificationController controller = new NotificationController(null, gson, notifLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
+        logger.info("Notification API controller registered at /v1/notifications/*");
     }
 
     /**

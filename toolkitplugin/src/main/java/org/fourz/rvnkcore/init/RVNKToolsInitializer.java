@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.init;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.event.PlayerBanListener;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
 import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
@@ -230,6 +231,10 @@ public class RVNKToolsInitializer {
                 WorldTrackingListener worldTracker = new WorldTrackingListener(plugin, plugin);
                 plugin.getServer().getPluginManager().registerEvents(worldTracker, plugin);
                 worldTracker.syncAllLoadedWorlds();
+
+                // Register ban detection listener
+                PlayerBanListener banListener = new PlayerBanListener(registry, logger);
+                plugin.getServer().getPluginManager().registerEvents(banListener, plugin);
 
                 // Register LuckPerms integration
                 try {

@@ -227,6 +227,42 @@ public class WebhookNotifier {
             });
     }
 
+    /**
+     * Fires a webhook notification for a player ban event.
+     * No debounce — bans are critical security events that must propagate immediately
+     * to trigger session revocation on the web frontend.
+     *
+     * @param uuid       The banned player's UUID
+     * @param playerName The banned player's name
+     */
+    public void notifyPlayerBanned(String uuid, String playerName) {
+        String payload = "{\"event\":\"player_banned\",\"server\":\""
+            + escapeJson(config.getServerId())
+            + "\",\"uuid\":\""
+            + escapeJson(uuid)
+            + "\",\"playerName\":\""
+            + escapeJson(playerName)
+            + "\",\"timestamp\":\""
+            + Instant.now().toString()
+            + "\"}";
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(config.getUrl()))
+            .header("Content-Type", "application/json")
+            .header("X-Webhook-Secret", config.getSecret())
+            .POST(HttpRequest.BodyPublishers.ofString(payload))
+            .timeout(Duration.ofMillis(config.getTimeoutMs()))
+            .build();
+
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenAccept(response ->
+                logger.warning("Webhook ban " + config.getServerId() + " -> " + response.statusCode()))
+            .exceptionally(e -> {
+                logger.warning("Webhook ban failed: " + e.getMessage());
+                return null;
+            });
+    }
+
     private static String escapeJson(String value) {
         if (value == null) return "";
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
