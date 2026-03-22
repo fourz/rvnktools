@@ -5,7 +5,7 @@
 
     <groupId>org.fourz</groupId>
     <artifactId>rvnkcore</artifactId>
-    <version>1.4.3-alpha</version>
+    <version>1.4.4-alpha</version>
 
     <name>RVNKCore</name>
     <description>Core unified library for Ravenkraft Minecraft plugins - provides ServiceRegistry, database abstraction, REST API, and shared services</description>

@@ -3,16 +3,22 @@ announce_types:
   prefix: '&a[News] &7'
   suffix: '&7'
   permission: rvnktools.announce.type.news
+- id: event
+  prefix: '&9[Event] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.event
 - id: help
   prefix: '&b[Help] &7'
   suffix: '&7'
   permission: rvnktools.announce.type.help
+  display_context: ingame
 - id: advert
   prefix: '&d[Advert] &f'
   suffix: '&7'
   list_fee: 4
   weekly_fee: 10
   permission: rvnktools.announce.type.advert
+  display_context: ingame
 - id: scheduled
   prefix: '&a[!!] &7'
   suffix: ' &a[!!]'
@@ -21,14 +27,27 @@ announce_types:
   prefix: '&c[Server] &f'
   suffix: '&7'
   permission: rvnktools.announce.type.server
+  display_context: ingame
 - id: guide
   prefix: '&e[Guide] &7'
   suffix: '&7'
   permission: rvnktools.announce.type.guide
+  display_context: ingame
 - id: motd
   prefix: '&b'
   suffix: '&r'
   permission: rvnktools.announce.type.motd
+  display_context: ingame
+- id: info
+  prefix: '&7[Info] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.info
+  display_context: ingame
+- id: warning
+  prefix: '&e[Warning] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.warning
+  display_context: ingame
 
 announcements:
 - id: events
