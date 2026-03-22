@@ -34,6 +34,7 @@ public class BarterShopsController extends HttpServlet {
     private static final Pattern SHOP_BY_ID_PATTERN = Pattern.compile("^/shops/([^/]+)$");
     private static final Pattern TRADE_BY_ID_PATTERN = Pattern.compile("^/trades/([^/]+)$");
     private static final Pattern STATS_SHOPS_PATTERN = Pattern.compile("^/stats/shops/?(.*)$");
+    private static final Pattern GROUP_BY_ID_PATTERN = Pattern.compile("^/groups/(\\d+)$");
 
     public BarterShopsController(IBarterShopsApiService ignored, Gson gson, LogManager logger) {
         this.gson = gson;
@@ -99,6 +100,12 @@ public class BarterShopsController extends HttpServlet {
                 future = apiService.getShopStats(shopId);
             } else if (pathInfo.equals("/health")) {
                 future = apiService.getHealthStatus();
+            } else if (pathInfo.equals("/groups")) {
+                future = apiService.getGroups(ApiUtils.extractQueryParams(req));
+            } else if (GROUP_BY_ID_PATTERN.matcher(pathInfo).matches()) {
+                Matcher m = GROUP_BY_ID_PATTERN.matcher(pathInfo);
+                m.matches();
+                future = apiService.getGroupById(m.group(1));
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;
