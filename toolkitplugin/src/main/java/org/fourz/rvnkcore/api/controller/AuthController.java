@@ -6,13 +6,21 @@ import com.google.gson.JsonSyntaxException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.bukkit.BanList;
+import org.bukkit.Bukkit;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.api.model.PlayerDTO;
+import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * REST API controller for authentication endpoints.
@@ -21,7 +29,8 @@ import java.util.Map;
  * <h3>Endpoints</h3>
  * <ul>
  *   <li>{@code POST /v1/auth/verify} — Exchange a one-time magic link token for player data</li>
- *   <li>{@code GET  /v1/auth/session} — Validate an existing session (stub for Phase 2.5)</li>
+ *   <li>{@code POST /v1/auth/session-token} — Generate a short-lived token for QR code session sharing</li>
+ *   <li>{@code GET  /v1/auth/session} — Validate an existing session</li>
  * </ul>
  *
  * @since 1.5.0
@@ -29,11 +38,13 @@ import java.util.Map;
 public class AuthController extends HttpServlet {
 
     private final AuthTokenStore authTokenStore;
+    private final PlayerService playerService;
     private final Gson gson;
     private final LogManager logger;
 
-    public AuthController(AuthTokenStore authTokenStore, Gson gson, LogManager logger) {
+    public AuthController(AuthTokenStore authTokenStore, PlayerService playerService, Gson gson, LogManager logger) {
         this.authTokenStore = authTokenStore;
+        this.playerService = playerService;
         this.gson = gson;
         this.logger = logger;
     }
@@ -45,6 +56,8 @@ public class AuthController extends HttpServlet {
         try {
             if (pathInfo != null && pathInfo.equals("/verify")) {
                 handleVerify(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/session-token")) {
+                handleSessionToken(req, resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown auth endpoint: POST " + pathInfo);
@@ -126,11 +139,142 @@ public class AuthController extends HttpServlet {
     }
 
     /**
-     * GET /v1/auth/session — Validate an existing JWT session.
-     * Stub for Phase 2.5 — returns 501 Not Implemented.
+     * POST /v1/auth/session-token — Generate a short-lived auth token for QR code session sharing.
+     * Body: {"uuid": "player-uuid"}
+     *
+     * <p>Allows an already-authenticated user to generate a token that can be
+     * encoded in a QR code and scanned on another device (e.g., mobile) to
+     * create a new session without requiring the in-game /link command.</p>
+     *
+     * <p>Uses the same AuthTokenStore as magic-link tokens. Rate limited to
+     * prevent token flooding.</p>
+     *
+     * Returns: { "token": "...", "expiresIn": 300 }
      */
-    private void handleSession(HttpServletRequest req, HttpServletResponse resp) {
-        ApiUtils.sendError(resp, gson, 501, "NOT_IMPLEMENTED",
-                "Session validation is not yet implemented");
+    private void handleSessionToken(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String body = ApiUtils.readRequestBody(req);
+
+        String uuidStr;
+        try {
+            JsonObject json = gson.fromJson(body, JsonObject.class);
+            if (json == null || !json.has("uuid") || json.get("uuid").isJsonNull()) {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required field: uuid");
+                return;
+            }
+            uuidStr = json.get("uuid").getAsString();
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid JSON body");
+            return;
+        }
+
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid UUID format");
+            return;
+        }
+
+        // Rate limit: reuse AuthTokenStore's per-player rate limiting
+        if (authTokenStore.isRateLimited(uuid)) {
+            ApiUtils.sendError(resp, gson, 429, "RATE_LIMITED",
+                    "Please wait before generating another session token");
+            return;
+        }
+
+        try {
+            // Look up the player to get current name and groups
+            Optional<PlayerDTO> optPlayer = playerService.getPlayer(uuid).get(10, TimeUnit.SECONDS);
+            if (optPlayer.isEmpty()) {
+                ApiUtils.sendError(resp, gson, 404, "NOT_FOUND", "Player not found");
+                return;
+            }
+
+            PlayerDTO player = optPlayer.get();
+
+            // Check ban status — don't generate tokens for banned players
+            boolean banned = player.isBanned()
+                    || Bukkit.getBanList(BanList.Type.NAME).isBanned(player.getCurrentName());
+            if (banned) {
+                ApiUtils.sendError(resp, gson, 403, "FORBIDDEN", "Cannot generate token for banned player");
+                return;
+            }
+
+            List<String> groups = player.getGroups() != null ? player.getGroups() : List.of();
+            String token = authTokenStore.generateToken(uuid, player.getCurrentName(), groups);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("token", token);
+            result.put("expiresIn", 300); // 5 min (tokens are 15 min TTL but we advertise 5 for UX)
+
+            logger.info("Session token generated for " + player.getCurrentName()
+                    + " (QR login) from " + ApiUtils.getClientIP(req));
+            ApiUtils.sendSuccess(resp, gson, result);
+        } catch (Exception e) {
+            logger.error("Failed to generate session token for " + uuid, e);
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to generate session token");
+        }
+    }
+
+    /**
+     * GET /v1/auth/session — Validate an existing JWT session.
+     * Checks player existence, ban status, and resolves current LuckPerms groups.
+     *
+     * <p>Query params:</p>
+     * <ul>
+     *   <li>{@code uuid} — Player UUID (required)</li>
+     * </ul>
+     *
+     * <p>Response: {@code { valid: bool, banned: bool, groups: [...], name: "..." }}</p>
+     */
+    private void handleSession(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String uuidParam = req.getParameter("uuid");
+        if (uuidParam == null || uuidParam.isBlank()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required query parameter: uuid");
+            return;
+        }
+
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(uuidParam);
+        } catch (IllegalArgumentException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid UUID format");
+            return;
+        }
+
+        try {
+            Optional<PlayerDTO> optPlayer = playerService.getPlayer(uuid).get(10, TimeUnit.SECONDS);
+
+            if (optPlayer.isEmpty()) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("valid", false);
+                result.put("banned", false);
+                result.put("groups", List.of());
+                result.put("name", "");
+                ApiUtils.sendSuccess(resp, gson, result);
+                return;
+            }
+
+            PlayerDTO player = optPlayer.get();
+
+            // Check ban status via Bukkit ban list
+            boolean banned = player.isBanned();
+            if (!banned) {
+                // Also check server ban list by name (covers console bans)
+                banned = Bukkit.getBanList(BanList.Type.NAME).isBanned(player.getCurrentName());
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("valid", !banned);
+            result.put("banned", banned);
+            result.put("groups", player.getGroups() != null ? player.getGroups() : List.of());
+            result.put("name", player.getCurrentName());
+            ApiUtils.sendSuccess(resp, gson, result);
+
+            logger.debug("Session validated for " + player.getCurrentName() + " (banned=" + banned + ")");
+        } catch (Exception e) {
+            logger.error("Failed to validate session for UUID " + uuid, e);
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Session validation failed");
+        }
     }
 }
