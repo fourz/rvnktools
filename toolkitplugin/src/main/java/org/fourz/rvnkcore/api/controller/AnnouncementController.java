@@ -365,8 +365,26 @@ public class AnnouncementController extends HttpServlet {
         }
     }
 
+    private static final List<String> ANNOUNCEMENT_PERMISSION_NODES = List.of(
+            "rvnk.announcements.create",
+            "rvnk.announcements.edit",
+            "rvnk.announcements.edit.own",
+            "rvnk.announcements.delete",
+            "rvnk.announcements.pin"
+    );
+
+    private static final Map<String, String> PERM_NODE_TO_KEY = Map.of(
+            "rvnk.announcements.create", "canCreate",
+            "rvnk.announcements.edit", "canEdit",
+            "rvnk.announcements.edit.own", "canEditOwn",
+            "rvnk.announcements.delete", "canDelete",
+            "rvnk.announcements.pin", "canPin"
+    );
+
     /**
      * Resolves announcement permissions for a UUID via LuckPerms.
+     * Uses {@code QueryOptions.nonContextual()} so inherited group permissions
+     * resolve correctly for offline players.
      * Falls back to all-false if LuckPerms is unavailable.
      */
     private Map<String, Boolean> resolvePermissions(UUID uuid) {
@@ -378,16 +396,14 @@ public class AnnouncementController extends HttpServlet {
         perms.put("canPin", false);
 
         try {
-            net.luckperms.api.LuckPerms lp = org.fourz.rvnktools.permission.LuckPermsManager.getLuckPerms();
-            net.luckperms.api.model.user.User user = lp.getUserManager().loadUser(uuid).join();
-            if (user == null) return perms;
-
-            net.luckperms.api.cacheddata.CachedPermissionData permData = user.getCachedData().getPermissionData();
-            perms.put("canCreate", permData.checkPermission("rvnk.announcements.create").asBoolean());
-            perms.put("canEdit", permData.checkPermission("rvnk.announcements.edit").asBoolean());
-            perms.put("canEditOwn", permData.checkPermission("rvnk.announcements.edit.own").asBoolean());
-            perms.put("canDelete", permData.checkPermission("rvnk.announcements.delete").asBoolean());
-            perms.put("canPin", permData.checkPermission("rvnk.announcements.pin").asBoolean());
+            Map<String, Boolean> resolved = org.fourz.rvnktools.permission.LuckPermsGroupResolver
+                    .checkPermissionsAsync(uuid, ANNOUNCEMENT_PERMISSION_NODES).join();
+            for (Map.Entry<String, Boolean> entry : resolved.entrySet()) {
+                String key = PERM_NODE_TO_KEY.get(entry.getKey());
+                if (key != null) {
+                    perms.put(key, entry.getValue());
+                }
+            }
         } catch (Exception e) {
             logger.warning("LuckPerms unavailable for permission check: " + e.getMessage());
         }

@@ -3,12 +3,12 @@ package org.fourz.rvnktools.listener;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.event.EventBus;
 import net.luckperms.api.event.EventSubscription;
-import net.luckperms.api.event.group.GroupDataRecalculateEvent;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
-import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.service.PlayerService;
+import org.fourz.rvnktools.permission.LuckPermsGroupResolver;
+import org.fourz.rvnktools.permission.LuckPermsGroupResolver.GroupResult;
 import org.fourz.rvnktools.permission.LuckPermsManager;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Listens to LuckPerms events and updates player data in RVNKCore.
@@ -60,14 +59,8 @@ public class LuckPermsIntegrationListener {
      * Registers event listeners with the LuckPerms event bus.
      */
     private void registerEventListeners() {
-        // Listen for user data recalculation events (includes group changes)
         subscriptions.add(
             eventBus.subscribe(UserDataRecalculateEvent.class, this::onUserDataRecalculate)
-        );
-
-        // Listen for group data recalculation events (for debugging/monitoring)
-        subscriptions.add(
-            eventBus.subscribe(GroupDataRecalculateEvent.class, this::onGroupDataRecalculate)
         );
 
         logger.debug("Registered LuckPerms event listeners");
@@ -96,18 +89,12 @@ public class LuckPermsIntegrationListener {
                         return CompletableFuture.completedFuture(null);
                     }
                     
-                    // Get updated groups from LuckPerms
-                    String primaryGroup = user.getPrimaryGroup();
-                    List<String> allGroups = user.getInheritedGroups(user.getQueryOptions())
-                        .stream()
-                        .map(Group::getName)
-                        .collect(Collectors.toList());
-                    
-                    logger.debug("Updating groups for " + user.getFriendlyName() + 
-                               ": primary=" + primaryGroup + ", all=" + allGroups);
-                    
-                    // Update in RVNKCore
-                    return playerService.updatePlayerGroups(playerId, primaryGroup, allGroups);
+                    GroupResult groups = LuckPermsGroupResolver.resolveGroups(user);
+
+                    logger.debug("Updating groups for " + user.getFriendlyName() +
+                               ": primary=" + groups.primaryGroup() + ", all=" + groups.allGroups());
+
+                    return playerService.updatePlayerGroups(playerId, groups.primaryGroup(), groups.allGroups());
                 })
                 .thenRun(() -> {
                     logger.debug("Successfully updated groups for " + user.getFriendlyName());
@@ -123,40 +110,18 @@ public class LuckPermsIntegrationListener {
     }
     
     /**
-     * Handles group data recalculation events for monitoring purposes.
-     * 
-     * @param event The group data recalculate event
-     */
-    private void onGroupDataRecalculate(GroupDataRecalculateEvent event) {
-        Group group = event.getGroup();
-        logger.debug("LuckPerms group data recalculated: " + group.getName());
-    }
-    
-    /**
      * Manually updates player groups for a specific player.
      * This can be called when needed to ensure synchronization.
-     * 
+     *
      * @param playerId The UUID of the player
      * @return CompletableFuture that completes when update is finished
      */
     public CompletableFuture<Void> updatePlayerGroups(UUID playerId) {
-        return luckPerms.getUserManager().loadUser(playerId)
-            .thenCompose(user -> {
-                if (user == null) {
-                    logger.warning("User not found in LuckPerms: " + playerId);
-                    return CompletableFuture.completedFuture(null);
-                }
-                
+        return LuckPermsGroupResolver.resolveGroupsAsync(playerId)
+            .thenCompose(groups -> {
                 try {
                     PlayerService playerService = rvnkCore.getService(PlayerService.class);
-                    
-                    String primaryGroup = user.getPrimaryGroup();
-                    List<String> allGroups = user.getInheritedGroups(user.getQueryOptions())
-                        .stream()
-                        .map(Group::getName)
-                        .collect(Collectors.toList());
-                    
-                    return playerService.updatePlayerGroups(playerId, primaryGroup, allGroups);
+                    return playerService.updatePlayerGroups(playerId, groups.primaryGroup(), groups.allGroups());
                 } catch (Exception e) {
                     CompletableFuture<Void> future = new CompletableFuture<>();
                     future.completeExceptionally(e);
