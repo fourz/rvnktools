@@ -187,6 +187,10 @@ public class AnnounceConfig {
             announceType.setListingFee(listingFee);
         }
         announceType.setPermission(permission);
+        String displayContext = (String) map.get("display_context");
+        if (displayContext != null) {
+            announceType.setDisplayContext(displayContext);
+        }
         return announceType;
     }
 

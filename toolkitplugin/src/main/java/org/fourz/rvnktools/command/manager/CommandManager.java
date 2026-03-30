@@ -11,10 +11,19 @@ import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
 import org.fourz.rvnktools.command.manager.commands.RVNKCoreCommand;
+import org.fourz.rvnktools.command.manager.commands.BackCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
+import org.fourz.rvnktools.command.manager.commands.TpaCommand;
+import org.fourz.rvnktools.command.manager.commands.TpAcceptCommand;
+import org.fourz.rvnktools.command.manager.commands.TpDenyCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
+import org.fourz.rvnkcore.service.teleport.BackLocationService;
+import org.fourz.rvnkcore.service.teleport.DefaultBackLocationService;
+import org.fourz.rvnkcore.service.teleport.TpaRequest;
+import org.fourz.rvnkcore.service.teleport.TpaRequestService;
+import org.fourz.rvnktools.listener.TpaListener;
 import org.fourz.rvnktools.link.LinkCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -99,6 +108,9 @@ public class CommandManager {
         // Register link command (magic link auth)
         registerLinkCommand();
 
+        // Register TPA commands (if enabled)
+        registerTpaCommands();
+
         // Register cycle commands
         cycleCommands.registerCommands();
 
@@ -122,6 +134,49 @@ public class CommandManager {
         } catch (Exception e) {
             logger.warning("Failed to register /link command: " + e.getMessage());
         }
+    }
+
+    /**
+     * Registers TPA commands if the feature is enabled in config.
+     * Creates TpaRequestService and BackLocationService, registers the listener,
+     * and registers all 5 commands: /tpa, /tpahere, /tpaccept, /tpdeny, /back.
+     */
+    private void registerTpaCommands() {
+        boolean enabled = plugin.getConfig().getBoolean("features.tpa-commands", true);
+        if (!enabled) {
+            logger.info("TPA commands disabled in config");
+            return;
+        }
+
+        // Create services
+        TpaRequestService tpaService = new TpaRequestService(plugin);
+        tpaService.setRequestExpireSeconds(plugin.getConfig().getInt("teleport.request-expire-seconds", 60));
+        tpaService.setWarmupSeconds(plugin.getConfig().getInt("teleport.warmup-seconds", 3));
+        tpaService.setCooldownSeconds(plugin.getConfig().getInt("teleport.cooldown-seconds", 10));
+
+        BackLocationService backService = new DefaultBackLocationService();
+
+        // Register services with ServiceRegistry
+        ServiceRegistry registry = plugin.getServiceRegistry();
+        registry.registerService(TpaRequestService.class, tpaService);
+        registry.registerService(BackLocationService.class, backService);
+
+        // Register listener for warmup movement cancellation + player quit cleanup
+        plugin.getServer().getPluginManager().registerEvents(
+            new TpaListener(tpaService, backService), plugin);
+
+        // Register commands
+        registerCommand(new TpaCommand(plugin, tpaService,
+            "tpa", "Request to teleport to another player", "/tpa <player>",
+            TpaRequest.Type.TPA));
+        registerCommand(new TpaCommand(plugin, tpaService,
+            "tpahere", "Request another player teleport to you", "/tpahere <player>",
+            TpaRequest.Type.TPAHERE));
+        registerCommand(new TpAcceptCommand(plugin, tpaService, backService));
+        registerCommand(new TpDenyCommand(plugin, tpaService));
+        registerCommand(new BackCommand(plugin, tpaService, backService));
+
+        logger.info("TPA commands registered: /tpa, /tpahere, /tpaccept, /tpdeny, /back");
     }
 
     /**

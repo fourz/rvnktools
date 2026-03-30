@@ -30,7 +30,8 @@ public class AnnouncementDTO {
     private List<String> targetWorlds;
     private List<String> targetGroups;
     private Map<String, Object> metadata;
-    
+    private String ownerUuid;
+
     /**
      * Creates a new AnnouncementDTO with default values.
      */
@@ -170,6 +171,14 @@ public class AnnouncementDTO {
         this.metadata = metadata != null ? metadata : new HashMap<>();
     }
     
+    public String getOwnerUuid() {
+        return ownerUuid;
+    }
+
+    public void setOwnerUuid(String ownerUuid) {
+        this.ownerUuid = ownerUuid;
+    }
+
     /**
      * Gets a metadata value by key.
      * 
@@ -310,7 +319,12 @@ public class AnnouncementDTO {
             dto.metadata.put(key, value);
             return this;
         }
-        
+
+        public Builder ownerUuid(String ownerUuid) {
+            dto.ownerUuid = ownerUuid;
+            return this;
+        }
+
         public AnnouncementDTO build() {
             return dto;
         }
@@ -323,6 +337,7 @@ public class AnnouncementDTO {
                 ", title='" + title + '\'' +
                 ", type='" + type + '\'' +
                 ", active=" + active +
+                ", ownerUuid='" + ownerUuid + '\'' +
                 ", scheduledFor=" + scheduledFor +
                 ", expiresAt=" + expiresAt +
                 '}';

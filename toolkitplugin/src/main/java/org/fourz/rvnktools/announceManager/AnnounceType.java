@@ -6,6 +6,7 @@ public class AnnounceType {
     private String suffix;
     private String permission;
     private Double listingFee;
+    private String displayContext = "both";
     private boolean imported = false;
 
     // Getters and setters
@@ -47,6 +48,14 @@ public class AnnounceType {
 
     public void setListingFee(Double listingFee) {
         this.listingFee = listingFee;
+    }
+
+    public String getDisplayContext() {
+        return displayContext;
+    }
+
+    public void setDisplayContext(String displayContext) {
+        this.displayContext = displayContext;
     }
 
 }

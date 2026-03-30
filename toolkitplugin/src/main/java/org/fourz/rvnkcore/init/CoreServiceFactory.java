@@ -7,6 +7,7 @@ import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
@@ -15,11 +16,13 @@ import org.fourz.rvnkcore.database.repository.AnnouncementTypeRepository;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
+import org.fourz.rvnkcore.database.repository.PushSubscriptionRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
 import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
+import org.fourz.rvnkcore.service.push.DefaultPushSubscriptionService;
 import org.fourz.rvnkcore.service.teleport.CoreTeleportService;
 import org.fourz.rvnkcore.service.world.DefaultWorldService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
@@ -106,8 +109,11 @@ public class CoreServiceFactory {
         registerMojangAPI(registry);
         logger.debug("  + MojangAPI registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerPushSubscriptionService(registry);
+        logger.debug("  + PushSubscriptionService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI (" + totalTime + "ms)");
+        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
     }
 
     /**
@@ -246,6 +252,23 @@ public class CoreServiceFactory {
      * api.getUuidByName("Player").thenAccept(uuid -> ...);
      * </pre>
      */
+    /**
+     * Registers the PushSubscriptionService for web push notification subscriptions.
+     */
+    private void registerPushSubscriptionService(ServiceRegistry registry) {
+        try {
+            LogManager pushLogger = LogManager.getInstance(plugin, DefaultPushSubscriptionService.class);
+            PushSubscriptionRepository pushRepo = new PushSubscriptionRepository(connectionProvider, plugin);
+            DefaultPushSubscriptionService pushService = new DefaultPushSubscriptionService(pushRepo, pushLogger);
+
+            registry.registerService(PushSubscriptionService.class, pushService);
+            logger.info("PushSubscriptionService registered");
+        } catch (Exception e) {
+            logger.error("Failed to register PushSubscriptionService", e);
+            throw new RuntimeException("PushSubscriptionService registration failed", e);
+        }
+    }
+
     private void registerMojangAPI(ServiceRegistry registry) {
         try {
             mojangAPI = new MojangAPI(plugin);

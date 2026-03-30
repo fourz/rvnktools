@@ -60,4 +60,16 @@ public interface IBarterShopsApiService {
      * GET /api/bartershops/health — health check.
      */
     CompletableFuture<ApiResponse<?>> getHealthStatus();
+
+    /**
+     * GET /api/bartershops/groups — list groups with optional filters.
+     *
+     * @param filters query parameters (owner, world, page, limit)
+     */
+    CompletableFuture<ApiResponse<?>> getGroups(Map<String, String> filters);
+
+    /**
+     * GET /api/bartershops/groups/{id} — get group by ID with shops and co-owners.
+     */
+    CompletableFuture<ApiResponse<?>> getGroupById(String groupId);
 }

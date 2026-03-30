@@ -319,6 +319,16 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
                 builder.targetGroups(targetGroups);
             }
             
+            // Parse owner_uuid
+            try {
+                String ownerUuid = rs.getString("owner_uuid");
+                if (ownerUuid != null && !ownerUuid.trim().isEmpty()) {
+                    builder.ownerUuid(ownerUuid);
+                }
+            } catch (SQLException ignored) {
+                // Column may not exist yet (pre-migration)
+            }
+
             // Parse metadata from JSON-like string (simplified implementation)
             String metadataStr = rs.getString("metadata");
             if (metadataStr != null && !metadataStr.trim().isEmpty()) {
@@ -326,7 +336,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
                 // In a full implementation, this would be proper JSON deserialization
                 builder.metadata("raw_metadata", metadataStr);
             }
-            
+
             AnnouncementDTO result = builder.build();
             logger.debug("Successfully mapped announcement DTO: " + id);
             return result;
@@ -357,8 +367,8 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         QueryBuilder builder = createQueryBuilder();
         return builder.insert(tableName)
             .columns("id", "title", "message", "type", "active", "pinned", "created_at", "updated_at",
-                    "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata")
-            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
+                    "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata", "owner_uuid")
+            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
     
@@ -379,6 +389,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
             .set("target_worlds", "?")
             .set("target_groups", "?")
             .set("metadata", "?")
+            .set("owner_uuid", "?")
             .where("id = ?")
             .build();
     }
@@ -406,8 +417,9 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
             metadataStr.append(entry.getKey()).append("=").append(entry.getValue());
         }
         stmt.setString(14, metadataStr.toString());
+        stmt.setString(15, entity.getOwnerUuid());
     }
-    
+
     @Override
     protected void setUpdateParameters(PreparedStatement stmt, AnnouncementDTO entity) throws SQLException {
         stmt.setString(1, entity.getTitle());
@@ -429,9 +441,43 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
             metadataStr.append(entry.getKey()).append("=").append(entry.getValue());
         }
         stmt.setString(12, metadataStr.toString());
-        stmt.setString(13, entity.getId()); // WHERE clause
+        stmt.setString(13, entity.getOwnerUuid());
+        stmt.setString(14, entity.getId()); // WHERE clause
     }
     
+    /**
+     * Finds announcements owned by a specific player UUID.
+     *
+     * @param ownerUuid The UUID of the owner
+     * @return CompletableFuture containing list of announcements owned by the player
+     */
+    public CompletableFuture<List<AnnouncementDTO>> findByOwnerUuid(String ownerUuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            String query = queryBuilder.select("*")
+                .from(tableName)
+                .where("owner_uuid = ?")
+                .orderBy("created_at", false)
+                .build();
+
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement(query)) {
+
+                stmt.setString(1, ownerUuid);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    List<AnnouncementDTO> results = new ArrayList<>();
+                    while (rs.next()) {
+                        results.add(mapResultSet(rs));
+                    }
+                    return results;
+                }
+            } catch (SQLException e) {
+                logger.error("Failed to find announcements by owner UUID: " + ownerUuid, e);
+                throw new org.fourz.rvnkcore.api.exception.DatabaseException("Announcements by owner lookup failed", e);
+            }
+        });
+    }
+
     // === Additional methods required by service ===
     
     /**

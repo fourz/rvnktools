@@ -1,7 +1,5 @@
 package org.fourz.rvnktools.link;
 
-import net.luckperms.api.LuckPerms;
-import net.luckperms.api.model.user.User;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -12,9 +10,8 @@ import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.util.ChatFormat;
 import org.fourz.rvnktools.command.manager.BaseCommand;
-import org.fourz.rvnktools.permission.LuckPermsManager;
+import org.fourz.rvnktools.permission.LuckPermsGroupResolver;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -147,19 +144,7 @@ public class LinkCommand extends BaseCommand {
      */
     private List<String> resolveGroups(Player player) {
         try {
-            LuckPerms lp = LuckPermsManager.getLuckPerms();
-            User user = lp.getPlayerAdapter(Player.class).getUser(player);
-            String primaryGroup = user.getPrimaryGroup();
-
-            List<String> groups = new ArrayList<>();
-            groups.add(primaryGroup);
-
-            user.getInheritedGroups(user.getQueryOptions()).stream()
-                    .map(g -> g.getName())
-                    .filter(name -> !name.equals(primaryGroup))
-                    .forEach(groups::add);
-
-            return groups;
+            return LuckPermsGroupResolver.resolveGroups(player).allGroups();
         } catch (Exception e) {
             logger.warning("Failed to resolve LuckPerms groups for " + player.getName() + ": " + e.getMessage());
             return List.of("default");
@@ -172,19 +157,7 @@ public class LinkCommand extends BaseCommand {
      */
     private List<String> resolveGroupsByUuid(UUID uuid, String playerName) {
         try {
-            LuckPerms lp = LuckPermsManager.getLuckPerms();
-            User user = lp.getUserManager().loadUser(uuid).join();
-            String primaryGroup = user.getPrimaryGroup();
-
-            List<String> groups = new ArrayList<>();
-            groups.add(primaryGroup);
-
-            user.getInheritedGroups(user.getQueryOptions()).stream()
-                    .map(g -> g.getName())
-                    .filter(name -> !name.equals(primaryGroup))
-                    .forEach(groups::add);
-
-            return groups;
+            return LuckPermsGroupResolver.resolveGroupsAsync(uuid).join().allGroups();
         } catch (Exception e) {
             logger.warning("Failed to resolve LuckPerms groups for " + playerName + ": " + e.getMessage());
             return List.of("default");

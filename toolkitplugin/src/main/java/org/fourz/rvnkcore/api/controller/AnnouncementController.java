@@ -365,27 +365,45 @@ public class AnnouncementController extends HttpServlet {
         }
     }
 
+    private static final List<String> ANNOUNCEMENT_PERMISSION_NODES = List.of(
+            "rvnk.announcements.create",
+            "rvnk.announcements.edit",
+            "rvnk.announcements.edit.own",
+            "rvnk.announcements.delete",
+            "rvnk.announcements.pin"
+    );
+
+    private static final Map<String, String> PERM_NODE_TO_KEY = Map.of(
+            "rvnk.announcements.create", "canCreate",
+            "rvnk.announcements.edit", "canEdit",
+            "rvnk.announcements.edit.own", "canEditOwn",
+            "rvnk.announcements.delete", "canDelete",
+            "rvnk.announcements.pin", "canPin"
+    );
+
     /**
      * Resolves announcement permissions for a UUID via LuckPerms.
+     * Uses {@code QueryOptions.nonContextual()} so inherited group permissions
+     * resolve correctly for offline players.
      * Falls back to all-false if LuckPerms is unavailable.
      */
     private Map<String, Boolean> resolvePermissions(UUID uuid) {
         Map<String, Boolean> perms = new LinkedHashMap<>();
         perms.put("canCreate", false);
         perms.put("canEdit", false);
+        perms.put("canEditOwn", false);
         perms.put("canDelete", false);
         perms.put("canPin", false);
 
         try {
-            net.luckperms.api.LuckPerms lp = org.fourz.rvnktools.permission.LuckPermsManager.getLuckPerms();
-            net.luckperms.api.model.user.User user = lp.getUserManager().loadUser(uuid).join();
-            if (user == null) return perms;
-
-            net.luckperms.api.cacheddata.CachedPermissionData permData = user.getCachedData().getPermissionData();
-            perms.put("canCreate", permData.checkPermission("rvnk.announcements.create").asBoolean());
-            perms.put("canEdit", permData.checkPermission("rvnk.announcements.edit").asBoolean());
-            perms.put("canDelete", permData.checkPermission("rvnk.announcements.delete").asBoolean());
-            perms.put("canPin", permData.checkPermission("rvnk.announcements.pin").asBoolean());
+            Map<String, Boolean> resolved = org.fourz.rvnktools.permission.LuckPermsGroupResolver
+                    .checkPermissionsAsync(uuid, ANNOUNCEMENT_PERMISSION_NODES).join();
+            for (Map.Entry<String, Boolean> entry : resolved.entrySet()) {
+                String key = PERM_NODE_TO_KEY.get(entry.getKey());
+                if (key != null) {
+                    perms.put(key, entry.getValue());
+                }
+            }
         } catch (Exception e) {
             logger.warning("LuckPerms unavailable for permission check: " + e.getMessage());
         }
@@ -398,6 +416,8 @@ public class AnnouncementController extends HttpServlet {
     private void handleGetAllAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             List<AnnouncementDTO> announcements = announcementService.getAllAnnouncements().get(15, TimeUnit.SECONDS);
+            // Filter out payment-depleted announcements from REST response
+            announcements = filterPaymentDepleted(announcements);
             ApiUtils.sendSuccess(response, gson, announcements);
         } catch (Exception e) {
             logger.error("Error retrieving all announcements", e);
@@ -553,11 +573,14 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
 
+            String ownerUuid = json.has("ownerUuid") ? json.get("ownerUuid").getAsString() : null;
+
             AnnouncementDTO announcement = new AnnouncementDTO.Builder()
                 .title(title)
                 .message(message)
                 .type(type)
                 .active(active)
+                .ownerUuid(ownerUuid)
                 .build();
 
             AnnouncementDTO created = announcementService.createAnnouncement(announcement).join();
@@ -640,9 +663,51 @@ public class AnnouncementController extends HttpServlet {
                 return;
             }
 
+            // Check X-User-UUID header for ownership-based updates
+            String callerUuid = request.getHeader("X-User-UUID");
+            if (callerUuid != null && !callerUuid.isEmpty()) {
+                UUID uuid = UUID.fromString(callerUuid);
+                Map<String, Boolean> perms = resolvePermissions(uuid);
+                boolean canEdit = Boolean.TRUE.equals(perms.get("canEdit"));
+                boolean canEditOwn = Boolean.TRUE.equals(perms.get("canEditOwn"));
+
+                if (!canEdit && !canEditOwn) {
+                    sendError(response, 403, "No permission to edit announcements");
+                    return;
+                }
+
+                if (!canEdit && canEditOwn) {
+                    // Verify ownership
+                    Optional<AnnouncementDTO> existing = announcementService.getAnnouncement(id).get(15, TimeUnit.SECONDS);
+                    if (existing.isEmpty()) {
+                        sendError(response, 404, "Announcement not found: " + id);
+                        return;
+                    }
+                    if (!callerUuid.equals(existing.get().getOwnerUuid())) {
+                        sendError(response, 403, "You can only edit your own announcements");
+                        return;
+                    }
+                    // Owner can only update message — parse body and restrict fields
+                    JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+                    AnnouncementDTO update = new AnnouncementDTO(id);
+                    if (json.has("message")) {
+                        update.setMessage(json.get("message").getAsString());
+                    } else if (json.has("content")) {
+                        update.setMessage(json.get("content").getAsString());
+                    }
+                    // Ignore title/type/active changes for canEditOwn callers
+                    AnnouncementDTO updated = announcementService.updateAnnouncement(update).get(15, TimeUnit.SECONDS);
+                    ApiUtils.sendSuccess(response, gson, updated);
+                    return;
+                }
+            }
+
+            // Global canEdit or no X-User-UUID header — full update
             AnnouncementDTO announcement = parseAnnouncementFromJson(body, id);
             AnnouncementDTO updated = announcementService.updateAnnouncement(announcement).get(15, TimeUnit.SECONDS);
             ApiUtils.sendSuccess(response, gson, updated);
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID: " + e.getMessage());
         } catch (Exception e) {
             logger.error("Error handling update announcement request for ID: " + id, e);
             sendError(response, 500, "Internal server error: " + e.getMessage());
@@ -651,6 +716,9 @@ public class AnnouncementController extends HttpServlet {
 
     private void handleActivateAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
+            // Ownership check for canEditOwn callers
+            if (!checkTogglePermission(id, request, response)) return;
+
             announcementService.activateAnnouncement(id).get(15, TimeUnit.SECONDS);
             ApiUtils.sendSuccess(response, gson, Map.of("message", "Announcement " + id + " activated"));
         } catch (Exception e) {
@@ -661,11 +729,57 @@ public class AnnouncementController extends HttpServlet {
 
     private void handleDeactivateAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
+            // Ownership check for canEditOwn callers
+            if (!checkTogglePermission(id, request, response)) return;
+
             announcementService.deactivateAnnouncement(id).get(15, TimeUnit.SECONDS);
             ApiUtils.sendSuccess(response, gson, Map.of("message", "Announcement " + id + " deactivated"));
         } catch (Exception e) {
             logger.error("Error deactivating announcement: " + id, e);
             sendError(response, 500, "Failed to deactivate announcement: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Checks toggle (activate/deactivate) permission. If X-User-UUID is present and caller
+     * has only canEditOwn (not global canEdit), verifies ownership.
+     *
+     * @return true if the operation should proceed, false if a response has already been sent
+     */
+    private boolean checkTogglePermission(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String callerUuid = request.getHeader("X-User-UUID");
+        if (callerUuid == null || callerUuid.isEmpty()) return true; // Legacy behavior
+
+        try {
+            UUID uuid = UUID.fromString(callerUuid);
+            Map<String, Boolean> perms = resolvePermissions(uuid);
+            boolean canEdit = Boolean.TRUE.equals(perms.get("canEdit"));
+            if (canEdit) return true; // Global edit permission — allow all
+
+            boolean canEditOwn = Boolean.TRUE.equals(perms.get("canEditOwn"));
+            if (!canEditOwn) {
+                sendError(response, 403, "No permission to toggle announcements");
+                return false;
+            }
+
+            // Verify ownership
+            Optional<AnnouncementDTO> existing = announcementService.getAnnouncement(id).get(15, TimeUnit.SECONDS);
+            if (existing.isEmpty()) {
+                sendError(response, 404, "Announcement not found: " + id);
+                return false;
+            }
+            if (!callerUuid.equals(existing.get().getOwnerUuid())) {
+                sendError(response, 403, "You can only toggle your own announcements");
+                return false;
+            }
+            return true;
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID: " + callerUuid);
+            return false;
+        } catch (Exception e) {
+            logger.error("Error checking toggle permission for: " + id, e);
+            sendError(response, 500, "Permission check failed: " + e.getMessage());
+            return false;
         }
     }
 
@@ -743,8 +857,21 @@ public class AnnouncementController extends HttpServlet {
 
     private void handleDeleteAnnouncement(String id, HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
+            // If caller identifies via X-User-UUID, they must have global canDelete
+            String callerUuid = request.getHeader("X-User-UUID");
+            if (callerUuid != null && !callerUuid.isEmpty()) {
+                UUID uuid = UUID.fromString(callerUuid);
+                Map<String, Boolean> perms = resolvePermissions(uuid);
+                if (!Boolean.TRUE.equals(perms.get("canDelete"))) {
+                    sendError(response, 403, "Only administrators can delete announcements");
+                    return;
+                }
+            }
+
             announcementService.deleteAnnouncement(id).get(15, TimeUnit.SECONDS);
             response.setStatus(204);
+        } catch (IllegalArgumentException e) {
+            sendError(response, 400, "Invalid UUID: " + e.getMessage());
         } catch (Exception e) {
             logger.error("Error deleting announcement: " + id, e);
             sendError(response, 500, "Failed to delete announcement: " + e.getMessage());
@@ -777,6 +904,23 @@ public class AnnouncementController extends HttpServlet {
             announcements.add(dto);
         }
         return announcements;
+    }
+
+    // ====== Filtering helpers ======
+
+    /**
+     * Filters out announcements that were deactivated due to payment depletion.
+     * These are hidden from the WebUI (distinct from admin-deactivated announcements).
+     */
+    private List<AnnouncementDTO> filterPaymentDepleted(List<AnnouncementDTO> announcements) {
+        return announcements.stream()
+            .filter(ann -> {
+                Map<String, Object> metadata = ann.getMetadata();
+                if (metadata == null) return true;
+                Object reason = metadata.get("deactivation_reason");
+                return reason == null || !"payment_depleted".equals(reason.toString());
+            })
+            .collect(Collectors.toList());
     }
 
     // ====== Response helpers ======
