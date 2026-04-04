@@ -57,7 +57,7 @@ public class ApiConfig {
         this.apiKey = config.getString("api.auth.key", "changeme");
         this.corsEnabled = config.getBoolean("api.cors.enabled", true);
         this.corsAllowedOrigins = config.getString("api.cors.allowed-origins", "*");
-        this.corsAllowedMethods = config.getString("api.cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS");
+        this.corsAllowedMethods = config.getString("api.cors.allowed-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
         this.maxThreads = config.getInt("api.server.max-threads", 50);
         this.idleTimeout = config.getInt("api.server.idle-timeout", 30000);
         this.httpsEnabled = config.getBoolean("api.https.enabled", false);
@@ -122,7 +122,7 @@ public class ApiConfig {
         this.apiKey = apiSection.getString("auth.key", "changeme");
         this.corsEnabled = apiSection.getBoolean("cors.enabled", true);
         this.corsAllowedOrigins = apiSection.getString("cors.allowed-origins", "*");
-        this.corsAllowedMethods = apiSection.getString("cors.allowed-methods", "GET,POST,PUT,DELETE,OPTIONS");
+        this.corsAllowedMethods = apiSection.getString("cors.allowed-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
         this.maxThreads = apiSection.getInt("server.max-threads", 50);
         this.idleTimeout = apiSection.getInt("server.idle-timeout", 30000);
         this.httpsEnabled = apiSection.getBoolean("https.enabled", false);
