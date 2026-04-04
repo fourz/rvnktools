@@ -90,4 +90,13 @@ public interface IBarterShopsApiService {
      * @param requesterUuid UUID of the player making the request (must be group owner)
      */
     CompletableFuture<ApiResponse<?>> removeGroupCoOwner(String groupId, String coOwnerUuid, String requesterUuid);
+
+    /**
+     * PATCH /api/bartershops/groups/{id} — rename a shop group.
+     *
+     * @param groupId       group to rename
+     * @param requesterUuid UUID of the player making the request (must be group owner)
+     * @param groupName     new name for the group
+     */
+    CompletableFuture<ApiResponse<?>> renameGroup(String groupId, String requesterUuid, String groupName);
 }

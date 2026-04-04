@@ -170,6 +170,60 @@ public class BarterShopsController extends HttpServlet {
     }
 
     @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp)
+            throws jakarta.servlet.ServletException, IOException {
+        if ("PATCH".equalsIgnoreCase(req.getMethod())) {
+            handlePatch(req, resp);
+        } else {
+            super.service(req, resp);
+        }
+    }
+
+    private void handlePatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        IBarterShopsApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            return;
+        }
+
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+
+        try {
+            if (GROUP_BY_ID_PATTERN.matcher(pathInfo).matches()) {
+                Matcher m = GROUP_BY_ID_PATTERN.matcher(pathInfo);
+                m.matches();
+                String groupId = m.group(1);
+
+                String body = req.getReader().lines().collect(Collectors.joining());
+                @SuppressWarnings("unchecked")
+                Map<String, String> bodyMap = gson.fromJson(body, Map.class);
+                if (bodyMap == null) {
+                    sendError(resp, 400, "INVALID_REQUEST", "Request body is required");
+                    return;
+                }
+                String requesterUuid = bodyMap.get("requesterUuid");
+                String groupName = bodyMap.get("groupName");
+                if (requesterUuid == null || groupName == null || groupName.isBlank()) {
+                    sendError(resp, 400, "INVALID_REQUEST", "requesterUuid and groupName are required");
+                    return;
+                }
+
+                ApiResponse<?> response = apiService.renameGroup(groupId, requesterUuid, groupName.trim())
+                        .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling BarterShops PATCH request: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+        }
+    }
+
+    @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
