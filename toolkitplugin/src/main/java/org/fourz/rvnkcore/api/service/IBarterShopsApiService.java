@@ -72,4 +72,22 @@ public interface IBarterShopsApiService {
      * GET /api/bartershops/groups/{id} — get group by ID with shops and co-owners.
      */
     CompletableFuture<ApiResponse<?>> getGroupById(String groupId);
+
+    /**
+     * POST /api/bartershops/groups/{id}/coowners — add a co-owner to a group.
+     *
+     * @param groupId       group to modify
+     * @param requesterUuid UUID of the player making the request (must be group owner)
+     * @param coOwnerUuid   UUID of the player to add as co-owner
+     */
+    CompletableFuture<ApiResponse<?>> addGroupCoOwner(String groupId, String requesterUuid, String coOwnerUuid);
+
+    /**
+     * DELETE /api/bartershops/groups/{id}/coowners/{coOwnerUuid} — remove a co-owner from a group.
+     *
+     * @param groupId       group to modify
+     * @param coOwnerUuid   UUID of the co-owner to remove
+     * @param requesterUuid UUID of the player making the request (must be group owner)
+     */
+    CompletableFuture<ApiResponse<?>> removeGroupCoOwner(String groupId, String coOwnerUuid, String requesterUuid);
 }

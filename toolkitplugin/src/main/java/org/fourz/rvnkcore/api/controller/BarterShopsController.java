@@ -13,10 +13,12 @@ import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * REST API controller for BarterShops endpoints.
@@ -31,10 +33,12 @@ public class BarterShopsController extends HttpServlet {
     private final Gson gson;
     private final LogManager logger;
 
-    private static final Pattern SHOP_BY_ID_PATTERN = Pattern.compile("^/shops/([^/]+)$");
-    private static final Pattern TRADE_BY_ID_PATTERN = Pattern.compile("^/trades/([^/]+)$");
-    private static final Pattern STATS_SHOPS_PATTERN = Pattern.compile("^/stats/shops/?(.*)$");
-    private static final Pattern GROUP_BY_ID_PATTERN = Pattern.compile("^/groups/(\\d+)$");
+    private static final Pattern SHOP_BY_ID_PATTERN       = Pattern.compile("^/shops/([^/]+)$");
+    private static final Pattern TRADE_BY_ID_PATTERN       = Pattern.compile("^/trades/([^/]+)$");
+    private static final Pattern STATS_SHOPS_PATTERN       = Pattern.compile("^/stats/shops/?(.*)$");
+    private static final Pattern GROUP_BY_ID_PATTERN       = Pattern.compile("^/groups/(\\d+)$");
+    private static final Pattern GROUP_COOWNERS_PATTERN    = Pattern.compile("^/groups/(\\d+)/coowners$");
+    private static final Pattern GROUP_COOWNER_UUID_PATTERN = Pattern.compile("^/groups/(\\d+)/coowners/([^/]+)$");
 
     public BarterShopsController(IBarterShopsApiService ignored, Gson gson, LogManager logger) {
         this.gson = gson;
@@ -116,6 +120,88 @@ public class BarterShopsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling BarterShops API request: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        IBarterShopsApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            return;
+        }
+
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+
+        try {
+            if (GROUP_COOWNERS_PATTERN.matcher(pathInfo).matches()) {
+                Matcher m = GROUP_COOWNERS_PATTERN.matcher(pathInfo);
+                m.matches();
+                String groupId = m.group(1);
+
+                String body = req.getReader().lines().collect(Collectors.joining());
+                @SuppressWarnings("unchecked")
+                Map<String, String> bodyMap = gson.fromJson(body, Map.class);
+                if (bodyMap == null) {
+                    sendError(resp, 400, "INVALID_REQUEST", "Request body is required");
+                    return;
+                }
+                String requesterUuid = bodyMap.get("requesterUuid");
+                String coOwnerUuid = bodyMap.get("coOwnerUuid");
+                if (requesterUuid == null || coOwnerUuid == null) {
+                    sendError(resp, 400, "INVALID_REQUEST", "requesterUuid and coOwnerUuid are required");
+                    return;
+                }
+
+                ApiResponse<?> response = apiService.addGroupCoOwner(groupId, requesterUuid, coOwnerUuid)
+                        .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling BarterShops POST request: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        IBarterShopsApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            return;
+        }
+
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+
+        try {
+            if (GROUP_COOWNER_UUID_PATTERN.matcher(pathInfo).matches()) {
+                Matcher m = GROUP_COOWNER_UUID_PATTERN.matcher(pathInfo);
+                m.matches();
+                String groupId = m.group(1);
+                String coOwnerUuid = m.group(2);
+                String requesterUuid = req.getParameter("requesterUuid");
+                if (requesterUuid == null || requesterUuid.isEmpty()) {
+                    sendError(resp, 400, "INVALID_REQUEST", "requesterUuid query parameter is required");
+                    return;
+                }
+
+                ApiResponse<?> response = apiService.removeGroupCoOwner(groupId, coOwnerUuid, requesterUuid)
+                        .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling BarterShops DELETE request: " + pathInfo, e);
             sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
         }
     }
