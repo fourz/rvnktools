@@ -3,6 +3,7 @@ package org.fourz.rvnktools.command.manager.commands.teleport;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import org.fourz.rvnktools.command.manager.RVNKCommand;
@@ -81,8 +82,9 @@ public class TeleportPlayerSubCommand extends BaseSubCommand {
             }
         }
 
-        // Execute teleport
-        playerToTeleport.teleport(targetPlayer.getLocation());
+        // Execute teleport — use COMMAND cause so WorldGuard treats this as an op-level action
+        // and our WorldAccessListener skips the region entry check (same as vanilla /tp).
+        playerToTeleport.teleport(targetPlayer.getLocation(), TeleportCause.COMMAND);
 
         // Feedback messages
         playerToTeleport.sendMessage("§a✓ Teleported to " + targetPlayer.getName());
