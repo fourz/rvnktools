@@ -119,9 +119,10 @@ logfilter:
 # Command Configuration
 # Customize command behavior
 commands:
-  override-vanilla-tp: false  # Override /tp with RVNKTools implementation (default: false)
-                              # When false: /tp uses vanilla Minecraft teleport
-                              # When true: /tp uses RVNKTools teleport (player/coords/worldswap)
+  override-vanilla-tp: true   # Override /tp with RVNKTools implementation
+                              # Must be true — plugin.yml declares /tp so vanilla is blocked regardless.
+                              # true: /tp routes to RVNKTools (player/coords/worldswap)
+                              # false: /tp is claimed by plugin but has no executor (broken)
 
 # Authentication
 # Web portal magic link configuration
