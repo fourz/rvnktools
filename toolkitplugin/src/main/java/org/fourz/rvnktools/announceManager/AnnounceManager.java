@@ -665,8 +665,14 @@ public class AnnounceManager {
             builder.intervalSeconds(ann.getRecurrence().intValue());
         }
 
-        if (ann.getDate() != null && ann.getTime() != null) {
-            builder.scheduledFor(Timestamp.valueOf(LocalDateTime.of(ann.getDate(), ann.getTime())));
+        if (ann.getDate() != null) {
+            String dateStr = ann.getOriginalDateString() != null
+                ? ann.getOriginalDateString()
+                : ann.getDate().toString();
+            builder.metadata("scheduleDate", dateStr);
+            if (ann.getTime() != null) {
+                builder.scheduledFor(Timestamp.valueOf(LocalDateTime.of(ann.getDate(), ann.getTime())));
+            }
         }
 
         if (ann.getExpiration() != null) {

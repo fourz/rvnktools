@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import org.fourz.rvnktools.command.manager.RVNKCommand;
@@ -74,7 +75,8 @@ public class TeleportCoordsSubCommand extends BaseSubCommand {
             targetLocation.setPitch(playerToTeleport.getLocation().getPitch());
             targetLocation.setYaw(playerToTeleport.getLocation().getYaw());
 
-            playerToTeleport.teleport(targetLocation);
+            // COMMAND cause: WorldGuard treats this as op-level, bypasses region entry checks.
+            playerToTeleport.teleport(targetLocation, TeleportCause.COMMAND);
 
             // Feedback messages
             String coordsText = String.format("%.1f, %.1f, %.1f", x, y, z);
