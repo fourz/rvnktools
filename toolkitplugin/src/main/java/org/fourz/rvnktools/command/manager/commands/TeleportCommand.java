@@ -9,6 +9,9 @@ import org.fourz.rvnktools.command.manager.commands.teleport.TeleportCoordsSubCo
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportHereSubCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportPlayerSubCommand;
 
+import org.bukkit.Bukkit;
+
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -53,8 +56,10 @@ public class TeleportCommand extends BaseCommand {
             return true;
         }
 
-        // Smart routing for /tp command when override is enabled
-        if (label.equalsIgnoreCase("tp") && overrideTp) {
+        // Smart routing for /tp — always active since /tp is registered in plugin.yml
+        // For /teleport, smart routing requires the override-vanilla-tp config flag
+        if (label.equalsIgnoreCase("tp") ||
+                (label.equalsIgnoreCase("teleport") && overrideTp)) {
             return handleTpSmartRouting(sender, args);
         }
 
@@ -155,6 +160,28 @@ public class TeleportCommand extends BaseCommand {
 
     @Override
     public List<String> tabComplete(CommandSender sender, String[] args) {
+        // When /tp or /teleport override is active, mimic vanilla tab-complete:
+        //   arg1 → online player names (or subcommand names for /teleport worldswap etc.)
+        //   arg2 → online player names (second player for from/to)
+        if (overrideTp && args.length >= 1) {
+            String partial = args[args.length - 1].toLowerCase();
+            if (args.length == 1 || args.length == 2) {
+                List<String> completions = new ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (p.getName().toLowerCase().startsWith(partial)) {
+                        completions.add(p.getName());
+                    }
+                }
+                // Also suggest subcommands (worldswap, here) at arg1
+                if (args.length == 1) {
+                    getMatchingSubCommands(sender, partial).stream()
+                        .filter(s -> !completions.contains(s))
+                        .forEach(completions::add);
+                }
+                return completions;
+            }
+        }
+
         if (args.length <= 1) {
             return getMatchingSubCommands(sender, args.length == 0 ? "" : args[0]);
         }

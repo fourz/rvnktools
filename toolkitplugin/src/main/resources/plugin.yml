@@ -187,13 +187,13 @@ permissions:
     default: op
   rvnktools.command.teleport:
     description: Allows access to teleportation utilities
-    default: op
+    default: true
   rvnktools.command.teleport.worldswap:
     description: Allows teleporting between worlds while preserving locations
     default: op
   rvnktools.command.tp:
     description: Basic teleport permission
-    default: op
+    default: true
   rvnktools.command.tp.others:
     description: Allows teleporting other players
     default: op
