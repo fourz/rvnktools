@@ -56,8 +56,10 @@ public class TeleportCommand extends BaseCommand {
             return true;
         }
 
-        // Smart routing for /tp and /teleport when override is enabled
-        if ((label.equalsIgnoreCase("tp") || label.equalsIgnoreCase("teleport")) && overrideTp) {
+        // Smart routing for /tp — always active since /tp is registered in plugin.yml
+        // For /teleport, smart routing requires the override-vanilla-tp config flag
+        if (label.equalsIgnoreCase("tp") ||
+                (label.equalsIgnoreCase("teleport") && overrideTp)) {
             return handleTpSmartRouting(sender, args);
         }
 
