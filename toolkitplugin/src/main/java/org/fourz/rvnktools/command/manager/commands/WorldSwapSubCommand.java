@@ -7,6 +7,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.command.manager.BaseCommand;
@@ -35,7 +36,7 @@ public class WorldSwapSubCommand extends BaseSubCommand {
         super(plugin, parent, "worldswap",
               "Teleport between worlds while preserving locations",
               "/rvnktools teleport worldswap [world]",
-              "rvnktools.command.teleport.worldswap", true);
+              ITeleportService.PERM_TP_WORLDSWAP, true);
 
         this.rvnkCore = plugin;
         // IWorldService lookup deferred to first use (RVNKWorlds registers after RVNKCore)

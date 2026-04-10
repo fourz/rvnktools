@@ -17,6 +17,12 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface ITeleportService {
 
+    /** Permission node to teleport other players (/tp &lt;p1&gt; &lt;p2&gt;, /tp here, /tp &lt;p&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;). */
+    String PERM_TP_OTHERS = "rvnktools.command.tp.others";
+
+    /** Permission node for world-swap teleportation (/teleport worldswap, /worldswap). */
+    String PERM_TP_WORLDSWAP = "rvnktools.command.tp.worldswap";
+
     /**
      * Teleport a player to another player's location.
      *

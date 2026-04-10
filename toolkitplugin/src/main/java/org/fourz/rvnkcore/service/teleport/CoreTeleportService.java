@@ -85,7 +85,7 @@ public class CoreTeleportService implements ITeleportService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Permission check
-                if (commander instanceof Player && !hasPermission(commander, "rvnktools.command.tp.others")) {
+                if (commander instanceof Player && !hasPermission(commander, ITeleportService.PERM_TP_OTHERS)) {
                     return false;
                 }
 

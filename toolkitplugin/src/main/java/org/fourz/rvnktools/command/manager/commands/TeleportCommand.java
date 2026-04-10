@@ -4,6 +4,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportCoordsSubCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportHereSubCommand;
@@ -33,7 +34,7 @@ public class TeleportCommand extends BaseCommand {
         super(plugin, "teleport",
               "Teleportation utilities and world management",
               "/teleport <subcommand> [args]",
-              "rvnktools.command.teleport");
+              "rvnktools.command.tp");
 
         this.overrideTp = plugin.getConfig().getBoolean("commands.override-vanilla-tp", false);
 

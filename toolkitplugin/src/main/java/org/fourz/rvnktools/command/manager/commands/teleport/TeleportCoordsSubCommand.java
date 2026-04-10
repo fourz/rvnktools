@@ -6,6 +6,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import org.fourz.rvnktools.command.manager.RVNKCommand;
 
@@ -49,7 +50,7 @@ public class TeleportCoordsSubCommand extends BaseSubCommand {
             }
 
             // Permission check for teleporting others
-            if (!isConsole && !sender.hasPermission("rvnktools.command.tp.others")) {
+            if (!isConsole && !sender.hasPermission(ITeleportService.PERM_TP_OTHERS)) {
                 sender.sendMessage("§c✖ You don't have permission to teleport other players");
                 return false;
             }

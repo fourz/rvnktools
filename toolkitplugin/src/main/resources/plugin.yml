@@ -156,61 +156,19 @@ permissions:
     description: Allows the player to use cycle railroad modes
   rvnktools.command.countdown:
     description: Allows the player to use the countdown command
-  rvnktools.command.announce:
-    description: Allows the player to use the announce command
-  rvnktools.command.trains:
-    description: Allows access to train commands
-  rvnktools.command.trains.enable:
-    description: Allows player enabling TrainCarts mode
-  rvnktools.command.trains.disable:
-    description: Allows disabling TrainCarts mode
-  rvnktools.command.railroad:
-    description: Allows the player to toggle between minecart modes
-  rvnktools.announce.help:
-    description: Allows the player to access announcement help
-  rvnktools.command.puthat:
-    description: Allows the player to use the puthat command
-  rvnktools.links:
-    description: Allows access to links commands
-    default: op
-  rvnktools.links.reload:
-    description: Allows reloading links configuration
-    default: op
-  rvnktools.cycle:
-    description: Allows access to cycle commands
-    default: op
-  rvnktools.cycle.reload:
-    description: Allows reloading cycle commands configuration
-    default: op
-  rvnktools.command.worldswap:
-    description: Allows swapping between worlds while maintaining location history
-    default: op
-  rvnktools.command.teleport:
-    description: Allows access to teleportation utilities
-    default: true
-  rvnktools.command.teleport.worldswap:
-    description: Allows teleporting between worlds while preserving locations
-    default: op
+  # ── Teleport ────────────────────────────────────────────────────────────────
   rvnktools.command.tp:
-    description: Basic teleport permission
+    description: Allows use of /tp and /teleport commands (unified node)
     default: true
   rvnktools.command.tp.others:
-    description: Allows teleporting other players
+    description: Allows teleporting other players (/tp <p1> <p2>, /tp here, /tp <p> <x> <y> <z>)
     default: op
-  rvnktools.command.example:
-    description: Allows using the example command
-  rvnktools.command.logfilter:
-    description: Allows managing log filtering for server plugins
+  rvnktools.command.tp.worldswap:
+    description: Allows world-swap teleportation (/teleport worldswap, /worldswap)
     default: op
-  rvnktools.admin.pstest:
-    description: Allows using player service test command
+  rvnktools.command.worldswap:
+    description: Allows swapping between worlds while maintaining location history (/worldswap)
     default: op
-  rvnktools.admin.test:
-    description: Allows using automated test commands
-    default: op
-  rvnktools.link:
-    description: Allows linking account to external services
-    default: true
   rvnktools.command.tpa:
     description: Allows sending teleport requests
     default: true
@@ -232,11 +190,141 @@ permissions:
   rvnktools.tpa.bypass.warmup:
     description: Bypass TPA warmup timer
     default: op
-  rvnkcore.prefs:
-    description: Manage notification preferences
+
+  # ── Announce ─────────────────────────────────────────────────────────────
+  rvnktools.announce.*:
+    description: All announcement permissions
+    default: op
+    children:
+      rvnktools.command.announce: true
+      rvnktools.command.announce.add: true
+      rvnktools.command.announce.set: true
+      rvnktools.command.announce.delete: true
+      rvnktools.command.announce.now: true
+      rvnktools.command.announce.reload: true
+      rvnktools.command.announce.update: true
+      rvnktools.announce.type.*: true
+  rvnktools.command.announce:
+    description: Allows use of the /announce command
+    default: op
+  rvnktools.command.announce.add:
+    description: Allows adding announcements
+    default: op
+  rvnktools.command.announce.set:
+    description: Allows modifying announcement fields
+    default: op
+  rvnktools.command.announce.delete:
+    description: Allows deleting announcements
+    default: op
+  rvnktools.command.announce.now:
+    description: Allows triggering an announcement immediately
+    default: op
+  rvnktools.command.announce.reload:
+    description: Allows reloading the announcement system
+    default: op
+  rvnktools.command.announce.update:
+    description: Allows updating announcements
+    default: op
+  rvnktools.announce.type.*:
+    description: Allows viewing/toggling all announcement types
+    default: op
+  rvnktools.announce.help:
+    description: Allows access to announcement help
     default: true
+
+  # ── Admin ────────────────────────────────────────────────────────────────
+  rvnktools.admin.*:
+    description: All admin permissions
+    default: op
+    children:
+      rvnktools.admin.test: true
+      rvnktools.admin.pstest: true
+      rvnktools.admin.reload: true
+      rvnktools.admin.debug: true
+      rvnktools.admin.migration: true
+  rvnktools.admin.test:
+    description: Allows use of automated test commands
+    default: op
+  rvnktools.admin.pstest:
+    description: Allows use of player service test command
+    default: op
+  rvnktools.admin.reload:
+    description: Allows reloading RVNKCore configuration
+    default: op
+  rvnktools.admin.debug:
+    description: Allows use of debug subcommands
+    default: op
+  rvnktools.admin.migration:
+    description: Allows running data migration commands
+    default: op
+
+  # ── Trains / Railroad ────────────────────────────────────────────────────
+  rvnktools.command.trains:
+    description: Allows access to train commands
+  rvnktools.command.trains.enable:
+    description: Allows enabling TrainCarts mode
+  rvnktools.command.trains.disable:
+    description: Allows disabling TrainCarts mode
+  rvnktools.command.railroad:
+    description: Allows toggling between minecart modes
+  rvnktools.command.cycletrainmode:
+    description: Allows cycling railroad modes
+
+  # ── Misc commands ────────────────────────────────────────────────────────
+  rvnktools.command.broadcast:
+    description: Allows use of the broadcast command
+    default: op
+  rvnktools.command.puthat:
+    description: Allows use of the puthat command
+  rvnktools.command.cyclegamemode:
+    description: Allows use of the /gmc cycle gamemode command
+  rvnktools.command.countdown:
+    description: Allows use of the countdown command
+  rvnktools.command.logfilter:
+    description: Allows managing log filtering for server plugins
+    default: op
+  rvnktools.command.example:
+    description: Allows use of the example command
+  rvnktools.command.event:
+    description: Allows teleporting to event worlds
+    default: op
+  rvnktools.command.return:
+    description: Allows returning from event worlds
+    default: op
+
+  # ── Links / Cycle ────────────────────────────────────────────────────────
+  rvnktools.link:
+    description: Allows linking account to external services (/link)
+    default: true
+  rvnktools.links:
+    description: Allows access to /links command
+    default: op
+  rvnktools.links.reload:
+    description: Allows reloading links configuration
+    default: op
+  rvnktools.cycle:
+    description: Allows access to cycle commands
+    default: op
+  rvnktools.cycle.reload:
+    description: Allows reloading cycle configuration
+    default: op
+
+  # ── Welcome ──────────────────────────────────────────────────────────────
+  rvnktools.welcome:
+    description: Allows player to receive welcome messages
+  rvnktools.welcome.newplayer:
+    description: Sends welcome message to new players
+
+  # ── Preferences (rvnkcore.*) ─────────────────────────────────────────────
+  rvnkcore.prefs:
+    description: Manage own notification preferences
+    default: true
+  rvnkcore.prefs.admin:
+    description: Manage notification preferences for other players
+    default: op
   rvnkcore.prefs.*:
     description: All preference permissions
-    default: true
+    default: op
     children:
       rvnkcore.prefs: true
+      rvnkcore.prefs.admin: true

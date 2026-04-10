@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import org.fourz.rvnktools.command.manager.RVNKCommand;
 
@@ -19,7 +20,7 @@ public class TeleportHereSubCommand extends BaseSubCommand {
 
     public TeleportHereSubCommand(RVNKCore plugin, RVNKCommand parent) {
         super(plugin, parent, "here", "Teleport a player to your location", "/tp here <player>",
-              "rvnktools.command.tp.others", true);
+              ITeleportService.PERM_TP_OTHERS, true);
     }
 
     @Override
