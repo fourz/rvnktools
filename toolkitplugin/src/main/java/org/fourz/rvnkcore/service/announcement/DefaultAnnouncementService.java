@@ -236,6 +236,16 @@ public class DefaultAnnouncementService implements AnnouncementService {
     }
     
     @Override
+    public CompletableFuture<List<AnnouncementDTO>> getAnnouncementsPage(int limit, int offset) {
+        logger.debug("Retrieving announcements page (limit=" + limit + ", offset=" + offset + ")");
+        return repository.findPage(limit, offset)
+            .exceptionally(ex -> {
+                logger.error("Failed to retrieve announcements page", ex);
+                throw new org.fourz.rvnkcore.api.exception.ServiceException("Failed to retrieve announcements page", ex);
+            });
+    }
+
+    @Override
     public CompletableFuture<List<AnnouncementDTO>> getAllAnnouncements() {
         logger.debug("Retrieving all announcements");
         return repository.findAll()

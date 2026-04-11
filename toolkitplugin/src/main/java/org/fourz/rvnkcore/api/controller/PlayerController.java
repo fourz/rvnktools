@@ -446,8 +446,13 @@ public class PlayerController extends HttpServlet {
     private void handleGetPlayerAllWorldData(UUID playerId, HttpServletResponse resp) throws IOException {
         try {
             List<PlayerWorldDataDTO> worldData = playerWorldService.getAllPlayerWorldData(playerId).get(15, TimeUnit.SECONDS);
+            // All records share the same playerId — fetch the name once to avoid N+1 queries.
+            String playerName = playerService.getPlayer(playerId)
+                    .get(5, TimeUnit.SECONDS)
+                    .map(PlayerDTO::getCurrentName)
+                    .orElse(null);
             List<PlayerWorldDataResponse> responses = worldData.stream()
-                    .map(this::convertWorldDataToResponse)
+                    .map(wd -> convertWorldDataToResponse(wd, playerName))
                     .collect(Collectors.toList());
             sendResponse(resp, 200, responses);
         } catch (Exception ex) {
@@ -460,7 +465,7 @@ public class PlayerController extends HttpServlet {
         try {
             Optional<PlayerWorldDataDTO> worldData = playerWorldService.getPlayerWorldData(playerId, worldName).get(15, TimeUnit.SECONDS);
             if (worldData.isPresent()) {
-                PlayerWorldDataResponse response = convertWorldDataToResponse(worldData.get());
+                PlayerWorldDataResponse response = convertWorldDataToResponse(worldData.get(), null);
                 sendResponse(resp, 200, response);
             } else {
                 sendError(resp, 404, "Player has not visited world: " + worldName);
@@ -576,16 +581,17 @@ public class PlayerController extends HttpServlet {
                 .build();
     }
 
-    private PlayerWorldDataResponse convertWorldDataToResponse(PlayerWorldDataDTO worldData) {
-        // Get player name from service if available
-        String playerName = null;
-        try {
-            Optional<PlayerDTO> player = playerService.getPlayer(worldData.getPlayerId()).get(5, TimeUnit.SECONDS);
-            if (player.isPresent()) {
-                playerName = player.get().getCurrentName();
+    /** Converts world data using a pre-fetched player name. Pass null to trigger a single DB lookup. */
+    private PlayerWorldDataResponse convertWorldDataToResponse(PlayerWorldDataDTO worldData, String playerName) {
+        if (playerName == null) {
+            try {
+                playerName = playerService.getPlayer(worldData.getPlayerId())
+                        .get(5, TimeUnit.SECONDS)
+                        .map(PlayerDTO::getCurrentName)
+                        .orElse(null);
+            } catch (Exception ex) {
+                logger.debug("Could not retrieve player name for world data response", ex);
             }
-        } catch (Exception ex) {
-            logger.debug("Could not retrieve player name for world data response", ex);
         }
 
         return PlayerWorldDataResponse.builder()

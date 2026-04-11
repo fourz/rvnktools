@@ -143,13 +143,23 @@ public class AuthTokenStore {
             return new ConsumeOutcome(ConsumeResult.ALREADY_USED, null);
         }
 
-        AuthToken authToken = tokens.remove(token);
+        // Check expiry before removing — ensures EXPIRED vs NOT_FOUND is reported correctly
+        // even when the cleanup task races with consume.
+        AuthToken authToken = tokens.get(token);
         if (authToken == null) {
             return new ConsumeOutcome(ConsumeResult.NOT_FOUND, null);
         }
         if (authToken.isExpired()) {
-            logger.debug("Token consumed but expired for " + authToken.playerName());
+            tokens.remove(token); // clean up expired token
+            logger.debug("Token expired for " + authToken.playerName());
             return new ConsumeOutcome(ConsumeResult.EXPIRED, null);
+        }
+
+        // Atomically remove — if another thread consumed between get() and remove(),
+        // remove() returns null and we report ALREADY_USED instead of silently dropping.
+        AuthToken removed = tokens.remove(token);
+        if (removed == null) {
+            return new ConsumeOutcome(ConsumeResult.ALREADY_USED, null);
         }
 
         // Track as consumed (kept until next cleanup cycle)

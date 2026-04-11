@@ -415,13 +415,26 @@ public class AnnouncementController extends HttpServlet {
 
     private void handleGetAllAnnouncements(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            List<AnnouncementDTO> announcements = announcementService.getAllAnnouncements().get(15, TimeUnit.SECONDS);
+            int limit = parseIntParam(request.getParameter("limit"), 500);
+            int offset = parseIntParam(request.getParameter("offset"), 0);
+            List<AnnouncementDTO> announcements = announcementService
+                    .getAnnouncementsPage(limit, offset)
+                    .get(15, TimeUnit.SECONDS);
             // Filter out payment-depleted announcements from REST response
             announcements = filterPaymentDepleted(announcements);
             ApiUtils.sendSuccess(response, gson, announcements);
         } catch (Exception e) {
             logger.error("Error retrieving all announcements", e);
             sendError(response, 500, "Internal server error: " + e.getMessage());
+        }
+    }
+
+    private static int parseIntParam(String value, int defaultValue) {
+        if (value == null) return defaultValue;
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
         }
     }
 

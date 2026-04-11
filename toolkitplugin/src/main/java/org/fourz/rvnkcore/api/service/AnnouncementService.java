@@ -76,6 +76,16 @@ public interface AnnouncementService {
     CompletableFuture<List<AnnouncementDTO>> getAllAnnouncements();
     
     /**
+     * Retrieves a page of announcements.
+     *
+     * @param limit  maximum number of results (1–1000)
+     * @param offset number of records to skip
+     * @return CompletableFuture containing the requested page of announcements
+     * @since 1.4.11
+     */
+    CompletableFuture<List<AnnouncementDTO>> getAnnouncementsPage(int limit, int offset);
+
+    /**
      * Retrieves all active announcements that are currently valid for display.
      * 
      * This includes announcements that are:

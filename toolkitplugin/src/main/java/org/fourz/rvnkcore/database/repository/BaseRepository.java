@@ -131,6 +131,38 @@ public abstract class BaseRepository<T, ID> {
     }
     
     /**
+     * Finds a page of entities using LIMIT/OFFSET.
+     *
+     * @param limit  maximum number of entities to return (clamped to 1–1000)
+     * @param offset number of entities to skip
+     * @return CompletableFuture containing the page of entities
+     */
+    public CompletableFuture<List<T>> findPage(int limit, int offset) {
+        int safeLimit = Math.max(1, Math.min(limit, 1000));
+        int safeOffset = Math.max(0, offset);
+        return CompletableFuture.supplyAsync(() -> {
+            QueryBuilder builder = createQueryBuilder();
+            String query = builder.select("*")
+                .from(tableName)
+                .build() + " LIMIT " + safeLimit + " OFFSET " + safeOffset;
+
+            try (Connection conn = connectionProvider.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(query);
+                 ResultSet rs = stmt.executeQuery()) {
+
+                List<T> results = new ArrayList<>();
+                while (rs.next()) {
+                    results.add(mapResultSet(rs));
+                }
+                return results;
+            } catch (SQLException e) {
+                logger.error("Failed to find page (limit=" + safeLimit + ", offset=" + safeOffset + ") from " + tableName, e);
+                throw new DatabaseException("Page query failed", e);
+            }
+        });
+    }
+
+    /**
      * Saves an entity to the database.
      * 
      * @param entity The entity to save

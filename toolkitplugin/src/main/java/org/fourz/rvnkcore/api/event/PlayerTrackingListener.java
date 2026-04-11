@@ -81,7 +81,7 @@ public class PlayerTrackingListener implements Listener {
                             .currentName(player.getName())
                             .firstJoin(new Timestamp(System.currentTimeMillis()))
                             .lastSeen(new Timestamp(System.currentTimeMillis()))
-                            .currentWorld(player.getWorld().getName())
+                            .currentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown")
                             .timesJoined(1)
                             .totalPlaytimeSeconds(0L)
                             .build();
@@ -94,7 +94,7 @@ public class PlayerTrackingListener implements Listener {
                         // Update existing player's data
                         PlayerDTO playerDTO = playerOpt.get();
                         playerDTO.updateName(player.getName());
-                        playerDTO.setCurrentWorld(player.getWorld().getName());
+                        playerDTO.setCurrentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown");
                         playerDTO.recordJoin();
                         
                         return playerService.savePlayer(playerDTO).thenApply((saved) -> (Void) null);
@@ -102,22 +102,23 @@ public class PlayerTrackingListener implements Listener {
                 });
                 
             // Track per-world data separately
-            CompletableFuture<Void> worldUpdate = playerWorldService.updatePlayerLocation(
-                player.getUniqueId(),
-                player.getWorld().getName(),
-                player.getLocation().getX(),
-                player.getLocation().getY(),
-                player.getLocation().getZ(),
-                player.getLocation().getYaw(),
-                player.getLocation().getPitch(),
-                player.getLocation().getBlock().getBiome().name()
-            );
-            
+            org.bukkit.World joinWorld = player.getWorld();
+            CompletableFuture<Void> worldUpdate = joinWorld != null
+                ? playerWorldService.updatePlayerLocation(
+                    player.getUniqueId(),
+                    joinWorld.getName(),
+                    player.getLocation().getX(),
+                    player.getLocation().getY(),
+                    player.getLocation().getZ(),
+                    player.getLocation().getYaw(),
+                    player.getLocation().getPitch(),
+                    player.getLocation().getBlock().getBiome().name())
+                : CompletableFuture.completedFuture(null);
+
             // Update world player count (including max_players_seen tracking)
-            CompletableFuture<Void> worldPlayerCountUpdate = worldService.updatePlayerCount(
-                player.getWorld().getName(),
-                player.getWorld().getPlayers().size()
-            );
+            CompletableFuture<Void> worldPlayerCountUpdate = joinWorld != null
+                ? worldService.updatePlayerCount(joinWorld.getName(), joinWorld.getPlayers().size())
+                : CompletableFuture.completedFuture(null);
             
             // Wait for all updates to complete
             CompletableFuture.allOf(globalUpdate, worldUpdate, worldPlayerCountUpdate)
@@ -161,7 +162,7 @@ public class PlayerTrackingListener implements Listener {
                 .thenCompose(playerOpt -> {
                     if (playerOpt.isPresent()) {
                         PlayerDTO playerDTO = playerOpt.get();
-                        playerDTO.setCurrentWorld(player.getWorld().getName());
+                        playerDTO.setCurrentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown");
                         playerDTO.setLastSeen(new Timestamp(System.currentTimeMillis()));
                         playerDTO.setTotalPlaytimeSeconds(
                                 playerDTO.getTotalPlaytimeSeconds() + finalSessionSeconds);
