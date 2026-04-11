@@ -83,7 +83,7 @@ public class PlayerTrackingListener implements Listener {
                             .lastSeen(new Timestamp(System.currentTimeMillis()))
                             .currentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown")
                             .timesJoined(1)
-                            .totalPlaytimeSeconds(0L)
+                            .totalPlaytimeHours(0f)
                             .build();
                         
                         return playerService.savePlayer(newPlayer).thenApply((dto) -> {
@@ -145,13 +145,13 @@ public class PlayerTrackingListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         
-        // Calculate session playtime
+        // Calculate session playtime in fractional hours
         Long joinTime = sessionStartTimes.remove(player.getUniqueId());
-        long sessionSeconds = 0;
+        float sessionHours = 0f;
         if (joinTime != null) {
-            sessionSeconds = (System.currentTimeMillis() - joinTime) / 1000;
+            sessionHours = (System.currentTimeMillis() - joinTime) / 3_600_000f;
         }
-        final long finalSessionSeconds = sessionSeconds;
+        final float finalSessionHours = sessionHours;
 
         try {
             PlayerService playerService = rvnkCore.getService(PlayerService.class);
@@ -164,8 +164,7 @@ public class PlayerTrackingListener implements Listener {
                         PlayerDTO playerDTO = playerOpt.get();
                         playerDTO.setCurrentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown");
                         playerDTO.setLastSeen(new Timestamp(System.currentTimeMillis()));
-                        playerDTO.setTotalPlaytimeSeconds(
-                                playerDTO.getTotalPlaytimeSeconds() + finalSessionSeconds);
+                        playerDTO.addTotalPlaytime(finalSessionHours);
                         return playerService.savePlayer(playerDTO).thenApply(saved -> (Void) null);
                     }
                     return CompletableFuture.completedFuture(null);
@@ -185,7 +184,7 @@ public class PlayerTrackingListener implements Listener {
                         logger.error("Failed to update player data on quit: " + player.getName(), throwable);
                     } else {
                         logger.debug("Updated player data on quit: " + player.getName() +
-                                   " (session: " + finalSessionSeconds + "s)");
+                                   String.format(" (session: %.4fh)", finalSessionHours));
                         notifyWebhook();
                     }
                 });

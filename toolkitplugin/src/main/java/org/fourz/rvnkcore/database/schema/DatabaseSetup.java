@@ -208,7 +208,7 @@ public class DatabaseSetup {
                 "last_seen TIMESTAMP NOT NULL, " +
                 "current_world VARCHAR(255), " +
                 "times_joined INT DEFAULT 1, " +
-                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
                 "primary_group VARCHAR(255) DEFAULT 'default', " +
                 "groups TEXT, " +
                 "banned BOOLEAN DEFAULT FALSE, " +
@@ -359,7 +359,7 @@ public class DatabaseSetup {
                 "last_seen TIMESTAMP NOT NULL, " +
                 "current_world TEXT, " +
                 "times_joined INTEGER DEFAULT 1, " +
-                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "total_playtime_hours REAL DEFAULT 0.0, " +
                 "primary_group TEXT DEFAULT 'default', " +
                 "groups TEXT DEFAULT '', " +
                 "banned BOOLEAN DEFAULT FALSE, " +
@@ -691,6 +691,31 @@ public class DatabaseSetup {
 
             // Best-effort backfill: resolve owner names from metadata to UUIDs via rvnk_players
             backfillOwnerUuids(connection, announcementsTable);
+        }
+
+        // Migration 6: Rename total_playtime_seconds -> total_playtime_hours (FLOAT) on players table
+        String playersTable = table(TABLE_PLAYERS);
+        if (!columnExists(connection, playersTable, "total_playtime_hours")) {
+            logger.info("Migrating players.total_playtime_seconds -> total_playtime_hours (float hours)");
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + playersTable + " ADD COLUMN total_playtime_hours FLOAT DEFAULT 0.0");
+                } else {
+                    stmt.execute("ALTER TABLE " + playersTable + " ADD COLUMN total_playtime_hours REAL DEFAULT 0.0");
+                }
+                logger.info("Added total_playtime_hours column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add total_playtime_hours column: " + e.getMessage());
+            }
+            // Backfill from seconds column if it exists
+            if (columnExists(connection, playersTable, "total_playtime_seconds")) {
+                try (var stmt = connection.createStatement()) {
+                    stmt.execute("UPDATE " + playersTable + " SET total_playtime_hours = total_playtime_seconds / 3600.0");
+                    logger.info("Backfilled total_playtime_hours from total_playtime_seconds");
+                } catch (SQLException e) {
+                    logger.warning("Failed to backfill total_playtime_hours: " + e.getMessage());
+                }
+            }
         }
 
         logger.debug("Database migrations completed");

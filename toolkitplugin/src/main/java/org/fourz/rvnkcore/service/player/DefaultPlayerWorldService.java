@@ -92,7 +92,7 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
                         .lastSeen(now)
                         .currentWorld(currentWorld)
                         .timesJoined(1)
-                        .totalPlaytimeSeconds(0L)
+                        .totalPlaytimeHours(0f)
                         .build();
                 }
                 
@@ -104,7 +104,7 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
     }
     
     @Override
-    public CompletableFuture<Void> recordPlayerQuit(UUID playerId, long sessionDurationSeconds) {
+    public CompletableFuture<Void> recordPlayerQuit(UUID playerId, float sessionDurationHours) {
         SessionData session = activeSessions.remove(playerId);
         
         return getPlayer(playerId)
@@ -115,7 +115,7 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
                 }
                 
                 PlayerDTO player = playerOpt.get();
-                player.addTotalPlaytime(sessionDurationSeconds);
+                player.addTotalPlaytime(sessionDurationHours);
                 player.setLastSeen(Timestamp.valueOf(LocalDateTime.now()));
                 
                 CompletableFuture<PlayerDTO> savePlayerFuture = savePlayer(player);
@@ -123,7 +123,7 @@ public class DefaultPlayerWorldService implements PlayerWorldService {
                 // Also update world-specific playtime if we have session data
                 if (session != null) {
                     CompletableFuture<Void> addWorldPlaytimeFuture = 
-                        addWorldPlaytime(playerId, session.worldName, sessionDurationSeconds);
+                        addWorldPlaytime(playerId, session.worldName, (long)(sessionDurationHours * 3600));
                     
                     return CompletableFuture.allOf(
                         savePlayerFuture.thenApply(saved -> null),

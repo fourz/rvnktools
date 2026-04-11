@@ -191,7 +191,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             .lastSeen(rs.getTimestamp("last_seen"))
             .currentWorld(rs.getString("current_world"))
             .timesJoined(rs.getInt("times_joined"))
-            .totalPlaytimeSeconds(rs.getLong("total_playtime_seconds"))
+            .totalPlaytimeHours(rs.getFloat("total_playtime_hours"))
             .primaryGroup(rs.getString("primary_group"))
             .banned(rs.getBoolean("banned"));
         
@@ -232,8 +232,8 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         // Create a new QueryBuilder instance for thread safety
         QueryBuilder builder = createQueryBuilder();
         return builder.insert(tableName)
-            .columns("id", "current_name", "name_history", "first_join", "last_seen", 
-                    "current_world", "times_joined", "total_playtime_seconds", "primary_group", "groups", "banned")
+            .columns("id", "current_name", "name_history", "first_join", "last_seen",
+                    "current_world", "times_joined", "total_playtime_hours", "primary_group", "groups", "banned")
             .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
@@ -248,7 +248,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                .set("last_seen", "?")
                .set("current_world", "?")
                .set("times_joined", "?")
-               .set("total_playtime_seconds", "?")
+               .set("total_playtime_hours", "?")
                .set("primary_group", "?")
                .set("groups", "?")
                .set("banned", "?")
@@ -265,7 +265,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setTimestamp(5, entity.getLastSeen());
         stmt.setString(6, entity.getCurrentWorld());
         stmt.setInt(7, entity.getTimesJoined());
-        stmt.setLong(8, entity.getTotalPlaytimeSeconds());
+        stmt.setFloat(8, entity.getTotalPlaytimeHours());
         stmt.setString(9, entity.getPrimaryGroup());
         stmt.setString(10, String.join(",", entity.getGroups()));
         stmt.setBoolean(11, entity.isBanned());
@@ -278,7 +278,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setTimestamp(3, entity.getLastSeen());
         stmt.setString(4, entity.getCurrentWorld());
         stmt.setInt(5, entity.getTimesJoined());
-        stmt.setLong(6, entity.getTotalPlaytimeSeconds());
+        stmt.setFloat(6, entity.getTotalPlaytimeHours());
         stmt.setString(7, entity.getPrimaryGroup());
         stmt.setString(8, String.join(",", entity.getGroups()));
         stmt.setBoolean(9, entity.isBanned());

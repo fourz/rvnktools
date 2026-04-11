@@ -61,10 +61,10 @@ public interface PlayerWorldService {
      * Records a player quit event and updates playtime.
      * 
      * @param playerId The player's UUID
-     * @param sessionDurationSeconds Duration of the session in seconds
+     * @param sessionDurationHours Duration of the session in fractional hours
      * @return CompletableFuture indicating completion
      */
-    CompletableFuture<Void> recordPlayerQuit(UUID playerId, long sessionDurationSeconds);
+    CompletableFuture<Void> recordPlayerQuit(UUID playerId, float sessionDurationHours);
     
     // World-Specific Player Management
     

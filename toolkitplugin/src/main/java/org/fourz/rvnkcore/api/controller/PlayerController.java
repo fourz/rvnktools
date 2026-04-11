@@ -565,7 +565,7 @@ public class PlayerController extends HttpServlet {
                 .lastSeen(lastSeen)
                 .timesJoined(player.getTimesJoined())
                 .currentWorld(player.getCurrentWorld())
-                .totalPlaytimeMinutes(player.getTotalPlaytimeSeconds() / 60)
+                .totalPlaytimeHours(player.getTotalPlaytimeHours())
                 .groups(player.getGroups())
                 .build();
     }
@@ -577,7 +577,7 @@ public class PlayerController extends HttpServlet {
                 .online(true)
                 .currentWorld(player.getWorld().getName())
                 .timesJoined(1) // Online players have at least joined once
-                .totalPlaytimeMinutes(0L) // Real-time calculation would require session tracking
+                .totalPlaytimeHours(0f) // Real-time calculation would require session tracking
                 .build();
     }
 
