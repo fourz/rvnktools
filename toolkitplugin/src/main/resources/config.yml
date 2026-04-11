@@ -124,11 +124,18 @@ commands:
                               # true: /tp routes to RVNKTools (player/coords/worldswap)
                               # false: /tp is claimed by plugin but has no executor (broken)
 
+# WebUI Configuration
+# Hostname and port of the local web portal dev server
+# Used to build the /link login callback URL when auth.callback-url is blank
+webui:
+  host: localhost         # WebUI hostname (e.g. icarus for local dev)
+  port: 3000              # WebUI dev server port
+
 # Authentication
 # Web portal magic link configuration
 auth:
   callback-url: ""       # Web portal callback URL for /link login (e.g. https://dev.fourz.org/auth/callback)
-                          # If empty, defaults to http://localhost:3000/auth/callback (local dev)
+                          # If empty, derived from: http://{webui.host}:{webui.port}/auth/callback
 
 # Feature Configuration
 # Enable or disable specific RVNKTools features

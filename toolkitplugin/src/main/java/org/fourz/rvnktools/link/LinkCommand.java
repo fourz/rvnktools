@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
  */
 public class LinkCommand extends BaseCommand {
 
-    private static final String DEFAULT_CALLBACK_URL = "http://localhost:3000/auth/callback";
     private static final List<String> SUBCOMMANDS = List.of("login", "matrix", "discord");
 
     private final AuthTokenStore authTokenStore;
@@ -41,9 +40,15 @@ public class LinkCommand extends BaseCommand {
                 "/link <login|matrix|discord>",
                 "rvnktools.link");
         this.authTokenStore = authTokenStore;
-        // config.yml: auth.callback-url (defaults to localhost for dev)
+        // config.yml: auth.callback-url takes precedence; if blank, derive from webui.host + webui.port
         String configured = plugin.getConfig().getString("auth.callback-url", "");
-        this.callbackUrl = (configured == null || configured.isBlank()) ? DEFAULT_CALLBACK_URL : configured;
+        if (configured == null || configured.isBlank()) {
+            String webHost = plugin.getConfig().getString("webui.host", "localhost");
+            int webPort    = plugin.getConfig().getInt("webui.port", 3000);
+            this.callbackUrl = "http://" + webHost + ":" + webPort + "/auth/callback";
+        } else {
+            this.callbackUrl = configured;
+        }
         logger.info("Link command initialized — callback URL: " + this.callbackUrl);
     }
 
