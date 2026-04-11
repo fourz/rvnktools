@@ -3,6 +3,10 @@ package org.fourz.rvnkcore.api.config;
 import org.bukkit.configuration.ConfigurationSection;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
+
 /**
  * Configuration for outbound webhook notifications.
  * Webhooks fire on player events to trigger cache revalidation in external systems.
@@ -67,6 +71,18 @@ public class WebhookConfig {
         } else if (url.startsWith("http://") && !url.startsWith("https://")) {
             logger.warning("Webhook using insecure http:// — ensure this is a trusted network");
         }
+        if (valid) {
+            try {
+                String host = URI.create(url).getHost();
+                if (isInternalHost(host)) {
+                    logger.error("Webhook URL resolves to a private/loopback address — SSRF risk blocked: " + host);
+                    valid = false;
+                }
+            } catch (Exception e) {
+                logger.error("Webhook URL is malformed: " + e.getMessage());
+                valid = false;
+            }
+        }
         if (secret == null || secret.trim().isEmpty()) {
             logger.error("Webhook enabled but secret is empty");
             valid = false;
@@ -76,6 +92,21 @@ public class WebhookConfig {
             valid = false;
         }
         return valid;
+    }
+
+    private static boolean isInternalHost(String host) {
+        if (host == null) return true;
+        String lower = host.toLowerCase();
+        if (lower.equals("localhost")) return true;
+        try {
+            InetAddress addr = InetAddress.getByName(host);
+            return addr.isLoopbackAddress()
+                || addr.isSiteLocalAddress()
+                || addr.isLinkLocalAddress()
+                || addr.isAnyLocalAddress();
+        } catch (UnknownHostException e) {
+            return false; // DNS failure — allow, let the HTTP client fail at send time
+        }
     }
 
     public boolean isEnabled() { return enabled; }
