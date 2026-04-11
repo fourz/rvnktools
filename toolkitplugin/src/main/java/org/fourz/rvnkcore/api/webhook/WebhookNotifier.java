@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.api.webhook;
 
+import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -9,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -24,6 +26,7 @@ public class WebhookNotifier {
 
     private static final long SHOP_DEBOUNCE_MS = 30_000L;
     private static final long TRADE_DEBOUNCE_MS = 30_000L;
+    private static final Gson GSON = new Gson();
 
     private final HttpClient httpClient;
     private final WebhookConfig config;
@@ -68,27 +71,13 @@ public class WebhookNotifier {
             return;
         }
 
-        String payload = "{\"event\":\"player_change\",\"server\":\""
-            + escapeJson(config.getServerId())
-            + "\",\"timestamp\":\""
-            + Instant.now().toString()
-            + "\"}";
+        String payload = GSON.toJson(Map.of(
+            "event", "player_change",
+            "server", config.getServerId(),
+            "timestamp", Instant.now().toString()
+        ));
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(config.getUrl()))
-            .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
-            .POST(HttpRequest.BodyPublishers.ofString(payload))
-            .timeout(Duration.ofMillis(config.getTimeoutMs()))
-            .build();
-
-        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response ->
-                logger.warning("Webhook " + config.getServerId() + " -> " + response.statusCode()))
-            .exceptionally(e -> {
-                logger.warning("Webhook failed: " + e.getMessage());
-                return null;
-            });
+        sendAsync(payload, "Webhook " + config.getServerId());
     }
 
     /**
@@ -99,29 +88,14 @@ public class WebhookNotifier {
      * @param announcementId The ID of the changed announcement (included in payload for targeted cache invalidation)
      */
     public void notifyAnnouncementChange(String announcementId) {
-        String payload = "{\"event\":\"announcement_change\",\"server\":\""
-            + escapeJson(config.getServerId())
-            + "\",\"announcementId\":\""
-            + escapeJson(announcementId != null ? announcementId : "")
-            + "\",\"timestamp\":\""
-            + Instant.now().toString()
-            + "\"}";
+        String payload = GSON.toJson(Map.of(
+            "event", "announcement_change",
+            "server", config.getServerId(),
+            "announcementId", announcementId != null ? announcementId : "",
+            "timestamp", Instant.now().toString()
+        ));
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(config.getUrl()))
-            .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
-            .POST(HttpRequest.BodyPublishers.ofString(payload))
-            .timeout(Duration.ofMillis(config.getTimeoutMs()))
-            .build();
-
-        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response ->
-                logger.warning("Webhook announcement " + config.getServerId() + " -> " + response.statusCode()))
-            .exceptionally(e -> {
-                logger.warning("Webhook announcement failed: " + e.getMessage());
-                return null;
-            });
+        sendAsync(payload, "Webhook announcement " + config.getServerId());
     }
 
     /**
@@ -150,29 +124,14 @@ public class WebhookNotifier {
             return;
         }
 
-        String payload = "{\"event\":\"shop_change\",\"server\":\""
-            + escapeJson(config.getServerId())
-            + "\",\"shopId\":\""
-            + escapeJson(shopId != null ? shopId : "")
-            + "\",\"timestamp\":\""
-            + Instant.now().toString()
-            + "\"}";
+        String payload = GSON.toJson(Map.of(
+            "event", "shop_change",
+            "server", config.getServerId(),
+            "shopId", shopId != null ? shopId : "",
+            "timestamp", Instant.now().toString()
+        ));
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(config.getUrl()))
-            .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
-            .POST(HttpRequest.BodyPublishers.ofString(payload))
-            .timeout(Duration.ofMillis(config.getTimeoutMs()))
-            .build();
-
-        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response ->
-                logger.warning("Webhook shop " + config.getServerId() + " -> " + response.statusCode()))
-            .exceptionally(e -> {
-                logger.warning("Webhook shop failed: " + e.getMessage());
-                return null;
-            });
+        sendAsync(payload, "Webhook shop " + config.getServerId());
     }
 
     /**
@@ -202,29 +161,14 @@ public class WebhookNotifier {
             return;
         }
 
-        String payload = "{\"event\":\"trade_complete\",\"server\":\""
-            + escapeJson(config.getServerId())
-            + "\",\"shopId\":\""
-            + escapeJson(shopId != null ? shopId : "")
-            + "\",\"timestamp\":\""
-            + Instant.now().toString()
-            + "\"}";
+        String payload = GSON.toJson(Map.of(
+            "event", "trade_complete",
+            "server", config.getServerId(),
+            "shopId", shopId != null ? shopId : "",
+            "timestamp", Instant.now().toString()
+        ));
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(config.getUrl()))
-            .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
-            .POST(HttpRequest.BodyPublishers.ofString(payload))
-            .timeout(Duration.ofMillis(config.getTimeoutMs()))
-            .build();
-
-        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response ->
-                logger.warning("Webhook trade " + config.getServerId() + " -> " + response.statusCode()))
-            .exceptionally(e -> {
-                logger.warning("Webhook trade failed: " + e.getMessage());
-                return null;
-            });
+        sendAsync(payload, "Webhook trade " + config.getServerId());
     }
 
     /**
@@ -236,16 +180,18 @@ public class WebhookNotifier {
      * @param playerName The banned player's name
      */
     public void notifyPlayerBanned(String uuid, String playerName) {
-        String payload = "{\"event\":\"player_banned\",\"server\":\""
-            + escapeJson(config.getServerId())
-            + "\",\"uuid\":\""
-            + escapeJson(uuid)
-            + "\",\"playerName\":\""
-            + escapeJson(playerName)
-            + "\",\"timestamp\":\""
-            + Instant.now().toString()
-            + "\"}";
+        String payload = GSON.toJson(Map.of(
+            "event", "player_banned",
+            "server", config.getServerId(),
+            "uuid", uuid != null ? uuid : "",
+            "playerName", playerName != null ? playerName : "",
+            "timestamp", Instant.now().toString()
+        ));
 
+        sendAsync(payload, "Webhook ban " + config.getServerId());
+    }
+
+    private void sendAsync(String payload, String logTag) {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(config.getUrl()))
             .header("Content-Type", "application/json")
@@ -255,16 +201,10 @@ public class WebhookNotifier {
             .build();
 
         httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response ->
-                logger.warning("Webhook ban " + config.getServerId() + " -> " + response.statusCode()))
+            .thenAccept(response -> logger.warning(logTag + " -> " + response.statusCode()))
             .exceptionally(e -> {
-                logger.warning("Webhook ban failed: " + e.getMessage());
+                logger.warning(logTag + " failed: " + e.getMessage());
                 return null;
             });
-    }
-
-    private static String escapeJson(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
