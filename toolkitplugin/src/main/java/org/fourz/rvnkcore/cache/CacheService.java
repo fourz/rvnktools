@@ -1,8 +1,9 @@
 package org.fourz.rvnkcore.cache;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +20,9 @@ import java.util.function.Supplier;
  */
 public class CacheService<K, V> {
 
-    private final ConcurrentHashMap<K, CacheEntry<V>> cache;
+    // Access-order LinkedHashMap makes evictOldest() O(1): eldest entry is always at head.
+    // Wrapped in synchronizedMap for thread safety; iteration must synchronize on cache.
+    private final Map<K, CacheEntry<V>> cache;
     private final long defaultTtlMillis;
     private final int maxSize;
     private final ScheduledExecutorService cleanupExecutor;
@@ -43,7 +46,16 @@ public class CacheService<K, V> {
      * @param maxSize Maximum number of entries
      */
     public CacheService(long defaultTtlMillis, int maxSize) {
-        this.cache = new ConcurrentHashMap<>();
+        this.cache = Collections.synchronizedMap(new LinkedHashMap<>(maxSize, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, CacheEntry<V>> eldest) {
+                if (size() > maxSize) {
+                    evictions++;
+                    return true;
+                }
+                return false;
+            }
+        });
         this.defaultTtlMillis = defaultTtlMillis;
         this.maxSize = maxSize;
         this.hits = 0;
@@ -158,11 +170,7 @@ public class CacheService<K, V> {
      * @param ttlMillis Time-to-live in milliseconds
      */
     public void put(K key, V value, long ttlMillis) {
-        // Enforce max size with simple eviction
-        if (cache.size() >= maxSize) {
-            evictOldest();
-        }
-
+        // LinkedHashMap with removeEldestEntry handles size enforcement automatically.
         cache.put(key, new CacheEntry<>(value, ttlMillis));
     }
 
@@ -173,9 +181,6 @@ public class CacheService<K, V> {
      * @param value The value to cache
      */
     public void putPermanent(K key, V value) {
-        if (cache.size() >= maxSize) {
-            evictOldest();
-        }
         cache.put(key, new CacheEntry<>(value));
     }
 
@@ -233,10 +238,14 @@ public class CacheService<K, V> {
      */
     public int invalidateByPrefix(String prefix) {
         int count = 0;
-        for (K key : cache.keySet()) {
-            if (key.toString().startsWith(prefix)) {
-                cache.remove(key);
-                count++;
+        synchronized (cache) {
+            java.util.Iterator<K> it = cache.keySet().iterator();
+            while (it.hasNext()) {
+                K key = it.next();
+                if (key.toString().startsWith(prefix)) {
+                    it.remove();
+                    count++;
+                }
             }
         }
         return count;
@@ -277,31 +286,14 @@ public class CacheService<K, V> {
     }
 
     private void cleanupExpired() {
-        cache.entrySet().removeIf(entry -> {
-            if (entry.getValue().isExpired()) {
-                evictions++;
-                return true;
-            }
-            return false;
-        });
-    }
-
-    private void evictOldest() {
-        // Simple LRU-like eviction: remove oldest accessed entry
-        K oldestKey = null;
-        long oldestAccess = Long.MAX_VALUE;
-
-        for (Map.Entry<K, CacheEntry<V>> entry : cache.entrySet()) {
-            long accessTime = entry.getValue().getLastAccessedAt().toEpochMilli();
-            if (accessTime < oldestAccess) {
-                oldestAccess = accessTime;
-                oldestKey = entry.getKey();
-            }
-        }
-
-        if (oldestKey != null) {
-            cache.remove(oldestKey);
-            evictions++;
+        synchronized (cache) {
+            cache.entrySet().removeIf(entry -> {
+                if (entry.getValue().isExpired()) {
+                    evictions++;
+                    return true;
+                }
+                return false;
+            });
         }
     }
 
