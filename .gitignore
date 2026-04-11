@@ -3,9 +3,10 @@ rvnktools.jar
 .vscode/bak
 shared-backup/
 docs
+!toolkitplugin/docs/
+!toolkitplugin/docs/**
 toolkitplugin/target/rvnktools-1.3.0-alpha.jar
 toolkitplugin/target/original-rvnkcore-1.3.0-alpha.jar
-docs
 nul
 toolkitplugin/target/rvnkcore-1.3.0-alpha.jar
 .mcp.json
