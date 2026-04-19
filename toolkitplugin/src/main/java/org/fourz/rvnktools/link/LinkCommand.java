@@ -157,9 +157,18 @@ public class LinkCommand extends BaseCommand {
      * printed URL will be signed in as that target. Admin shares the URL
      * out-of-band (DM, email, screenshot).
      *
-     * Permission: {@code rvnktools.link.invite} (console always passes).
-     * TTL: {@code link.invite-ttl-minutes} (default 120), capped at
-     * {@code link.invite-ttl-max-minutes} (default 1440 = 24h).
+     * <p>Permissions:
+     * <ul>
+     *   <li>{@code rvnktools.link.invite} — required to use the command at all
+     *       (self-invite).</li>
+     *   <li>{@code rvnktools.link.invite.other} — additionally required when the
+     *       target is a different player than the issuer.</li>
+     * </ul>
+     * Console bypasses both (no associated user identity).
+     * </p>
+     *
+     * <p>TTL: {@code link.invite-ttl-minutes} (default 120), capped at
+     * {@code link.invite-ttl-max-minutes} (default 1440 = 24h).</p>
      */
     @SuppressWarnings("deprecation")
     private void handleInvite(CommandSender sender, String[] args) {
@@ -222,6 +231,16 @@ public class LinkCommand extends BaseCommand {
             }
             uuid = offline.getUniqueId();
             resolvedName = offline.getName() != null ? offline.getName() : targetName;
+        }
+
+        // Second-gate: targeting another player requires the .other permission.
+        // Console always bypasses (no associated user identity to compare against).
+        if (sender instanceof Player issuer && !issuer.getUniqueId().equals(uuid)) {
+            if (!issuer.hasPermission("rvnktools.link.invite.other")) {
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7[Link] &cYou don't have permission to issue invites for other players."));
+                return;
+            }
         }
 
         List<String> groups = online != null

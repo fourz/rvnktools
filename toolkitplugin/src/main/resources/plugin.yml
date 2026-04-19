@@ -297,7 +297,10 @@ permissions:
     description: Allows linking account to external services (/link)
     default: true
   rvnktools.link.invite:
-    description: Allows issuing shareable /link invite URLs for another player
+    description: Allows issuing shareable /link invite URLs (self-invite by default)
+    default: op
+  rvnktools.link.invite.other:
+    description: Additionally allows /link invite to target a DIFFERENT player than the issuer
     default: op
   rvnktools.links:
     description: Allows access to /links command
