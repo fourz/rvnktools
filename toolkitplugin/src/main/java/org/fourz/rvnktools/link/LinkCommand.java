@@ -8,6 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore.TokenKind;
 import org.fourz.rvnkcore.util.ChatFormat;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.permission.LuckPermsGroupResolver;
@@ -29,7 +30,10 @@ import java.util.stream.Collectors;
  */
 public class LinkCommand extends BaseCommand {
 
-    private static final List<String> SUBCOMMANDS = List.of("login", "matrix", "discord");
+    private static final List<String> SUBCOMMANDS = List.of("login", "invite", "matrix", "discord");
+    private static final long DEFAULT_LOGIN_TTL_MINUTES = 15L;
+    private static final long DEFAULT_INVITE_TTL_MINUTES = 120L;   // 2h
+    private static final long DEFAULT_INVITE_TTL_MAX_MINUTES = 1440L; // 24h hard cap
 
     private final AuthTokenStore authTokenStore;
     private final String callbackUrl;
@@ -63,6 +67,7 @@ public class LinkCommand extends BaseCommand {
 
         switch (subCommand) {
             case "login" -> handleLogin(sender, args);
+            case "invite" -> handleInvite(sender, args);
             case "matrix" -> sender.sendMessage(ChatFormat.colorize("&7[Link] &eMatrix linking is coming soon!"));
             case "discord" -> sender.sendMessage(ChatFormat.colorize("&7[Link] &eDiscord linking is coming soon!"));
             default -> sendUnknownSubCommandMessage(sender, subCommand);
@@ -145,6 +150,112 @@ public class LinkCommand extends BaseCommand {
     }
 
     /**
+     * {@code /link invite <player> [hours]} — admin-only, pre-bound shareable URL.
+     *
+     * Generates an INVITE token whose session grants are captured from the
+     * TARGET's UUID/name/groups at generation time. Any browser clicking the
+     * printed URL will be signed in as that target. Admin shares the URL
+     * out-of-band (DM, email, screenshot).
+     *
+     * Permission: {@code rvnktools.link.invite} (console always passes).
+     * TTL: {@code link.invite-ttl-minutes} (default 120), capped at
+     * {@code link.invite-ttl-max-minutes} (default 1440 = 24h).
+     */
+    @SuppressWarnings("deprecation")
+    private void handleInvite(CommandSender sender, String[] args) {
+        if (sender instanceof Player p && !p.hasPermission("rvnktools.link.invite")) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7[Link] &cYou don't have permission to issue invite links."));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7[Link] &cUsage: /link invite <player> [hours]"));
+            return;
+        }
+
+        String targetName = args[1];
+
+        // TTL resolution: config default + optional per-command override, capped.
+        long defaultTtlMinutes = plugin.getConfig().getLong(
+                "link.invite-ttl-minutes", DEFAULT_INVITE_TTL_MINUTES);
+        long maxTtlMinutes = plugin.getConfig().getLong(
+                "link.invite-ttl-max-minutes", DEFAULT_INVITE_TTL_MAX_MINUTES);
+        long requestedMinutes = defaultTtlMinutes;
+        boolean wasCapped = false;
+
+        if (args.length >= 3) {
+            try {
+                long hours = Long.parseLong(args[2]);
+                if (hours <= 0) {
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&7[Link] &cHours must be positive."));
+                    return;
+                }
+                requestedMinutes = hours * 60L;
+            } catch (NumberFormatException nfe) {
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7[Link] &cHours must be a whole number."));
+                return;
+            }
+        }
+        long ttlMinutes = Math.min(requestedMinutes, maxTtlMinutes);
+        if (ttlMinutes < requestedMinutes) {
+            wasCapped = true;
+        }
+
+        // Target resolution — online first, then offline player cache.
+        Player online = Bukkit.getPlayerExact(targetName);
+        UUID uuid;
+        String resolvedName;
+
+        if (online != null) {
+            uuid = online.getUniqueId();
+            resolvedName = online.getName();
+        } else {
+            OfflinePlayer offline = Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore()) {
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7[Link] &cPlayer '" + targetName + "' not found (never joined this server)."));
+                return;
+            }
+            uuid = offline.getUniqueId();
+            resolvedName = offline.getName() != null ? offline.getName() : targetName;
+        }
+
+        List<String> groups = online != null
+                ? resolveGroups(online)
+                : resolveGroupsByUuid(uuid, resolvedName);
+
+        String token = authTokenStore.generateToken(
+                uuid, resolvedName, groups, TokenKind.INVITE, ttlMinutes * 60L);
+        String url = callbackUrl + "?token=" + token;
+
+        String issuerName = (sender instanceof Player p) ? p.getName() : "console";
+        logger.info("Invite issued — invitee=" + resolvedName + " targetUuid=" + uuid
+                + " ttlMinutes=" + ttlMinutes + " issuer=" + issuerName);
+
+        sender.sendMessage(ChatFormat.colorize(
+                "&7[Link] &aInvite link for &f" + resolvedName + "&a:"));
+
+        if (sender instanceof Player issuer) {
+            TextComponent linkComponent = new TextComponent(ChatFormat.colorize("&b&n" + url));
+            linkComponent.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url));
+            issuer.spigot().sendMessage(linkComponent);
+        } else {
+            sender.sendMessage(url);
+        }
+
+        sender.sendMessage(ChatFormat.colorize(
+                "&7Expires in &f" + ttlMinutes + " minutes&7. One-time use. Share only with &f" + resolvedName + "&7."));
+        if (wasCapped) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7[Link] &eTTL capped to server maximum (" + maxTtlMinutes + " min)."));
+        }
+    }
+
+    /**
      * Resolves the player's permission groups via LuckPerms (online player).
      */
     private List<String> resolveGroups(Player player) {
@@ -177,8 +288,11 @@ public class LinkCommand extends BaseCommand {
                     .filter(s -> s.startsWith(partial))
                     .collect(Collectors.toList());
         }
-        // Tab-complete player names for console "link login <player>"
-        if (args.length == 2 && args[0].equalsIgnoreCase("login") && !(sender instanceof Player)) {
+        // Tab-complete player names for: console "link login <player>" and
+        // any "link invite <player>" caller (admin or console).
+        if (args.length == 2
+                && (args[0].equalsIgnoreCase("invite")
+                    || (args[0].equalsIgnoreCase("login") && !(sender instanceof Player)))) {
             String partial = args[1].toLowerCase();
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)

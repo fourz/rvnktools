@@ -137,6 +137,12 @@ auth:
   callback-url: ""       # Web portal callback URL for /link login (e.g. https://dev.fourz.org/auth/callback)
                           # If empty, derived from: http://{webui.host}:{webui.port}/auth/callback
 
+# /link command TTLs (minutes)
+link:
+  login-ttl-minutes: 15            # /link login token lifetime. Short by design — player runs it live.
+  invite-ttl-minutes: 120          # /link invite default lifetime (shareable link, admin-issued).
+  invite-ttl-max-minutes: 1440     # Hard cap on per-command override (24h).
+
 # Feature Configuration
 # Enable or disable specific RVNKTools features
 features:
