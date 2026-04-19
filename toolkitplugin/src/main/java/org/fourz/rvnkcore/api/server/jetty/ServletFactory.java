@@ -16,6 +16,7 @@ import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
+import org.fourz.rvnkcore.api.controller.EventsController;
 import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
@@ -23,6 +24,7 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.EventService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -39,6 +41,7 @@ public class ServletFactory {
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
+    private final EventService eventService;
     private final WorldService worldService;
     private final AuthTokenStore authTokenStore;
     private final Gson gson;
@@ -58,7 +61,8 @@ public class ServletFactory {
      */
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger,
                                  PlayerService playerService, PlayerWorldService playerWorldService,
-                                 AnnouncementService announcementService, WorldService worldService,
+                                 AnnouncementService announcementService, EventService eventService,
+                                 WorldService worldService,
                                  AuthTokenStore authTokenStore, Gson gson) {
         this.config = config;
         this.plugin = plugin;
@@ -66,6 +70,7 @@ public class ServletFactory {
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
+        this.eventService = eventService;
         this.worldService = worldService;
         this.authTokenStore = authTokenStore;
         this.gson = gson;
@@ -131,7 +136,10 @@ public class ServletFactory {
 
         // Register announcement controller
         registerAnnouncementController(context);
-        
+
+        // Register events controller
+        registerEventsController(context);
+
         // Register world controller
         registerWorldController(context);
         
@@ -159,6 +167,18 @@ public class ServletFactory {
         
         AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger, gson);
         context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
+    }
+
+    /**
+     * Registers the events controller with the servlet context.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerEventsController(ServletContextHandler context) {
+        LogManager eventsLogger = LogManager.getInstance(plugin, EventsController.class);
+        EventsController controller = new EventsController(eventService, eventsLogger, gson);
+        context.addServlet(new ServletHolder(controller), "/v1/events/*");
+        logger.info("Events API controller registered at /v1/events/*");
     }
 
     /**
