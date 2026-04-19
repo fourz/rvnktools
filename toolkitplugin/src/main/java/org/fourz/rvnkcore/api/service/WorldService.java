@@ -136,7 +136,17 @@ public interface WorldService {
      * @return CompletableFuture completing when world is removed
      */
     CompletableFuture<Void> removeWorldTracking(String worldName);
-    
+
+    /**
+     * Update the human-readable display name for a world.
+     * Persists to rvnk_worlds.display_name so the REST API and WebUI reflect it.
+     *
+     * @param worldName   The Bukkit world name (unique key)
+     * @param displayName The human-readable name to store
+     * @return CompletableFuture completing when the update is written
+     */
+    CompletableFuture<Void> updateDisplayName(String worldName, String displayName);
+
     /**
      * Data class for correlated world and player-world information.
      */
