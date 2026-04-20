@@ -107,6 +107,31 @@ public class WebhookNotifier {
     }
 
     /**
+     * Fires a webhook notification for an event CRUD change.
+     * No debounce — events change infrequently and each mutation should
+     * immediately invalidate the frontend cache.
+     *
+     * @param eventId The ID of the changed event (for targeted cache invalidation)
+     */
+    public void notifyEventChange(String eventId) {
+        String payload = GSON.toJson(Map.of(
+            "event", "event_change",
+            "server", config.getServerId(),
+            "eventId", eventId != null ? eventId : "",
+            "timestamp", Instant.now().toString()
+        ));
+
+        sendAsync(payload, "Webhook event " + config.getServerId());
+    }
+
+    /**
+     * Backwards-compatible overload that invalidates all event caches.
+     */
+    public void notifyEventChange() {
+        notifyEventChange(null);
+    }
+
+    /**
      * Fires a webhook notification for a shop CRUD event (create/update/delete).
      * Uses a 30-second leading-edge debounce separate from player and trade events.
      *

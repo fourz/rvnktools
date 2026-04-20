@@ -288,6 +288,21 @@ public class DefaultWorldRepository implements WorldRepository {
         });
     }
     
+    public CompletableFuture<Void> updateDisplayName(String worldName, String displayName) {
+        return CompletableFuture.runAsync(() -> {
+            String query = "UPDATE rvnk_worlds SET display_name = ? WHERE name = ?";
+            try (Connection conn = connectionProvider.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, displayName);
+                stmt.setString(2, worldName);
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                logger.error("Error updating display name for world: " + worldName, e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     @Override
     public CompletableFuture<Boolean> exists(String worldName) {
         return CompletableFuture.supplyAsync(() -> {
