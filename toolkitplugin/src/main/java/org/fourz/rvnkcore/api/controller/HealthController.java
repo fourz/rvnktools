@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.fourz.rvnkcore.ApiVersion;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -54,6 +55,8 @@ public class HealthController extends HttpServlet {
         // Server info
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "healthy");
+        data.put("apiVersion", ApiVersion.API_VERSION);
+        data.put("mcVersion", parseMcVersion(Bukkit.getVersion()));
         data.put("version", Bukkit.getVersion());
         data.put("bukkitVersion", Bukkit.getBukkitVersion());
         data.put("onlinePlayers", Bukkit.getOnlinePlayers().size());
@@ -89,5 +92,15 @@ public class HealthController extends HttpServlet {
         }
 
         ApiUtils.sendSuccess(resp, gson, data);
+    }
+
+    /** "git-Paper-xxx (MC: 1.21.1)" → "1.21.1" */
+    private static String parseMcVersion(String raw) {
+        int start = raw.indexOf("MC: ");
+        if (start >= 0) {
+            int end = raw.indexOf(')', start);
+            if (end >= 0) return raw.substring(start + 4, end).trim();
+        }
+        return raw;
     }
 }
