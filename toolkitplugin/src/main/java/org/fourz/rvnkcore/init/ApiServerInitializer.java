@@ -7,7 +7,6 @@ import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
-import org.fourz.rvnkcore.api.service.EventService;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -92,9 +91,6 @@ public class ApiServerInitializer {
             AnnouncementService announcementService = registry.getService(AnnouncementService.class);
             logger.debug("  + AnnouncementService retrieved");
 
-            EventService eventService = registry.getService(EventService.class);
-            logger.debug("  + EventService retrieved");
-
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
 
@@ -109,7 +105,6 @@ public class ApiServerInitializer {
                 playerService,
                 playerWorldService,
                 announcementService,
-                eventService,
                 worldService,
                 authTokenStore,
                 plugin
@@ -132,7 +127,7 @@ public class ApiServerInitializer {
             }
 
             long totalTime = System.currentTimeMillis() - startTime;
-            logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " with 30 endpoints (" + totalTime + "ms)");
+            logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");
         } catch (Exception e) {
             logger.error("Failed to start REST API server", e);
         }

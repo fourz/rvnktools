@@ -13,7 +13,6 @@ import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
-import org.fourz.rvnkcore.api.service.EventService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImpl;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -43,7 +42,6 @@ public class CoreServer {
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
     private final AnnouncementService announcementService;
-    private final EventService eventService;
     private final WorldService worldService;
     private final Gson gson;
     private final LogManager logger;
@@ -69,14 +67,13 @@ public class CoreServer {
      * @param plugin Plugin instance
      */
     public CoreServer(ApiConfig config, PlayerService playerService, PlayerWorldService playerWorldService,
-                                    AnnouncementService announcementService, EventService eventService,
+                                    AnnouncementService announcementService,
                                     WorldService worldService,
                                     AuthTokenStore authTokenStore, Plugin plugin) {
         this.config = config;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.announcementService = announcementService;
-        this.eventService = eventService;
         this.worldService = worldService;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -87,7 +84,7 @@ public class CoreServer {
 
         // Initialize specialized factories
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
-        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, eventService, worldService, authTokenStore, gson);
+        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, authTokenStore, gson);
         this.serverLifecycle = new ServerLifecycle(config, logger);
 
         // Initialize external servlet registration service

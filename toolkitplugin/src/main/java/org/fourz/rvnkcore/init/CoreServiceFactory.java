@@ -3,7 +3,6 @@ package org.fourz.rvnkcore.init;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.mojang.MojangAPI;
 import org.fourz.rvnkcore.api.service.AnnouncementService;
-import org.fourz.rvnkcore.api.service.EventService;
 import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.service.PlayerService;
@@ -14,15 +13,12 @@ import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
 import org.fourz.rvnkcore.database.repository.AnnouncementTypeRepository;
-import org.fourz.rvnkcore.database.repository.EventRepository;
-import org.fourz.rvnkcore.database.repository.EventSectionRepository;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
 import org.fourz.rvnkcore.database.repository.PushSubscriptionRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
 import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
-import org.fourz.rvnkcore.service.events.DefaultEventService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
@@ -92,6 +88,10 @@ public class CoreServiceFactory {
         long startTime = System.currentTimeMillis();
         logger.debug("Registering core services...");
 
+        // Expose ConnectionProvider so dependent plugins (e.g. RVNKEvents) can borrow the shared connection pool
+        registry.registerService(ConnectionProvider.class, connectionProvider);
+        logger.debug("  + ConnectionProvider registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         registerPlayerService(registry);
         logger.debug("  + PlayerService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -103,9 +103,6 @@ public class CoreServiceFactory {
 
         registerAnnouncementService(registry);
         logger.debug("  + AnnouncementService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
-
-        registerEventService(registry);
-        logger.debug("  + EventService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         registerPlayerPreferencesService(registry);
         logger.debug("  + PlayerPreferencesService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
@@ -120,7 +117,7 @@ public class CoreServiceFactory {
         logger.debug("  + PushSubscriptionService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
+        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
     }
 
     /**
@@ -203,26 +200,6 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register AnnouncementService", e);
             throw new RuntimeException("AnnouncementService registration failed", e);
-        }
-    }
-
-    /**
-     * Registers the EventService for admin-edited events content.
-     */
-    private void registerEventService(ServiceRegistry registry) {
-        try {
-            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            EventRepository eventRepository = new EventRepository(connectionProvider, queryBuilder, plugin);
-            EventSectionRepository sectionRepository = new EventSectionRepository(connectionProvider, queryBuilder, plugin);
-            LogManager eventLogger = LogManager.getInstance(plugin, DefaultEventService.class);
-            DefaultEventService eventService = new DefaultEventService(
-                eventRepository, sectionRepository, eventLogger, registry);
-
-            registry.registerService(EventService.class, eventService);
-            logger.info("EventService registered");
-        } catch (Exception e) {
-            logger.error("Failed to register EventService", e);
-            throw new RuntimeException("EventService registration failed", e);
         }
     }
 
