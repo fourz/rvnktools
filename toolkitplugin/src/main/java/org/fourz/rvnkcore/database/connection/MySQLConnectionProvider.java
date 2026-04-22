@@ -143,7 +143,8 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.setConnectionTimeout(config.getConnectionTimeoutMs());
             hikariConfig.setIdleTimeout(config.getIdleTimeoutMs());
             hikariConfig.setMaxLifetime(config.getMaxLifetimeMs());
-            
+            hikariConfig.setKeepaliveTime(config.getKeepaliveTimeMs());
+
             // Health and Monitoring
             hikariConfig.setLeakDetectionThreshold(config.getLeakDetectionMs());
             hikariConfig.setConnectionTestQuery("SELECT 1");

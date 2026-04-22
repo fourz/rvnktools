@@ -24,8 +24,9 @@ public class DatabaseConfig {
     private int maxConnections = 10;
     private int minIdleConnections = 2;
     private long connectionTimeoutMs = 30000;
-    private long idleTimeoutMs = 600000;
-    private long maxLifetimeMs = 1800000;
+    private long idleTimeoutMs = 300000;
+    private long maxLifetimeMs = 600000;
+    private long keepaliveTimeMs = 120000;
     private long leakDetectionMs = 60000;
     
     // Performance Settings
@@ -87,6 +88,7 @@ public class DatabaseConfig {
     public long getConnectionTimeoutMs() { return connectionTimeoutMs; }
     public long getIdleTimeoutMs() { return idleTimeoutMs; }
     public long getMaxLifetimeMs() { return maxLifetimeMs; }
+    public long getKeepaliveTimeMs() { return keepaliveTimeMs; }
     public long getLeakDetectionMs() { return leakDetectionMs; }
     public boolean isCachePrepStmts() { return cachePrepStmts; }
     public int getPrepStmtCacheSize() { return prepStmtCacheSize; }
@@ -208,7 +210,12 @@ public class DatabaseConfig {
             config.maxLifetimeMs = lifetimeMs;
             return this;
         }
-        
+
+        public Builder keepaliveTimeMs(long keepaliveMs) {
+            config.keepaliveTimeMs = keepaliveMs;
+            return this;
+        }
+
         public Builder leakDetectionMs(long detectionMs) {
             config.leakDetectionMs = detectionMs;
             return this;
