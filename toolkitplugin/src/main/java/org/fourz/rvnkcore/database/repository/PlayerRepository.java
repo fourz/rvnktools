@@ -10,6 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -202,11 +205,17 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             builder.nameHistory(nameHistory);
         }
         
-        // Parse groups from comma-separated string
+        // Parse groups from JSON array string (e.g. ["default","member"])
         String groupsStr = rs.getString("groups");
         if (groupsStr != null && !groupsStr.trim().isEmpty()) {
-            List<String> groups = Arrays.asList(groupsStr.split(","));
-            builder.groups(groups);
+            try {
+                Type listType = new TypeToken<List<String>>(){}.getType();
+                List<String> groups = new Gson().fromJson(groupsStr, listType);
+                if (groups != null) builder.groups(groups);
+            } catch (Exception e) {
+                // Fallback for legacy CSV rows not yet migrated
+                builder.groups(Arrays.asList(groupsStr.split(",")));
+            }
         }
         
         return builder.build();
@@ -267,7 +276,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setInt(7, entity.getTimesJoined());
         stmt.setFloat(8, entity.getTotalPlaytimeHours());
         stmt.setString(9, entity.getPrimaryGroup());
-        stmt.setString(10, String.join(",", entity.getGroups()));
+        stmt.setString(10, new Gson().toJson(entity.getGroups()));
         stmt.setBoolean(11, entity.isBanned());
     }
     
@@ -280,7 +289,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setInt(5, entity.getTimesJoined());
         stmt.setFloat(6, entity.getTotalPlaytimeHours());
         stmt.setString(7, entity.getPrimaryGroup());
-        stmt.setString(8, String.join(",", entity.getGroups()));
+        stmt.setString(8, new Gson().toJson(entity.getGroups()));
         stmt.setBoolean(9, entity.isBanned());
         stmt.setString(10, entity.getId().toString()); // WHERE clause
     }
