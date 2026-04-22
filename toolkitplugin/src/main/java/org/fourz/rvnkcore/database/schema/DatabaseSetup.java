@@ -36,6 +36,7 @@ public class DatabaseSetup {
     public static final String TABLE_PREFERENCE_DEFAULTS = "rvnk_preference_defaults";
     public static final String TABLE_ANNOUNCEMENT_TYPES = "rvnk_announcement_types";
     public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
+    public static final String TABLE_PUSH_SUBSCRIPTIONS = "rvnk_push_subscriptions";
 
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
         this.connectionProvider = connectionProvider;
@@ -187,6 +188,7 @@ public class DatabaseSetup {
         String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
+        String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
 
         String createPlayersTable;
         String createPlayerWorldDataTable;
@@ -197,6 +199,7 @@ public class DatabaseSetup {
         String createNotificationTypesTable;
         String createNotificationChannelsTable;
         String createPreferenceDefaultsTable;
+        String createPushSubscriptionsTable;
 
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL-specific table definitions with proper column types
@@ -349,6 +352,17 @@ public class DatabaseSetup {
                 "PRIMARY KEY (plugin_id, preference_key), " +
                 "INDEX idx_defaults_plugin (plugin_id)" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createPushSubscriptionsTable = "CREATE TABLE IF NOT EXISTS " + pushSubscriptionsTable + " (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "endpoint TEXT NOT NULL, " +
+                "p256dh TEXT NOT NULL, " +
+                "auth_key VARCHAR(128) NOT NULL, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "INDEX idx_push_player (player_id), " +
+                "UNIQUE INDEX idx_push_endpoint (endpoint(255))" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
             createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
@@ -493,6 +507,15 @@ public class DatabaseSetup {
                 "description TEXT, " +
                 "PRIMARY KEY (plugin_id, preference_key)" +
                 ")";
+
+            createPushSubscriptionsTable = "CREATE TABLE IF NOT EXISTS " + pushSubscriptionsTable + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "player_id TEXT NOT NULL, " +
+                "endpoint TEXT NOT NULL UNIQUE, " +
+                "p256dh TEXT NOT NULL, " +
+                "auth_key TEXT NOT NULL, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")";
         }
 
         try (var stmt = connection.createStatement()) {
@@ -514,6 +537,8 @@ public class DatabaseSetup {
             stmt.execute(createNotificationChannelsTable);
             logger.debug("Creating " + preferenceDefaultsTable + " table...");
             stmt.execute(createPreferenceDefaultsTable);
+            logger.debug("Creating " + pushSubscriptionsTable + " table...");
+            stmt.execute(createPushSubscriptionsTable);
             logger.debug("All tables created successfully");
         }
     }
