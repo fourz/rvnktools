@@ -11,7 +11,7 @@ import java.util.List;
  *   "success": true,
  *   "data": { ... },
  *   "error": null,
- *   "meta": { "timestamp": "2026-03-01T00:00:00Z", "version": "1.0" }
+ *   "meta": { "timestamp": "2026-03-01T00:00:00Z", "version": "1.1" }
  * }
  * </pre>
  *

@@ -1,13 +1,14 @@
 package org.fourz.rvnkcore.api.model.response;
 
 import java.time.Instant;
+import org.fourz.rvnkcore.ApiVersion;
 
 /**
  * Metadata attached to every {@link ApiResponse}.
  * Includes an ISO-8601 timestamp, API version, and optional pagination fields.
  *
  * @param timestamp  ISO-8601 UTC timestamp of when the response was generated
- * @param version    API version string (e.g. {@code "1.0"})
+ * @param version    API version string (from {@link ApiVersion#API_VERSION})
  * @param page       Current page number (paginated responses only)
  * @param limit      Page size (paginated responses only)
  * @param totalItems Total matching items across all pages (paginated responses only)
@@ -27,7 +28,7 @@ public record ApiMeta(
      * Creates basic (non-paginated) metadata with the current timestamp.
      */
     public static ApiMeta create() {
-        return new ApiMeta(Instant.now().toString(), "1.0", null, null, null, null);
+        return new ApiMeta(Instant.now().toString(), ApiVersion.API_VERSION, null, null, null, null);
     }
 
     /**
@@ -39,6 +40,6 @@ public record ApiMeta(
      */
     public static ApiMeta createPaginated(int page, int limit, int totalItems) {
         int totalPages = limit > 0 ? (int) Math.ceil((double) totalItems / limit) : 0;
-        return new ApiMeta(Instant.now().toString(), "1.0", page, limit, totalItems, totalPages);
+        return new ApiMeta(Instant.now().toString(), ApiVersion.API_VERSION, page, limit, totalItems, totalPages);
     }
 }
