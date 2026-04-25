@@ -393,6 +393,7 @@ public class MigrationSubCommand extends BaseSubCommand {
 
     @Override
     public boolean hasPermission(CommandSender sender) {
-        return sender.hasPermission("rvnktools.admin.migration") || sender.isOp();
+        return sender.hasPermission("rvnktools.admin.migration")
+            || sender.hasPermission("rvnktools.admin.*");
     }
 }
