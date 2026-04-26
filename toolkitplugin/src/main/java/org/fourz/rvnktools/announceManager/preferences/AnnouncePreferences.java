@@ -123,7 +123,8 @@ public class AnnouncePreferences {
             }
         }
 
-        return PreferenceProperty.fromKey(property).getDefaultValue();
+        PreferenceProperty prop = PreferenceProperty.fromKey(property);
+        return prop != null ? prop.getDefaultValue() : null;
     }
 
     public Map<String, String> getAllPreferences(UUID playerId) {
@@ -223,6 +224,7 @@ public class AnnouncePreferences {
         if (prefs != null && prefs.containsKey(property)) {
             return prefs.get(property);
         }
-        return PreferenceProperty.fromKey(property).getDefaultValue();
+        PreferenceProperty prop = PreferenceProperty.fromKey(property);
+        return prop != null ? prop.getDefaultValue() : null;
     }
 }
