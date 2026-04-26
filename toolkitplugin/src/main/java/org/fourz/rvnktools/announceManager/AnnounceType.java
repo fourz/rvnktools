@@ -7,6 +7,7 @@ public class AnnounceType {
     private String permission;
     private Double listingFee;
     private String displayContext = "both";
+    private boolean defaultEnabled = true;
     private boolean imported = false;
 
     // Getters and setters
@@ -56,6 +57,14 @@ public class AnnounceType {
 
     public void setDisplayContext(String displayContext) {
         this.displayContext = displayContext;
+    }
+
+    public boolean isDefaultEnabled() {
+        return defaultEnabled;
+    }
+
+    public void setDefaultEnabled(boolean defaultEnabled) {
+        this.defaultEnabled = defaultEnabled;
     }
 
 }

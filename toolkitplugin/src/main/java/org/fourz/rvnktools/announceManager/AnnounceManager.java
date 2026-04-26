@@ -364,22 +364,38 @@ public class AnnounceManager {
     public void toggleAnnouncementType(Player player, String type) {
         UUID playerId = player.getUniqueId();
         type = type.toLowerCase();
-        if (player.hasPermission("rvnktools.command.announce.toggle." + type)) {
-            Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().getOrDefault(playerId, new HashSet<>());
-
-            if (disabledTypes.contains(type)) {
-                disabledTypes.remove(type);
-                announceConfig.removePlayerDisabledType(playerId, type);
-                chatService.sendMessage(player, "Announcements of type '" + type + "' enabled.");
-            } else {
-                disabledTypes.add(type);
-                announceConfig.addPlayerDisabledType(playerId, type);
-                chatService.sendMessage(player, "Announcements of type '" + type + "' disabled.");
-            }
-            announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
-        } else {
+        if (!player.hasPermission("rvnktools.command.announce.toggle." + type)) {
             chatService.sendMessage(player, "You do not have permission to toggle announcements of this type.");
+            return;
         }
+
+        AnnounceType typeConfig = announceConfig.getAnnounceTypes().get(type);
+        if (typeConfig != null && !typeConfig.isDefaultEnabled()) {
+            // Opt-in type: toggle via preference key
+            String prefKey = "optin_" + type;
+            String current = announceConfig.getPreference(playerId, prefKey);
+            if ("true".equals(current)) {
+                announceConfig.setPreference(playerId, prefKey, "false");
+                chatService.sendMessage(player, "&7Unsubscribed from &d" + type + "&7 announcements. Use &d/announce toggle " + type + "&7 to re-enable.");
+            } else {
+                announceConfig.setPreference(playerId, prefKey, "true");
+                chatService.sendMessage(player, "&aSubscribed to &d" + type + "&a announcements. Use &d/announce toggle " + type + "&a to disable.");
+            }
+            return;
+        }
+
+        // Opt-out type: toggle disabled state
+        Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().getOrDefault(playerId, new HashSet<>());
+        if (disabledTypes.contains(type)) {
+            disabledTypes.remove(type);
+            announceConfig.removePlayerDisabledType(playerId, type);
+            chatService.sendMessage(player, "&a" + Character.toUpperCase(type.charAt(0)) + type.substring(1) + " announcements enabled.");
+        } else {
+            disabledTypes.add(type);
+            announceConfig.addPlayerDisabledType(playerId, type);
+            chatService.sendMessage(player, "&7" + Character.toUpperCase(type.charAt(0)) + type.substring(1) + " announcements disabled.");
+        }
+        announceConfig.getPlayerDisabledTypes().put(playerId, disabledTypes);
     }
 
     public void reloadConfig() {
@@ -419,8 +435,18 @@ public class AnnounceManager {
             return false;
         }
 
+        String typeLower = announcement.getType().toLowerCase();
+        AnnounceType typeConfig = announceConfig.getAnnounceTypes().get(typeLower);
+
+        if (typeConfig != null && !typeConfig.isDefaultEnabled()) {
+            // Opt-in type: only deliver if player has explicitly subscribed
+            String optInPref = announceConfig.getPreference(player.getUniqueId(), "optin_" + typeLower);
+            return "true".equals(optInPref);
+        }
+
+        // Opt-out type (default): deliver unless player has disabled it
         Set<String> disabledTypes = announceConfig.getPlayerDisabledTypes().get(player.getUniqueId());
-        if (disabledTypes != null && disabledTypes.contains(announcement.getType().toLowerCase())) {
+        if (disabledTypes != null && disabledTypes.contains(typeLower)) {
             return false;
         }
 

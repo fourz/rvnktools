@@ -191,6 +191,10 @@ public class AnnounceConfig {
         if (displayContext != null) {
             announceType.setDisplayContext(displayContext);
         }
+        Object defaultEnabled = map.get("default_enabled");
+        if (defaultEnabled instanceof Boolean) {
+            announceType.setDefaultEnabled((Boolean) defaultEnabled);
+        }
         return announceType;
     }
 
