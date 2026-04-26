@@ -700,10 +700,7 @@ public class DefaultAnnouncementService implements AnnouncementService {
      * @param announcementId The ID of the changed announcement for targeted cache invalidation
      */
     private void notifyWebhook(String announcementId) {
-        if (serviceRegistry == null) return;
-        WebhookNotifier notifier = serviceRegistry.getService(WebhookNotifier.class);
-        if (notifier != null) {
-            notifier.notifyAnnouncementChange(announcementId);
-        }
+        if (serviceRegistry == null || !serviceRegistry.hasService(WebhookNotifier.class)) return;
+        serviceRegistry.getService(WebhookNotifier.class).notifyAnnouncementChange(announcementId);
     }
 }
