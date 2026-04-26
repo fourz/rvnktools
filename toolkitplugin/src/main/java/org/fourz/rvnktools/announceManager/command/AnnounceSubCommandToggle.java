@@ -14,13 +14,29 @@ public class AnnounceSubCommandToggle extends AnnounceSubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        
-        if (!(sender instanceof Player)) { 
-            messageSender(sender, "&cYou must be a player to toggle announcement types");
-            return false;
+        if (!(sender instanceof Player)) {
+            // Console: /announce toggle <type> <player>
+            if (args.length < 3) {
+                messageSender(sender, "&cUsage: /announce toggle <type> <player>");
+                return false;
+            }
+            String type = args[1];
+            Player target = plugin.getServer().getPlayer(args[2]);
+            if (target == null) {
+                messageSender(sender, "&cPlayer not found or not online: " + args[2]);
+                return false;
+            }
+            if (!announceManager.validateAnnounceType(type)) {
+                messageSender(sender, "&cInvalid announcement type: " + type);
+                return false;
+            }
+            announceManager.toggleAnnouncementType(target, type);
+            messageSender(sender, "&aToggled " + type + " for " + target.getName());
+            return true;
         }
+
         Player player = (Player) sender;
-        
+
         if (args.length < 2) {
             messageSender(player, "&cAnnouncement type cannot be empty");
             return false;
