@@ -50,18 +50,24 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         return CompletableFuture.supplyAsync(() -> {
             String query = queryBuilder.select("*")
                 .from(tableName)
-                .where("active = ? AND (expires_at IS NULL OR expires_at > ?) AND (scheduled_for IS NULL OR scheduled_for <= ?)")
+                .where("active = ? " +
+                       "AND (expires_at IS NULL OR expires_at > ?) " +
+                       "AND (scheduled_for IS NULL OR scheduled_for <= ?) " +
+                       "AND (recurrence_date IS NULL OR recurrence_date = ?)")
                 .orderBy("created_at", false)
                 .build();
-                
+
             try (var conn = connectionProvider.getConnection();
                  var stmt = conn.prepareStatement(query)) {
-                
+
                 Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+                String todayMmDd = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
+                    .format(java.time.LocalDate.now());
                 stmt.setBoolean(1, true);
                 stmt.setTimestamp(2, now);
                 stmt.setTimestamp(3, now);
-                
+                stmt.setString(4, todayMmDd);
+
                 try (ResultSet rs = stmt.executeQuery()) {
                     List<AnnouncementDTO> results = new ArrayList<>();
                     while (rs.next()) {
@@ -329,6 +335,16 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
                 // Column may not exist yet (pre-migration)
             }
 
+            // Parse recurrence_date (MM-DD annual pattern)
+            try {
+                String recurrenceDate = rs.getString("recurrence_date");
+                if (recurrenceDate != null && !recurrenceDate.trim().isEmpty()) {
+                    builder.recurrenceDate(recurrenceDate);
+                }
+            } catch (SQLException ignored) {
+                // Column may not exist yet (pre-migration)
+            }
+
             // Parse metadata from JSON-like string (simplified implementation)
             String metadataStr = rs.getString("metadata");
             if (metadataStr != null && !metadataStr.trim().isEmpty()) {
@@ -367,8 +383,8 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         QueryBuilder builder = createQueryBuilder();
         return builder.insert(tableName)
             .columns("id", "title", "message", "type", "active", "pinned", "created_at", "updated_at",
-                    "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata", "owner_uuid")
-            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
+                    "scheduled_for", "expires_at", "interval_seconds", "target_worlds", "target_groups", "metadata", "owner_uuid", "recurrence_date")
+            .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
     
@@ -390,6 +406,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
             .set("target_groups", "?")
             .set("metadata", "?")
             .set("owner_uuid", "?")
+            .set("recurrence_date", "?")
             .where("id = ?")
             .build();
     }
@@ -418,6 +435,7 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         }
         stmt.setString(14, metadataStr.toString());
         stmt.setString(15, entity.getOwnerUuid());
+        stmt.setString(16, entity.getRecurrenceDate());
     }
 
     @Override
@@ -442,7 +460,8 @@ public class AnnouncementRepository extends BaseRepository<AnnouncementDTO, Stri
         }
         stmt.setString(12, metadataStr.toString());
         stmt.setString(13, entity.getOwnerUuid());
-        stmt.setString(14, entity.getId()); // WHERE clause
+        stmt.setString(14, entity.getRecurrenceDate());
+        stmt.setString(15, entity.getId()); // WHERE clause
     }
     
     /**

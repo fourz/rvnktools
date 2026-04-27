@@ -4,6 +4,8 @@ import org.bukkit.command.CommandSender;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.announceManager.Announcement;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AnnounceSubCommandList extends AnnounceSubCommand {
     
@@ -33,20 +35,26 @@ public class AnnounceSubCommandList extends AnnounceSubCommand {
     }
 
     private void listAll(CommandSender sender) {
-        messageSender(sender, "&6All announcements:");
-        for (Announcement announcement : announceManager.getAnnouncements()) {
-            messageSender(sender, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getMessage());
+        List<Announcement> all = announceManager.getAnnouncements();
+        messageSender(sender, "&6All announcements &7(" + all.size() + "):");
+        for (Announcement a : all) {
+            messageSender(sender, " &7- &3" + a.getId() + " &7(&a" + a.getType() + "&7)" + scheduleSuffix(a) + " &7- &f" + a.getMessage());
         }
     }
 
     private void listAccessible(CommandSender sender) {
-        messageSender(sender, "&6Available announcements:");
-        for (Announcement announcement : announceManager.getAnnouncements()) {
-            if (sender.hasPermission("rvnktools.announce.type.*") || 
-                sender.hasPermission("rvnktools.announce.type." + announcement.getType().toLowerCase())) {
-                messageSender(sender, " &7- &3" + announcement.getId() + " &7(&a" + announcement.getType() + "&7) - &f" + announcement.getMessage());
+        List<Announcement> all = announceManager.getAnnouncements();
+        int count = 0;
+        List<String> lines = new ArrayList<>();
+        for (Announcement a : all) {
+            if (sender.hasPermission("rvnktools.announce.type.*") ||
+                sender.hasPermission("rvnktools.announce.type." + a.getType().toLowerCase())) {
+                lines.add(" &7- &3" + a.getId() + " &7(&a" + a.getType() + "&7)" + scheduleSuffix(a) + " &7- &f" + a.getMessage());
+                count++;
             }
         }
+        messageSender(sender, "&6Available announcements &7(" + count + "):");
+        for (String line : lines) messageSender(sender, line);
     }
 
     private boolean listByType(CommandSender sender, String type) {
@@ -58,14 +66,25 @@ public class AnnounceSubCommandList extends AnnounceSubCommand {
             messageSender(sender, "&cInvalid announcement type: " + type);
             return false;
         }
-        
-        messageSender(sender, "&6Announcements for type &a" + type + "&6:");
-        for (Announcement announcement : announceManager.getAnnouncements()) {
-            if (announcement.getType().equalsIgnoreCase(type)) {
-                messageSender(sender, " &7- &3" + announcement.getId() + " &7- &f" + announcement.getMessage());
+
+        List<String> lines = new ArrayList<>();
+        for (Announcement a : announceManager.getAnnouncements()) {
+            if (a.getType().equalsIgnoreCase(type)) {
+                lines.add(" &7- &3" + a.getId() + scheduleSuffix(a) + " &7- &f" + a.getMessage());
             }
         }
+        messageSender(sender, "&6Announcements for type &a" + type + "&6 &7(" + lines.size() + "):");
+        for (String line : lines) messageSender(sender, line);
         return true;
+    }
+
+    private String scheduleSuffix(Announcement a) {
+        if (a.getDate() == null) return "";
+        String orig = a.getOriginalDateString();
+        if (orig != null && orig.matches("\\d{2}-\\d{2}")) {
+            return " &e[annual:" + orig + "]";
+        }
+        return " &e[date:" + a.getDate() + "]";
     }
 
     private void listTypes(CommandSender sender) {

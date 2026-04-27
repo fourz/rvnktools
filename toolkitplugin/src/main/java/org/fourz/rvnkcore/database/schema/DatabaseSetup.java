@@ -743,6 +743,17 @@ public class DatabaseSetup {
             }
         }
 
+        // Migration 7: Add recurrence_date column to announcements table
+        if (!columnExists(connection, announcementsTable, "recurrence_date")) {
+            logger.info("Adding 'recurrence_date' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN recurrence_date VARCHAR(5) NULL");
+                logger.info("Successfully added 'recurrence_date' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add recurrence_date column: " + e.getMessage());
+            }
+        }
+
         logger.debug("Database migrations completed");
     }
 

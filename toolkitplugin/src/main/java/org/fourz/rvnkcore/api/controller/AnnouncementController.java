@@ -912,6 +912,9 @@ public class AnnouncementController extends HttpServlet {
                 announcement.setScheduledFor(Timestamp.from(Instant.parse(obj.get("scheduledFor").getAsString())));
             } catch (Exception ignored) {}
         }
+        if (obj.has("recurrenceDate") && !obj.get("recurrenceDate").isJsonNull()) {
+            announcement.setRecurrenceDate(obj.get("recurrenceDate").getAsString());
+        }
 
         return announcement;
     }

@@ -5,7 +5,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.command.CommandSender;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -638,6 +641,17 @@ public class AnnounceManager {
 
     // ========== DTO Conversion Methods ==========
 
+    static LocalDate resolveAnnualDate(String mmdd) {
+        try {
+            LocalDate today = LocalDate.now();
+            LocalDate thisYear = LocalDate.parse(today.getYear() + "-" + mmdd,
+                DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            return today.isAfter(thisYear) ? thisYear.plusYears(1) : thisYear;
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     static Announcement convertFromDTO(AnnouncementDTO dto) {
         Announcement ann = new Announcement();
         ann.setId(dto.getId());
@@ -650,7 +664,10 @@ public class AnnounceManager {
             ann.setRecurrence((long) dto.getIntervalSeconds());
         }
 
-        if (dto.getScheduledFor() != null) {
+        if (dto.getRecurrenceDate() != null && !dto.getRecurrenceDate().isBlank()) {
+            ann.setOriginalDateString(dto.getRecurrenceDate());
+            ann.setDate(resolveAnnualDate(dto.getRecurrenceDate()));
+        } else if (dto.getScheduledFor() != null) {
             ann.setDate(dto.getScheduledFor().toLocalDateTime().toLocalDate());
             ann.setTime(dto.getScheduledFor().toLocalDateTime().toLocalTime());
         }

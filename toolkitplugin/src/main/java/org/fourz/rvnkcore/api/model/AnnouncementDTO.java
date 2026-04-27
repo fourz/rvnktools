@@ -31,6 +31,7 @@ public class AnnouncementDTO {
     private List<String> targetGroups;
     private Map<String, Object> metadata;
     private String ownerUuid;
+    private String recurrenceDate;
 
     /**
      * Creates a new AnnouncementDTO with default values.
@@ -179,6 +180,14 @@ public class AnnouncementDTO {
         this.ownerUuid = ownerUuid;
     }
 
+    public String getRecurrenceDate() {
+        return recurrenceDate;
+    }
+
+    public void setRecurrenceDate(String recurrenceDate) {
+        this.recurrenceDate = recurrenceDate;
+    }
+
     /**
      * Gets a metadata value by key.
      * 
@@ -322,6 +331,11 @@ public class AnnouncementDTO {
 
         public Builder ownerUuid(String ownerUuid) {
             dto.ownerUuid = ownerUuid;
+            return this;
+        }
+
+        public Builder recurrenceDate(String recurrenceDate) {
+            dto.recurrenceDate = recurrenceDate;
             return this;
         }
 
