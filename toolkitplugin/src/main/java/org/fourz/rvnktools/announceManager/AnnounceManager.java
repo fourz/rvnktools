@@ -399,10 +399,10 @@ public class AnnounceManager {
     }
 
     public void reloadConfig() {
+        announceConfig.reloadConfig();
         if (announcementService != null) {
             reloadFromDatabase();
         } else {
-            announceConfig.reloadConfig();
             announceScheduler.scheduleAnnouncements();
         }
     }

@@ -48,6 +48,11 @@ announce_types:
   suffix: '&7'
   permission: rvnktools.announce.type.warning
   display_context: ingame
+- id: webonly
+  prefix: '&b[Web] &7'
+  suffix: '&7'
+  permission: rvnktools.announce.type.webonly
+  display_context: webonly
 
 announcements:
 - id: events
