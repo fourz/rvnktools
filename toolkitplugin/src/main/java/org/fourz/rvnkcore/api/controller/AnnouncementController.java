@@ -34,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.sql.Timestamp;
+import java.time.Instant;
 
 /**
  * REST API controller for announcement management.
@@ -905,6 +907,11 @@ public class AnnouncementController extends HttpServlet {
         if (obj.has("active")) announcement.setActive(obj.get("active").getAsBoolean());
         else if (obj.has("isActive")) announcement.setActive(obj.get("isActive").getAsBoolean());
         if (obj.has("intervalSeconds")) announcement.setIntervalSeconds(obj.get("intervalSeconds").getAsInt());
+        if (obj.has("scheduledFor") && !obj.get("scheduledFor").isJsonNull()) {
+            try {
+                announcement.setScheduledFor(Timestamp.from(Instant.parse(obj.get("scheduledFor").getAsString())));
+            } catch (Exception ignored) {}
+        }
 
         return announcement;
     }
