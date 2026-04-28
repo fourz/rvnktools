@@ -56,7 +56,7 @@ announce_types:
 
 announcements:
 - id: events
-  text: '&e&lEvents &7are held every &eSaturday &7at &e7pm CST.'
+  text: '&e&lEvents &7are held on &eSundays &7at &e1pm CST&7.'
   type: news
   recurrence: 90m
   imported: false
