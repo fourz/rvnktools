@@ -185,13 +185,30 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         });
     }
     
+    /**
+     * Reads a Timestamp column, returning null for zero-date values (0000-00-00 00:00:00).
+     * MySQL Connector/J 9.x throws by default on zero dates; this prevents cascade failures
+     * for migrated rows. The caller's update path will overwrite null timestamps with current time.
+     */
+    private Timestamp safeGetTimestamp(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getTimestamp(column);
+        } catch (SQLException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Zero date value prohibited")) {
+                logger.warning("Zero date in column '" + column + "' — treating as null (row will self-heal on next update)");
+                return null;
+            }
+            throw e;
+        }
+    }
+
     @Override
     protected PlayerDTO mapResultSet(ResultSet rs) throws SQLException {
         PlayerDTO.Builder builder = new PlayerDTO.Builder()
             .id(UUID.fromString(rs.getString("id")))
             .currentName(rs.getString("current_name"))
-            .firstJoin(rs.getTimestamp("first_join"))
-            .lastSeen(rs.getTimestamp("last_seen"))
+            .firstJoin(safeGetTimestamp(rs, "first_join"))
+            .lastSeen(safeGetTimestamp(rs, "last_seen"))
             .currentWorld(rs.getString("current_world"))
             .timesJoined(rs.getInt("times_joined"))
             .totalPlaytimeHours(rs.getFloat("total_playtime_hours"))
