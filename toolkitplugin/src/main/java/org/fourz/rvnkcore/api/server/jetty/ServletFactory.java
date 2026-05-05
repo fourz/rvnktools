@@ -16,6 +16,7 @@ import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.AnnouncementController;
+import org.fourz.rvnkcore.api.controller.WhitelistController;
 import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
@@ -142,6 +143,9 @@ public class ServletFactory {
         // Register notification controller
         registerNotificationController(context);
 
+        // Whitelist management
+        registerWhitelistController(context);
+
         // Plugin controllers — registered if their API service is available in ServiceRegistry
         registerBarterShopsController(context);
         registerLoreController(context);
@@ -199,6 +203,13 @@ public class ServletFactory {
         NotificationController controller = new NotificationController(null, gson, notifLogger);
         context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
         logger.info("Notification API controller registered at /v1/notifications/*");
+    }
+
+    private void registerWhitelistController(ServletContextHandler context) {
+        LogManager whitelistLogger = LogManager.getInstance(plugin, WhitelistController.class);
+        WhitelistController controller = new WhitelistController(gson, whitelistLogger, plugin);
+        context.addServlet(new ServletHolder(controller), "/v1/whitelist/*");
+        logger.info("Whitelist API controller registered at /v1/whitelist/*");
     }
 
     /**
