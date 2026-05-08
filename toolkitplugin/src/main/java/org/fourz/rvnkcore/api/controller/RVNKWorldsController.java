@@ -66,10 +66,11 @@ public class RVNKWorldsController extends HttpServlet {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
 
+        // Fall back to Bukkit-backed read-only service when RVNKWorlds is not loaded.
+        // See RVNKWorldsFallbackService — keep response shapes in sync with WorldApiEndpointImpl.
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
-            return;
+            apiService = new RVNKWorldsFallbackService();
         }
 
         String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
