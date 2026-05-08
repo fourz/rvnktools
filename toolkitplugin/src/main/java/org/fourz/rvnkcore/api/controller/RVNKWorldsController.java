@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * REST API controller for RVNKWorlds endpoints.
  * Routes HTTP requests to {@link IRVNKWorldsApiService} provided by the RVNKWorlds plugin.
  *
- * <p>If the RVNKWorlds plugin is not loaded (service not registered), all endpoints return 503.</p>
+ * <p>If the RVNKWorlds plugin is not loaded (service not registered), all endpoints return 501.</p>
  *
  * @since 1.4.0
  */
@@ -68,7 +68,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
             return;
         }
 
@@ -113,7 +113,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
             return;
         }
 
@@ -154,7 +154,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
             return;
         }
 
