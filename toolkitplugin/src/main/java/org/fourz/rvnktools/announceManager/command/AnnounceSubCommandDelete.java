@@ -23,11 +23,15 @@ public class AnnounceSubCommandDelete extends AnnounceSubCommand {
         }
 
         String id = args[1];
+        if (!id.startsWith("ann_")) {
+            messageSender(sender, "&cInvalid announcement ID: &e" + id + " &c(expected format: ann_XXXXXXXX)");
+            return false;
+        }
         if (announceManager.deleteAnnouncement(id)) {
             messageSender(sender, "&aAnnouncement deleted successfully");
             return true;
         } else {
-            messageSender(sender, "&cFailed to delete announcement: " + id);
+            messageSender(sender, "&cAnnouncement not found: &e" + id);
             return false;
         }
     }

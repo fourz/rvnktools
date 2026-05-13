@@ -351,6 +351,11 @@ public class AnnounceManager {
             return false;
         }
 
+        if (!announcements.containsKey(id)) {
+            logger.debug("Announcement not found: " + id);
+            return false;
+        }
+
         try {
             if (announcementService != null) {
                 announcementService.deleteAnnouncement(id).join();

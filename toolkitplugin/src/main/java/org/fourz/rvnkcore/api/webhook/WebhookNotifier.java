@@ -4,10 +4,13 @@ import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -216,11 +219,24 @@ public class WebhookNotifier {
         sendAsync(payload, "Webhook ban " + config.getServerId());
     }
 
+    private String hmacSha256(String secret, String payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] bytes = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("HMAC-SHA256 failed", e);
+        }
+    }
+
     private void sendAsync(String payload, String logTag) {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(config.getUrl()))
             .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
+            .header("X-Webhook-Signature", "sha256=" + hmacSha256(config.getSecret(), payload))
             .POST(HttpRequest.BodyPublishers.ofString(payload))
             .timeout(Duration.ofMillis(config.getTimeoutMs()))
             .build();
