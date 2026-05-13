@@ -131,8 +131,8 @@ public class ServletFactory {
         // Also register player controller for singular player endpoints
         context.addServlet(new ServletHolder(playerController), "/v1/player/*");
 
-        // Register announcement controller
-        registerAnnouncementController(context);
+        // Announcements controller is now owned by RVNKEvents via IServletRegistrationService (#868)
+        // registerAnnouncementController(context);
 
         // Register world controller
         registerWorldController(context);

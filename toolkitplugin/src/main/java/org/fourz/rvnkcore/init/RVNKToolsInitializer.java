@@ -89,8 +89,9 @@ public class RVNKToolsInitializer {
         initializeLinkMaker();
         logger.debug("  + LinkMaker initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
-        initializeAnnounceManager();
-        logger.debug("  + AnnounceManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+        // AnnounceManager is now owned by RVNKEvents plugin (#867/#868)
+        // initializeAnnounceManager();
+        // logger.debug("  + AnnounceManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         checkPlaceholderAPI();
         logger.debug("  + PlaceholderAPI checked (" + (System.currentTimeMillis() - startTime) + "ms)");
@@ -281,11 +282,9 @@ public class RVNKToolsInitializer {
                 logger.info("PlayerPreferencesCommand registered");
             }
 
-            // Register AnnounceManager commands
-            AnnounceManager announceManager = registry.getService(AnnounceManager.class);
-            if (announceManager != null) {
-                announceManager.registerCommands();
-            }
+            // AnnounceManager commands now owned by RVNKEvents plugin (#868)
+            // AnnounceManager announceManager = registry.getService(AnnounceManager.class);
+            // if (announceManager != null) { announceManager.registerCommands(); }
         } catch (Exception e) {
             logger.error("Failed to register bundled component commands", e);
         }
