@@ -10,8 +10,6 @@ import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
-import org.fourz.rvnktools.announceManager.AnnounceManager;
-
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.listener.JoinListener;
@@ -89,10 +87,6 @@ public class RVNKToolsInitializer {
         initializeLinkMaker();
         logger.debug("  + LinkMaker initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
-        // AnnounceManager is now owned by RVNKEvents plugin (#867/#868)
-        // initializeAnnounceManager();
-        // logger.debug("  + AnnounceManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
-
         checkPlaceholderAPI();
         logger.debug("  + PlaceholderAPI checked (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -110,7 +104,7 @@ public class RVNKToolsInitializer {
         logger.debug("  + Bundled commands registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, AnnounceManager, Events, LogFilter, CommandManager (" + totalTime + "ms)");
+        logger.info("RVNKTools components initialized: ToolsConfig, Permissions, Economy, LinkMaker, Events, LogFilter, CommandManager (" + totalTime + "ms)");
     }
 
     /**
@@ -118,16 +112,6 @@ public class RVNKToolsInitializer {
      */
     public void shutdownAll() {
         logger.info("Shutting down RVNKTools components...");
-
-        // Shutdown AnnounceManager
-        try {
-            AnnounceManager announceManager = registry.getService(AnnounceManager.class);
-            if (announceManager != null) {
-                announceManager.shutdown();
-            }
-        } catch (Exception e) {
-            // Service may not be registered
-        }
 
         // Shutdown LogFilter
         try {
@@ -198,16 +182,6 @@ public class RVNKToolsInitializer {
             logger.info("LinkMaker registered");
         } catch (Exception e) {
             logger.error("Failed to initialize LinkMaker", e);
-        }
-    }
-
-    private void initializeAnnounceManager() {
-        try {
-            AnnounceManager announceManager = new AnnounceManager(plugin);
-            registry.registerService(AnnounceManager.class, announceManager);
-            logger.info("AnnounceManager registered");
-        } catch (Exception e) {
-            logger.error("Failed to initialize AnnounceManager", e);
         }
     }
 
@@ -282,9 +256,6 @@ public class RVNKToolsInitializer {
                 logger.info("PlayerPreferencesCommand registered");
             }
 
-            // AnnounceManager commands now owned by RVNKEvents plugin (#868)
-            // AnnounceManager announceManager = registry.getService(AnnounceManager.class);
-            // if (announceManager != null) { announceManager.registerCommands(); }
         } catch (Exception e) {
             logger.error("Failed to register bundled component commands", e);
         }

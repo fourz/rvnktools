@@ -15,7 +15,6 @@ import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
-import org.fourz.rvnkcore.api.controller.AnnouncementController;
 import org.fourz.rvnkcore.api.controller.WhitelistController;
 import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.docs.OpenApiHandler;
@@ -23,7 +22,6 @@ import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.PushSubscriptionService;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -39,7 +37,6 @@ public class ServletFactory {
     private final LogManager logger;
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
-    private final AnnouncementService announcementService;
     private final WorldService worldService;
     private final AuthTokenStore authTokenStore;
     private final Gson gson;
@@ -52,14 +49,12 @@ public class ServletFactory {
      * @param logger Logger instance
      * @param playerService Player service for data operations
      * @param playerWorldService Player world service for world-specific data operations
-     * @param announcementService Announcement service for data operations
      * @param worldService World service for world tracking and management
      * @param authTokenStore Authentication token store for magic link flow
      * @param gson JSON serializer instance
      */
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger,
                                  PlayerService playerService, PlayerWorldService playerWorldService,
-                                 AnnouncementService announcementService,
                                  WorldService worldService,
                                  AuthTokenStore authTokenStore, Gson gson) {
         this.config = config;
@@ -67,7 +62,6 @@ public class ServletFactory {
         this.logger = logger;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
-        this.announcementService = announcementService;
         this.worldService = worldService;
         this.authTokenStore = authTokenStore;
         this.gson = gson;
@@ -131,9 +125,6 @@ public class ServletFactory {
         // Also register player controller for singular player endpoints
         context.addServlet(new ServletHolder(playerController), "/v1/player/*");
 
-        // Announcements controller is now owned by RVNKEvents via IServletRegistrationService (#868)
-        // registerAnnouncementController(context);
-
         // Register world controller
         registerWorldController(context);
         
@@ -150,20 +141,6 @@ public class ServletFactory {
         registerBarterShopsController(context);
         registerLoreController(context);
         registerRVNKWorldsController(context);
-    }
-
-    /**
-     * Registers the announcement controller with the servlet context.
-     *
-     * @param context The servlet context to configure
-     */
-    private void registerAnnouncementController(ServletContextHandler context) {
-        // Register announcement controller with proper class-specific logger
-        LogManager announcementControllerLogger = LogManager.getInstance(plugin, 
-            org.fourz.rvnkcore.api.controller.AnnouncementController.class);
-        
-        AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger, gson);
-        context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
     }
 
     /**

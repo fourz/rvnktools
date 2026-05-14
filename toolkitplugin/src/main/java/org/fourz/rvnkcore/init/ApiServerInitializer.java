@@ -6,7 +6,6 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -64,7 +63,6 @@ public class ApiServerInitializer {
      * <ul>
      *   <li>{@link PlayerService}</li>
      *   <li>{@link PlayerWorldService}</li>
-     *   <li>{@link AnnouncementService}</li>
      *   <li>{@link WorldService}</li>
      * </ul>
      *
@@ -88,9 +86,6 @@ public class ApiServerInitializer {
             PlayerWorldService playerWorldService = registry.getService(PlayerWorldService.class);
             logger.debug("  + PlayerWorldService retrieved");
 
-            AnnouncementService announcementService = registry.getService(AnnouncementService.class);
-            logger.debug("  + AnnouncementService retrieved");
-
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
 
@@ -104,7 +99,6 @@ public class ApiServerInitializer {
                 apiConfig,
                 playerService,
                 playerWorldService,
-                announcementService,
                 worldService,
                 authTokenStore,
                 plugin

@@ -2,7 +2,6 @@ package org.fourz.rvnkcore;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
@@ -18,7 +17,6 @@ import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 // Bundled component imports for accessor compatibility
-import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
@@ -280,15 +278,6 @@ public class RVNKCore extends JavaPlugin implements Listener {
     }
 
     /**
-     * Gets the AnnouncementService for announcement management.
-     *
-     * @return AnnouncementService instance
-     */
-    public AnnouncementService getAnnouncementService() {
-        return getService(AnnouncementService.class);
-    }
-
-    /**
      * Safely retrieves a service from the ServiceRegistry without throwing.
      *
      * <p>Returns null if RVNKCore is not initialized, the registry is unavailable,
@@ -353,14 +342,6 @@ public class RVNKCore extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * Gets the AnnounceManager for announcement operations.
-     *
-     * @return AnnounceManager instance
-     */
-    public AnnounceManager getAnnounceManager() {
-        return getService(AnnounceManager.class);
-    }
 
     /**
      * Gets the LinkMaker for link creation operations.
