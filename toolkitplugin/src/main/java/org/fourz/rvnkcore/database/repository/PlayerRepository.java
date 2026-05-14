@@ -225,14 +225,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         // Parse groups from JSON array string (e.g. ["default","member"])
         String groupsStr = rs.getString("groups");
         if (groupsStr != null && !groupsStr.trim().isEmpty()) {
-            try {
-                Type listType = new TypeToken<List<String>>(){}.getType();
-                List<String> groups = new Gson().fromJson(groupsStr, listType);
-                if (groups != null) builder.groups(groups);
-            } catch (Exception e) {
-                // Fallback for legacy CSV rows not yet migrated
-                builder.groups(Arrays.asList(groupsStr.split(",")));
-            }
+            Type listType = new TypeToken<List<String>>(){}.getType();
+            List<String> groups = new Gson().fromJson(groupsStr, listType);
+            if (groups != null) builder.groups(groups);
         }
         
         return builder.build();

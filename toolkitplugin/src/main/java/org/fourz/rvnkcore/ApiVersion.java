@@ -9,6 +9,13 @@ package org.fourz.rvnkcore;
  *
  * <p>Version history:
  * <ul>
+ *   <li><b>1.2</b> (May 2026, RVNKCore 1.5.x)
+ *     <ul>
+ *       <li>{@code POST /v1/whitelist/add} — add player to whitelist</li>
+ *       <li>{@code DELETE /v1/whitelist/{ign}} — remove player from whitelist</li>
+ *       <li>{@code GET /v1/whitelist/{ign}} — check whitelist status</li>
+ *     </ul>
+ *   </li>
  *   <li><b>1.1</b> (Apr 2026, RVNKCore 1.5.0-alpha)
  *     <ul>
  *       <li>Trade responses include new {@code itemType} field (material name extracted from {@code itemStackData})</li>
@@ -22,7 +29,7 @@ package org.fourz.rvnkcore;
  * </p>
  */
 public final class ApiVersion {
-    public static final String API_VERSION = "1.1";
+    public static final String API_VERSION = "1.2";
 
     private ApiVersion() {}
 }
