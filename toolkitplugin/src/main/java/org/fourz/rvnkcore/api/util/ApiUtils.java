@@ -142,6 +142,28 @@ public final class ApiUtils {
     }
 
     /**
+     * Sends an error JSON response, deriving the machine-readable code from the HTTP status.
+     * Convenience overload — callers that do not need a custom code string should use this.
+     *
+     * @param resp    HTTP response
+     * @param gson    JSON serializer
+     * @param status  HTTP status code
+     * @param message Human-readable error description
+     */
+    public static void sendError(HttpServletResponse resp, Gson gson, int status, String message) {
+        String code = switch (status) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 403 -> "FORBIDDEN";
+            case 404 -> "NOT_FOUND";
+            case 503 -> "SERVICE_UNAVAILABLE";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        sendError(resp, gson, status, code, message);
+    }
+
+    /**
      * Writes an arbitrary object as JSON to the response with the given HTTP status.
      *
      * @param resp   HTTP response
