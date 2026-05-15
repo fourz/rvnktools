@@ -140,7 +140,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
         ServletRegistration registration = new ServletRegistration(servlet, displayName, requireAuth, false);
         registeredServlets.put(normalizedPath, registration);
         
-        logger.info("Registered external servlet: " + displayName + " at " + normalizedPath + 
+        logger.debug("Registered external servlet: " + displayName + " at " + normalizedPath + 
                    (requireAuth ? " (authenticated)" : " (public)"));
         
         // If server is running, apply immediately
@@ -159,7 +159,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
         
         ServletRegistration removed = registeredServlets.remove(normalizedPath);
         if (removed != null) {
-            logger.info("Unregistered external servlet at: " + normalizedPath);
+            logger.debug("Unregistered external servlet at: " + normalizedPath);
             // Note: Actual servlet removal from Jetty requires server restart
             if (removed.applied()) {
                 logger.warning("Servlet was active - full removal requires server restart");

@@ -82,7 +82,7 @@ public class ApiConfig {
 
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(logLevelStr) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+        logger.debug("RVNKCore API configuration loaded - Enabled: " + enabled +
                    ", Global Log Level: " + logLevelStr +
                    ", API Log Level: " + apiLogStr +
                    ", HTTP Port: " + httpPort +
@@ -147,7 +147,7 @@ public class ApiConfig {
 
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(globalLogLevel.getName()) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+        logger.debug("RVNKCore API configuration loaded - Enabled: " + enabled +
                    ", Global Log Level: " + globalLogLevel.getName() +
                    ", API Log Level: " + apiLogStr +
                    ", HTTP Port: " + httpPort +

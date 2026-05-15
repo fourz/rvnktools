@@ -166,7 +166,7 @@ public class ServletFactory {
         LogManager authLogger = LogManager.getInstance(plugin, AuthController.class);
         AuthController authController = new AuthController(authTokenStore, playerService, gson, authLogger);
         context.addServlet(new ServletHolder(authController), "/v1/auth/*");
-        logger.info("Auth API controller registered at /v1/auth/*");
+        logger.debug("Auth API controller registered at /v1/auth/*");
     }
 
     /**
@@ -179,14 +179,14 @@ public class ServletFactory {
         LogManager notifLogger = LogManager.getInstance(plugin, NotificationController.class);
         NotificationController controller = new NotificationController(null, gson, notifLogger);
         context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
-        logger.info("Notification API controller registered at /v1/notifications/*");
+        logger.debug("Notification API controller registered at /v1/notifications/*");
     }
 
     private void registerWhitelistController(ServletContextHandler context) {
         LogManager whitelistLogger = LogManager.getInstance(plugin, WhitelistController.class);
         WhitelistController controller = new WhitelistController(gson, whitelistLogger, plugin);
         context.addServlet(new ServletHolder(controller), "/v1/whitelist/*");
-        logger.info("Whitelist API controller registered at /v1/whitelist/*");
+        logger.debug("Whitelist API controller registered at /v1/whitelist/*");
     }
 
     /**
@@ -198,7 +198,7 @@ public class ServletFactory {
             LogManager controllerLogger = LogManager.getInstance(plugin, BarterShopsController.class);
             BarterShopsController controller = new BarterShopsController(null, gson, controllerLogger);
             context.addServlet(new ServletHolder(controller), "/bartershops/*");
-            logger.info("BarterShops API controller registered at /bartershops/* (service resolved lazily)");
+            logger.debug("BarterShops API controller registered at /bartershops/* (service resolved lazily)");
         } catch (Throwable e) {
             logger.warning("BarterShops API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
         }
@@ -213,7 +213,7 @@ public class ServletFactory {
             LogManager controllerLogger = LogManager.getInstance(plugin, RVNKWorldsController.class);
             RVNKWorldsController controller = new RVNKWorldsController(null, gson, controllerLogger);
             context.addServlet(new ServletHolder(controller), "/rvnkworlds/*");
-            logger.info("RVNKWorlds API controller registered at /rvnkworlds/* (service resolved lazily)");
+            logger.debug("RVNKWorlds API controller registered at /rvnkworlds/* (service resolved lazily)");
         } catch (Throwable e) {
             logger.warning("RVNKWorlds API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
         }
@@ -228,7 +228,7 @@ public class ServletFactory {
             LogManager controllerLogger = LogManager.getInstance(plugin, LoreController.class);
             LoreController controller = new LoreController(null, gson, controllerLogger);
             context.addServlet(new ServletHolder(controller), "/lore/*");
-            logger.info("RVNKLore API controller registered at /lore/* (service resolved lazily)");
+            logger.debug("RVNKLore API controller registered at /lore/* (service resolved lazily)");
         } catch (Throwable e) {
             logger.warning("RVNKLore API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
         }
@@ -275,7 +275,7 @@ public class ServletFactory {
             context.addFilter(corsHolder, "/*",
                     EnumSet.of(DispatcherType.REQUEST, DispatcherType.ASYNC));
 
-            logger.info("CORS filter registered - Origins: " + config.getCorsAllowedOrigins()
+            logger.debug("CORS filter registered - Origins: " + config.getCorsAllowedOrigins()
                     + ", Methods: " + config.getCorsAllowedMethods());
         } catch (Exception e) {
             logger.warning("Failed to register CORS filter: " + e.getMessage());
@@ -312,7 +312,7 @@ public class ServletFactory {
     private void registerOpenApiDocs(ServletContextHandler context) {
         OpenApiHandler docsHandler = new OpenApiHandler();
         context.addServlet(new ServletHolder(docsHandler), "/docs/*");
-        logger.info("OpenAPI docs registered at " + config.getContextPath() + "/docs/ui");
+        logger.debug("OpenAPI docs registered at " + config.getContextPath() + "/docs/ui");
     }
 
     /**

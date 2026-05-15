@@ -127,8 +127,8 @@ public class MySQLConnectionProvider implements ConnectionProvider {
                 return;
             }
             
-            logger.info("Initializing MySQL connection provider - Host: " + config.getHost() + ":" + config.getPort() + ", Database: " + config.getDatabase());
-            logger.info("Initializing MySQL connection pool");
+            logger.debug("Initializing MySQL connection provider - Host: " + config.getHost() + ":" + config.getPort() + ", Database: " + config.getDatabase());
+            logger.debug("Initializing MySQL connection pool");
             
             HikariConfig hikariConfig = new HikariConfig();
             
@@ -169,7 +169,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             this.dataSource = new HikariDataSource(hikariConfig);
             this.initialized = true;
             
-            logger.info("MySQL connection pool initialized successfully - Max connections: " + 
+            logger.debug("MySQL connection pool initialized successfully - Max connections: " + 
                        config.getMaxConnections() + ", Min idle: " + config.getMinIdleConnections());
             
         } catch (Exception e) {

@@ -48,9 +48,9 @@ public class DatabaseSetup {
         this.tablePrefix = plugin.getConfig().getString("storage." + storageType + ".tablePrefix", "");
 
         if (tablePrefix != null && !tablePrefix.isEmpty()) {
-            logger.info("DatabaseSetup using table prefix: " + tablePrefix);
+            logger.debug("DatabaseSetup using table prefix: " + tablePrefix);
         }
-        logger.info("DatabaseSetup initialized for database type: " + databaseType);
+        logger.debug("DatabaseSetup initialized for database type: " + databaseType);
     }
 
     /**

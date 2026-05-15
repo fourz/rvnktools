@@ -79,16 +79,16 @@ public class RVNKCore extends JavaPlugin implements Listener {
         logger.info("=== RVNKCore Starting ===");
 
         // Phase 1: Initialize Core Framework
-        logger.info("Phase 1: Initializing Core Framework...");
+        logger.debug("Phase 1: Initializing Core Framework...");
         long phase1Start = System.currentTimeMillis();
         initializeCoreFramework();
-        logger.info("Phase 1 complete (" + (System.currentTimeMillis() - phase1Start) + "ms)");
+        logger.debug("Phase 1 complete (" + (System.currentTimeMillis() - phase1Start) + "ms)");
 
         // Phase 2: Initialize Bundled RVNKTools Components
-        logger.info("Phase 2: Initializing Bundled Components...");
+        logger.debug("Phase 2: Initializing Bundled Components...");
         long phase2Start = System.currentTimeMillis();
         initializeBundledComponents();
-        logger.info("Phase 2 complete (" + (System.currentTimeMillis() - phase2Start) + "ms)");
+        logger.debug("Phase 2 complete (" + (System.currentTimeMillis() - phase2Start) + "ms)");
 
         logger.info("=== RVNKCore Enabled === (Total startup: " + (System.currentTimeMillis() - totalStartTime) + "ms)");
     }
@@ -112,7 +112,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
     // ============================================================
 
     private void initializeCoreFramework() {
-        logger.info("Initializing core framework...");
+        logger.debug("Initializing core framework...");
 
         try {
             // Initialize service registry
@@ -134,7 +134,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
             apiInitializer.start();
 
             coreInitialized = true;
-            logger.info("Core framework initialization complete");
+            logger.debug("Core framework initialization complete");
 
         } catch (Exception e) {
             logger.error("Failed to initialize core framework", e);
