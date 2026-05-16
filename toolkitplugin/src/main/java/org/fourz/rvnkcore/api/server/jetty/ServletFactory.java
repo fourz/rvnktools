@@ -106,6 +106,7 @@ public class ServletFactory {
         context.addFilter(authHolder, "/bartershops/*", null);
         context.addFilter(authHolder, "/lore/*", null);
         context.addFilter(authHolder, "/rvnkworlds/*", null);
+        context.addFilter(authHolder, "/docs/*", null);
     }
 
     /**
