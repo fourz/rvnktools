@@ -298,7 +298,8 @@ public class PlayerController extends HttpServlet {
             return;
         }
         try {
-            List<PlayerDTO> players = playerService.searchPlayersByName("%" + name + "%")
+            String escaped = name.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+            List<PlayerDTO> players = playerService.searchPlayersByName("%" + escaped + "%")
                                                .get(15, TimeUnit.SECONDS);
             List<PlayerResponse> responses = players.stream()
                                                 .map(this::convertToResponse)

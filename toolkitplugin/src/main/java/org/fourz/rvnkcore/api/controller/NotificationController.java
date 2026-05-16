@@ -211,6 +211,13 @@ public class NotificationController extends HttpServlet {
         }
 
         try {
+            java.util.UUID.fromString(uuid);
+        } catch (IllegalArgumentException e) {
+            ApiUtils.sendError(resp, gson, 400, "INVALID_UUID", "Invalid UUID format.");
+            return;
+        }
+
+        try {
             List<PushSubscriptionDTO> subs = service.getSubscriptionsByPlayer(uuid)
                     .get(10, TimeUnit.SECONDS);
             ApiUtils.sendSuccess(resp, gson, subs);

@@ -161,7 +161,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             QueryBuilder builder = createQueryBuilder();
             String query = builder.select("*")
                 .from(tableName)
-                .where("current_name LIKE ? OR name_history LIKE ?")
+                .where("current_name LIKE ? ESCAPE '!' OR name_history LIKE ? ESCAPE '!'")
                 .orderBy("current_name", true)
                 .build();
                 
