@@ -71,24 +71,20 @@ public class WhitelistController extends HttpServlet {
             ApiUtils.sendError(resp, gson, 400, "MISSING_IGN", "Path must be /v1/whitelist/{ign}");
             return;
         }
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(plugin, () ->
-                future.complete(Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "whitelist remove " + ign))
-        );
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getOfflinePlayer(ign).setWhitelisted(false);
+            future.complete(null);
+        });
         try {
-            boolean ok = future.get(5, TimeUnit.SECONDS);
-            if (ok) {
-                logger.info("[whitelist] Removed: " + ign);
-                ApiUtils.sendJson(resp, gson, 200, Map.of("ign", ign, "removed", true));
-            } else {
-                ApiUtils.sendError(resp, gson, 500, "COMMAND_FAILED",
-                        "Whitelist remove command returned failure for: " + ign);
-            }
+            future.get(5, TimeUnit.SECONDS);
+            logger.info("[whitelist] Removed: " + ign);
+            ApiUtils.sendJson(resp, gson, 200, Map.of("ign", ign, "removed", true));
         } catch (TimeoutException e) {
-            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist command timed out");
+            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist operation timed out");
         } catch (Exception e) {
             logger.error("[whitelist] Error removing: " + ign, e);
-            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to execute whitelist remove command");
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to remove from whitelist");
         }
     }
 
@@ -113,28 +109,23 @@ public class WhitelistController extends HttpServlet {
             return;
         }
 
-        // Bukkit.dispatchCommand must run on the main thread
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(plugin, () ->
-                future.complete(Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "whitelist add " + ign))
-        );
+        // Must run on the main thread
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getOfflinePlayer(ign).setWhitelisted(true);
+            future.complete(null);
+        });
 
         try {
-            boolean ok = future.get(5, TimeUnit.SECONDS);
-            if (ok) {
-                logger.info("[whitelist] Added: " + ign);
-                ApiUtils.sendSuccess(resp, gson, Map.of("ign", ign));
-            } else {
-                logger.warning("[whitelist] Command returned false for: " + ign);
-                ApiUtils.sendError(resp, gson, 500, "COMMAND_FAILED",
-                        "Whitelist command returned failure for: " + ign);
-            }
+            future.get(5, TimeUnit.SECONDS);
+            logger.info("[whitelist] Added: " + ign);
+            ApiUtils.sendSuccess(resp, gson, Map.of("ign", ign));
         } catch (TimeoutException e) {
-            logger.error("[whitelist] Timed out dispatching whitelist add for: " + ign);
-            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist command timed out");
+            logger.error("[whitelist] Timed out adding: " + ign);
+            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist operation timed out");
         } catch (Exception e) {
-            logger.error("[whitelist] Error dispatching command for: " + ign, e);
-            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to execute whitelist command");
+            logger.error("[whitelist] Error adding: " + ign, e);
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to add to whitelist");
         }
     }
 
