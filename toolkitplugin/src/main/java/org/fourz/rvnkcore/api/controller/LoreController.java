@@ -103,7 +103,7 @@ public class LoreController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling Lore API request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -131,7 +131,7 @@ public class LoreController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling Lore API POST: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 

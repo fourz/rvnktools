@@ -120,7 +120,7 @@ public class BarterShopsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling BarterShops API request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -165,7 +165,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops POST request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -219,7 +219,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops PATCH request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -256,7 +256,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops DELETE request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -284,7 +284,7 @@ public class BarterShopsController extends HttpServlet {
             double radius = radiusStr != null ? Double.parseDouble(radiusStr) : 50.0;
             return getApiService().getShopsNearby(world, x, y, z, radius);
         } catch (NumberFormatException e) {
-            sendError(resp, 400, "INVALID_REQUEST", "Invalid coordinate format: " + e.getMessage());
+            sendError(resp, 400, "INVALID_REQUEST", "Invalid request format.");
             return null;
         }
     }

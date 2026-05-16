@@ -114,7 +114,7 @@ public class PlayerController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling GET request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
@@ -206,7 +206,7 @@ public class PlayerController extends HttpServlet {
             sendError(resp, 400, "Invalid UUID format");
         } catch (Exception e) {
             logger.error("Error handling PUT request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
