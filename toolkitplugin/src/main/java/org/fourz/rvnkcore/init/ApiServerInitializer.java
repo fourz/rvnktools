@@ -112,13 +112,15 @@ public class ApiServerInitializer {
             registry.registerService(IServletRegistrationService.class, apiServer.getServletRegistrationService());
             logger.debug("  + IServletRegistrationService registered");
 
-            // Initialize webhook notifier if configured
+            // Register webhook notifier unconditionally — methods no-op when disabled
             WebhookConfig webhookConfig = configLoader.getWebhookConfig();
-            if (webhookConfig.isEnabled() && webhookConfig.validate(logger)) {
-                WebhookNotifier notifier = new WebhookNotifier(webhookConfig, logger);
-                registry.registerService(WebhookNotifier.class, notifier);
-                logger.info("Webhook notifier registered — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            if (webhookConfig.isEnabled()) {
+                webhookConfig.validate(logger);
+                logger.info("Webhook notifier enabled — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            } else {
+                logger.debug("Webhook notifier registered (disabled — no-op mode)");
             }
+            registry.registerService(WebhookNotifier.class, new WebhookNotifier(webhookConfig, logger));
 
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");

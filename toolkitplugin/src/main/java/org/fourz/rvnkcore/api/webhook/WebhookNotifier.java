@@ -61,6 +61,7 @@ public class WebhookNotifier {
      * The HTTP POST is sent asynchronously and never blocks the calling thread.
      */
     public void notifyPlayerChange() {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = lastFiredAt.get();
         long debounceMs = config.getDebounceSeconds() * 1000L;
@@ -91,6 +92,7 @@ public class WebhookNotifier {
      * @param announcementId The ID of the changed announcement (included in payload for targeted cache invalidation)
      */
     public void notifyAnnouncementChange(String announcementId) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "announcement_change",
             "server", config.getServerId(),
@@ -117,6 +119,7 @@ public class WebhookNotifier {
      * @param eventId The ID of the changed event (for targeted cache invalidation)
      */
     public void notifyEventChange(String eventId) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "event_change",
             "server", config.getServerId(),
@@ -141,6 +144,7 @@ public class WebhookNotifier {
      * @param shopId The ID of the changed shop (included in payload for targeted cache invalidation)
      */
     public void notifyShopChange(String shopId) {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = shopLastFiredAt.get();
 
@@ -178,6 +182,7 @@ public class WebhookNotifier {
      * @param shopId The ID of the shop where the trade occurred
      */
     public void notifyTradeComplete(String shopId) {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = tradeLastFiredAt.get();
 
@@ -208,6 +213,7 @@ public class WebhookNotifier {
      * @param playerName The banned player's name
      */
     public void notifyPlayerBanned(String uuid, String playerName) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "player_banned",
             "server", config.getServerId(),
