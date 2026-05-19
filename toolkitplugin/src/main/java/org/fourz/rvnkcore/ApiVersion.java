@@ -9,6 +9,11 @@ package org.fourz.rvnkcore;
  *
  * <p>Version history:
  * <ul>
+ *   <li><b>1.3</b> (May 2026, RVNKCore 1.5.4-alpha)
+ *     <ul>
+ *       <li>fourzorg-api proxy version sync</li>
+ *     </ul>
+ *   </li>
  *   <li><b>1.2</b> (May 2026, RVNKCore 1.5.x)
  *     <ul>
  *       <li>{@code POST /v1/whitelist/add} — add player to whitelist</li>
@@ -29,7 +34,7 @@ package org.fourz.rvnkcore;
  * </p>
  */
 public final class ApiVersion {
-    public static final String API_VERSION = "1.2";
+    public static final String API_VERSION = "1.3";
 
     private ApiVersion() {}
 }
