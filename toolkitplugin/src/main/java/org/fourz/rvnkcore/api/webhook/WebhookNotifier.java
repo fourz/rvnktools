@@ -230,11 +230,18 @@ public class WebhookNotifier {
 
     private void sendCachePurgeAsync() {
         if (!config.isCachePurgeEnabled()) return;
+        String payload = GSON.toJson(Map.of(
+            "event", "cache_purge",
+            "env", config.getCachePurgeEnv(),
+            "server", config.getServerId(),
+            "timestamp", Instant.now().toString()
+        ));
         String url = config.getCachePurgeUrl() + "?env=" + config.getCachePurgeEnv();
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .header("X-Admin-Token", config.getCachePurgeToken())
-            .POST(HttpRequest.BodyPublishers.noBody())
+            .header("Content-Type", "application/json")
+            .header("X-Webhook-Signature", "sha256=" + hmacSha256(config.getSecret(), payload))
+            .POST(HttpRequest.BodyPublishers.ofString(payload))
             .timeout(Duration.ofMillis(config.getTimeoutMs()))
             .build();
         httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())

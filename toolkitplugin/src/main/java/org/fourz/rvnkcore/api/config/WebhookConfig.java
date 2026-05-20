@@ -26,12 +26,11 @@ public class WebhookConfig {
     private final int debounceSeconds;
     private final int timeoutMs;
     private final String cachePurgeUrl;
-    private final String cachePurgeToken;
     private final String cachePurgeEnv;
 
     private WebhookConfig(boolean enabled, String url, String secret, String serverId,
                           int debounceSeconds, int timeoutMs,
-                          String cachePurgeUrl, String cachePurgeToken, String cachePurgeEnv) {
+                          String cachePurgeUrl, String cachePurgeEnv) {
         this.enabled = enabled;
         this.url = url;
         this.secret = secret;
@@ -39,7 +38,6 @@ public class WebhookConfig {
         this.debounceSeconds = debounceSeconds;
         this.timeoutMs = timeoutMs;
         this.cachePurgeUrl = cachePurgeUrl != null ? cachePurgeUrl.trim() : "";
-        this.cachePurgeToken = cachePurgeToken != null ? cachePurgeToken.trim() : "";
         this.cachePurgeEnv = cachePurgeEnv != null ? cachePurgeEnv.trim() : "";
     }
 
@@ -51,7 +49,7 @@ public class WebhookConfig {
      */
     public static WebhookConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new WebhookConfig(false, "", "", "", 10, 5000, "", "", "");
+            return new WebhookConfig(false, "", "", "", 10, 5000, "", "");
         }
         ConfigurationSection purge = section.getConfigurationSection("cache-purge");
         return new WebhookConfig(
@@ -62,7 +60,6 @@ public class WebhookConfig {
             section.getInt("debounce-seconds", 10),
             section.getInt("timeout-ms", 5000),
             purge != null ? purge.getString("url", "") : "",
-            purge != null ? purge.getString("token", "") : "",
             purge != null ? purge.getString("env", "") : ""
         );
     }
@@ -134,9 +131,8 @@ public class WebhookConfig {
 
     /** Returns true if the cache-purge sub-section is fully configured. */
     public boolean isCachePurgeEnabled() {
-        return !cachePurgeUrl.isEmpty() && !cachePurgeToken.isEmpty() && !cachePurgeEnv.isEmpty();
+        return !cachePurgeUrl.isEmpty() && !cachePurgeEnv.isEmpty() && !secret.isEmpty();
     }
     public String getCachePurgeUrl() { return cachePurgeUrl; }
-    public String getCachePurgeToken() { return cachePurgeToken; }
     public String getCachePurgeEnv() { return cachePurgeEnv; }
 }
