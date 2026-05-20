@@ -101,6 +101,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook announcement " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -164,6 +165,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook shop " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -202,6 +204,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook trade " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -223,6 +226,23 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook ban " + config.getServerId());
+    }
+
+    private void sendCachePurgeAsync() {
+        if (!config.isCachePurgeEnabled()) return;
+        String url = config.getCachePurgeUrl() + "?env=" + config.getCachePurgeEnv();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-Admin-Token", config.getCachePurgeToken())
+            .POST(HttpRequest.BodyPublishers.noBody())
+            .timeout(Duration.ofMillis(config.getTimeoutMs()))
+            .build();
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenAccept(response -> logger.debug("Cache purge -> " + response.statusCode()))
+            .exceptionally(e -> {
+                logger.warning("Cache purge failed: " + e.getMessage());
+                return null;
+            });
     }
 
     private String hmacSha256(String secret, String payload) {

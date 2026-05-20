@@ -9,7 +9,11 @@ import java.net.UnknownHostException;
 
 /**
  * Configuration for outbound webhook notifications.
- * Webhooks fire on player events to trigger cache revalidation in external systems.
+ * Webhooks fire on player/data events to trigger cache revalidation in external systems.
+ *
+ * <p>Optional cache-purge sub-section sends a separate lightweight POST to the
+ * fourzorg-api /diag/cache/purge endpoint on data-changing events (announcements,
+ * shops, trades). Authenticated via X-Admin-Token rather than HMAC.
  *
  * @since 1.5.0
  */
@@ -21,14 +25,22 @@ public class WebhookConfig {
     private final String serverId;
     private final int debounceSeconds;
     private final int timeoutMs;
+    private final String cachePurgeUrl;
+    private final String cachePurgeToken;
+    private final String cachePurgeEnv;
 
-    private WebhookConfig(boolean enabled, String url, String secret, String serverId, int debounceSeconds, int timeoutMs) {
+    private WebhookConfig(boolean enabled, String url, String secret, String serverId,
+                          int debounceSeconds, int timeoutMs,
+                          String cachePurgeUrl, String cachePurgeToken, String cachePurgeEnv) {
         this.enabled = enabled;
         this.url = url;
         this.secret = secret;
         this.serverId = serverId;
         this.debounceSeconds = debounceSeconds;
         this.timeoutMs = timeoutMs;
+        this.cachePurgeUrl = cachePurgeUrl != null ? cachePurgeUrl.trim() : "";
+        this.cachePurgeToken = cachePurgeToken != null ? cachePurgeToken.trim() : "";
+        this.cachePurgeEnv = cachePurgeEnv != null ? cachePurgeEnv.trim() : "";
     }
 
     /**
@@ -39,15 +51,19 @@ public class WebhookConfig {
      */
     public static WebhookConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new WebhookConfig(false, "", "", "", 10, 5000);
+            return new WebhookConfig(false, "", "", "", 10, 5000, "", "", "");
         }
+        ConfigurationSection purge = section.getConfigurationSection("cache-purge");
         return new WebhookConfig(
             section.getBoolean("enabled", false),
             section.getString("url", ""),
             section.getString("secret", ""),
             section.getString("server-id", ""),
             section.getInt("debounce-seconds", 10),
-            section.getInt("timeout-ms", 5000)
+            section.getInt("timeout-ms", 5000),
+            purge != null ? purge.getString("url", "") : "",
+            purge != null ? purge.getString("token", "") : "",
+            purge != null ? purge.getString("env", "") : ""
         );
     }
 
@@ -115,4 +131,12 @@ public class WebhookConfig {
     public String getServerId() { return serverId; }
     public int getDebounceSeconds() { return debounceSeconds; }
     public int getTimeoutMs() { return timeoutMs; }
+
+    /** Returns true if the cache-purge sub-section is fully configured. */
+    public boolean isCachePurgeEnabled() {
+        return !cachePurgeUrl.isEmpty() && !cachePurgeToken.isEmpty() && !cachePurgeEnv.isEmpty();
+    }
+    public String getCachePurgeUrl() { return cachePurgeUrl; }
+    public String getCachePurgeToken() { return cachePurgeToken; }
+    public String getCachePurgeEnv() { return cachePurgeEnv; }
 }
