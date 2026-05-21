@@ -40,6 +40,7 @@ public class ServletFactory {
     private final WorldService worldService;
     private final AuthTokenStore authTokenStore;
     private final Gson gson;
+    private final LiveDataCache liveDataCache;
 
     /**
      * Creates a new servlet factory instance.
@@ -56,7 +57,7 @@ public class ServletFactory {
     public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger,
                                  PlayerService playerService, PlayerWorldService playerWorldService,
                                  WorldService worldService,
-                                 AuthTokenStore authTokenStore, Gson gson) {
+                                 AuthTokenStore authTokenStore, Gson gson, LiveDataCache liveDataCache) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
@@ -65,6 +66,7 @@ public class ServletFactory {
         this.worldService = worldService;
         this.authTokenStore = authTokenStore;
         this.gson = gson;
+        this.liveDataCache = liveDataCache;
     }
 
     /**
@@ -120,7 +122,7 @@ public class ServletFactory {
         LogManager playerControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.PlayerController.class);
         
-        PlayerController playerController = new PlayerController(playerService, playerWorldService, gson, playerControllerLogger);
+        PlayerController playerController = new PlayerController(playerService, playerWorldService, gson, playerControllerLogger, liveDataCache);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
         
         // Also register player controller for singular player endpoints
