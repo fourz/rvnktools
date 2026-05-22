@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.api.controller;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
 
 import java.util.*;
@@ -30,21 +31,23 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
      */
     @Override
     public CompletableFuture<ApiResponse<?>> listWorlds() {
-        return CompletableFuture.supplyAsync(() -> {
-            List<Map<String, Object>> summaries = new ArrayList<>();
-            for (World world : Bukkit.getServer().getWorlds()) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("name", world.getName());
-                entry.put("displayName", world.getName());
-                entry.put("state", "ACTIVE");
-                entry.put("environment", world.getEnvironment().name());
-                entry.put("groupName", "");
-                entry.put("playerCount", world.getPlayers().size());
-                entry.put("lastAccessed", System.currentTimeMillis());
-                summaries.add(entry);
-            }
-            return (ApiResponse<?>) ApiResponse.success(summaries);
-        });
+        LiveDataCache cache = LiveDataCache.getInstance();
+        List<LiveDataCache.WorldSnapshot> snapshot = cache != null
+                ? cache.getSnapshot().worlds
+                : List.of();
+        List<Map<String, Object>> summaries = new ArrayList<>();
+        for (LiveDataCache.WorldSnapshot w : snapshot) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("name", w.name());
+            entry.put("displayName", w.name());
+            entry.put("state", "ACTIVE");
+            entry.put("environment", w.environment());
+            entry.put("groupName", "");
+            entry.put("playerCount", w.playerCount());
+            entry.put("lastAccessed", System.currentTimeMillis());
+            summaries.add(entry);
+        }
+        return CompletableFuture.completedFuture(ApiResponse.success(summaries));
     }
 
     /**
@@ -93,31 +96,32 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
      */
     @Override
     public CompletableFuture<ApiResponse<?>> getMetrics() {
-        return CompletableFuture.supplyAsync(() -> {
-            List<World> worlds = Bukkit.getServer().getWorlds();
-            Map<String, Object> metrics = new LinkedHashMap<>();
-            metrics.put("totalWorlds", worlds.size());
-            metrics.put("loadedWorlds", worlds.size());
-            metrics.put("totalPlayers", Bukkit.getOnlinePlayers().size());
-            metrics.put("totalChunksLoaded", worlds.stream().mapToLong(w -> w.getLoadedChunks().length).sum());
-            metrics.put("uptimeMs", -1);
-            metrics.put("worldsByState", Map.of("ACTIVE", worlds.size()));
-            return (ApiResponse<?>) ApiResponse.success(metrics);
-        });
+        LiveDataCache cache = LiveDataCache.getInstance();
+        LiveDataCache.BukkitSnapshot snap = cache != null ? cache.getSnapshot() : null;
+        int worldCount = snap != null ? snap.worlds.size() : 0;
+        int onlineCount = snap != null ? snap.onlineCount : Bukkit.getOnlinePlayers().size();
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("totalWorlds", worldCount);
+        metrics.put("loadedWorlds", worldCount);
+        metrics.put("totalPlayers", onlineCount);
+        metrics.put("totalChunksLoaded", -1);
+        metrics.put("uptimeMs", -1);
+        metrics.put("worldsByState", Map.of("ACTIVE", worldCount));
+        return CompletableFuture.completedFuture(ApiResponse.success(metrics));
     }
 
     @Override
     public CompletableFuture<ApiResponse<?>> getHealthStatus() {
-        return CompletableFuture.supplyAsync(() -> {
-            Map<String, Object> health = new LinkedHashMap<>();
-            health.put("healthy", false);
-            health.put("version", "unavailable");
-            health.put("uptimeMs", -1);
-            health.put("managedWorlds", Bukkit.getServer().getWorlds().size());
-            health.put("databaseConnected", false);
-            health.put("message", "RVNKWorlds plugin not loaded");
-            return (ApiResponse<?>) ApiResponse.success(health);
-        });
+        LiveDataCache cache = LiveDataCache.getInstance();
+        int worldCount = (cache != null) ? cache.getSnapshot().worlds.size() : 0;
+        Map<String, Object> health = new LinkedHashMap<>();
+        health.put("healthy", false);
+        health.put("version", "unavailable");
+        health.put("uptimeMs", -1);
+        health.put("managedWorlds", worldCount);
+        health.put("databaseConnected", false);
+        health.put("message", "RVNKWorlds plugin not loaded");
+        return CompletableFuture.completedFuture(ApiResponse.success(health));
     }
 
     // ==================== Write Operations (unavailable without RVNKWorlds) ====================

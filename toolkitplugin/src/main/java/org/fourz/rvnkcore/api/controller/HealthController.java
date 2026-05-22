@@ -6,13 +6,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.bukkit.Bukkit;
 import org.fourz.rvnkcore.ApiVersion;
+import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * REST API controller for server health and status.
@@ -59,6 +62,15 @@ public class HealthController extends HttpServlet {
         data.put("maxPlayers", Bukkit.getMaxPlayers());
         data.put("memory", Map.of("used", usedMB, "max", maxMB));
         data.put("uptimeMs", uptimeMs);
+
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache != null) {
+            LiveDataCache.BukkitSnapshot snap = cache.getSnapshot();
+            data.put("worldsLoaded", snap.worlds.size());
+            data.put("worlds", snap.worlds.stream()
+                    .map(w -> Map.of("name", w.name(), "environment", w.environment()))
+                    .collect(Collectors.toList()));
+        }
 
         ApiUtils.sendSuccess(resp, gson, data);
     }

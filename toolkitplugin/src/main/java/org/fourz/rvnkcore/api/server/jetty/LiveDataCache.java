@@ -23,7 +23,17 @@ public class LiveDataCache {
 
     private static final int INTERVAL_TICKS = 200; // 10 seconds
 
+    private static volatile LiveDataCache INSTANCE;
+
     private final AtomicReference<BukkitSnapshot> ref = new AtomicReference<>(BukkitSnapshot.EMPTY);
+
+    public LiveDataCache() {
+        INSTANCE = this;
+    }
+
+    public static LiveDataCache getInstance() {
+        return INSTANCE;
+    }
 
     public void start(Plugin plugin) {
         Bukkit.getScheduler().runTaskTimer(plugin, this::refresh, 0L, INTERVAL_TICKS);

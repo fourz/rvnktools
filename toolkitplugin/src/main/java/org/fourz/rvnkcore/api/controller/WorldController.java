@@ -11,11 +11,11 @@ import org.fourz.rvnkcore.util.log.LogManager;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.bukkit.Bukkit;
-import org.bukkit.World;
+import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,16 +90,25 @@ public class WorldController extends HttpServlet {
     }
 
     /**
-     * Handles GET /api/worlds - Get all worlds with metadata
+     * Handles GET /api/worlds - Live world list from LiveDataCache snapshot (always available).
      */
     private void handleGetAllWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try {
-            var worlds = worldService.getAllWorlds().get(30, TimeUnit.SECONDS);
-            sendResponse(response, worlds);
-        } catch (Exception e) {
-            logger.error("Failed to get all worlds", e);
-            sendErrorResponse(response, 500, "Failed to retrieve worlds");
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache == null) {
+            sendErrorResponse(response, 503, "Server not ready");
+            return;
         }
+        List<Map<String, Object>> worlds = cache.getSnapshot().worlds.stream()
+                .map(w -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("name", w.name());
+                    m.put("environment", w.environment());
+                    m.put("playerCount", w.playerCount());
+                    m.put("state", "ACTIVE");
+                    return m;
+                })
+                .collect(Collectors.toList());
+        sendResponse(response, worlds);
     }
 
     /**
@@ -116,35 +125,31 @@ public class WorldController extends HttpServlet {
     }
 
     /**
-     * Handles GET /api/v1/worlds/statistics - Get overall world statistics
-     * Uses live Bukkit data for player counts, not stale DB values.
+     * Handles GET /api/v1/worlds/statistics - Get overall world statistics from LiveDataCache snapshot.
      */
     private void handleGetWorldStatistics(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try {
-            List<World> loadedWorlds = Bukkit.getWorlds();
-            int totalOnline = Bukkit.getOnlinePlayers().size();
-
-            List<Map<String, Object>> worldStats = loadedWorlds.stream()
-                    .map(w -> {
-                        Map<String, Object> ws = new HashMap<>();
-                        ws.put("name", w.getName());
-                        ws.put("environment", w.getEnvironment().toString());
-                        ws.put("playerCount", w.getPlayers().size());
-                        return ws;
-                    })
-                    .collect(Collectors.toList());
-
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("totalWorlds", loadedWorlds.size());
-            stats.put("activeWorlds", loadedWorlds.stream().filter(w -> !w.getPlayers().isEmpty()).count());
-            stats.put("totalPlayers", totalOnline);
-            stats.put("maxPlayers", Bukkit.getMaxPlayers());
-            stats.put("worlds", worldStats);
-            sendResponse(response, stats);
-        } catch (Exception e) {
-            logger.error("Failed to get world statistics", e);
-            sendErrorResponse(response, 500, "Failed to retrieve world statistics");
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache == null) {
+            sendErrorResponse(response, 503, "Server not ready");
+            return;
         }
+        LiveDataCache.BukkitSnapshot snap = cache.getSnapshot();
+        List<Map<String, Object>> worldStats = snap.worlds.stream()
+                .map(w -> {
+                    Map<String, Object> ws = new HashMap<>();
+                    ws.put("name", w.name());
+                    ws.put("environment", w.environment());
+                    ws.put("playerCount", w.playerCount());
+                    return ws;
+                })
+                .collect(Collectors.toList());
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalWorlds", snap.worlds.size());
+        stats.put("activeWorlds", snap.worlds.stream().filter(w -> w.playerCount() > 0).count());
+        stats.put("totalPlayers", snap.onlineCount);
+        stats.put("maxPlayers", snap.maxPlayers);
+        stats.put("worlds", worldStats);
+        sendResponse(response, stats);
     }
 
     /**
