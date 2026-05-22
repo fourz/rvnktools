@@ -44,9 +44,14 @@ public class LiveDataCache {
                     .add(Map.of("name", p.getName(), "uuid", p.getUniqueId().toString()));
         }
 
+        List<WorldSnapshot> worlds = Bukkit.getWorlds().stream()
+                .map(w -> new WorldSnapshot(w.getName(), w.getEnvironment().name(), w.getPlayers().size()))
+                .collect(Collectors.toList());
+
         ref.set(new BukkitSnapshot(
                 Collections.unmodifiableList(players),
                 Collections.unmodifiableMap(worldGroups),
+                Collections.unmodifiableList(worlds),
                 online.size(),
                 maxPlayers,
                 System.currentTimeMillis()
@@ -68,21 +73,26 @@ public class LiveDataCache {
         return ref.get();
     }
 
+    public record WorldSnapshot(String name, String environment, int playerCount) {}
+
     public static class BukkitSnapshot {
         static final BukkitSnapshot EMPTY = new BukkitSnapshot(
-                Collections.emptyList(), Collections.emptyMap(), 0, 0, 0L);
+                Collections.emptyList(), Collections.emptyMap(), Collections.emptyList(), 0, 0, 0L);
 
         public final List<PlayerResponse> onlinePlayers;
         public final Map<String, List<Map<String, Object>>> worldGroups;
+        public final List<WorldSnapshot> worlds;
         public final int onlineCount;
         public final int maxPlayers;
         public final long capturedAt;
 
         BukkitSnapshot(List<PlayerResponse> onlinePlayers,
                        Map<String, List<Map<String, Object>>> worldGroups,
+                       List<WorldSnapshot> worlds,
                        int onlineCount, int maxPlayers, long capturedAt) {
             this.onlinePlayers = onlinePlayers;
             this.worldGroups = worldGroups;
+            this.worlds = worlds;
             this.onlineCount = onlineCount;
             this.maxPlayers = maxPlayers;
             this.capturedAt = capturedAt;
