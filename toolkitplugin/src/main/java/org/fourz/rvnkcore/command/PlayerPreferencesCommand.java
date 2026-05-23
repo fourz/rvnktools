@@ -153,8 +153,8 @@ public class PlayerPreferencesCommand extends BaseCommand {
                     return true;
             }
         } catch (Exception e) {
-            player.sendMessage(ChatColor.RED + "✖ Error processing command: " + e.getMessage());
-            logger.warning("Error in PlayerPreferencesCommand", e);
+            logger.warning("Error in PlayerPreferencesCommand for " + player.getName(), e);
+            player.sendMessage(ChatColor.RED + "✖ An error occurred. Please try again.");
         }
 
         return true;

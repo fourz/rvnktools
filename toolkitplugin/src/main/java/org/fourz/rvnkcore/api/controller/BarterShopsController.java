@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  * REST API controller for BarterShops endpoints.
  * Routes HTTP requests to {@link IBarterShopsApiService} provided by the BarterShops plugin.
  *
- * <p>If the BarterShops plugin is not loaded (service not registered), all endpoints return 503.</p>
+ * <p>If the BarterShops plugin is not loaded (service not registered), all endpoints return 501.</p>
  *
  * @since 1.4.0
  */
@@ -67,7 +67,7 @@ public class BarterShopsController extends HttpServlet {
 
         IBarterShopsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "BarterShops plugin is not loaded");
             return;
         }
 
@@ -120,7 +120,7 @@ public class BarterShopsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling BarterShops API request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -131,7 +131,7 @@ public class BarterShopsController extends HttpServlet {
 
         IBarterShopsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "BarterShops plugin is not loaded");
             return;
         }
 
@@ -165,7 +165,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops POST request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -185,7 +185,7 @@ public class BarterShopsController extends HttpServlet {
 
         IBarterShopsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "BarterShops plugin is not loaded");
             return;
         }
 
@@ -219,7 +219,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops PATCH request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -230,7 +230,7 @@ public class BarterShopsController extends HttpServlet {
 
         IBarterShopsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "BarterShops plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "BarterShops plugin is not loaded");
             return;
         }
 
@@ -256,7 +256,7 @@ public class BarterShopsController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling BarterShops DELETE request: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -284,7 +284,7 @@ public class BarterShopsController extends HttpServlet {
             double radius = radiusStr != null ? Double.parseDouble(radiusStr) : 50.0;
             return getApiService().getShopsNearby(world, x, y, z, radius);
         } catch (NumberFormatException e) {
-            sendError(resp, 400, "INVALID_REQUEST", "Invalid coordinate format: " + e.getMessage());
+            sendError(resp, 400, "INVALID_REQUEST", "Invalid request format.");
             return null;
         }
     }

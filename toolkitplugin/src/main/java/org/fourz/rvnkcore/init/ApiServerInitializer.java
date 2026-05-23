@@ -6,7 +6,6 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -64,7 +63,6 @@ public class ApiServerInitializer {
      * <ul>
      *   <li>{@link PlayerService}</li>
      *   <li>{@link PlayerWorldService}</li>
-     *   <li>{@link AnnouncementService}</li>
      *   <li>{@link WorldService}</li>
      * </ul>
      *
@@ -88,9 +86,6 @@ public class ApiServerInitializer {
             PlayerWorldService playerWorldService = registry.getService(PlayerWorldService.class);
             logger.debug("  + PlayerWorldService retrieved");
 
-            AnnouncementService announcementService = registry.getService(AnnouncementService.class);
-            logger.debug("  + AnnouncementService retrieved");
-
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
 
@@ -104,7 +99,6 @@ public class ApiServerInitializer {
                 apiConfig,
                 playerService,
                 playerWorldService,
-                announcementService,
                 worldService,
                 authTokenStore,
                 plugin
@@ -118,13 +112,15 @@ public class ApiServerInitializer {
             registry.registerService(IServletRegistrationService.class, apiServer.getServletRegistrationService());
             logger.debug("  + IServletRegistrationService registered");
 
-            // Initialize webhook notifier if configured
+            // Register webhook notifier unconditionally — methods no-op when disabled
             WebhookConfig webhookConfig = configLoader.getWebhookConfig();
-            if (webhookConfig.isEnabled() && webhookConfig.validate(logger)) {
-                WebhookNotifier notifier = new WebhookNotifier(webhookConfig, logger);
-                registry.registerService(WebhookNotifier.class, notifier);
-                logger.info("Webhook notifier registered — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            if (webhookConfig.isEnabled()) {
+                webhookConfig.validate(logger);
+                logger.info("Webhook notifier enabled — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            } else {
+                logger.debug("Webhook notifier registered (disabled — no-op mode)");
             }
+            registry.registerService(WebhookNotifier.class, new WebhookNotifier(webhookConfig, logger));
 
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");

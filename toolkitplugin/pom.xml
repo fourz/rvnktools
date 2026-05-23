@@ -5,7 +5,7 @@
 
     <groupId>org.fourz</groupId>
     <artifactId>rvnkcore</artifactId>
-    <version>1.5.3-alpha</version>
+    <version>1.5.6-alpha</version>
 
     <name>RVNKCore</name>
     <description>Core unified library for Ravenkraft Minecraft plugins - provides ServiceRegistry, database abstraction, REST API, and shared services</description>
@@ -53,16 +53,19 @@
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
             <version>2.0</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>31.0.1-jre</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.8.9</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>me.clip</groupId>
@@ -205,6 +208,23 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- Strip sqlite-jdbc native binaries for platforms not used by Minecraft servers -->
+                                <!-- Kept: Linux/x86_64, Linux/aarch64, Linux-Musl/x86_64, Linux-Musl/aarch64, Mac/*, Windows/x86_64, Windows/aarch64 -->
+                                <filter>
+                                    <artifact>org.xerial:sqlite-jdbc</artifact>
+                                    <excludes>
+                                        <exclude>org/sqlite/native/FreeBSD/**</exclude>
+                                        <exclude>org/sqlite/native/Linux-Android/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/arm/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/armv6/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/armv7/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/ppc64/**</exclude>
+                                        <exclude>org/sqlite/native/Linux/x86/**</exclude>
+                                        <exclude>org/sqlite/native/Linux-Musl/x86/**</exclude>
+                                        <exclude>org/sqlite/native/Windows/armv7/**</exclude>
+                                        <exclude>org/sqlite/native/Windows/x86/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

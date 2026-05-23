@@ -64,6 +64,12 @@ public class AuthFilter implements Filter {
         // Move API request logging to debug level to reduce verbosity
         logger.debug("API Request: " + method + " " + requestURI + " from IP: " + clientIP);
         
+        // Health endpoint is public — allow unauthenticated probes (Caddy, uptime monitors)
+        if (requestURI.endsWith("/v1/health") || requestURI.contains("/v1/health/")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         // Check IP whitelist if enabled
         if (ipWhitelistEnabled) {
             if (!allowedIPs.contains(clientIP)) {
@@ -84,9 +90,9 @@ public class AuthFilter implements Filter {
             return;
         }
         
-        if (!apiKey.equals(providedKey)) {
+        if (!ApiUtils.constantTimeEquals(apiKey, providedKey)) {
             logger.warning("API access denied - Invalid API key from IP: " + clientIP);
-            logger.debug("API key mismatch: provided key length=" + (providedKey != null ? providedKey.length() : 0));
+            logger.debug("API key mismatch: provided key length=" + providedKey.length());
             sendUnauthorized(httpResponse, "Invalid API key");
             return;
         }

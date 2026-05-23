@@ -69,8 +69,8 @@ api:
     allowed-ips: ""
 
 # Webhook Configuration
-# Fires HTTP POST to a URL when player events occur (join/quit)
-# Used to trigger cache revalidation in external systems (e.g., WebUI)
+# Fires HTTP POST to a URL when player/data events occur (join/quit, announcements, shops, trades)
+# Used to trigger cache revalidation in external systems (e.g., WebUI, fourzorg-api)
 webhook:
   enabled: false
   url: ""
@@ -78,6 +78,10 @@ webhook:
   server-id: ""            # Identifies this server to the WebUI (must match servers.ts name: "dev", "event", "prod")
   debounce-seconds: 10
   timeout-ms: 5000
+  cache-purge:
+    url: ""                # fourzorg-api purge endpoint, e.g. https://api.ravenkraft.org/diag/cache/purge
+    env: ""                # dev | event | prod (must match this server's env name in fourzorg-api)
+                           # uses webhook.secret for HMAC auth — no separate token needed
 
 # ──────────────────────────────────────────
 # RVNKTools Settings

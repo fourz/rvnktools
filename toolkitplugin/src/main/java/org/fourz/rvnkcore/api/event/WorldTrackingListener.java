@@ -42,7 +42,7 @@ public class WorldTrackingListener implements Listener {
         this.logger = LogManager.getInstance(plugin, getClass());
         
         // Log initialization with proper class prefix
-        logger.info("World tracking listener initialized");
+        logger.debug("World tracking listener initialized");
     }
     
     /**
@@ -84,7 +84,7 @@ public class WorldTrackingListener implements Listener {
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         World world = event.getWorld();
-        logger.info("World unloading: " + world.getName());
+        logger.debug("World unloading: " + world.getName());
         
         try {
             WorldService worldService = rvnkCore.getService(WorldService.class);
@@ -125,7 +125,7 @@ public class WorldTrackingListener implements Listener {
                         logger.error("Failed to register world during " + context + ": " + world.getName(), throwable);
                     } else {
                         int currentPlayers = world.getPlayers().size();
-                        logger.info("Successfully registered world during " + context + ": " + 
+                        logger.debug("Successfully registered world during " + context + ": " + 
                                   world.getName() + " [" + world.getEnvironment() + 
                                   ", " + world.getDifficulty() + 
                                   ", Players: " + currentPlayers + "/" + currentPlayers + " max]");
@@ -156,7 +156,7 @@ public class WorldTrackingListener implements Listener {
         try {
             WorldService worldService = rvnkCore.getService(WorldService.class);
             
-            logger.info("Initiating world sync through WorldService");
+            logger.debug("Initiating world sync through WorldService");
             
             // Delegate to the WorldService for proper business logic handling
             worldService.syncLoadedWorlds()
@@ -164,7 +164,7 @@ public class WorldTrackingListener implements Listener {
                     if (throwable != null) {
                         logger.error("World sync failed through WorldService", throwable);
                     } else {
-                        logger.info("World sync completed through WorldService");
+                        logger.debug("World sync completed through WorldService");
                     }
                 });
                 

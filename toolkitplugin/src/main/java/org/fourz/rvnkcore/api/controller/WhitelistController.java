@@ -17,7 +17,9 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * REST controller for server whitelist management.
- * POST /v1/whitelist/add — adds a player to the server whitelist via Bukkit console dispatch.
+ * POST /v1/whitelist/add       — add a player to the whitelist
+ * DELETE /v1/whitelist/{ign}   — remove a player from the whitelist
+ * GET /v1/whitelist/{ign}      — check whether a player is whitelisted
  * Protected by AuthFilter (X-API-Key header). Called by fourzorg-api on application acceptance.
  */
 public class WhitelistController extends HttpServlet {
@@ -29,6 +31,19 @@ public class WhitelistController extends HttpServlet {
         this.gson = gson;
         this.logger = logger;
         this.plugin = plugin;
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        String ign = extractIgn(req.getPathInfo());
+        if (ign == null) {
+            ApiUtils.sendError(resp, gson, 400, "MISSING_IGN", "Path must be /v1/whitelist/{ign}");
+            return;
+        }
+        boolean whitelisted = Bukkit.getWhitelistedPlayers().stream()
+                .anyMatch(p -> p.getName().equalsIgnoreCase(ign));
+        ApiUtils.sendJson(resp, gson, 200, Map.of("ign", ign, "whitelisted", whitelisted));
     }
 
     @Override
@@ -45,6 +60,31 @@ public class WhitelistController extends HttpServlet {
         } catch (Exception e) {
             logger.error("[whitelist] Unhandled error", e);
             ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Whitelist operation failed");
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        String ign = extractIgn(req.getPathInfo());
+        if (ign == null) {
+            ApiUtils.sendError(resp, gson, 400, "MISSING_IGN", "Path must be /v1/whitelist/{ign}");
+            return;
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getOfflinePlayer(ign).setWhitelisted(false);
+            future.complete(null);
+        });
+        try {
+            future.get(5, TimeUnit.SECONDS);
+            logger.info("[whitelist] Removed: " + ign);
+            ApiUtils.sendJson(resp, gson, 200, Map.of("ign", ign, "removed", true));
+        } catch (TimeoutException e) {
+            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist operation timed out");
+        } catch (Exception e) {
+            logger.error("[whitelist] Error removing: " + ign, e);
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to remove from whitelist");
         }
     }
 
@@ -69,28 +109,29 @@ public class WhitelistController extends HttpServlet {
             return;
         }
 
-        // Bukkit.dispatchCommand must run on the main thread
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(plugin, () ->
-                future.complete(Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "whitelist add " + ign))
-        );
+        // Must run on the main thread
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getOfflinePlayer(ign).setWhitelisted(true);
+            future.complete(null);
+        });
 
         try {
-            boolean ok = future.get(5, TimeUnit.SECONDS);
-            if (ok) {
-                logger.info("[whitelist] Added: " + ign);
-                ApiUtils.sendSuccess(resp, gson, Map.of("ign", ign));
-            } else {
-                logger.warning("[whitelist] Command returned false for: " + ign);
-                ApiUtils.sendError(resp, gson, 500, "COMMAND_FAILED",
-                        "Whitelist command returned failure for: " + ign);
-            }
+            future.get(5, TimeUnit.SECONDS);
+            logger.info("[whitelist] Added: " + ign);
+            ApiUtils.sendSuccess(resp, gson, Map.of("ign", ign));
         } catch (TimeoutException e) {
-            logger.error("[whitelist] Timed out dispatching whitelist add for: " + ign);
-            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist command timed out");
+            logger.error("[whitelist] Timed out adding: " + ign);
+            ApiUtils.sendError(resp, gson, 504, "TIMEOUT", "Whitelist operation timed out");
         } catch (Exception e) {
-            logger.error("[whitelist] Error dispatching command for: " + ign, e);
-            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to execute whitelist command");
+            logger.error("[whitelist] Error adding: " + ign, e);
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to add to whitelist");
         }
+    }
+
+    private String extractIgn(String pathInfo) {
+        if (pathInfo == null || pathInfo.length() < 2) return null;
+        String ign = pathInfo.startsWith("/") ? pathInfo.substring(1) : pathInfo;
+        return ign.matches("[a-zA-Z0-9_]{3,16}") ? ign : null;
     }
 }

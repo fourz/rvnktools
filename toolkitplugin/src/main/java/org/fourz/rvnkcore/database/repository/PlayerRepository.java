@@ -161,7 +161,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             QueryBuilder builder = createQueryBuilder();
             String query = builder.select("*")
                 .from(tableName)
-                .where("current_name LIKE ? OR name_history LIKE ?")
+                .where("current_name LIKE ? ESCAPE '!' OR name_history LIKE ? ESCAPE '!'")
                 .orderBy("current_name", true)
                 .build();
                 
@@ -222,16 +222,16 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             builder.nameHistory(nameHistory);
         }
         
-        // Parse groups from JSON array string (e.g. ["default","member"])
+        // Parse groups — JSON array preferred, CSV tolerated for legacy rows not yet migrated
         String groupsStr = rs.getString("groups");
         if (groupsStr != null && !groupsStr.trim().isEmpty()) {
-            try {
+            String trimmed = groupsStr.trim();
+            if (trimmed.startsWith("[")) {
                 Type listType = new TypeToken<List<String>>(){}.getType();
-                List<String> groups = new Gson().fromJson(groupsStr, listType);
+                List<String> groups = new Gson().fromJson(trimmed, listType);
                 if (groups != null) builder.groups(groups);
-            } catch (Exception e) {
-                // Fallback for legacy CSV rows not yet migrated
-                builder.groups(Arrays.asList(groupsStr.split(",")));
+            } else {
+                builder.groups(Arrays.asList(trimmed.split(",")));
             }
         }
         

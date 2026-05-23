@@ -106,7 +106,8 @@ public class DebugSubCommand extends BaseSubCommand {
                 sender.sendMessage("§a✓ §7" + row[0] + " §8← §f" + row[1]);
                 ok++;
             } catch (Exception e) {
-                sender.sendMessage("§c✖ Failed: " + cmd + " (" + e.getMessage() + ")");
+                logger.error("LuckPerms command failed: " + cmd, e);
+                sender.sendMessage("§c✖ §7Failed to apply: §f" + row[0] + " §8← §f" + row[1]);
                 fail++;
             }
         }

@@ -7,6 +7,7 @@ import org.fourz.rvnkcore.api.model.response.ApiResponse;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,22 +23,29 @@ public final class ApiUtils {
     private ApiUtils() {}
 
     /**
-     * Resolves the real client IP from standard proxy headers before falling back to
-     * the raw remote address.
+     * Returns the raw TCP remote address of the connection.
+     * XFF and X-Real-IP headers are intentionally ignored — they are attacker-controlled
+     * and would allow IP whitelist bypass if trusted unconditionally (#1020).
      *
      * @param req The incoming HTTP request
-     * @return Best-guess client IP address string
+     * @return Client IP address from the TCP connection
      */
     public static String getClientIP(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-        String xri = req.getHeader("X-Real-IP");
-        if (xri != null && !xri.isEmpty()) {
-            return xri;
-        }
         return req.getRemoteAddr();
+    }
+
+    /**
+     * Compares two strings in constant time to prevent timing side-channel attacks (#1019).
+     * Safe to use for API key comparison.
+     *
+     * @param a First string
+     * @param b Second string
+     * @return true if equal
+     */
+    public static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) return false;
+        return MessageDigest.isEqual(a.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                                     b.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /**
@@ -139,6 +147,28 @@ public final class ApiUtils {
      */
     public static void sendError(HttpServletResponse resp, Gson gson, int status, String code, String message) {
         sendJson(resp, gson, status, ApiResponse.error(code, message));
+    }
+
+    /**
+     * Sends an error JSON response, deriving the machine-readable code from the HTTP status.
+     * Convenience overload — callers that do not need a custom code string should use this.
+     *
+     * @param resp    HTTP response
+     * @param gson    JSON serializer
+     * @param status  HTTP status code
+     * @param message Human-readable error description
+     */
+    public static void sendError(HttpServletResponse resp, Gson gson, int status, String message) {
+        String code = switch (status) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 403 -> "FORBIDDEN";
+            case 404 -> "NOT_FOUND";
+            case 503 -> "SERVICE_UNAVAILABLE";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        sendError(resp, gson, status, code, message);
     }
 
     /**

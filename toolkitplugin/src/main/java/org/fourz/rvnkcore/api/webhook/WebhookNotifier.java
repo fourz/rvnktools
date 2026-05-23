@@ -4,10 +4,13 @@ import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -58,6 +61,7 @@ public class WebhookNotifier {
      * The HTTP POST is sent asynchronously and never blocks the calling thread.
      */
     public void notifyPlayerChange() {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = lastFiredAt.get();
         long debounceMs = config.getDebounceSeconds() * 1000L;
@@ -88,6 +92,7 @@ public class WebhookNotifier {
      * @param announcementId The ID of the changed announcement (included in payload for targeted cache invalidation)
      */
     public void notifyAnnouncementChange(String announcementId) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "announcement_change",
             "server", config.getServerId(),
@@ -96,6 +101,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook announcement " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -114,6 +120,7 @@ public class WebhookNotifier {
      * @param eventId The ID of the changed event (for targeted cache invalidation)
      */
     public void notifyEventChange(String eventId) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "event_change",
             "server", config.getServerId(),
@@ -138,6 +145,7 @@ public class WebhookNotifier {
      * @param shopId The ID of the changed shop (included in payload for targeted cache invalidation)
      */
     public void notifyShopChange(String shopId) {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = shopLastFiredAt.get();
 
@@ -157,6 +165,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook shop " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -175,6 +184,7 @@ public class WebhookNotifier {
      * @param shopId The ID of the shop where the trade occurred
      */
     public void notifyTradeComplete(String shopId) {
+        if (!config.isEnabled()) return;
         long now = System.currentTimeMillis();
         long last = tradeLastFiredAt.get();
 
@@ -194,6 +204,7 @@ public class WebhookNotifier {
         ));
 
         sendAsync(payload, "Webhook trade " + config.getServerId());
+        sendCachePurgeAsync();
     }
 
     /**
@@ -205,6 +216,7 @@ public class WebhookNotifier {
      * @param playerName The banned player's name
      */
     public void notifyPlayerBanned(String uuid, String playerName) {
+        if (!config.isEnabled()) return;
         String payload = GSON.toJson(Map.of(
             "event", "player_banned",
             "server", config.getServerId(),
@@ -216,11 +228,48 @@ public class WebhookNotifier {
         sendAsync(payload, "Webhook ban " + config.getServerId());
     }
 
+    private void sendCachePurgeAsync() {
+        if (!config.isCachePurgeEnabled()) return;
+        String payload = GSON.toJson(Map.of(
+            "event", "cache_purge",
+            "env", config.getCachePurgeEnv(),
+            "server", config.getServerId(),
+            "timestamp", Instant.now().toString()
+        ));
+        String url = config.getCachePurgeUrl() + "?env=" + config.getCachePurgeEnv();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-Webhook-Signature", "sha256=" + hmacSha256(config.getSecret(), payload))
+            .POST(HttpRequest.BodyPublishers.ofString(payload))
+            .timeout(Duration.ofMillis(config.getTimeoutMs()))
+            .build();
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenAccept(response -> logger.debug("Cache purge -> " + response.statusCode()))
+            .exceptionally(e -> {
+                logger.warning("Cache purge failed: " + e.getMessage());
+                return null;
+            });
+    }
+
+    private String hmacSha256(String secret, String payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] bytes = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("HMAC-SHA256 failed", e);
+        }
+    }
+
     private void sendAsync(String payload, String logTag) {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(config.getUrl()))
             .header("Content-Type", "application/json")
-            .header("X-Webhook-Secret", config.getSecret())
+            .header("X-Webhook-Signature", "sha256=" + hmacSha256(config.getSecret(), payload))
             .POST(HttpRequest.BodyPublishers.ofString(payload))
             .timeout(Duration.ofMillis(config.getTimeoutMs()))
             .build();

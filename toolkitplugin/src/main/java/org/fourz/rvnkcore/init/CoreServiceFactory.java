@@ -2,7 +2,6 @@ package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.mojang.MojangAPI;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.api.service.PlayerPreferencesService;
 import org.fourz.rvnkcore.api.service.PlayerService;
@@ -11,14 +10,11 @@ import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
-import org.fourz.rvnkcore.database.repository.AnnouncementRepository;
-import org.fourz.rvnkcore.database.repository.AnnouncementTypeRepository;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
 import org.fourz.rvnkcore.database.repository.PushSubscriptionRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
-import org.fourz.rvnkcore.service.announcement.DefaultAnnouncementService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
@@ -40,7 +36,6 @@ import org.fourz.rvnkcore.util.log.LogManager;
  *   <li>{@link PlayerService} - Player data management</li>
  *   <li>{@link PlayerWorldService} - Per-world player tracking</li>
  *   <li>{@link WorldService} - World metadata management</li>
- *   <li>{@link AnnouncementService} - Announcement system</li>
  *   <li>{@link PlayerPreferencesService} - Player notification preferences</li>
  *   <li>{@link ITeleportService} - Core teleportation service (extensible)</li>
  *   <li>{@link MojangAPI} - Mojang API wrapper with rate limiting (shared instance)</li>
@@ -78,7 +73,6 @@ public class CoreServiceFactory {
      *   <li>PlayerService (no dependencies)</li>
      *   <li>PlayerWorldService (depends on PlayerRepository)</li>
      *   <li>WorldService (no dependencies)</li>
-     *   <li>AnnouncementService (no dependencies)</li>
      * </ol>
      *
      * @param registry The ServiceRegistry to register services with
@@ -101,9 +95,6 @@ public class CoreServiceFactory {
         registerWorldService(registry);
         logger.debug("  + WorldService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
-        registerAnnouncementService(registry);
-        logger.debug("  + AnnouncementService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
-
         registerPlayerPreferencesService(registry);
         logger.debug("  + PlayerPreferencesService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -117,7 +108,7 @@ public class CoreServiceFactory {
         logger.debug("  + PushSubscriptionService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, AnnouncementService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
+        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
     }
 
     /**
@@ -180,26 +171,6 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register WorldService", e);
             throw new RuntimeException("WorldService registration failed", e);
-        }
-    }
-
-    /**
-     * Registers the AnnouncementService for announcement management.
-     */
-    private void registerAnnouncementService(ServiceRegistry registry) {
-        try {
-            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            AnnouncementRepository announcementRepository = new AnnouncementRepository(connectionProvider, queryBuilder, plugin);
-            AnnouncementTypeRepository typeRepository = new AnnouncementTypeRepository(connectionProvider, queryBuilder, plugin);
-            LogManager announcementLogger = LogManager.getInstance(plugin, DefaultAnnouncementService.class);
-            DefaultAnnouncementService announcementService = new DefaultAnnouncementService(
-                announcementRepository, typeRepository, announcementLogger, registry);
-
-            registry.registerService(AnnouncementService.class, announcementService);
-            logger.info("AnnouncementService registered (with type repository)");
-        } catch (Exception e) {
-            logger.error("Failed to register AnnouncementService", e);
-            throw new RuntimeException("AnnouncementService registration failed", e);
         }
     }
 

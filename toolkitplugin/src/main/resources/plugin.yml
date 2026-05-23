@@ -27,12 +27,6 @@ commands:
   discord:
     description: Provides information about the server's discord
     usage: /discord
-  announce:
-    description: Manages announcements
-    usage: /announce <toggle|list|add|delete> [args]
-    aliases: [announcement]
-    permission: rvnktools.command.announce
-    default: op
   broadcast:
     description: Broadcasts a message to all players
     usage: /broadcast <message>

@@ -121,7 +121,7 @@ public abstract class BaseRepository<T, ID> {
                         throw mapEx;
                     }
                 }
-                logger.info("FindAll query completed for table " + tableName + " - found " + rowCount + " rows, returning " + results.size() + " entities");
+                logger.debug("FindAll query completed for table " + tableName + " - found " + rowCount + " rows, returning " + results.size() + " entities");
                 return results;
             } catch (SQLException e) {
                 logger.error("Failed to find all entities from table: " + tableName, e);
@@ -200,7 +200,7 @@ public abstract class BaseRepository<T, ID> {
                     throw new DatabaseException("Insert failed, no rows affected");
                 }
                 
-                logger.info("Successfully inserted " + getEntityTypeName() + " into " + tableName);
+                logger.debug("Successfully inserted " + getEntityTypeName() + " into " + tableName);
                 return entity;
             } catch (SQLException e) {
                 logger.error("Failed to insert entity into " + tableName, e);
@@ -263,7 +263,7 @@ public abstract class BaseRepository<T, ID> {
                 if (rowsAffected == 0) {
                     logger.warning("Delete operation affected 0 rows for ID: " + id);
                 } else {
-                    logger.info("Successfully deleted entity with ID: " + id + " from " + tableName);
+                    logger.debug("Successfully deleted entity with ID: " + id + " from " + tableName);
                 }
             } catch (SQLException e) {
                 logger.error("Failed to delete entity by ID: " + id, e);
@@ -337,8 +337,46 @@ public abstract class BaseRepository<T, ID> {
         });
     }
     
+    /**
+     * Functional interface for parameterising a {@link PreparedStatement}.
+     * Allows checked {@link SQLException} to propagate naturally.
+     */
+    @FunctionalInterface
+    protected interface StatementPreparer {
+        void prepare(PreparedStatement stmt) throws SQLException;
+    }
+
+    /**
+     * Executes a SELECT query and maps every row via {@link #mapResultSet(ResultSet)}.
+     *
+     * Eliminates the supplyAsync / try-with-resources / while-loop boilerplate that
+     * is otherwise repeated in every list-returning repository method.
+     *
+     * @param sql      Fully-formed SQL string (use {@link #createQueryBuilder()} to build it)
+     * @param preparer Lambda that sets all parameter values on the statement
+     * @return CompletableFuture containing the mapped entity list
+     */
+    protected CompletableFuture<List<T>> queryList(String sql, StatementPreparer preparer) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection conn = connectionProvider.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                preparer.prepare(stmt);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    List<T> results = new ArrayList<>();
+                    while (rs.next()) {
+                        results.add(mapResultSet(rs));
+                    }
+                    return results;
+                }
+            } catch (SQLException e) {
+                logger.error("queryList failed — SQL: " + sql, e);
+                throw new DatabaseException("Query execution failed", e);
+            }
+        });
+    }
+
     // Abstract methods that must be implemented by subclasses
-    
+
     /**
      * Maps a ResultSet row to an entity object.
      * 

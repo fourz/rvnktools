@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * REST API controller for RVNKWorlds endpoints.
  * Routes HTTP requests to {@link IRVNKWorldsApiService} provided by the RVNKWorlds plugin.
  *
- * <p>If the RVNKWorlds plugin is not loaded (service not registered), all endpoints return 503.</p>
+ * <p>If the RVNKWorlds plugin is not loaded (service not registered), all endpoints return 501.</p>
  *
  * @since 1.4.0
  */
@@ -66,10 +66,11 @@ public class RVNKWorldsController extends HttpServlet {
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
 
+        // Fall back to Bukkit-backed read-only service when RVNKWorlds is not loaded.
+        // See RVNKWorldsFallbackService — keep response shapes in sync with WorldApiEndpointImpl.
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
-            return;
+            apiService = new RVNKWorldsFallbackService();
         }
 
         String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
@@ -102,7 +103,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling RVNKWorlds API GET: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -113,7 +114,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
             return;
         }
 
@@ -143,7 +144,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling RVNKWorlds API POST: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 
@@ -154,7 +155,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         IRVNKWorldsApiService apiService = getApiService();
         if (apiService == null) {
-            sendError(resp, 503, "SERVICE_UNAVAILABLE", "RVNKWorlds plugin is not loaded");
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
             return;
         }
 
@@ -175,7 +176,7 @@ public class RVNKWorldsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling RVNKWorlds API DELETE: " + pathInfo, e);
-            sendError(resp, 500, "INTERNAL_ERROR", "Server error: " + e.getMessage());
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
 

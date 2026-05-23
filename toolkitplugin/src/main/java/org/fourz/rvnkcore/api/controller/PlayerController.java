@@ -38,12 +38,16 @@ public class PlayerController extends HttpServlet {
     private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
+    private final org.fourz.rvnkcore.api.server.jetty.LiveDataCache liveDataCache;
 
-    public PlayerController(PlayerService playerService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
+    public PlayerController(PlayerService playerService, PlayerWorldService playerWorldService,
+                            Gson gson, LogManager logger,
+                            org.fourz.rvnkcore.api.server.jetty.LiveDataCache liveDataCache) {
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
+        this.liveDataCache = liveDataCache;
     }
 
     @Override
@@ -114,7 +118,7 @@ public class PlayerController extends HttpServlet {
             }
         } catch (Exception e) {
             logger.error("Error handling GET request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
@@ -206,7 +210,7 @@ public class PlayerController extends HttpServlet {
             sendError(resp, 400, "Invalid UUID format");
         } catch (Exception e) {
             logger.error("Error handling PUT request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
@@ -228,11 +232,7 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleGetOnlinePlayers(HttpServletResponse resp) throws IOException {
-        List<PlayerResponse> onlinePlayers = Bukkit.getOnlinePlayers().stream()
-                .map(this::convertBukkitPlayerToResponse)
-                .collect(Collectors.toList());
-        
-        sendResponse(resp, 200, onlinePlayers);
+        sendResponse(resp, 200, liveDataCache.getSnapshot().onlinePlayers);
     }
 
     private void handleGetRecentPlayers(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -298,7 +298,8 @@ public class PlayerController extends HttpServlet {
             return;
         }
         try {
-            List<PlayerDTO> players = playerService.searchPlayersByName("%" + name + "%")
+            String escaped = name.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+            List<PlayerDTO> players = playerService.searchPlayersByName("%" + escaped + "%")
                                                .get(15, TimeUnit.SECONDS);
             List<PlayerResponse> responses = players.stream()
                                                 .map(this::convertToResponse)
@@ -313,28 +314,13 @@ public class PlayerController extends HttpServlet {
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
         try {
             long registeredCount = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
-
-            // Live online data from Bukkit
-            java.util.Collection<? extends Player> onlinePlayers = Bukkit.getOnlinePlayers();
-            int onlineCount = onlinePlayers.size();
-            int maxPlayers = Bukkit.getMaxPlayers();
-
-            // Group online players by world
-            Map<String, List<Map<String, Object>>> worldGroups = new java.util.LinkedHashMap<>();
-            for (Player p : onlinePlayers) {
-                String worldName = p.getWorld().getName();
-                worldGroups.computeIfAbsent(worldName, k -> new java.util.ArrayList<>())
-                        .add(Map.of(
-                                "name", p.getName(),
-                                "uuid", p.getUniqueId().toString()
-                        ));
-            }
+            org.fourz.rvnkcore.api.server.jetty.LiveDataCache.BukkitSnapshot snap = liveDataCache.getSnapshot();
 
             Map<String, Object> data = new java.util.LinkedHashMap<>();
             data.put("registered", registeredCount);
-            data.put("online", onlineCount);
-            data.put("max", maxPlayers);
-            data.put("worlds", worldGroups);
+            data.put("online", snap.onlineCount);
+            data.put("max", snap.maxPlayers);
+            data.put("worlds", snap.worldGroups);
 
             sendResponse(resp, 200, data);
         } catch (Exception ex) {
@@ -567,17 +553,6 @@ public class PlayerController extends HttpServlet {
                 .currentWorld(player.getCurrentWorld())
                 .totalPlaytimeHours(player.getTotalPlaytimeHours())
                 .groups(player.getGroups())
-                .build();
-    }
-
-    private PlayerResponse convertBukkitPlayerToResponse(Player player) {
-        return PlayerResponse.builder()
-                .uuid(player.getUniqueId())
-                .name(player.getName())
-                .online(true)
-                .currentWorld(player.getWorld().getName())
-                .timesJoined(1) // Online players have at least joined once
-                .totalPlaytimeHours(0f) // Real-time calculation would require session tracking
                 .build();
     }
 

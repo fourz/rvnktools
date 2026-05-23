@@ -51,7 +51,7 @@ public class PlayerTrackingListener implements Listener {
         this.logger = LogManager.getInstance(plugin, getClass());
 
         // Log initialization with proper class prefix
-        logger.info("Player listener initialized");
+        logger.debug("Player listener initialized");
     }
     
     /**

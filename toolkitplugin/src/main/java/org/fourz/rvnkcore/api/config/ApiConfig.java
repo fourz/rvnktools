@@ -18,6 +18,7 @@ public class ApiConfig {
     private final String apiKey;
     private final boolean enabled;
     private final String host;
+    private final String bindHost;
     private final boolean corsEnabled;
     private final String corsAllowedOrigins;
     private final String corsAllowedMethods;
@@ -52,6 +53,7 @@ public class ApiConfig {
         
         this.enabled = config.getBoolean("api.enabled", false);
         this.host = config.getString("api.host", "localhost");
+        this.bindHost = config.getString("api.bind-host", "127.0.0.1");
         this.httpPort = config.getInt("api.http.port", 8080);
         this.httpsPort = config.getInt("api.https.port", 8081);
         this.apiKey = config.getString("api.auth.key", "changeme");
@@ -82,7 +84,7 @@ public class ApiConfig {
 
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(logLevelStr) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+        logger.debug("RVNKCore API configuration loaded - Enabled: " + enabled +
                    ", Global Log Level: " + logLevelStr +
                    ", API Log Level: " + apiLogStr +
                    ", HTTP Port: " + httpPort +
@@ -117,6 +119,7 @@ public class ApiConfig {
         
         this.enabled = apiSection.getBoolean("enabled", false);
         this.host = apiSection.getString("host", "localhost");
+        this.bindHost = apiSection.getString("bind-host", "127.0.0.1");
         this.httpPort = apiSection.getInt("http.port", 8080);
         this.httpsPort = apiSection.getInt("https.port", 8081);
         this.apiKey = apiSection.getString("auth.key", "changeme");
@@ -147,7 +150,7 @@ public class ApiConfig {
 
         // Log configuration summary
         String apiLogStr = apiLogLevelStr.equals(globalLogLevel.getName()) ? "inherits global" : apiLogLevelStr;
-        logger.info("RVNKCore API configuration loaded - Enabled: " + enabled +
+        logger.debug("RVNKCore API configuration loaded - Enabled: " + enabled +
                    ", Global Log Level: " + globalLogLevel.getName() +
                    ", API Log Level: " + apiLogStr +
                    ", HTTP Port: " + httpPort +
@@ -157,6 +160,7 @@ public class ApiConfig {
     // Getters
     public boolean isEnabled() { return enabled; }
     public String getHost() { return host; }
+    public String getBindHost() { return bindHost; }
     public int getHttpPort() { return httpPort; }
     public int getHttpsPort() { return httpsPort; }
     public String getApiKey() { return apiKey; }
@@ -220,8 +224,9 @@ public class ApiConfig {
                 isValid = false;
             }
             
-            if (apiKey == null || apiKey.trim().isEmpty() || "changeme".equals(apiKey.trim())) {
-                logger.warning("API key is set to default value 'changeme' - please change for security");
+            if (apiKey == null || apiKey.trim().isEmpty() || "changeme".equals(apiKey.trim()) || apiKey.trim().length() < 16) {
+                logger.error("API key is insecure (default 'changeme' or shorter than 16 characters) — API server will not start. Set api.auth.key in config.yml.");
+                isValid = false;
             }
             
             if (httpsEnabled && (keystorePath == null || keystorePath.trim().isEmpty())) {

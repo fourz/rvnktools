@@ -12,7 +12,6 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.service.impl.ServletRegistrationServiceImpl;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -41,7 +40,6 @@ public class CoreServer {
     private final ApiConfig config;
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
-    private final AnnouncementService announcementService;
     private final WorldService worldService;
     private final Gson gson;
     private final LogManager logger;
@@ -55,25 +53,25 @@ public class CoreServer {
     // External servlet registration service
     private final ServletRegistrationServiceImpl servletRegistrationService;
 
+    // Main-thread snapshot cache — safe for Jetty threads to read
+    private final LiveDataCache liveDataCache;
+
     /**
      * Creates a new RVNKCore server instance.
      *
      * @param config API configuration
      * @param playerService Player service for data operations
      * @param playerWorldService Player world service for world-specific data operations
-     * @param announcementService Announcement service for data operations
      * @param worldService World service for world tracking and management
      * @param authTokenStore Authentication token store for magic link flow
      * @param plugin Plugin instance
      */
     public CoreServer(ApiConfig config, PlayerService playerService, PlayerWorldService playerWorldService,
-                                    AnnouncementService announcementService,
                                     WorldService worldService,
                                     AuthTokenStore authTokenStore, Plugin plugin) {
         this.config = config;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
-        this.announcementService = announcementService;
         this.worldService = worldService;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -83,8 +81,9 @@ public class CoreServer {
         configureJettyLogging();
 
         // Initialize specialized factories
+        this.liveDataCache = new LiveDataCache();
         this.connectorFactory = new ServerConnectorFactory(config, plugin, logger);
-        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, announcementService, worldService, authTokenStore, gson);
+        this.servletFactory = new ServletFactory(config, plugin, logger, playerService, playerWorldService, worldService, authTokenStore, gson, liveDataCache);
         this.serverLifecycle = new ServerLifecycle(config, logger);
 
         // Initialize external servlet registration service
@@ -176,6 +175,9 @@ public class CoreServer {
             // Start the server
             serverLifecycle.startServer(server);
             
+            // Start the main-thread snapshot cache
+            liveDataCache.start(plugin);
+
             // Enable external servlet registration now that server is running
             servletRegistrationService.setServletContext(context);
             

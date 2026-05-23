@@ -76,6 +76,7 @@ public class ServerSSLFactory {
                     new SslConnectionFactory(sslContextFactory, "http/1.1"),
                     new HttpConnectionFactory(httpsConfig));
             
+            httpsConnector.setHost(config.getBindHost());
             httpsConnector.setPort(config.getHttpsPort());
             httpsConnector.setIdleTimeout(config.getIdleTimeout());
             httpsConnector.setName("https-connector");

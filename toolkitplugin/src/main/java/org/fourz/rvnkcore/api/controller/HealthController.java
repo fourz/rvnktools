@@ -5,13 +5,13 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.ApiVersion;
+import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,44 +51,25 @@ public class HealthController extends HttpServlet {
         Runtime runtime = Runtime.getRuntime();
         long usedMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
         long maxMB = runtime.maxMemory() / (1024 * 1024);
+        long uptimeMs = ManagementFactory.getRuntimeMXBean().getUptime();
 
-        // Server info
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "healthy");
         data.put("apiVersion", ApiVersion.API_VERSION);
         data.put("mcVersion", parseMcVersion(Bukkit.getVersion()));
         data.put("version", Bukkit.getVersion());
         data.put("bukkitVersion", Bukkit.getBukkitVersion());
-        data.put("onlinePlayers", Bukkit.getOnlinePlayers().size());
         data.put("maxPlayers", Bukkit.getMaxPlayers());
         data.put("memory", Map.of("used", usedMB, "max", maxMB));
+        data.put("uptimeMs", uptimeMs);
 
-        // Per-world live player counts
-        List<Map<String, Object>> worlds = Bukkit.getWorlds().stream()
-                .map(world -> {
-                    Map<String, Object> w = new LinkedHashMap<>();
-                    w.put("name", world.getName());
-                    w.put("environment", world.getEnvironment().toString());
-                    w.put("playerCount", world.getPlayers().size());
-                    w.put("players", world.getPlayers().stream()
-                            .map(Player::getName)
-                            .collect(Collectors.toList()));
-                    return w;
-                })
-                .collect(Collectors.toList());
-        data.put("worlds", worlds);
-
-        // TPS (Paper API via reflection — not in Spigot API)
-        try {
-            java.lang.reflect.Method getTPS = Bukkit.getServer().getClass().getMethod("getTPS");
-            double[] tps = (double[]) getTPS.invoke(Bukkit.getServer());
-            data.put("tps", Map.of(
-                    "1m", Math.round(tps[0] * 100.0) / 100.0,
-                    "5m", Math.round(tps[1] * 100.0) / 100.0,
-                    "15m", Math.round(tps[2] * 100.0) / 100.0
-            ));
-        } catch (Exception e) {
-            // TPS not available on non-Paper servers
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache != null) {
+            LiveDataCache.BukkitSnapshot snap = cache.getSnapshot();
+            data.put("worldsLoaded", snap.worlds.size());
+            data.put("worlds", snap.worlds.stream()
+                    .map(w -> Map.of("name", w.name(), "environment", w.environment()))
+                    .collect(Collectors.toList()));
         }
 
         ApiUtils.sendSuccess(resp, gson, data);
