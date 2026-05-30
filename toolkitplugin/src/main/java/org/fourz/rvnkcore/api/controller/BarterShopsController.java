@@ -34,6 +34,7 @@ public class BarterShopsController extends HttpServlet {
     private final LogManager logger;
 
     private static final Pattern SHOP_BY_ID_PATTERN       = Pattern.compile("^/shops/([^/]+)$");
+    private static final Pattern SHOP_ITEMS_PATTERN        = Pattern.compile("^/shops/([^/]+)/items$");
     private static final Pattern TRADE_BY_ID_PATTERN       = Pattern.compile("^/trades/([^/]+)$");
     private static final Pattern STATS_SHOPS_PATTERN       = Pattern.compile("^/stats/shops/?(.*)$");
     private static final Pattern GROUP_BY_ID_PATTERN       = Pattern.compile("^/groups/(\\d+)$");
@@ -81,6 +82,10 @@ public class BarterShopsController extends HttpServlet {
             } else if (pathInfo.equals("/shops/nearby")) {
                 future = handleShopsNearby(req, resp);
                 if (future == null) return; // error already sent
+            } else if (SHOP_ITEMS_PATTERN.matcher(pathInfo).matches()) {
+                Matcher m = SHOP_ITEMS_PATTERN.matcher(pathInfo);
+                m.matches();
+                future = apiService.getShopItems(m.group(1));
             } else if (SHOP_BY_ID_PATTERN.matcher(pathInfo).matches()) {
                 Matcher m = SHOP_BY_ID_PATTERN.matcher(pathInfo);
                 m.matches();
