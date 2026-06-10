@@ -1,5 +1,7 @@
 package org.fourz.rvnkcore.service.preferences;
 
+import org.bukkit.Bukkit;
+import org.fourz.rvnkcore.api.event.PlayerPreferenceChangedEvent;
 import org.fourz.rvnkcore.api.model.NotificationTypeDefinition;
 import org.fourz.rvnkcore.api.model.PlayerPreferencesDTO;
 import org.fourz.rvnkcore.api.model.QuietHoursConfig;
@@ -97,6 +99,8 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
                     }
                     logger.debug("Set notification type " + notificationType + "=" + enabled +
                             " for " + playerUuid + " " + pluginId);
+                    Bukkit.getPluginManager().callEvent(
+                            new PlayerPreferenceChangedEvent(playerUuid, pluginId, notificationType));
                 });
     }
 
@@ -147,6 +151,8 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
                     }
                     logger.debug("Set channel " + channelName + "=" + enabled +
                             " for type " + notificationType + " player " + playerUuid + " " + pluginId);
+                    Bukkit.getPluginManager().callEvent(
+                            new PlayerPreferenceChangedEvent(playerUuid, pluginId, notificationType));
                 });
     }
 
@@ -239,6 +245,8 @@ public class DefaultPlayerPreferencesService implements PlayerPreferencesService
                     String key = cacheKey(preferences.getPlayerUuid(), preferences.getPluginId());
                     cache.put(key, preferences);
                     logger.debug("Saved full preferences for " + preferences.getPlayerUuid() + " " + preferences.getPluginId());
+                    Bukkit.getPluginManager().callEvent(
+                            new PlayerPreferenceChangedEvent(preferences.getPlayerUuid(), preferences.getPluginId(), null));
                 });
     }
 

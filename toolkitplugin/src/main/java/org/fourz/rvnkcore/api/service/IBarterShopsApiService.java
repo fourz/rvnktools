@@ -62,6 +62,15 @@ public interface IBarterShopsApiService {
     CompletableFuture<ApiResponse<?>> getHealthStatus();
 
     /**
+     * GET /api/bartershops/shops/{id}/items — trade items configured for a shop.
+     *
+     * <p>Returns the offering item, price item/amount, and accepted payment types
+     * extracted from the shop's metadata. Useful for listing what a shop trades
+     * without fetching the full shop record.</p>
+     */
+    CompletableFuture<ApiResponse<?>> getShopItems(String shopId);
+
+    /**
      * GET /api/bartershops/groups — list groups with optional filters.
      *
      * @param filters query parameters (owner, world, page, limit)

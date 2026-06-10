@@ -156,17 +156,27 @@ public class PlayerPreferencesRepository {
     public CompletableFuture<Void> setTypeEnabled(UUID playerUuid, String pluginId, String type, boolean enabled) {
         return CompletableFuture.runAsync(() -> {
             String playerId = playerUuid.toString();
-            String sql = "INSERT INTO " + typesTable +
-                    " (player_id, plugin_id, notification_type, enabled) VALUES (?, ?, ?, ?)" +
-                    " ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)";
-
-            // SQLite fallback
-            String sqliteSQL = "INSERT OR REPLACE INTO " + typesTable +
-                    " (player_id, plugin_id, notification_type, enabled) VALUES (?, ?, ?, ?)";
 
             try (Connection conn = connectionProvider.getConnection()) {
-                String query = isMysql(conn) ? sql : sqliteSQL;
-                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                boolean mysql = isMysql(conn);
+
+                // Ensure the parent preferences row exists before inserting the FK-constrained type row
+                String ensureParent = mysql
+                        ? "INSERT IGNORE INTO " + prefsTable + " (player_id, plugin_id) VALUES (?, ?)"
+                        : "INSERT OR IGNORE INTO " + prefsTable + " (player_id, plugin_id) VALUES (?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(ensureParent)) {
+                    stmt.setString(1, playerId);
+                    stmt.setString(2, pluginId);
+                    stmt.executeUpdate();
+                }
+
+                String upsertType = mysql
+                        ? "INSERT INTO " + typesTable +
+                          " (player_id, plugin_id, notification_type, enabled) VALUES (?, ?, ?, ?)" +
+                          " ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)"
+                        : "INSERT OR REPLACE INTO " + typesTable +
+                          " (player_id, plugin_id, notification_type, enabled) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(upsertType)) {
                     stmt.setString(1, playerId);
                     stmt.setString(2, pluginId);
                     stmt.setString(3, type);
@@ -217,16 +227,38 @@ public class PlayerPreferencesRepository {
     public CompletableFuture<Void> setChannelEnabled(UUID playerUuid, String pluginId, String type, String channel, boolean enabled) {
         return CompletableFuture.runAsync(() -> {
             String playerId = playerUuid.toString();
-            String sql = "INSERT INTO " + channelsTable +
-                    " (player_id, plugin_id, notification_type, channel_name, enabled) VALUES (?, ?, ?, ?, ?)" +
-                    " ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)";
-
-            String sqliteSQL = "INSERT OR REPLACE INTO " + channelsTable +
-                    " (player_id, plugin_id, notification_type, channel_name, enabled) VALUES (?, ?, ?, ?, ?)";
 
             try (Connection conn = connectionProvider.getConnection()) {
-                String query = isMysql(conn) ? sql : sqliteSQL;
-                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                boolean mysql = isMysql(conn);
+
+                // Ensure grandparent preferences row exists
+                String ensurePrefs = mysql
+                        ? "INSERT IGNORE INTO " + prefsTable + " (player_id, plugin_id) VALUES (?, ?)"
+                        : "INSERT OR IGNORE INTO " + prefsTable + " (player_id, plugin_id) VALUES (?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(ensurePrefs)) {
+                    stmt.setString(1, playerId);
+                    stmt.setString(2, pluginId);
+                    stmt.executeUpdate();
+                }
+
+                // Ensure parent notification_type row exists
+                String ensureType = mysql
+                        ? "INSERT IGNORE INTO " + typesTable + " (player_id, plugin_id, notification_type) VALUES (?, ?, ?)"
+                        : "INSERT OR IGNORE INTO " + typesTable + " (player_id, plugin_id, notification_type) VALUES (?, ?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(ensureType)) {
+                    stmt.setString(1, playerId);
+                    stmt.setString(2, pluginId);
+                    stmt.setString(3, type);
+                    stmt.executeUpdate();
+                }
+
+                String upsertChannel = mysql
+                        ? "INSERT INTO " + channelsTable +
+                          " (player_id, plugin_id, notification_type, channel_name, enabled) VALUES (?, ?, ?, ?, ?)" +
+                          " ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)"
+                        : "INSERT OR REPLACE INTO " + channelsTable +
+                          " (player_id, plugin_id, notification_type, channel_name, enabled) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(upsertChannel)) {
                     stmt.setString(1, playerId);
                     stmt.setString(2, pluginId);
                     stmt.setString(3, type);
