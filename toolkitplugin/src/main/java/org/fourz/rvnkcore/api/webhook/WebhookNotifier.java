@@ -14,13 +14,18 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Sends webhook POST notifications on server events.
  * Player events use a leading-edge debounce to coalesce rapid join/quit bursts.
  * Shop CRUD events use a 30-second leading-edge debounce.
- * Trade completion events use a separate 30-second debounce (independent of shop CRUD).
+ * Trade completion events use a trailing-edge debounce: fires 30s after the last
+ * trade in a burst, ensuring the cache reflects the final state rather than the first.
  * Announcement events fire immediately (no debounce).
  *
  * @since 1.5.0
@@ -36,7 +41,13 @@ public class WebhookNotifier {
     private final LogManager logger;
     private final AtomicLong lastFiredAt = new AtomicLong(0);
     private final AtomicLong shopLastFiredAt = new AtomicLong(0);
-    private final AtomicLong tradeLastFiredAt = new AtomicLong(0);
+
+    // Trailing-edge debounce state for trade events
+    private final ScheduledExecutorService tradeScheduler =
+        Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "rvnkcore-trade-debounce"));
+    private final Object tradeLock = new Object();
+    private ScheduledFuture<?> pendingTradeFuture = null;
+    private String latestTradeShopId = "";
 
     /**
      * Creates a new WebhookNotifier.
@@ -178,33 +189,47 @@ public class WebhookNotifier {
 
     /**
      * Fires a webhook notification for a trade completion event.
-     * Uses a separate 30-second leading-edge debounce independent of shop CRUD events,
-     * so shop create/delete and trade completions don't suppress each other.
+     * Uses a trailing-edge debounce: each call resets the 30-second timer, so the
+     * webhook fires once, 30s after the last trade in a burst. This ensures peak-hour
+     * trade bursts produce a single cache refresh reflecting the final state, rather
+     * than firing on the first trade and missing all subsequent ones in the window.
      *
      * @param shopId The ID of the shop where the trade occurred
      */
     public void notifyTradeComplete(String shopId) {
         if (!config.isEnabled()) return;
-        long now = System.currentTimeMillis();
-        long last = tradeLastFiredAt.get();
-
-        if (now - last < TRADE_DEBOUNCE_MS) {
-            logger.debug("Webhook trade debounced (within 30s window)");
-            return;
+        synchronized (tradeLock) {
+            latestTradeShopId = shopId != null ? shopId : "";
+            if (pendingTradeFuture != null) {
+                pendingTradeFuture.cancel(false);
+            }
+            pendingTradeFuture = tradeScheduler.schedule(this::fireTrade, TRADE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+            logger.debug("Webhook trade debounce reset (fires in 30s)");
         }
-        if (!tradeLastFiredAt.compareAndSet(last, now)) {
-            return;
-        }
+    }
 
+    private void fireTrade() {
+        String shopId;
+        synchronized (tradeLock) {
+            shopId = latestTradeShopId;
+            pendingTradeFuture = null;
+        }
         String payload = GSON.toJson(Map.of(
             "event", "trade_complete",
             "server", config.getServerId(),
-            "shopId", shopId != null ? shopId : "",
+            "shopId", shopId,
             "timestamp", Instant.now().toString()
         ));
-
         sendAsync(payload, "Webhook trade " + config.getServerId());
         sendCachePurgeAsync();
+    }
+
+    /**
+     * Shuts down the trade debounce scheduler. Call on plugin disable to avoid thread leaks.
+     * Any pending trade flush is cancelled — trades within the final 30s window are dropped.
+     */
+    public void shutdown() {
+        tradeScheduler.shutdownNow();
     }
 
     /**
