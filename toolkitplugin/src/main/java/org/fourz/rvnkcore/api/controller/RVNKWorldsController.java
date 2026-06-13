@@ -35,6 +35,7 @@ public class RVNKWorldsController extends HttpServlet {
     private static final Pattern WORLD_NAME_PATTERN = Pattern.compile("^/worlds/([^/]+)/?$");
     private static final Pattern WORLD_LOAD_PATTERN = Pattern.compile("^/worlds/([^/]+)/load/?$");
     private static final Pattern WORLD_UNLOAD_PATTERN = Pattern.compile("^/worlds/([^/]+)/unload/?$");
+    private static final Pattern WORLD_RESTORE_PATTERN = Pattern.compile("^/worlds/([^/]+)/restore/?$");
     private static final Pattern TEMPLATES_PATTERN = Pattern.compile("^/templates/?$");
     private static final Pattern GROUPS_PATTERN = Pattern.compile("^/groups/?$");
     private static final Pattern GROUP_NAME_PATTERN = Pattern.compile("^/groups/([^/]+)/?$");
@@ -176,6 +177,39 @@ public class RVNKWorldsController extends HttpServlet {
 
         } catch (Exception e) {
             logger.error("Error handling RVNKWorlds API DELETE: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
+        }
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        IRVNKWorldsApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKWorlds plugin is not loaded");
+            return;
+        }
+
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+
+        try {
+            Matcher matcher = WORLD_RESTORE_PATTERN.matcher(pathInfo);
+            if (matcher.matches()) {
+                String worldName = matcher.group(1);
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.restoreWorldSnapshot(worldName, body)
+                    .get(30, TimeUnit.SECONDS);
+                // 202 Accepted for a successfully queued restore; other statuses use normal mapping
+                int status = response.success() ? 202
+                    : (response.error() != null ? response.error().suggestedHttpStatus() : 400);
+                ApiUtils.sendJson(resp, gson, status, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling RVNKWorlds API PUT: " + pathInfo, e);
             sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }
