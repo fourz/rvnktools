@@ -12,10 +12,14 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
+import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.sql.Timestamp;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Event listener for tracking player activity using RVNKCore services.
@@ -33,6 +37,9 @@ public class PlayerTrackingListener implements Listener {
     private final LogManager logger;
     private final RVNKCore rvnkCore;
 
+    /** Tracks when each player's current session started (epoch millis). */
+    private final Map<UUID, Long> sessionStartTimes = new ConcurrentHashMap<>();
+
     /**
      * Constructor for PlayerTrackingListener.
      *
@@ -42,9 +49,9 @@ public class PlayerTrackingListener implements Listener {
     public PlayerTrackingListener(RVNKCore plugin, RVNKCore rvnkCore) {
         this.rvnkCore = rvnkCore;
         this.logger = LogManager.getInstance(plugin, getClass());
-        
+
         // Log initialization with proper class prefix
-        logger.info("Player listener initialized");
+        logger.debug("Player listener initialized");
     }
     
     /**
@@ -56,11 +63,14 @@ public class PlayerTrackingListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         
+        // Record session start time for playtime tracking
+        sessionStartTimes.put(player.getUniqueId(), System.currentTimeMillis());
+
         try {
             PlayerService playerService = rvnkCore.getService(PlayerService.class);
             PlayerWorldService playerWorldService = rvnkCore.getService(PlayerWorldService.class);
             WorldService worldService = rvnkCore.getService(WorldService.class);
-            
+
             // Track both global and world-specific data
             CompletableFuture<Void> globalUpdate = playerService.getPlayer(player.getUniqueId())
                 .thenCompose((playerOpt) -> {
@@ -71,9 +81,9 @@ public class PlayerTrackingListener implements Listener {
                             .currentName(player.getName())
                             .firstJoin(new Timestamp(System.currentTimeMillis()))
                             .lastSeen(new Timestamp(System.currentTimeMillis()))
-                            .currentWorld(player.getWorld().getName())
+                            .currentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown")
                             .timesJoined(1)
-                            .totalPlaytimeSeconds(0L)
+                            .totalPlaytimeHours(0f)
                             .build();
                         
                         return playerService.savePlayer(newPlayer).thenApply((dto) -> {
@@ -84,7 +94,7 @@ public class PlayerTrackingListener implements Listener {
                         // Update existing player's data
                         PlayerDTO playerDTO = playerOpt.get();
                         playerDTO.updateName(player.getName());
-                        playerDTO.setCurrentWorld(player.getWorld().getName());
+                        playerDTO.setCurrentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown");
                         playerDTO.recordJoin();
                         
                         return playerService.savePlayer(playerDTO).thenApply((saved) -> (Void) null);
@@ -92,22 +102,23 @@ public class PlayerTrackingListener implements Listener {
                 });
                 
             // Track per-world data separately
-            CompletableFuture<Void> worldUpdate = playerWorldService.updatePlayerLocation(
-                player.getUniqueId(),
-                player.getWorld().getName(),
-                player.getLocation().getX(),
-                player.getLocation().getY(),
-                player.getLocation().getZ(),
-                player.getLocation().getYaw(),
-                player.getLocation().getPitch(),
-                player.getLocation().getBlock().getBiome().name()
-            );
-            
+            org.bukkit.World joinWorld = player.getWorld();
+            CompletableFuture<Void> worldUpdate = joinWorld != null
+                ? playerWorldService.updatePlayerLocation(
+                    player.getUniqueId(),
+                    joinWorld.getName(),
+                    player.getLocation().getX(),
+                    player.getLocation().getY(),
+                    player.getLocation().getZ(),
+                    player.getLocation().getYaw(),
+                    player.getLocation().getPitch(),
+                    player.getLocation().getBlock().getBiome().name())
+                : CompletableFuture.completedFuture(null);
+
             // Update world player count (including max_players_seen tracking)
-            CompletableFuture<Void> worldPlayerCountUpdate = worldService.updatePlayerCount(
-                player.getWorld().getName(),
-                player.getWorld().getPlayers().size()
-            );
+            CompletableFuture<Void> worldPlayerCountUpdate = joinWorld != null
+                ? worldService.updatePlayerCount(joinWorld.getName(), joinWorld.getPlayers().size())
+                : CompletableFuture.completedFuture(null);
             
             // Wait for all updates to complete
             CompletableFuture.allOf(globalUpdate, worldUpdate, worldPlayerCountUpdate)
@@ -116,6 +127,7 @@ public class PlayerTrackingListener implements Listener {
                         logger.error("Failed to update player data for: " + player.getName(), throwable);
                     } else {
                         logger.debug("Successfully updated player data for: " + player.getName());
+                        notifyWebhook();
                     }
                 });
                 
@@ -133,36 +145,50 @@ public class PlayerTrackingListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         
+        // Calculate session playtime in fractional hours
+        Long joinTime = sessionStartTimes.remove(player.getUniqueId());
+        float sessionHours = 0f;
+        if (joinTime != null) {
+            sessionHours = (System.currentTimeMillis() - joinTime) / 3_600_000f;
+        }
+        final float finalSessionHours = sessionHours;
+
         try {
             PlayerService playerService = rvnkCore.getService(PlayerService.class);
             WorldService worldService = rvnkCore.getService(WorldService.class);
-            
-            // Update player's last location before they quit
-            CompletableFuture<Void> playerLocationUpdate = playerService.updatePlayerLocation(
-                player.getUniqueId(),
-                player.getWorld().getName(),
-                player.getLocation().getX(),
-                player.getLocation().getY(),
-                player.getLocation().getZ()
-            );
-            
+
+            // Update player location and add session playtime
+            CompletableFuture<Void> playerUpdate = playerService.getPlayer(player.getUniqueId())
+                .thenCompose(playerOpt -> {
+                    if (playerOpt.isPresent()) {
+                        PlayerDTO playerDTO = playerOpt.get();
+                        playerDTO.setCurrentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown");
+                        playerDTO.setLastSeen(new Timestamp(System.currentTimeMillis()));
+                        playerDTO.addTotalPlaytime(finalSessionHours);
+                        return playerService.savePlayer(playerDTO).thenApply(saved -> (Void) null);
+                    }
+                    return CompletableFuture.completedFuture(null);
+                });
+
             // Update world player count (subtract 1 since player is leaving)
             int newPlayerCount = Math.max(0, player.getWorld().getPlayers().size() - 1);
             CompletableFuture<Void> worldPlayerCountUpdate = worldService.updatePlayerCount(
                 player.getWorld().getName(),
                 newPlayerCount
             );
-            
+
             // Wait for both updates to complete
-            CompletableFuture.allOf(playerLocationUpdate, worldPlayerCountUpdate)
+            CompletableFuture.allOf(playerUpdate, worldPlayerCountUpdate)
                 .whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         logger.error("Failed to update player data on quit: " + player.getName(), throwable);
                     } else {
-                        logger.debug("Updated player data on quit: " + player.getName());
+                        logger.debug("Updated player data on quit: " + player.getName() +
+                                   String.format(" (session: %.4fh)", finalSessionHours));
+                        notifyWebhook();
                     }
                 });
-            
+
         } catch (Exception e) {
             logger.error("Failed to get services for quit event", e);
         }
@@ -219,6 +245,21 @@ public class PlayerTrackingListener implements Listener {
             
         } catch (Exception e) {
             logger.error("Failed to get services for world change event", e);
+        }
+    }
+
+    /**
+     * Fires a webhook notification for player change events.
+     * Fails silently if WebhookNotifier is not registered (webhooks disabled).
+     */
+    private void notifyWebhook() {
+        try {
+            WebhookNotifier notifier = rvnkCore.getService(WebhookNotifier.class);
+            if (notifier != null) {
+                notifier.notifyPlayerChange();
+            }
+        } catch (Exception ignored) {
+            // Webhook is optional — never disrupt player tracking
         }
     }
 }

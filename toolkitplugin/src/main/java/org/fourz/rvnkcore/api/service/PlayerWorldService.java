@@ -4,6 +4,7 @@ import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -60,10 +61,10 @@ public interface PlayerWorldService {
      * Records a player quit event and updates playtime.
      * 
      * @param playerId The player's UUID
-     * @param sessionDurationSeconds Duration of the session in seconds
+     * @param sessionDurationHours Duration of the session in fractional hours
      * @return CompletableFuture indicating completion
      */
-    CompletableFuture<Void> recordPlayerQuit(UUID playerId, long sessionDurationSeconds);
+    CompletableFuture<Void> recordPlayerQuit(UUID playerId, float sessionDurationHours);
     
     // World-Specific Player Management
     
@@ -96,7 +97,7 @@ public interface PlayerWorldService {
     
     /**
      * Records a player's world change/teleport event.
-     * 
+     *
      * @param playerId The player's UUID
      * @param fromWorld The world they're leaving (null if first join)
      * @param toWorld The world they're entering
@@ -107,8 +108,27 @@ public interface PlayerWorldService {
      * @param pitch The new view pitch
      * @return CompletableFuture indicating completion
      */
-    CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld, 
+    CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld,
                                             double x, double y, double z, float yaw, float pitch);
+
+    /**
+     * Records a player's world change/teleport event with world-specific data.
+     * This overload allows storing additional metadata like gamemode.
+     *
+     * @param playerId The player's UUID
+     * @param fromWorld The world they're leaving (null if first join)
+     * @param toWorld The world they're entering
+     * @param x The new X coordinate
+     * @param y The new Y coordinate
+     * @param z The new Z coordinate
+     * @param yaw The new view yaw
+     * @param pitch The new view pitch
+     * @param worldSpecificData Additional world-specific data (e.g., {"gamemode": "SURVIVAL"})
+     * @return CompletableFuture indicating completion
+     */
+    CompletableFuture<Void> recordWorldChange(UUID playerId, String fromWorld, String toWorld,
+                                            double x, double y, double z, float yaw, float pitch,
+                                            Map<String, Object> worldSpecificData);
     
     /**
      * Updates a player's location within their current world.
@@ -129,8 +149,27 @@ public interface PlayerWorldService {
                                                float yaw, float pitch, String biome);
     
     /**
+     * Updates a player's location, bypassing the rate limiter.
+     * Use this for critical saves (player quit, server shutdown) where the location
+     * must be persisted regardless of how recently it was last written.
+     *
+     * @param playerId  The player's UUID
+     * @param worldName The current world name
+     * @param x         The X coordinate
+     * @param y         The Y coordinate
+     * @param z         The Z coordinate
+     * @param yaw       The view yaw
+     * @param pitch     The view pitch
+     * @param biome     The current biome (optional)
+     * @return CompletableFuture indicating completion
+     */
+    CompletableFuture<Void> forceUpdatePlayerLocation(UUID playerId, String worldName,
+                                                      double x, double y, double z,
+                                                      float yaw, float pitch, String biome);
+
+    /**
      * Records a player death in a specific world.
-     * 
+     *
      * @param playerId The player's UUID
      * @param worldName The world where the death occurred
      * @return CompletableFuture indicating completion

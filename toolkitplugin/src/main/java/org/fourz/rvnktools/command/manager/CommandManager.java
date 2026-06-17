@@ -2,17 +2,29 @@ package org.fourz.rvnktools.command.manager;
 
 import org.bukkit.command.PluginCommand;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.command.manager.commands.DiscordCommand;
 import org.fourz.rvnktools.command.manager.commands.EventCommand;
 import org.fourz.rvnktools.command.manager.commands.EventsCommand;
 import org.fourz.rvnktools.command.manager.commands.PingCommand;
 import org.fourz.rvnktools.command.manager.commands.PlayerServiceTestCommand;
 import org.fourz.rvnktools.command.manager.commands.PutHatCommand;
-import org.fourz.rvnktools.command.manager.commands.RVNKTestCommand;
+import org.fourz.rvnktools.command.manager.commands.RVNKCoreCommand;
+import org.fourz.rvnktools.command.manager.commands.BackCommand;
 import org.fourz.rvnktools.command.manager.commands.TeleportCommand;
+import org.fourz.rvnktools.command.manager.commands.TpaCommand;
+import org.fourz.rvnktools.command.manager.commands.TpAcceptCommand;
+import org.fourz.rvnktools.command.manager.commands.TpDenyCommand;
 import org.fourz.rvnktools.command.manager.commands.TrainsCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapCommand;
 import org.fourz.rvnktools.command.manager.commands.WorldSwapSubCommand;
+import org.fourz.rvnkcore.service.teleport.BackLocationService;
+import org.fourz.rvnkcore.service.teleport.DefaultBackLocationService;
+import org.fourz.rvnkcore.service.teleport.TpaRequest;
+import org.fourz.rvnkcore.service.teleport.TpaRequestService;
+import org.fourz.rvnktools.listener.TpaListener;
+import org.fourz.rvnktools.link.LinkCommand;
 import org.fourz.rvnktools.logfilter.LogFilterCommand;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnktools.command.manager.commands.RVNKToolsCommand;
@@ -71,17 +83,21 @@ public class CommandManager {
         
         // Create a single shared WorldSwapSubCommand instance to prevent duplicate initialization
         WorldSwapSubCommand sharedWorldSwap = new WorldSwapSubCommand(plugin, null);
-        
+
         // Register teleportation commands with shared instance
-        registerCommand(new TeleportCommand(plugin, sharedWorldSwap));
-        
+        TeleportCommand teleportCommand = new TeleportCommand(plugin, sharedWorldSwap);
+        registerCommand(teleportCommand);
+
+        // Conditionally register /tp alias based on config
+        registerTpAlias(plugin, teleportCommand);
+
         // Register standalone worldswap and event commands that directly use the shared instance
         registerCommand(new WorldSwapCommand(plugin, sharedWorldSwap));
         registerCommand(new EventCommand(plugin, sharedWorldSwap));
         
         // Register debugging and testing commands
         registerCommand(new PlayerServiceTestCommand(plugin));
-        registerCommand(new RVNKTestCommand(plugin));
+        registerCommand(new RVNKCoreCommand(plugin));
         
         // Register puthat command with CommandManager
         registerCommand(new PutHatCommand(plugin));
@@ -89,12 +105,80 @@ public class CommandManager {
         // Register DH log filter command
         registerCommand(new LogFilterCommand(plugin));
 
+        // Register link command (magic link auth)
+        registerLinkCommand();
+
+        // Register TPA commands (if enabled)
+        registerTpaCommands();
+
         // Register cycle commands
         cycleCommands.registerCommands();
 
         logger.info("Command initialization complete!");
     }
     
+    /**
+     * Registers the /link command if AuthTokenStore is available in ServiceRegistry.
+     * AuthTokenStore is created by ApiServerInitializer — if the API server is disabled,
+     * the /link command will not be registered.
+     */
+    private void registerLinkCommand() {
+        try {
+            ServiceRegistry registry = plugin.getServiceRegistry();
+            if (registry.hasService(AuthTokenStore.class)) {
+                AuthTokenStore authTokenStore = registry.getService(AuthTokenStore.class);
+                registerCommand(new LinkCommand(plugin, authTokenStore));
+            } else {
+                logger.info("AuthTokenStore not available — /link command not registered (API server may be disabled)");
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to register /link command: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers TPA commands if the feature is enabled in config.
+     * Creates TpaRequestService and BackLocationService, registers the listener,
+     * and registers all 5 commands: /tpa, /tpahere, /tpaccept, /tpdeny, /back.
+     */
+    private void registerTpaCommands() {
+        boolean enabled = plugin.getConfig().getBoolean("features.tpa-commands", true);
+        if (!enabled) {
+            logger.info("TPA commands disabled in config");
+            return;
+        }
+
+        // Create services
+        TpaRequestService tpaService = new TpaRequestService(plugin);
+        tpaService.setRequestExpireSeconds(plugin.getConfig().getInt("teleport.request-expire-seconds", 60));
+        tpaService.setWarmupSeconds(plugin.getConfig().getInt("teleport.warmup-seconds", 3));
+        tpaService.setCooldownSeconds(plugin.getConfig().getInt("teleport.cooldown-seconds", 10));
+
+        BackLocationService backService = new DefaultBackLocationService();
+
+        // Register services with ServiceRegistry
+        ServiceRegistry registry = plugin.getServiceRegistry();
+        registry.registerService(TpaRequestService.class, tpaService);
+        registry.registerService(BackLocationService.class, backService);
+
+        // Register listener for warmup movement cancellation + player quit cleanup
+        plugin.getServer().getPluginManager().registerEvents(
+            new TpaListener(tpaService, backService), plugin);
+
+        // Register commands
+        registerCommand(new TpaCommand(plugin, tpaService,
+            "tpa", "Request to teleport to another player", "/tpa <player>",
+            TpaRequest.Type.TPA));
+        registerCommand(new TpaCommand(plugin, tpaService,
+            "tpahere", "Request another player teleport to you", "/tpahere <player>",
+            TpaRequest.Type.TPAHERE));
+        registerCommand(new TpAcceptCommand(plugin, tpaService, backService));
+        registerCommand(new TpDenyCommand(plugin, tpaService));
+        registerCommand(new BackCommand(plugin, tpaService, backService));
+
+        logger.info("TPA commands registered: /tpa, /tpahere, /tpaccept, /tpdeny, /back");
+    }
+
     /**
      * Get the CommandManager instance (singleton pattern).
      *
@@ -249,8 +333,38 @@ public class CommandManager {
     }
     
     /**
+     * Conditionally registers the /tp alias based on config.
+     * If override is enabled in config, routes /tp to TeleportCommand.
+     * If disabled, /tp remains as vanilla Minecraft behavior.
+     *
+     * @param plugin The RVNKCore plugin instance
+     * @param teleportCommand The TeleportCommand instance to route /tp to
+     */
+    private void registerTpAlias(RVNKCore plugin, TeleportCommand teleportCommand) {
+        boolean shouldOverrideTp = plugin.getConfig().getBoolean("commands.override-vanilla-tp", false);
+
+        if (!shouldOverrideTp) {
+            logger.info("Vanilla /tp override is DISABLED - using vanilla Minecraft teleport");
+            return;
+        }
+
+        // Get the /tp command from plugin.yml
+        PluginCommand tpCommand = plugin.getCommand("tp");
+        if (tpCommand == null) {
+            logger.warning("Failed to register /tp alias - command not found in plugin.yml");
+            return;
+        }
+
+        // Route /tp to TeleportCommand
+        tpCommand.setExecutor(teleportCommand);
+        tpCommand.setTabCompleter(teleportCommand);
+
+        logger.info("Registered /tp command override (vanilla behavior overridden)");
+    }
+
+    /**
      * Register an alias for a command.
-     * 
+     *
      * @param alias The alias name
      * @param commandName The target command name
      * @return true if the alias was registered successfully

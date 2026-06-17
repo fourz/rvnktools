@@ -183,7 +183,12 @@ public class DefaultWorldService implements WorldService {
     public CompletableFuture<Void> removeWorldTracking(String worldName) {
         return worldRepository.delete(worldName);
     }
-    
+
+    @Override
+    public CompletableFuture<Void> updateDisplayName(String worldName, String displayName) {
+        return worldRepository.updateDisplayName(worldName, displayName);
+    }
+
     /**
      * Creates a WorldDTO from a Bukkit World object.
      * Extracts comprehensive world metadata for database storage.

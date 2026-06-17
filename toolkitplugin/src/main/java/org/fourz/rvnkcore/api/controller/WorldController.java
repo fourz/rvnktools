@@ -1,16 +1,26 @@
 package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
+import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
+
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * REST API controller for world management and tracking operations.
@@ -21,11 +31,13 @@ import java.util.Map;
 public class WorldController extends HttpServlet {
     
     private final WorldService worldService;
+    private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
 
-    public WorldController(WorldService worldService, Gson gson, LogManager logger) {
+    public WorldController(WorldService worldService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
         this.worldService = worldService;
+        this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
     }
@@ -64,7 +76,7 @@ public class WorldController extends HttpServlet {
             } else if (pathInfo.startsWith("/recent")) {
                 // GET /api/v1/worlds/recent - Get recently accessed worlds
                 handleGetRecentWorlds(request, response);
-            } else if (pathInfo.startsWith("/") && !pathInfo.contains("/")) {
+            } else if (!pathInfo.substring(1).contains("/")) {
                 // GET /api/v1/worlds/{worldName} - Get world by name (direct world name)
                 String worldName = pathInfo.substring(1); // Remove leading "/"
                 handleGetWorldByName(worldName, request, response);
@@ -78,106 +90,98 @@ public class WorldController extends HttpServlet {
     }
 
     /**
-     * Handles GET /api/worlds - Get all worlds with metadata
+     * Handles GET /api/worlds - Live world list from LiveDataCache snapshot (always available).
      */
     private void handleGetAllWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getAllWorlds()
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize worlds response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get all worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds");
-                return null;
-            });
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache == null) {
+            sendErrorResponse(response, 503, "Server not ready");
+            return;
+        }
+        List<Map<String, Object>> worlds = cache.getSnapshot().worlds.stream()
+                .map(w -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("name", w.name());
+                    m.put("environment", w.environment());
+                    m.put("playerCount", w.playerCount());
+                    m.put("state", "ACTIVE");
+                    return m;
+                })
+                .collect(Collectors.toList());
+        sendResponse(response, worlds);
     }
 
     /**
      * Handles GET /api/v1/worlds/with-players - Get worlds that currently have players
      */
     private void handleGetWorldsWithPlayers(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldsWithPlayers()
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize worlds with players response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get worlds with players", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds with players");
-                return null;
-            });
+        try {
+            var worlds = worldService.getWorldsWithPlayers().get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get worlds with players", e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds with players");
+        }
     }
 
     /**
-     * Handles GET /api/v1/worlds/statistics - Get overall world statistics
+     * Handles GET /api/v1/worlds/statistics - Get overall world statistics from LiveDataCache snapshot.
      */
     private void handleGetWorldStatistics(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getAllWorlds()
-            .thenAccept(worlds -> {
-                try {
-                    // Calculate basic statistics from all worlds
-                    Map<String, Object> stats = new HashMap<>();
-                    stats.put("totalWorlds", worlds.size());
-                    stats.put("activeWorlds", worlds.stream().filter(w -> w.getPlayerCount() != null && w.getPlayerCount() > 0).count());
-                    stats.put("totalPlayers", worlds.stream().mapToInt(w -> w.getPlayerCount() != null ? w.getPlayerCount() : 0).sum());
-                    
-                    String json = gson.toJson(stats);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize world statistics response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world statistics", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world statistics");
-                return null;
-            });
+        LiveDataCache cache = LiveDataCache.getInstance();
+        if (cache == null) {
+            sendErrorResponse(response, 503, "Server not ready");
+            return;
+        }
+        LiveDataCache.BukkitSnapshot snap = cache.getSnapshot();
+        List<Map<String, Object>> worldStats = snap.worlds.stream()
+                .map(w -> {
+                    Map<String, Object> ws = new HashMap<>();
+                    ws.put("name", w.name());
+                    ws.put("environment", w.environment());
+                    ws.put("playerCount", w.playerCount());
+                    return ws;
+                })
+                .collect(Collectors.toList());
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalWorlds", snap.worlds.size());
+        stats.put("activeWorlds", snap.worlds.stream().filter(w -> w.playerCount() > 0).count());
+        stats.put("totalPlayers", snap.onlineCount);
+        stats.put("maxPlayers", snap.maxPlayers);
+        stats.put("worlds", worldStats);
+        sendResponse(response, stats);
     }
 
     /**
      * Handles GET /api/v1/worlds/environment/{environment} - Get worlds by environment type
      */
     private void handleGetWorldsByEnvironment(String environment, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldsByEnvironment(environment)
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize worlds by environment response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get worlds by environment: " + environment, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds by environment");
-                return null;
-            });
+        try {
+            var worlds = worldService.getWorldsByEnvironment(environment).get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get worlds by environment: " + environment, e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds by environment");
+        }
     }
 
     /**
      * Handles GET /api/v1/worlds/player/{playerUuid} - Get worlds visited by specific player
      */
     private void handleGetWorldsForPlayer(String playerUuid, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // For now, return empty list since this requires PlayerWorld correlation
         try {
-            String json = gson.toJson(java.util.Collections.emptyList());
-            sendResponse(response, json);
+            UUID uuid = UUID.fromString(playerUuid);
+            List<String> worlds = playerWorldService.getPlayerVisitedWorlds(uuid).get(15, TimeUnit.SECONDS);
+            Map<String, Object> result = new HashMap<>();
+            result.put("playerUuid", playerUuid);
+            result.put("worldCount", worlds.size());
+            result.put("worlds", worlds);
+            sendResponse(response, result);
+        } catch (IllegalArgumentException e) {
+            sendErrorResponse(response, 400, "Invalid UUID format: " + playerUuid);
         } catch (Exception e) {
-            logger.error("Failed to serialize worlds for player response", e);
-            sendErrorResponse(response, 500, "Failed to serialize response");
+            logger.error("Failed to get worlds for player: " + playerUuid, e);
+            sendErrorResponse(response, 500, "Failed to retrieve worlds for player");
         }
     }
 
@@ -185,19 +189,38 @@ public class WorldController extends HttpServlet {
      * Handles GET /api/v1/worlds/correlation/{playerUuid} - Get world-player correlation data
      */
     private void handleGetWorldPlayerCorrelation(String playerUuid, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // For now, return empty correlation data
         try {
+            UUID uuid = UUID.fromString(playerUuid);
+            List<PlayerWorldDataDTO> allData = playerWorldService.getAllPlayerWorldData(uuid).get(15, TimeUnit.SECONDS);
+            List<PlayerWorldDataDTO> mostVisited = playerWorldService.getPlayerMostVisitedWorlds(uuid, 5).get(15, TimeUnit.SECONDS);
+
+            long totalPlaytime = allData.stream().mapToLong(PlayerWorldDataDTO::getPlaytimeSeconds).sum();
+            int totalDeaths = allData.stream().mapToInt(PlayerWorldDataDTO::getDeathCount).sum();
+            int totalVisits = allData.stream().mapToInt(PlayerWorldDataDTO::getVisitCount).sum();
+            String favoriteWorld = mostVisited.isEmpty() ? null : mostVisited.get(0).getWorldName();
+
             Map<String, Object> correlationData = new HashMap<>();
             correlationData.put("playerUuid", playerUuid);
-            correlationData.put("worldsVisited", 0);
-            correlationData.put("totalPlaytime", 0);
-            correlationData.put("worlds", java.util.Collections.emptyList());
-            
-            String json = gson.toJson(correlationData);
-            sendResponse(response, json);
+            correlationData.put("worldsVisited", allData.size());
+            correlationData.put("totalPlaytimeSeconds", totalPlaytime);
+            correlationData.put("totalDeaths", totalDeaths);
+            correlationData.put("totalVisits", totalVisits);
+            correlationData.put("favoriteWorld", favoriteWorld);
+            correlationData.put("worlds", allData.stream().map(d -> {
+                Map<String, Object> world = new HashMap<>();
+                world.put("worldName", d.getWorldName());
+                world.put("visitCount", d.getVisitCount());
+                world.put("playtimeSeconds", d.getPlaytimeSeconds());
+                world.put("deathCount", d.getDeathCount());
+                world.put("lastVisit", d.getLastVisit());
+                return world;
+            }).collect(Collectors.toList()));
+            sendResponse(response, correlationData);
+        } catch (IllegalArgumentException e) {
+            sendErrorResponse(response, 400, "Invalid UUID format: " + playerUuid);
         } catch (Exception e) {
-            logger.error("Failed to serialize correlation data response", e);
-            sendErrorResponse(response, 500, "Failed to serialize response");
+            logger.error("Failed to get world-player correlation: " + playerUuid, e);
+            sendErrorResponse(response, 500, "Failed to retrieve world-player correlation");
         }
     }
 
@@ -205,179 +228,57 @@ public class WorldController extends HttpServlet {
      * Handles GET /api/v1/worlds/recent - Get recently accessed worlds
      */
     private void handleGetRecentWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getRecentlyAccessedWorlds(10)
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize recent worlds response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get recent worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve recent worlds");
-                return null;
-            });
+        try {
+            var worlds = worldService.getRecentlyAccessedWorlds(10).get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get recent worlds", e);
+            sendErrorResponse(response, 500, "Failed to retrieve recent worlds");
+        }
     }
 
     /**
      * Handles GET /api/worlds/name/{name} - Get world by name
      */
     private void handleGetWorldByName(String worldName, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorld(worldName)
-            .thenAccept(world -> {
-                if (world.isPresent()) {
-                    try {
-                        String json = gson.toJson(world.get());
-                        sendResponse(response, json);
-                    } catch (Exception e) {
-                        logger.error("Failed to serialize world response", e);
-                        sendErrorResponse(response, 500, "Failed to serialize response");
-                    }
-                } else {
-                    sendErrorResponse(response, 404, "World not found with name: " + worldName);
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world by name: " + worldName, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world");
-                return null;
-            });
-    }
-
-    /**
-     * Handles GET /api/worlds/type/{type} - Get worlds by type
-     */
-    private void handleGetWorldsByType(String worldType, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldsByEnvironment(worldType)
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize worlds response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get worlds by type: " + worldType, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve worlds");
-                return null;
-            });
-    }
-
-    /**
-     * Handles GET /api/worlds/details/{worldName} - Get comprehensive world details with player correlation
-     */
-    private void handleGetWorldDetails(String worldName, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorld(worldName)
-            .thenAccept(world -> {
-                if (world.isPresent()) {
-                    try {
-                        String json = gson.toJson(world.get());
-                        sendResponse(response, json);
-                    } catch (Exception e) {
-                        logger.error("Failed to serialize world details response", e);
-                        sendErrorResponse(response, 500, "Failed to serialize response");
-                    }
-                } else {
-                    sendErrorResponse(response, 404, "World details not found for: " + worldName);
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world details: " + worldName, throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world details");
-                return null;
-            });
-    }
-
-    /**
-     * Handles GET /api/worlds/id/{id}/players - Get players in world by world ID
-     */
-    private void handleGetWorldPlayersById(String worldId, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // Note: WorldService currently doesn't have getWorldPlayersById method
-        // For now, return a placeholder response
-        sendErrorResponse(response, 501, "Get world players by ID not yet implemented");
-    }
-
-    /**
-     * Handles GET /api/worlds/name/{name}/players - Get players in world by world name
-     */
-    private void handleGetWorldPlayersByName(String worldName, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // Note: WorldService currently doesn't have getWorldPlayersByName method
-        // For now, return a placeholder response
-        sendErrorResponse(response, 501, "Get world players by name not yet implemented");
-    }
-
-    /**
-     * Handles GET /api/worlds/stats - Get comprehensive world statistics
-     */
-    private void handleGetWorldStats(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getWorldStatistics()
-            .thenAccept(stats -> {
-                try {
-                    String json = gson.toJson(stats);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize world stats response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get world statistics", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve world statistics");
-                return null;
-            });
+        try {
+            var world = worldService.getWorld(worldName).get(30, TimeUnit.SECONDS);
+            if (world.isPresent()) {
+                sendResponse(response, world.get());
+            } else {
+                sendErrorResponse(response, 404, "World not found with name: " + worldName);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to get world by name: " + worldName, e);
+            sendErrorResponse(response, 500, "Failed to retrieve world");
+        }
     }
 
     /**
      * Handles GET /api/worlds/active - Get active worlds only
      */
     private void handleGetActiveWorlds(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        worldService.getActiveWorlds()
-            .thenAccept(worlds -> {
-                try {
-                    String json = gson.toJson(worlds);
-                    sendResponse(response, json);
-                } catch (Exception e) {
-                    logger.error("Failed to serialize active worlds response", e);
-                    sendErrorResponse(response, 500, "Failed to serialize response");
-                }
-            })
-            .exceptionally(throwable -> {
-                logger.error("Failed to get active worlds", throwable);
-                sendErrorResponse(response, 500, "Failed to retrieve active worlds");
-                return null;
-            });
-    }
-
-    /**
-     * Sends a successful JSON response
-     */
-    private void sendResponse(HttpServletResponse response, String json) {
         try {
-            response.setStatus(200);
-            PrintWriter writer = response.getWriter();
-            writer.write(json);
-            writer.flush();
-        } catch (IOException e) {
-            logger.error("Failed to send response", e);
+            var worlds = worldService.getActiveWorlds().get(30, TimeUnit.SECONDS);
+            sendResponse(response, worlds);
+        } catch (Exception e) {
+            logger.error("Failed to get active worlds", e);
+            sendErrorResponse(response, 500, "Failed to retrieve active worlds");
         }
     }
 
-    /**
-     * Sends an error response with specified status code and message
-     */
+    private void sendResponse(HttpServletResponse response, Object data) {
+        ApiUtils.sendSuccess(response, gson, data);
+    }
+
     private void sendErrorResponse(HttpServletResponse response, int statusCode, String message) {
-        try {
-            response.setStatus(statusCode);
-            PrintWriter writer = response.getWriter();
-            writer.write("{\"error\":\"" + message + "\"}");
-            writer.flush();
-        } catch (IOException e) {
-            logger.error("Failed to send error response", e);
-        }
+        String code = switch (statusCode) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 404 -> "NOT_FOUND";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        ApiUtils.sendError(response, gson, statusCode, code, message);
     }
 }

@@ -7,13 +7,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
-import org.fourz.rvnkcore.api.model.response.CountResponse;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
-import org.fourz.rvnkcore.api.model.response.StatusResponse;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
+import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.model.response.PlayerWorldDataResponse;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -24,7 +23,6 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -40,18 +38,22 @@ public class PlayerController extends HttpServlet {
     private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
+    private final org.fourz.rvnkcore.api.server.jetty.LiveDataCache liveDataCache;
 
-    public PlayerController(PlayerService playerService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
+    public PlayerController(PlayerService playerService, PlayerWorldService playerWorldService,
+                            Gson gson, LogManager logger,
+                            org.fourz.rvnkcore.api.server.jetty.LiveDataCache liveDataCache) {
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
+        this.liveDataCache = liveDataCache;
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
-        String clientIP = getClientIP(req);
+        String clientIP = ApiUtils.getClientIP(req);
         String queryString = req.getQueryString();
         
         // Move request logging to debug level to reduce verbosity
@@ -115,8 +117,8 @@ public class PlayerController extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error handling GET request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            logger.error("Error handling GET request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
@@ -169,7 +171,7 @@ public class PlayerController extends HttpServlet {
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String pathInfo = req.getPathInfo();
-        String clientIP = getClientIP(req);
+        String clientIP = ApiUtils.getClientIP(req);
         
         // Move request logging to debug level to reduce verbosity
         logger.debug("PlayerController PUT request: " + pathInfo + " from IP: " + clientIP);
@@ -207,8 +209,8 @@ public class PlayerController extends HttpServlet {
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, "Invalid UUID format");
         } catch (Exception e) {
-            logger.error("Error handling PUT request from IP: " + getClientIP(req) + ", Path: " + req.getPathInfo(), e);
-            sendError(resp, 500, "Internal server error: " + e.getMessage());
+            logger.error("Error handling PUT request from IP: " + ApiUtils.getClientIP(req) + ", Path: " + req.getPathInfo(), e);
+            sendError(resp, 500, "An unexpected error occurred.");
         }
     }
 
@@ -230,28 +232,22 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleGetOnlinePlayers(HttpServletResponse resp) throws IOException {
-        List<PlayerResponse> onlinePlayers = Bukkit.getOnlinePlayers().stream()
-                .map(this::convertBukkitPlayerToResponse)
-                .collect(Collectors.toList());
-        
-        sendResponse(resp, 200, onlinePlayers);
+        sendResponse(resp, 200, liveDataCache.getSnapshot().onlinePlayers);
     }
 
     private void handleGetRecentPlayers(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         int hours = getIntParam(req, "hours", 24);
-        
-        playerService.getRecentPlayers(hours)
-                .thenAccept(players -> {
-                    List<PlayerResponse> responses = players.stream()
-                            .map(this::convertToResponse)
-                            .collect(Collectors.toList());
-                    sendResponse(resp, 200, responses);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error retrieving recent players", ex);
-                    sendError(resp, 500, "Failed to retrieve recent players");
-                    return null;
-                });
+
+        try {
+            List<PlayerDTO> players = playerService.getRecentPlayers(hours).get(15, TimeUnit.SECONDS);
+            List<PlayerResponse> responses = players.stream()
+                    .map(this::convertToResponse)
+                    .collect(Collectors.toList());
+            sendResponse(resp, 200, responses);
+        } catch (Exception ex) {
+            logger.error("Error retrieving recent players", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to retrieve recent players");
+        }
     }
 
     private void handleGetPlayer(UUID uuid, HttpServletResponse resp) throws IOException {
@@ -302,7 +298,8 @@ public class PlayerController extends HttpServlet {
             return;
         }
         try {
-            List<PlayerDTO> players = playerService.searchPlayersByName("%" + name + "%")
+            String escaped = name.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+            List<PlayerDTO> players = playerService.searchPlayersByName("%" + escaped + "%")
                                                .get(15, TimeUnit.SECONDS);
             List<PlayerResponse> responses = players.stream()
                                                 .map(this::convertToResponse)
@@ -316,8 +313,16 @@ public class PlayerController extends HttpServlet {
 
     private void handleGetPlayerCount(HttpServletResponse resp) throws IOException {
         try {
-            long count = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, new CountResponse(count, "Total registered players"));
+            long registeredCount = playerService.getPlayerCount().get(15, TimeUnit.SECONDS);
+            org.fourz.rvnkcore.api.server.jetty.LiveDataCache.BukkitSnapshot snap = liveDataCache.getSnapshot();
+
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("registered", registeredCount);
+            data.put("online", snap.onlineCount);
+            data.put("max", snap.maxPlayers);
+            data.put("worlds", snap.worldGroups);
+
+            sendResponse(resp, 200, data);
         } catch (Exception ex) {
             logger.error("Error retrieving player count", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to retrieve player count");
@@ -345,12 +350,12 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleUpdateLocation(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        LocationUpdateRequest request = gson.fromJson(readRequestBody(req), LocationUpdateRequest.class);
+        LocationUpdateRequest request = gson.fromJson(ApiUtils.readRequestBody(req), LocationUpdateRequest.class);
         if (!request.isValid()) { sendError(resp, 400, "Invalid location update request"); return; }
         try {
             playerService.updatePlayerLocation(uuid, request.getWorld(), request.getX(), request.getY(), request.getZ())
                      .get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, StatusResponse.success("Location updated successfully"));
+            sendResponse(resp, 200, java.util.Map.of("message", "Location updated successfully"));
         } catch (Exception ex) {
             logger.error("Error updating player location", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to update location");
@@ -358,13 +363,13 @@ public class PlayerController extends HttpServlet {
     }
 
     private void handleUpdateGroups(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        GroupUpdateRequest request = gson.fromJson(readRequestBody(req), GroupUpdateRequest.class);
+        GroupUpdateRequest request = gson.fromJson(ApiUtils.readRequestBody(req), GroupUpdateRequest.class);
         if (!request.isValid()) { sendError(resp, 400, "Invalid group update request"); return; }
         String primary = request.getGroups().isEmpty() ? "" : request.getGroups().get(0);
         try {
             playerService.updatePlayerGroups(uuid, primary, request.getGroups())
                      .get(15, TimeUnit.SECONDS);
-            sendResponse(resp, 200, StatusResponse.success("Groups updated successfully"));
+            sendResponse(resp, 200, java.util.Map.of("message", "Groups updated successfully"));
         } catch (Exception ex) {
             logger.error("Error updating player groups", ex instanceof CompletionException ? ex.getCause() : ex);
             sendError(resp, 500, "Failed to update groups");
@@ -427,8 +432,13 @@ public class PlayerController extends HttpServlet {
     private void handleGetPlayerAllWorldData(UUID playerId, HttpServletResponse resp) throws IOException {
         try {
             List<PlayerWorldDataDTO> worldData = playerWorldService.getAllPlayerWorldData(playerId).get(15, TimeUnit.SECONDS);
+            // All records share the same playerId — fetch the name once to avoid N+1 queries.
+            String playerName = playerService.getPlayer(playerId)
+                    .get(5, TimeUnit.SECONDS)
+                    .map(PlayerDTO::getCurrentName)
+                    .orElse(null);
             List<PlayerWorldDataResponse> responses = worldData.stream()
-                    .map(this::convertWorldDataToResponse)
+                    .map(wd -> convertWorldDataToResponse(wd, playerName))
                     .collect(Collectors.toList());
             sendResponse(resp, 200, responses);
         } catch (Exception ex) {
@@ -441,7 +451,7 @@ public class PlayerController extends HttpServlet {
         try {
             Optional<PlayerWorldDataDTO> worldData = playerWorldService.getPlayerWorldData(playerId, worldName).get(15, TimeUnit.SECONDS);
             if (worldData.isPresent()) {
-                PlayerWorldDataResponse response = convertWorldDataToResponse(worldData.get());
+                PlayerWorldDataResponse response = convertWorldDataToResponse(worldData.get(), null);
                 sendResponse(resp, 200, response);
             } else {
                 sendError(resp, 404, "Player has not visited world: " + worldName);
@@ -457,16 +467,15 @@ public class PlayerController extends HttpServlet {
             Optional<PlayerWorldDataDTO> worldData = playerWorldService.getLastKnownLocation(playerId, worldName).get(15, TimeUnit.SECONDS);
             if (worldData.isPresent()) {
                 PlayerWorldDataDTO data = worldData.get();
-                Map<String, Object> location = Map.of(
-                        "worldName", data.getWorldName(),
-                        "x", data.getLastX(),
-                        "y", data.getLastY(),
-                        "z", data.getLastZ(),
-                        "yaw", data.getLastYaw(),
-                        "pitch", data.getLastPitch(),
-                        "biome", data.getLastBiome() != null ? data.getLastBiome() : "unknown",
-                        "lastVisit", data.getLastVisit()
-                );
+                Map<String, Object> location = new java.util.HashMap<>();
+                location.put("worldName", data.getWorldName());
+                location.put("x", data.getLastX());
+                location.put("y", data.getLastY());
+                location.put("z", data.getLastZ());
+                location.put("yaw", data.getLastYaw());
+                location.put("pitch", data.getLastPitch());
+                location.put("biome", data.getLastBiome());
+                location.put("lastVisit", data.getLastVisit());
                 sendResponse(resp, 200, location);
             } else {
                 sendError(resp, 404, "Player has not visited world: " + worldName);
@@ -503,22 +512,21 @@ public class PlayerController extends HttpServlet {
             
             String favoriteWorld = mostVisited.isEmpty() ? null : mostVisited.get(0).getWorldName();
             
-            Map<String, Object> stats = Map.of(
-                    "playerId", playerId,
-                    "totalWorlds", allWorldData.size(),
-                    "totalPlaytimeMinutes", totalPlaytimeSeconds / 60,
-                    "totalDeaths", totalDeaths,
-                    "totalVisits", totalVisits,
-                    "favoriteWorld", favoriteWorld != null ? favoriteWorld : "none",
-                    "mostVisitedWorlds", mostVisited.stream()
-                            .map(data -> Map.of(
-                                    "worldName", data.getWorldName(),
-                                    "visitCount", data.getVisitCount(),
-                                    "playtimeMinutes", data.getPlaytimeSeconds() / 60,
-                                    "deathCount", data.getDeathCount()
-                            ))
-                            .collect(Collectors.toList())
-            );
+            Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("playerId", playerId);
+            stats.put("totalWorlds", allWorldData.size());
+            stats.put("totalPlaytimeMinutes", totalPlaytimeSeconds / 60);
+            stats.put("totalDeaths", totalDeaths);
+            stats.put("totalVisits", totalVisits);
+            stats.put("favoriteWorld", favoriteWorld);
+            stats.put("mostVisitedWorlds", mostVisited.stream()
+                    .map(data -> Map.of(
+                            "worldName", data.getWorldName(),
+                            "visitCount", data.getVisitCount(),
+                            "playtimeMinutes", data.getPlaytimeSeconds() / 60,
+                            "deathCount", data.getDeathCount()
+                    ))
+                    .collect(Collectors.toList()));
             sendResponse(resp, 200, stats);
         } catch (Exception ex) {
             logger.error("Error retrieving player world statistics", ex instanceof CompletionException ? ex.getCause() : ex);
@@ -543,37 +551,27 @@ public class PlayerController extends HttpServlet {
                 .lastSeen(lastSeen)
                 .timesJoined(player.getTimesJoined())
                 .currentWorld(player.getCurrentWorld())
-                .totalPlaytimeMinutes(player.getTotalPlaytimeSeconds() / 60)
+                .totalPlaytimeHours(player.getTotalPlaytimeHours())
                 .groups(player.getGroups())
                 .build();
     }
 
-    private PlayerResponse convertBukkitPlayerToResponse(Player player) {
-        return PlayerResponse.builder()
-                .uuid(player.getUniqueId())
-                .name(player.getName())
-                .online(true)
-                .currentWorld(player.getWorld().getName())
-                .timesJoined(1) // Online players have at least joined once
-                .totalPlaytimeMinutes(0L) // Real-time calculation would require session tracking
-                .build();
-    }
-
-    private PlayerWorldDataResponse convertWorldDataToResponse(PlayerWorldDataDTO worldData) {
-        // Get player name from service if available
-        String playerName = null;
-        try {
-            Optional<PlayerDTO> player = playerService.getPlayer(worldData.getPlayerId()).get(5, TimeUnit.SECONDS);
-            if (player.isPresent()) {
-                playerName = player.get().getCurrentName();
+    /** Converts world data using a pre-fetched player name. Pass null to trigger a single DB lookup. */
+    private PlayerWorldDataResponse convertWorldDataToResponse(PlayerWorldDataDTO worldData, String playerName) {
+        if (playerName == null) {
+            try {
+                playerName = playerService.getPlayer(worldData.getPlayerId())
+                        .get(5, TimeUnit.SECONDS)
+                        .map(PlayerDTO::getCurrentName)
+                        .orElse(null);
+            } catch (Exception ex) {
+                logger.debug("Could not retrieve player name for world data response", ex);
             }
-        } catch (Exception ex) {
-            logger.debug("Could not retrieve player name for world data response", ex);
         }
 
         return PlayerWorldDataResponse.builder()
                 .playerId(worldData.getPlayerId())
-                .playerName(playerName != null ? playerName : "unknown")
+                .playerName(playerName)
                 .worldName(worldData.getWorldName())
                 .firstVisit(worldData.getFirstVisit() != null ? worldData.getFirstVisit().toLocalDateTime() : null)
                 .lastVisit(worldData.getLastVisit() != null ? worldData.getLastVisit().toLocalDateTime() : null)
@@ -588,57 +586,21 @@ public class PlayerController extends HttpServlet {
     }
 
     private void sendResponse(HttpServletResponse resp, int status, Object data) {
-        try {
-            resp.setStatus(status);
-            resp.getWriter().write(gson.toJson(data));
-        } catch (IOException e) {
-            logger.error("Error sending response", e);
-        }
+        ApiUtils.sendSuccess(resp, gson, data);
     }
 
     private void sendError(HttpServletResponse resp, int status, String message) {
-        try {
-            resp.setStatus(status);
-            StatusResponse error = StatusResponse.error(message, status);
-            resp.getWriter().write(gson.toJson(error));
-        } catch (IOException e) {
-            logger.error("Error sending error response", e);
-        }
+        String code = switch (status) {
+            case 400 -> "BAD_REQUEST";
+            case 401 -> "UNAUTHORIZED";
+            case 404 -> "NOT_FOUND";
+            case 500 -> "INTERNAL_ERROR";
+            default -> "ERROR";
+        };
+        ApiUtils.sendError(resp, gson, status, code, message);
     }
 
     private int getIntParam(HttpServletRequest req, String name, int defaultValue) {
-        String value = req.getParameter(name);
-        if (value == null) return defaultValue;
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * Extracts client IP address, handling forwarded headers.
-     */
-    private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        
-        String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty()) {
-            return xRealIP;
-        }
-        
-        return request.getRemoteAddr();
-    }
-
-    private String readRequestBody(HttpServletRequest req) throws IOException {
-        StringBuilder body = new StringBuilder();
-        String line;
-        while ((line = req.getReader().readLine()) != null) {
-            body.append(line);
-        }
-        return body.toString();
+        return ApiUtils.getIntParam(req, name, defaultValue);
     }
 }

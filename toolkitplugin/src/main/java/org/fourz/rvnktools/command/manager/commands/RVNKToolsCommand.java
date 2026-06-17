@@ -22,8 +22,6 @@ public class RVNKToolsCommand extends BaseCommand {
         registerSubCommand("cycle", new CycleSubCommand(plugin, this));
         registerSubCommand("reload", new ReloadSubCommand(plugin, this));
         registerSubCommand("debug", new DebugSubCommand(plugin, this));
-        registerSubCommand("createtestdata", new CreateTestDataSubCommand(plugin, this));
-        registerSubCommand("migration", new MigrationSubCommand(plugin, this));
 
         // Create teleport subcommands without world swap - they will get it from CommandManager
         registerSubCommand("teleport", new TeleportSubCommand(plugin, this));

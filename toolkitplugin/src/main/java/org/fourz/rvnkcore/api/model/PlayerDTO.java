@@ -26,7 +26,7 @@ public class PlayerDTO {
     private Timestamp lastSeen;
     private String currentWorld;
     private int timesJoined;
-    private long totalPlaytimeSeconds;
+    private float totalPlaytimeHours;
     private String primaryGroup;
     private List<String> groups;
     private boolean banned;
@@ -41,7 +41,7 @@ public class PlayerDTO {
         this.groups = new ArrayList<>();
         this.banned = false;
         this.timesJoined = 0;
-        this.totalPlaytimeSeconds = 0L;
+        this.totalPlaytimeHours = 0f;
     }
     
     /**
@@ -138,21 +138,21 @@ public class PlayerDTO {
         }
     }
     
-    public long getTotalPlaytimeSeconds() {
-        return totalPlaytimeSeconds;
+    public float getTotalPlaytimeHours() {
+        return totalPlaytimeHours;
     }
-    
-    public void setTotalPlaytimeSeconds(long totalPlaytimeSeconds) {
-        this.totalPlaytimeSeconds = totalPlaytimeSeconds;
+
+    public void setTotalPlaytimeHours(float totalPlaytimeHours) {
+        this.totalPlaytimeHours = totalPlaytimeHours;
     }
-    
+
     /**
      * Adds playtime to the total.
-     * 
-     * @param seconds Additional seconds of playtime
+     *
+     * @param hours Additional hours of playtime (fractional)
      */
-    public void addTotalPlaytime(long seconds) {
-        this.totalPlaytimeSeconds += seconds;
+    public void addTotalPlaytime(float hours) {
+        this.totalPlaytimeHours += hours;
     }
     
     // Permission group tracking
@@ -261,8 +261,8 @@ public class PlayerDTO {
             return this;
         }
         
-        public Builder totalPlaytimeSeconds(long totalPlaytimeSeconds) {
-            dto.totalPlaytimeSeconds = totalPlaytimeSeconds;
+        public Builder totalPlaytimeHours(float totalPlaytimeHours) {
+            dto.totalPlaytimeHours = totalPlaytimeHours;
             return this;
         }
         

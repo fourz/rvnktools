@@ -30,7 +30,13 @@ public class DatabaseSetup {
     public static final String TABLE_PLAYERS = "rvnk_players";
     public static final String TABLE_PLAYER_WORLD_DATA = "rvnk_player_world_data";
     public static final String TABLE_ANNOUNCEMENTS = "rvnk_announcements";
+    public static final String TABLE_PLAYER_PREFERENCES = "rvnk_player_preferences";
+    public static final String TABLE_PLAYER_NOTIFICATION_TYPES = "rvnk_player_notification_types";
+    public static final String TABLE_PLAYER_NOTIFICATION_CHANNELS = "rvnk_player_notification_channels";
+    public static final String TABLE_PREFERENCE_DEFAULTS = "rvnk_preference_defaults";
+    public static final String TABLE_ANNOUNCEMENT_TYPES = "rvnk_announcement_types";
     public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
+    public static final String TABLE_PUSH_SUBSCRIPTIONS = "rvnk_push_subscriptions";
 
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
         this.connectionProvider = connectionProvider;
@@ -42,9 +48,9 @@ public class DatabaseSetup {
         this.tablePrefix = plugin.getConfig().getString("storage." + storageType + ".tablePrefix", "");
 
         if (tablePrefix != null && !tablePrefix.isEmpty()) {
-            logger.info("DatabaseSetup using table prefix: " + tablePrefix);
+            logger.debug("DatabaseSetup using table prefix: " + tablePrefix);
         }
-        logger.info("DatabaseSetup initialized for database type: " + databaseType);
+        logger.debug("DatabaseSetup initialized for database type: " + databaseType);
     }
 
     /**
@@ -83,12 +89,20 @@ public class DatabaseSetup {
             boolean schemaExists = checkSchemaExists(connection);
 
             if (schemaExists) {
-                logger.info("Database schema already initialized - performing verification only");
-                verifySchema(connection);
+                logger.info("Database schema already initialized - ensuring all tables exist");
             } else {
                 logger.info("Initializing database schema for the first time...");
-                createTables(connection);
-                createIndexes(connection);
+            }
+
+            // Always run createTables - uses CREATE TABLE IF NOT EXISTS so it's idempotent
+            // This ensures new tables added in updates are created on existing databases
+            createTables(connection);
+            createIndexes(connection);
+
+            // Run migrations to add new columns to existing tables
+            runMigrations(connection);
+
+            if (!schemaExists) {
                 logger.info("Database schema initialization completed successfully");
             }
 
@@ -169,11 +183,23 @@ public class DatabaseSetup {
         String playersTable = table(TABLE_PLAYERS);
         String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
         String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        String playerPreferencesTable = table(TABLE_PLAYER_PREFERENCES);
+        String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
+        String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
+        String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
+        String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
 
         String createPlayersTable;
         String createPlayerWorldDataTable;
         String createWorldsTable;
         String createAnnouncementsTable;
+        String createAnnouncementTypesTable;
+        String createPlayerPreferencesTable;
+        String createNotificationTypesTable;
+        String createNotificationChannelsTable;
+        String createPreferenceDefaultsTable;
+        String createPushSubscriptionsTable;
 
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL-specific table definitions with proper column types
@@ -185,7 +211,7 @@ public class DatabaseSetup {
                 "last_seen TIMESTAMP NOT NULL, " +
                 "current_world VARCHAR(255), " +
                 "times_joined INT DEFAULT 1, " +
-                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
                 "primary_group VARCHAR(255) DEFAULT 'default', " +
                 "groups TEXT, " +
                 "banned BOOLEAN DEFAULT FALSE, " +
@@ -207,6 +233,7 @@ public class DatabaseSetup {
                 "last_pitch FLOAT DEFAULT 0, " +
                 "last_biome VARCHAR(255), " +
                 "death_count INT DEFAULT 0, " +
+                "world_specific_data TEXT, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
                 "PRIMARY KEY (player_id, world_name), " +
@@ -253,6 +280,7 @@ public class DatabaseSetup {
                 "message TEXT NOT NULL, " +
                 "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
                 "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
                 "scheduled_for TIMESTAMP NULL, " +
@@ -261,6 +289,79 @@ public class DatabaseSetup {
                 "target_worlds TEXT, " +
                 "target_groups TEXT, " +
                 "metadata TEXT" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id VARCHAR(50) PRIMARY KEY, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "prefix VARCHAR(200), " +
+                "suffix VARCHAR(200), " +
+                "permission VARCHAR(200), " +
+                "list_fee INT DEFAULT 0, " +
+                "weekly_fee INT DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "plugin_id VARCHAR(64) NOT NULL, " +
+                "master_enabled BOOLEAN DEFAULT FALSE, " +
+                "quiet_hours_start INT DEFAULT -1, " +
+                "quiet_hours_end INT DEFAULT -1, " +
+                "metadata TEXT, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, plugin_id), " +
+                "INDEX idx_player_prefs_player (player_id), " +
+                "INDEX idx_player_prefs_plugin (plugin_id), " +
+                "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createNotificationTypesTable = "CREATE TABLE IF NOT EXISTS " + notificationTypesTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "plugin_id VARCHAR(64) NOT NULL, " +
+                "notification_type VARCHAR(64) NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                "INDEX idx_notif_types_player (player_id), " +
+                "INDEX idx_notif_types_plugin_type (plugin_id, notification_type), " +
+                "FOREIGN KEY (player_id, plugin_id) REFERENCES " + playerPreferencesTable + "(player_id, plugin_id) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createNotificationChannelsTable = "CREATE TABLE IF NOT EXISTS " + notificationChannelsTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "plugin_id VARCHAR(64) NOT NULL, " +
+                "notification_type VARCHAR(64) NOT NULL, " +
+                "channel_name VARCHAR(32) NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                "INDEX idx_channels_player (player_id), " +
+                "INDEX idx_channels_plugin_type (plugin_id, notification_type), " +
+                "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + notificationTypesTable + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createPreferenceDefaultsTable = "CREATE TABLE IF NOT EXISTS " + preferenceDefaultsTable + " (" +
+                "plugin_id VARCHAR(64) NOT NULL, " +
+                "preference_key VARCHAR(64) NOT NULL, " +
+                "preference_value TEXT NOT NULL, " +
+                "description TEXT, " +
+                "PRIMARY KEY (plugin_id, preference_key), " +
+                "INDEX idx_defaults_plugin (plugin_id)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createPushSubscriptionsTable = "CREATE TABLE IF NOT EXISTS " + pushSubscriptionsTable + " (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "endpoint TEXT NOT NULL, " +
+                "p256dh TEXT NOT NULL, " +
+                "auth_key VARCHAR(128) NOT NULL, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "INDEX idx_push_player (player_id), " +
+                "UNIQUE INDEX idx_push_endpoint (endpoint(255))" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
@@ -272,7 +373,7 @@ public class DatabaseSetup {
                 "last_seen TIMESTAMP NOT NULL, " +
                 "current_world TEXT, " +
                 "times_joined INTEGER DEFAULT 1, " +
-                "total_playtime_seconds BIGINT DEFAULT 0, " +
+                "total_playtime_hours REAL DEFAULT 0.0, " +
                 "primary_group TEXT DEFAULT 'default', " +
                 "groups TEXT DEFAULT '', " +
                 "banned BOOLEAN DEFAULT FALSE, " +
@@ -294,6 +395,7 @@ public class DatabaseSetup {
                 "last_pitch REAL DEFAULT 0, " +
                 "last_biome TEXT, " +
                 "death_count INTEGER DEFAULT 0, " +
+                "world_specific_data TEXT, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "PRIMARY KEY (player_id, world_name), " +
@@ -340,6 +442,7 @@ public class DatabaseSetup {
                 "message TEXT NOT NULL, " +
                 "type TEXT NOT NULL DEFAULT 'general', " +
                 "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                 "scheduled_for TIMESTAMP NULL, " +
@@ -348,6 +451,70 @@ public class DatabaseSetup {
                 "target_worlds TEXT, " +
                 "target_groups TEXT, " +
                 "metadata TEXT" +
+                ")";
+
+            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id TEXT PRIMARY KEY, " +
+                "name TEXT NOT NULL, " +
+                "prefix TEXT, " +
+                "suffix TEXT, " +
+                "permission TEXT, " +
+                "list_fee INTEGER DEFAULT 0, " +
+                "weekly_fee INTEGER DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context TEXT NOT NULL DEFAULT 'both'" +
+                ")";
+
+            createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "master_enabled BOOLEAN DEFAULT FALSE, " +
+                "quiet_hours_start INTEGER DEFAULT -1, " +
+                "quiet_hours_end INTEGER DEFAULT -1, " +
+                "metadata TEXT, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, plugin_id), " +
+                "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                ")";
+
+            createNotificationTypesTable = "CREATE TABLE IF NOT EXISTS " + notificationTypesTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                "FOREIGN KEY (player_id, plugin_id) REFERENCES " + playerPreferencesTable + "(player_id, plugin_id) ON DELETE CASCADE" +
+                ")";
+
+            createNotificationChannelsTable = "CREATE TABLE IF NOT EXISTS " + notificationChannelsTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "channel_name TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + notificationTypesTable + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                ")";
+
+            createPreferenceDefaultsTable = "CREATE TABLE IF NOT EXISTS " + preferenceDefaultsTable + " (" +
+                "plugin_id TEXT NOT NULL, " +
+                "preference_key TEXT NOT NULL, " +
+                "preference_value TEXT NOT NULL, " +
+                "description TEXT, " +
+                "PRIMARY KEY (plugin_id, preference_key)" +
+                ")";
+
+            createPushSubscriptionsTable = "CREATE TABLE IF NOT EXISTS " + pushSubscriptionsTable + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "player_id TEXT NOT NULL, " +
+                "endpoint TEXT NOT NULL UNIQUE, " +
+                "p256dh TEXT NOT NULL, " +
+                "auth_key TEXT NOT NULL, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
         }
 
@@ -360,6 +527,18 @@ public class DatabaseSetup {
             stmt.execute(createPlayerWorldDataTable);
             logger.debug("Creating " + announcementsTable + " table...");
             stmt.execute(createAnnouncementsTable);
+            logger.debug("Creating " + announcementTypesTable + " table...");
+            stmt.execute(createAnnouncementTypesTable);
+            logger.debug("Creating " + playerPreferencesTable + " table...");
+            stmt.execute(createPlayerPreferencesTable);
+            logger.debug("Creating " + notificationTypesTable + " table...");
+            stmt.execute(createNotificationTypesTable);
+            logger.debug("Creating " + notificationChannelsTable + " table...");
+            stmt.execute(createNotificationChannelsTable);
+            logger.debug("Creating " + preferenceDefaultsTable + " table...");
+            stmt.execute(createPreferenceDefaultsTable);
+            logger.debug("Creating " + pushSubscriptionsTable + " table...");
+            stmt.execute(createPushSubscriptionsTable);
             logger.debug("All tables created successfully");
         }
     }
@@ -372,6 +551,10 @@ public class DatabaseSetup {
         String playersTable = table(TABLE_PLAYERS);
         String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
         String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        String playerPreferencesTable = table(TABLE_PLAYER_PREFERENCES);
+        String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
+        String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
+        String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
         String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
 
         String[] indexes;
@@ -395,7 +578,15 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_active ON " + announcementsTable + "(active, expires_at)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_type ON " + announcementsTable + "(type(50))",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_scheduled ON " + announcementsTable + "(scheduled_for)",
-                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)",
+                // Player preferences indexes (SQLite only - MySQL has inline indexes)
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_prefs_player ON " + playerPreferencesTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_prefs_plugin ON " + playerPreferencesTable + "(plugin_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_player ON " + notificationTypesTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_plugin_type ON " + notificationTypesTable + "(plugin_id, notification_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_player ON " + notificationChannelsTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_plugin_type ON " + notificationChannelsTable + "(plugin_id, notification_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)"
             };
         } else {
             // SQLite indexes
@@ -416,7 +607,15 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_active ON " + announcementsTable + "(active, expires_at)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_type ON " + announcementsTable + "(type)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_scheduled ON " + announcementsTable + "(scheduled_for)",
-                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_created_at ON " + announcementsTable + "(created_at)",
+                // Player preferences indexes
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_prefs_player ON " + playerPreferencesTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "player_prefs_plugin ON " + playerPreferencesTable + "(plugin_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_player ON " + notificationTypesTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_plugin_type ON " + notificationTypesTable + "(plugin_id, notification_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_player ON " + notificationChannelsTable + "(player_id)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_plugin_type ON " + notificationChannelsTable + "(plugin_id, notification_type)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)"
             };
         }
 
@@ -429,6 +628,240 @@ public class DatabaseSetup {
         }
     }
     
+    /**
+     * Runs database migrations to add new columns to existing tables.
+     * This handles schema evolution for existing databases.
+     */
+    private void runMigrations(Connection connection) throws SQLException {
+        logger.debug("Running database migrations...");
+
+        String playerWorldDataTable = table(TABLE_PLAYER_WORLD_DATA);
+
+        // Migration 1: Add world_specific_data column if missing
+        if (!columnExists(connection, playerWorldDataTable, "world_specific_data")) {
+            logger.info("Adding 'world_specific_data' column to " + playerWorldDataTable);
+            try (var stmt = connection.createStatement()) {
+                String alterSql = "ALTER TABLE " + playerWorldDataTable + " ADD COLUMN world_specific_data TEXT";
+                stmt.execute(alterSql);
+                logger.info("Successfully added 'world_specific_data' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add world_specific_data column: " + e.getMessage());
+                // Don't throw - allow startup to continue, feature will just not persist
+            }
+        }
+
+        // Migration 2: Add pinned column to announcements table if missing
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        if (!columnExists(connection, announcementsTable, "pinned")) {
+            logger.info("Adding 'pinned' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN pinned BOOLEAN DEFAULT FALSE");
+                logger.info("Successfully added 'pinned' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add pinned column: " + e.getMessage());
+            }
+        }
+
+        // Migration 3: Seed rvnk_players for any preference records with no matching player row
+        migrateOrphanedPreferenceUsers(connection);
+
+        // Migration 4: Add display_context column to announcement_types table
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        if (!columnExists(connection, announcementTypesTable, "display_context")) {
+            logger.info("Adding 'display_context' column to " + announcementTypesTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementTypesTable
+                    + " ADD COLUMN display_context VARCHAR(10) NOT NULL DEFAULT 'both'");
+                logger.info("Successfully added 'display_context' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add display_context column: " + e.getMessage());
+            }
+            // Set in-game-only types
+            try (var stmt = connection.prepareStatement(
+                    "UPDATE " + announcementTypesTable + " SET display_context = 'ingame' WHERE id IN (?, ?, ?, ?, ?)")) {
+                stmt.setString(1, "help");
+                stmt.setString(2, "guide");
+                stmt.setString(3, "info");
+                stmt.setString(4, "motd");
+                stmt.setString(5, "advert");
+                stmt.executeUpdate();
+                logger.info("Set display_context for in-game-only announcement types");
+            } catch (SQLException e) {
+                logger.warning("Failed to set display_context values: " + e.getMessage());
+            }
+        }
+
+        // Migration 5: Add owner_uuid column to announcements table
+        if (!columnExists(connection, announcementsTable, "owner_uuid")) {
+            logger.info("Adding 'owner_uuid' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN owner_uuid VARCHAR(36) NULL");
+                } else {
+                    stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN owner_uuid TEXT NULL");
+                }
+                logger.info("Successfully added 'owner_uuid' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add owner_uuid column: " + e.getMessage());
+            }
+
+            // Create index on owner_uuid for lookup queries
+            try (var stmt = connection.createStatement()) {
+                String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_" + prefix + "announcements_owner_uuid ON " + announcementsTable + "(owner_uuid)");
+                logger.info("Created index on owner_uuid");
+            } catch (SQLException e) {
+                logger.warning("Failed to create owner_uuid index: " + e.getMessage());
+            }
+
+            // Best-effort backfill: resolve owner names from metadata to UUIDs via rvnk_players
+            backfillOwnerUuids(connection, announcementsTable);
+        }
+
+        // Migration 6: Rename total_playtime_seconds -> total_playtime_hours (FLOAT) on players table
+        String playersTable = table(TABLE_PLAYERS);
+        if (!columnExists(connection, playersTable, "total_playtime_hours")) {
+            logger.info("Migrating players.total_playtime_seconds -> total_playtime_hours (float hours)");
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + playersTable + " ADD COLUMN total_playtime_hours FLOAT DEFAULT 0.0");
+                } else {
+                    stmt.execute("ALTER TABLE " + playersTable + " ADD COLUMN total_playtime_hours REAL DEFAULT 0.0");
+                }
+                logger.info("Added total_playtime_hours column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add total_playtime_hours column: " + e.getMessage());
+            }
+            // Backfill from seconds column if it exists
+            if (columnExists(connection, playersTable, "total_playtime_seconds")) {
+                try (var stmt = connection.createStatement()) {
+                    stmt.execute("UPDATE " + playersTable + " SET total_playtime_hours = total_playtime_seconds / 3600.0");
+                    logger.info("Backfilled total_playtime_hours from total_playtime_seconds");
+                } catch (SQLException e) {
+                    logger.warning("Failed to backfill total_playtime_hours: " + e.getMessage());
+                }
+            }
+        }
+
+        // Migration 7: Add recurrence_date column to announcements table
+        if (!columnExists(connection, announcementsTable, "recurrence_date")) {
+            logger.info("Adding 'recurrence_date' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + announcementsTable + " ADD COLUMN recurrence_date VARCHAR(5) NULL");
+                logger.info("Successfully added 'recurrence_date' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add recurrence_date column: " + e.getMessage());
+            }
+        }
+
+        logger.debug("Database migrations completed");
+    }
+
+    /**
+     * Backfills owner_uuid from metadata owner= entries by looking up rvnk_players.
+     * Best-effort: unresolvable names stay NULL.
+     */
+    private void backfillOwnerUuids(Connection connection, String announcementsTable) {
+        String playersTable = table(TABLE_PLAYERS);
+        try {
+            // Extract owner name from metadata (format: "owner=Name,key=val" or "raw_metadata=owner=Name,...")
+            // and join against rvnk_players to resolve UUID
+            String sql;
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                // MySQL: use SUBSTRING_INDEX to extract owner value from metadata
+                sql = "UPDATE " + announcementsTable + " a " +
+                    "INNER JOIN " + playersTable + " p ON p.current_name = " +
+                    "TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(a.metadata, 'owner=', -1), ',', 1)) " +
+                    "SET a.owner_uuid = p.id " +
+                    "WHERE a.owner_uuid IS NULL AND a.metadata LIKE '%owner=%'";
+            } else {
+                // SQLite: simpler approach — only handle direct owner=Name metadata format
+                sql = "UPDATE " + announcementsTable + " SET owner_uuid = (" +
+                    "SELECT p.id FROM " + playersTable + " p " +
+                    "WHERE p.current_name = TRIM(REPLACE(SUBSTR(" +
+                    announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), " +
+                    "SUBSTR(SUBSTR(" + announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), " +
+                    "INSTR(SUBSTR(" + announcementsTable + ".metadata, INSTR(" + announcementsTable + ".metadata, 'owner=') + 6), ',')), '')) " +
+                    "LIMIT 1) " +
+                    "WHERE owner_uuid IS NULL AND metadata LIKE '%owner=%'";
+            }
+
+            try (var stmt = connection.createStatement()) {
+                int rows = stmt.executeUpdate(sql);
+                if (rows > 0) {
+                    logger.info("Backfilled owner_uuid for " + rows + " announcement(s)");
+                } else {
+                    logger.info("No announcements needed owner_uuid backfill");
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("owner_uuid backfill failed (non-fatal): " + e.getMessage());
+        }
+    }
+
+    /**
+     * Seeds rvnk_players rows for any player_id values in rvnk_player_preferences
+     * that have no corresponding rvnk_players entry. This handles databases that were
+     * set up before rvnk_players existed or had FK constraints dropped and recreated.
+     *
+     * MySQL-only: SQLite uses no FK constraints on preference tables.
+     */
+    private void migrateOrphanedPreferenceUsers(Connection connection) {
+        if (!"MySQL".equalsIgnoreCase(databaseType)) return;
+        String sql = "INSERT IGNORE INTO " + table(TABLE_PLAYERS) +
+            " (id, current_name, first_join, last_seen)" +
+            " SELECT DISTINCT player_id, 'migrated', NOW(), NOW()" +
+            " FROM " + table(TABLE_PLAYER_PREFERENCES) +
+            " WHERE player_id NOT IN (SELECT id FROM " + table(TABLE_PLAYERS) + ")";
+        try (var stmt = connection.createStatement()) {
+            int rows = stmt.executeUpdate(sql);
+            if (rows > 0) {
+                logger.info("Seeded " + rows + " rvnk_players row(s) from orphaned preference data");
+            }
+        } catch (SQLException e) {
+            logger.warning("migrateOrphanedPreferenceUsers failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Checks if a column exists in a table.
+     */
+    private boolean columnExists(Connection connection, String tableName, String columnName) {
+        try (var stmt = connection.createStatement()) {
+            String query;
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + tableName + "' " +
+                        "AND COLUMN_NAME = '" + columnName + "'";
+            } else {
+                // SQLite uses PRAGMA table_info
+                query = "PRAGMA table_info(" + tableName + ")";
+            }
+
+            var rs = stmt.executeQuery(query);
+
+            if ("MySQL".equalsIgnoreCase(databaseType)) {
+                boolean exists = rs.next();
+                rs.close();
+                return exists;
+            } else {
+                // SQLite: iterate through columns to find match
+                while (rs.next()) {
+                    String colName = rs.getString("name");
+                    if (columnName.equalsIgnoreCase(colName)) {
+                        rs.close();
+                        return true;
+                    }
+                }
+                rs.close();
+                return false;
+            }
+        } catch (SQLException e) {
+            logger.debug("Column existence check failed for " + tableName + "." + columnName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     private void verifySchema(Connection connection) throws SQLException {
         logger.debug("Verifying database schema...");
         // Verify critical tables exist (with prefix)

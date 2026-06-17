@@ -51,7 +51,7 @@ public class ConnectionProviderFactory {
     public ConnectionProvider createConnectionProvider(DatabaseConfig config) {
         String databaseType = config.getType().toLowerCase();
         
-        logger.info("Creating ConnectionProvider for database type: " + databaseType);
+        logger.debug("Creating ConnectionProvider for database type: " + databaseType);
         
         switch (databaseType) {
             case "sqlite":

@@ -82,8 +82,9 @@ public class ServerConnectorFactory {
      */
     private void createAndAddHttpConnector(Server server, HttpConfiguration httpConfig) {
         try {
-            ServerConnector httpConnector = new ServerConnector(server, 
+            ServerConnector httpConnector = new ServerConnector(server,
                     new HttpConnectionFactory(httpConfig));
+            httpConnector.setHost(config.getBindHost());
             httpConnector.setPort(config.getHttpPort());
             httpConnector.setIdleTimeout(config.getIdleTimeout());
             httpConnector.setName("http-connector");

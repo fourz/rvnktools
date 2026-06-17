@@ -2,7 +2,6 @@ package org.fourz.rvnkcore;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
@@ -18,7 +17,6 @@ import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 // Bundled component imports for accessor compatibility
-import org.fourz.rvnktools.announceManager.AnnounceManager;
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
@@ -81,16 +79,16 @@ public class RVNKCore extends JavaPlugin implements Listener {
         logger.info("=== RVNKCore Starting ===");
 
         // Phase 1: Initialize Core Framework
-        logger.info("Phase 1: Initializing Core Framework...");
+        logger.debug("Phase 1: Initializing Core Framework...");
         long phase1Start = System.currentTimeMillis();
         initializeCoreFramework();
-        logger.info("Phase 1 complete (" + (System.currentTimeMillis() - phase1Start) + "ms)");
+        logger.debug("Phase 1 complete (" + (System.currentTimeMillis() - phase1Start) + "ms)");
 
         // Phase 2: Initialize Bundled RVNKTools Components
-        logger.info("Phase 2: Initializing Bundled Components...");
+        logger.debug("Phase 2: Initializing Bundled Components...");
         long phase2Start = System.currentTimeMillis();
         initializeBundledComponents();
-        logger.info("Phase 2 complete (" + (System.currentTimeMillis() - phase2Start) + "ms)");
+        logger.debug("Phase 2 complete (" + (System.currentTimeMillis() - phase2Start) + "ms)");
 
         logger.info("=== RVNKCore Enabled === (Total startup: " + (System.currentTimeMillis() - totalStartTime) + "ms)");
     }
@@ -114,7 +112,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
     // ============================================================
 
     private void initializeCoreFramework() {
-        logger.info("Initializing core framework...");
+        logger.debug("Initializing core framework...");
 
         try {
             // Initialize service registry
@@ -136,7 +134,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
             apiInitializer.start();
 
             coreInitialized = true;
-            logger.info("Core framework initialization complete");
+            logger.debug("Core framework initialization complete");
 
         } catch (Exception e) {
             logger.error("Failed to initialize core framework", e);
@@ -170,6 +168,11 @@ public class RVNKCore extends JavaPlugin implements Listener {
             // Stop API server
             if (apiInitializer != null) {
                 apiInitializer.stop();
+            }
+
+            // Shutdown core services (MojangAPI, etc.)
+            if (coreServiceFactory != null) {
+                coreServiceFactory.shutdown();
             }
 
             // Close database connections
@@ -275,12 +278,32 @@ public class RVNKCore extends JavaPlugin implements Listener {
     }
 
     /**
-     * Gets the AnnouncementService for announcement management.
+     * Safely retrieves a service from the ServiceRegistry without throwing.
      *
-     * @return AnnouncementService instance
+     * <p>Returns null if RVNKCore is not initialized, the registry is unavailable,
+     * the service is not registered, or any exception occurs. Use this in place of
+     * per-plugin PreferencesServiceLookup wrappers for null-safe service access.</p>
+     *
+     * <pre>
+     * PlayerPreferencesService prefs = RVNKCore.getServiceSafe(PlayerPreferencesService.class);
+     * if (prefs == null) { return; } // service unavailable
+     * prefs.doSomething();
+     * </pre>
+     *
+     * @param serviceClass The service interface class
+     * @param <T>          The service type
+     * @return The service instance, or null if unavailable
      */
-    public AnnouncementService getAnnouncementService() {
-        return getService(AnnouncementService.class);
+    public static <T> T getServiceSafe(Class<T> serviceClass) {
+        try {
+            RVNKCore core = getInstance();
+            if (core == null) return null;
+            ServiceRegistry registry = core.getServiceRegistry();
+            if (registry == null || !registry.hasService(serviceClass)) return null;
+            return registry.getService(serviceClass);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -319,14 +342,6 @@ public class RVNKCore extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * Gets the AnnounceManager for announcement operations.
-     *
-     * @return AnnounceManager instance
-     */
-    public AnnounceManager getAnnounceManager() {
-        return getService(AnnounceManager.class);
-    }
 
     /**
      * Gets the LinkMaker for link creation operations.

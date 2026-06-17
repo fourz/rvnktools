@@ -128,4 +128,13 @@ public interface WorldRepository {
      * @return CompletableFuture containing list of worlds where player has data
      */
     CompletableFuture<List<WorldDTO>> findWorldsForPlayer(String playerUuid);
+
+    /**
+     * Update the display name for a world in the database.
+     *
+     * @param worldName   The Bukkit world name (primary key)
+     * @param displayName The human-readable display name to persist
+     * @return CompletableFuture completing when updated
+     */
+    CompletableFuture<Void> updateDisplayName(String worldName, String displayName);
 }

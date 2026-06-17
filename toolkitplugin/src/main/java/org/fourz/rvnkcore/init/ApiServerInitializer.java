@@ -1,9 +1,11 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -61,7 +63,6 @@ public class ApiServerInitializer {
      * <ul>
      *   <li>{@link PlayerService}</li>
      *   <li>{@link PlayerWorldService}</li>
-     *   <li>{@link AnnouncementService}</li>
      *   <li>{@link WorldService}</li>
      * </ul>
      *
@@ -85,19 +86,21 @@ public class ApiServerInitializer {
             PlayerWorldService playerWorldService = registry.getService(PlayerWorldService.class);
             logger.debug("  + PlayerWorldService retrieved");
 
-            AnnouncementService announcementService = registry.getService(AnnouncementService.class);
-            logger.debug("  + AnnouncementService retrieved");
-
             WorldService worldService = registry.getService(WorldService.class);
             logger.debug("  + WorldService retrieved");
+
+            // Create AuthTokenStore and register as a service (used by LinkCommand + AuthController)
+            AuthTokenStore authTokenStore = new AuthTokenStore(plugin);
+            registry.registerService(AuthTokenStore.class, authTokenStore);
+            logger.debug("  + AuthTokenStore created and registered");
 
             logger.debug("REST API: Creating CoreServer instance on port " + apiConfig.getHttpsPort());
             apiServer = new CoreServer(
                 apiConfig,
                 playerService,
                 playerWorldService,
-                announcementService,
                 worldService,
+                authTokenStore,
                 plugin
             );
 
@@ -109,8 +112,18 @@ public class ApiServerInitializer {
             registry.registerService(IServletRegistrationService.class, apiServer.getServletRegistrationService());
             logger.debug("  + IServletRegistrationService registered");
 
+            // Register webhook notifier unconditionally — methods no-op when disabled
+            WebhookConfig webhookConfig = configLoader.getWebhookConfig();
+            if (webhookConfig.isEnabled()) {
+                webhookConfig.validate(logger);
+                logger.info("Webhook notifier enabled — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+            } else {
+                logger.debug("Webhook notifier registered (disabled — no-op mode)");
+            }
+            registry.registerService(WebhookNotifier.class, new WebhookNotifier(webhookConfig, logger));
+
             long totalTime = System.currentTimeMillis() - startTime;
-            logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " with 30 endpoints (" + totalTime + "ms)");
+            logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");
         } catch (Exception e) {
             logger.error("Failed to start REST API server", e);
         }
@@ -122,9 +135,11 @@ public class ApiServerInitializer {
     public void stop() {
         if (apiServer != null) {
             try {
+                // Unregister webhook notifier
+                registry.unregisterService(WebhookNotifier.class);
                 // Unregister servlet registration service
                 registry.unregisterService(IServletRegistrationService.class);
-                
+
                 apiServer.stop();
                 logger.info("REST API server stopped");
             } catch (Exception e) {

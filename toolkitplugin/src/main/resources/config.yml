@@ -1,7 +1,93 @@
-# RVNKTools Configuration
-# Main configuration for RVNKTools features
+# RVNKCore Configuration
+# Combined configuration for RVNKCore and RVNKTools features
 
-# Log levels: DEBUG (verbose), INFO (default), WARN (warnings), ERROR (errors only)
+# Log level: OFF | SEVERE | WARNING | INFO | FINE | DEBUG
+# Production default: WARNING
+general:
+  logLevel: WARNING
+
+# Database Configuration
+# Supported types: sqlite, mysql
+database:
+  type: sqlite
+
+  # SQLite Configuration (default)
+  sqlite:
+    file: rvnkcore.db
+    pool:
+      maxConnections: 5
+      minIdleConnections: 1
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 0
+
+  # MySQL Configuration
+  mysql:
+    host: localhost
+    port: 3306
+    database: rvnkcore
+    username: root
+    password: ""
+    useSSL: true
+    connectionParameters: allowPublicKeyRetrieval=true
+    pool:
+      maxConnections: 20
+      minIdleConnections: 5
+      connectionTimeoutMs: 30000
+      idleTimeoutMs: 600000
+      maxLifetimeMs: 1800000
+      leakDetectionMs: 60000
+
+# API Configuration
+api:
+  enabled: false
+  host: localhost
+  context-path: /api
+  http:
+    port: 8080
+  https:
+    enabled: false
+    port: 8081
+    keystore-path: "keystore.jks"
+    keystore-password: ""          # Leave empty to auto-generate a secure password on first start
+    san-hostnames: ""              # Extra hostnames for TLS cert SANs (comma-separated, e.g. "myhost.local,api.example.com")
+                                   # api.host is always included automatically if not localhost
+  cors:
+    enabled: true
+    allowed-origins: "*"
+    allowed-methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+  auth:
+    key: "changeme"
+  server:
+    max-threads: 50
+    idle-timeout: 30000
+    connection-timeout: 60000
+    send-version: false
+    use-forwarded-headers: true
+  security:
+    allowed-ips: ""
+
+# Webhook Configuration
+# Fires HTTP POST to a URL when player/data events occur (join/quit, announcements, shops, trades)
+# Used to trigger cache revalidation in external systems (e.g., WebUI, fourzorg-api)
+webhook:
+  enabled: false
+  url: ""
+  secret: ""
+  server-id: ""            # Identifies this server to the WebUI (must match servers.ts name: "dev", "event", "prod")
+  debounce-seconds: 10
+  timeout-ms: 5000
+  cache-purge:
+    url: ""                # fourzorg-api purge endpoint, e.g. https://api.ravenkraft.org/diag/cache/purge
+    env: ""                # dev | event | prod (must match this server's env name in fourzorg-api)
+                           # uses webhook.secret for HMAC auth — no separate token needed
+
+# ──────────────────────────────────────────
+# RVNKTools Settings
+# ──────────────────────────────────────────
+
+# RVNKTools log levels: DEBUG (verbose), INFO (default), WARN, ERROR
 logging:
   level: INFO
 
@@ -30,9 +116,36 @@ logfilter:
   show:
     spigot: false        # Show Spigot framework messages
     bukkit: false        # Show Bukkit framework messages
-    craftbukkit: false   # Show CraftBukkit implementation messages  
+    craftbukkit: false   # Show CraftBukkit implementation messages
     paper: false         # Show Paper-specific messages
     plugins: true        # Show plugin messages
+
+# Command Configuration
+# Customize command behavior
+commands:
+  override-vanilla-tp: true   # Override /tp with RVNKTools implementation
+                              # Must be true — plugin.yml declares /tp so vanilla is blocked regardless.
+                              # true: /tp routes to RVNKTools (player/coords/worldswap)
+                              # false: /tp is claimed by plugin but has no executor (broken)
+
+# WebUI Configuration
+# Hostname and port of the local web portal dev server
+# Used to build the /link login callback URL when auth.callback-url is blank
+webui:
+  host: localhost         # WebUI hostname (e.g. icarus for local dev)
+  port: 3000              # WebUI dev server port
+
+# Authentication
+# Web portal magic link configuration
+auth:
+  callback-url: ""       # Web portal callback URL for /link login (e.g. https://dev.fourz.org/auth/callback)
+                          # If empty, derived from: http://{webui.host}:{webui.port}/auth/callback
+
+# /link command TTLs (minutes)
+link:
+  login-ttl-minutes: 15            # /link login token lifetime. Short by design — player runs it live.
+  invite-ttl-minutes: 120          # /link invite default lifetime (shareable link, admin-issued).
+  invite-ttl-max-minutes: 1440     # Hard cap on per-command override (24h).
 
 # Feature Configuration
 # Enable or disable specific RVNKTools features
@@ -41,3 +154,13 @@ features:
   hat-command: true      # /hat command for cosmetic items
   link-command: true     # /link command for clickable links
   world-swap: true       # World switching with location tracking
+  tpa-commands: true     # /tpa, /tpahere, /tpaccept, /tpdeny, /back
+
+# Teleport Request Configuration
+teleport:
+  # TPA request expiry in seconds (how long target has to accept/deny)
+  request-expire-seconds: 60
+  # Warmup delay before teleport executes (seconds, 0 to disable)
+  warmup-seconds: 3
+  # Cooldown between TPA requests (seconds)
+  cooldown-seconds: 10

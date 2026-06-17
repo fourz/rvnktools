@@ -2,6 +2,7 @@ package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.command.CommandSender;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.BaseSubCommand;
 import java.util.Arrays;
@@ -18,7 +19,7 @@ public class TeleportSubCommand extends BaseSubCommand {
         super(plugin, parent, "teleport",
               "Teleport management commands",
               "/rvnktools teleport <worldswap> [args]",
-              "rvnktools.command.teleport", false);
+              "rvnktools.command.tp", false);
 
         // Note: This subcommand now only handles help - actual worldswap is done through standalone commands
     }
@@ -53,7 +54,7 @@ public class TeleportSubCommand extends BaseSubCommand {
     @Override
     protected List<String> getTabCompletions(CommandSender sender, String[] args) {
         if (args.length == 1) {
-            if (sender.hasPermission("rvnktools.command.teleport.worldswap")) {
+            if (sender.hasPermission(ITeleportService.PERM_TP_WORLDSWAP)) {
                 return Arrays.asList("worldswap");
             }
         }

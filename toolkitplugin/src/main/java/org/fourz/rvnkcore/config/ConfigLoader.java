@@ -2,27 +2,23 @@ package org.fourz.rvnkcore.config;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Unified configuration loader for RVNKCore components.
- * 
- * Handles loading and validation of API and database configuration from config-core.yml,
- * ensuring proper configuration file creation using Bukkit/Spigot methodology.
- * Uses singleton pattern per plugin to prevent duplicate loading.
- * 
+ *
+ * Handles loading and validation of API and database configuration from config.yml,
+ * using the standard Bukkit config API. Uses singleton pattern per plugin to prevent
+ * duplicate loading.
+ *
  * @since 1.0.0
  */
 public class ConfigLoader {
@@ -33,11 +29,11 @@ public class ConfigLoader {
     private final Plugin plugin;
     private final LogManager logger;
     private FileConfiguration coreConfig;
-    private final String configFileName = "config-core.yml";
     
     // Cached configurations to prevent duplicate loading
     private DatabaseConfig cachedDatabaseConfig;
     private ApiConfig cachedApiConfig;
+    private WebhookConfig cachedWebhookConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -57,40 +53,32 @@ public class ConfigLoader {
     }
     
     /**
-     * Ensures config-core.yml exists and is properly initialized from resources.
-     * Uses standard Bukkit/Spigot methodology for configuration handling.
-     * Thread-safe and idempotent - only loads once.
+     * Ensures config.yml exists and is properly initialized.
+     * Uses the standard Bukkit config API. Thread-safe and idempotent - only loads once.
      */
     public void ensureConfigExists() {
         if (initialized && coreConfig != null) {
             logger.debug("Core configuration already initialized; skipping re-load");
             return;
         }
-        
+
         synchronized (initLock) {
             if (initialized && coreConfig != null) {
                 logger.debug("Core configuration already initialized (within lock); skipping re-load");
                 return;
             }
-            
-            // Create plugin data folder if it doesn't exist
-            if (!plugin.getDataFolder().exists()) {
-                boolean created = plugin.getDataFolder().mkdirs();
-                if (created) {
-                    logger.info("Created plugin data folder: " + plugin.getDataFolder().getAbsolutePath());
-                } else {
-                    logger.warning("Failed to create plugin data folder");
-                }
+
+            // saveDefaultConfig() copies config.yml from the JAR if it doesn't exist yet
+            plugin.saveDefaultConfig();
+
+            // Migration: warn if old config-core.yml is still present
+            File oldConfigFile = new File(plugin.getDataFolder(), "config-core.yml");
+            if (oldConfigFile.exists()) {
+                logger.warning("config-core.yml is deprecated and no longer used. " +
+                    "Settings have been merged into config.yml. " +
+                    "Please migrate your custom settings and delete config-core.yml.");
             }
-            
-            File configFile = new File(plugin.getDataFolder(), configFileName);
-            
-            // If config doesn't exist, copy from resources
-            if (!configFile.exists()) {
-                logger.info(configFileName + " not found, creating from default resources");
-                copyDefaultConfig(configFile);
-            }
-            
+
             // Load and validate configuration once
             loadConfig();
             validateConfiguration();
@@ -100,12 +88,12 @@ public class ConfigLoader {
     }
     
     /**
-     * Loads the core configuration from disk.
+     * Loads the core configuration via the Bukkit config API.
      */
     private void loadConfig() {
-        File configFile = new File(plugin.getDataFolder(), configFileName);
-        coreConfig = YamlConfiguration.loadConfiguration(configFile);
-        logger.info("Core configuration loaded from " + configFileName);
+        plugin.reloadConfig();
+        coreConfig = plugin.getConfig();
+        logger.info("Core configuration loaded from config.yml");
     }
     
     /**
@@ -115,7 +103,7 @@ public class ConfigLoader {
      */
     @SuppressWarnings("deprecation")
     private void applyCoreLoggingSettings() {
-        String coreLogLevel = coreConfig.getString("logging.level", "INFO");
+        String coreLogLevel = coreConfig.getString("general.logLevel", "WARNING");
         Level level = LogManager.parseLevel(coreLogLevel);
 
         // Use plugin logger directly to guarantee visibility regardless of LogManager state
@@ -125,62 +113,7 @@ public class ConfigLoader {
         // Apply to rvnkcore LogManager (primary - used by all plugins)
         LogManager.setGlobalLogLevel(level);
 
-        // Apply to deprecated rvnktools LogManager (for any remaining legacy instances)
-        org.fourz.rvnktools.util.log.LogManager.setGlobalLogLevel(level);
-    }
-    
-    /**
-     * Copies the default config-core.yml from plugin resources to the data folder.
-     * 
-     * @param configFile The target config file
-     */
-    private void copyDefaultConfig(File configFile) {
-        try (InputStream resourceStream = plugin.getResource(configFileName)) {
-            if (resourceStream == null) {
-                logger.error("Default " + configFileName + " not found in plugin resources");
-                createMinimalConfig(configFile);
-                return;
-            }
-            
-            Files.copy(resourceStream, configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            logger.info("Default core configuration copied to: " + configFile.getAbsolutePath());
-            
-        } catch (IOException e) {
-            logger.error("Failed to copy default " + configFileName + " from resources", e);
-            createMinimalConfig(configFile);
-        }
-    }
-    
-    /**
-     * Creates a minimal core configuration file if resource copy fails.
-     * 
-     * @param configFile The target config file
-     */
-    private void createMinimalConfig(File configFile) {
-        StringBuilder fallbackConfig = new StringBuilder();
-        fallbackConfig.append("# RVNKCore Configuration\n");
-        fallbackConfig.append("# This file was auto-generated due to missing default configuration\n\n");
-        fallbackConfig.append("logging:\n");
-        fallbackConfig.append("  level: INFO\n\n");
-        fallbackConfig.append("database:\n");
-        fallbackConfig.append("  type: sqlite\n");
-        fallbackConfig.append("  sqlite:\n");
-        fallbackConfig.append("    file: rvnkcore.db\n\n");
-        fallbackConfig.append("api:\n");
-        fallbackConfig.append("  enabled: false\n");
-        fallbackConfig.append("  host: localhost\n");
-        fallbackConfig.append("  context-path: /api\n");
-        fallbackConfig.append("  http:\n");
-        fallbackConfig.append("    port: 8080\n");
-        fallbackConfig.append("  auth:\n");
-        fallbackConfig.append("    key: changeme\n");
-        
-        try {
-            Files.write(configFile.toPath(), fallbackConfig.toString().getBytes());
-            logger.info("Created fallback core configuration file");
-        } catch (IOException e) {
-            logger.error("Failed to create fallback core configuration", e);
-        }
+        // Legacy rvnktools LogManager removed — all callers migrated to rvnkcore.util.log.LogManager
     }
     
     /**
@@ -318,9 +251,9 @@ public class ConfigLoader {
      * Validates logging configuration with level validation.
      */
     private void validateLoggingConfiguration() {
-        String logLevel = coreConfig.getString("logging.level", "INFO");
-        String[] validLevels = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR"};
-        
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
+        String[] validLevels = {"OFF", "SEVERE", "WARNING", "INFO", "FINE", "DEBUG"};
+
         boolean validLevel = false;
         for (String level : validLevels) {
             if (level.equalsIgnoreCase(logLevel)) {
@@ -328,19 +261,19 @@ public class ConfigLoader {
                 break;
             }
         }
-        
+
         if (!validLevel) {
-            logger.warning("Invalid RVNKCore logging level: " + logLevel + " (valid: DEBUG, INFO, WARN, ERROR)");
+            logger.warning("Invalid RVNKCore logging level: " + logLevel + " (valid: OFF, SEVERE, WARNING, INFO, FINE, DEBUG)");
         }
     }
     
     /**
      * Gets the RVNKCore log level from configuration.
-     * 
+     *
      * @return The configured log level
      */
     public Level getCoreLogLevel() {
-        String logLevel = coreConfig.getString("logging.level", "INFO");
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
         return LogManager.parseLevel(logLevel);
     }
     
@@ -375,14 +308,34 @@ public class ConfigLoader {
         }
         
         // Get global log level for API config
-        String globalLogLevel = coreConfig.getString("logging.level", "INFO");
+        String globalLogLevel = coreConfig.getString("general.logLevel", "WARNING");
         
         // Create ApiConfig using static factory method and cache it
         cachedApiConfig = ApiConfig.fromConfigurationSection(plugin, apiSection, globalLogLevel);
         logger.debug("API configuration loaded and cached");
         return cachedApiConfig;
     }
-    
+
+    /**
+     * Gets the webhook configuration instance with caching.
+     *
+     * @return WebhookConfig instance
+     */
+    public WebhookConfig getWebhookConfig() {
+        if (cachedWebhookConfig != null) {
+            return cachedWebhookConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection webhookSection = coreConfig.getConfigurationSection("webhook");
+        cachedWebhookConfig = WebhookConfig.fromConfigurationSection(webhookSection);
+        logger.debug("Webhook configuration loaded and cached");
+        return cachedWebhookConfig;
+    }
+
     /**
      * Gets the database configuration instance with caching.
      * 
@@ -427,6 +380,13 @@ public class ConfigLoader {
             cachedDatabaseConfig = DatabaseConfig.builder()
                 .type("sqlite")
                 .database(databaseFile)
+                // Connection Pool Configuration (SQLite defaults: small pool, leak detection disabled)
+                .maxConnections(coreConfig.getInt("database.sqlite.pool.maxConnections", 5))
+                .minIdleConnections(coreConfig.getInt("database.sqlite.pool.minIdleConnections", 1))
+                .connectionTimeoutMs(coreConfig.getLong("database.sqlite.pool.connectionTimeoutMs", 30000L))
+                .idleTimeoutMs(coreConfig.getLong("database.sqlite.pool.idleTimeoutMs", 600000L))
+                .maxLifetimeMs(coreConfig.getLong("database.sqlite.pool.maxLifetimeMs", 1800000L))
+                .leakDetectionMs(coreConfig.getLong("database.sqlite.pool.leakDetectionMs", 0L))
                 .build();
         }
         
@@ -439,14 +399,16 @@ public class ConfigLoader {
      * Invalidates all cached configurations to force fresh parsing.
      */
     public void reloadConfiguration() {
-        logger.info("Reloading core configuration from " + configFileName);
-        loadConfig();
+        logger.info("Reloading core configuration from config.yml");
+        plugin.reloadConfig();
+        coreConfig = plugin.getConfig();
         validateConfiguration();
         applyCoreLoggingSettings();
-        
+
         // Invalidate caches so subsequent calls re-parse from the fresh config
         cachedApiConfig = null;
         cachedDatabaseConfig = null;
+        cachedWebhookConfig = null;
     }
     
     /**
@@ -496,7 +458,7 @@ public class ConfigLoader {
         summary.append("RVNKCore Configuration Summary:\n");
         
         // Logging configuration
-        String logLevel = coreConfig.getString("logging.level", "INFO");
+        String logLevel = coreConfig.getString("general.logLevel", "WARNING");
         summary.append("  Logging Level: ").append(logLevel).append("\n");
         
         // Database configuration

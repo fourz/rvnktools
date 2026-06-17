@@ -1,20 +1,31 @@
 package org.fourz.rvnkcore.api.server.jetty;
 
 import com.google.gson.Gson;
+import jakarta.servlet.DispatcherType;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.api.controller.AuthController;
+import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.HealthController;
+import org.fourz.rvnkcore.api.controller.LoreController;
+import org.fourz.rvnkcore.api.controller.NotificationController;
+import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
-import org.fourz.rvnkcore.api.controller.AnnouncementController;
+import org.fourz.rvnkcore.api.controller.WhitelistController;
 import org.fourz.rvnkcore.api.controller.WorldController;
+import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
-import org.fourz.rvnkcore.api.service.AnnouncementService;
+import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
+import java.util.EnumSet;
 
 /**
  * Factory for creating and configuring servlet contexts for the RVNKCore API server.
@@ -26,9 +37,10 @@ public class ServletFactory {
     private final LogManager logger;
     private final PlayerService playerService;
     private final PlayerWorldService playerWorldService;
-    private final AnnouncementService announcementService;
     private final WorldService worldService;
+    private final AuthTokenStore authTokenStore;
     private final Gson gson;
+    private final LiveDataCache liveDataCache;
 
     /**
      * Creates a new servlet factory instance.
@@ -38,21 +50,23 @@ public class ServletFactory {
      * @param logger Logger instance
      * @param playerService Player service for data operations
      * @param playerWorldService Player world service for world-specific data operations
-     * @param announcementService Announcement service for data operations
      * @param worldService World service for world tracking and management
+     * @param authTokenStore Authentication token store for magic link flow
      * @param gson JSON serializer instance
      */
-    public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger, 
-                                 PlayerService playerService, PlayerWorldService playerWorldService, 
-                                 AnnouncementService announcementService, WorldService worldService, Gson gson) {
+    public ServletFactory(ApiConfig config, Plugin plugin, LogManager logger,
+                                 PlayerService playerService, PlayerWorldService playerWorldService,
+                                 WorldService worldService,
+                                 AuthTokenStore authTokenStore, Gson gson, LiveDataCache liveDataCache) {
         this.config = config;
         this.plugin = plugin;
         this.logger = logger;
         this.playerService = playerService;
         this.playerWorldService = playerWorldService;
-        this.announcementService = announcementService;
         this.worldService = worldService;
+        this.authTokenStore = authTokenStore;
         this.gson = gson;
+        this.liveDataCache = liveDataCache;
     }
 
     /**
@@ -82,14 +96,19 @@ public class ServletFactory {
      * @param context The servlet context to configure
      */
     private void registerSecurityFilters(ServletContextHandler context) {
-        // Add authentication filter for all API endpoints with debug logging configured
-        AuthFilter authFilter = new AuthFilter(config, plugin);
-        context.addFilter(new FilterHolder(authFilter), "/v1/*", null);
-
-        // Add CORS filter if enabled
+        // CORS must be registered before auth so OPTIONS preflight requests
+        // receive CORS headers before any auth check runs
         if (config.isCorsEnabled()) {
             registerCorsFilter(context);
         }
+
+        // Add authentication filter for all API endpoints (single shared instance)
+        FilterHolder authHolder = new FilterHolder(new AuthFilter(config, plugin, gson));
+        context.addFilter(authHolder, "/v1/*", null);
+        context.addFilter(authHolder, "/bartershops/*", null);
+        context.addFilter(authHolder, "/lore/*", null);
+        context.addFilter(authHolder, "/rvnkworlds/*", null);
+        context.addFilter(authHolder, "/docs/*", null);
     }
 
     /**
@@ -103,35 +122,28 @@ public class ServletFactory {
         LogManager playerControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.PlayerController.class);
         
-        PlayerController playerController = new PlayerController(playerService, playerWorldService, gson, playerControllerLogger);
+        PlayerController playerController = new PlayerController(playerService, playerWorldService, gson, playerControllerLogger, liveDataCache);
         context.addServlet(new ServletHolder(playerController), "/v1/players/*");
         
         // Also register player controller for singular player endpoints
         context.addServlet(new ServletHolder(playerController), "/v1/player/*");
 
-        // Register announcement controller
-        registerAnnouncementController(context);
-        
         // Register world controller
         registerWorldController(context);
         
-        // Future controllers can be registered here
-        // registerShopController(context);
-        // registerLoreController(context);
-    }
+        // Register auth controller
+        registerAuthController(context);
 
-    /**
-     * Registers the announcement controller with the servlet context.
-     *
-     * @param context The servlet context to configure
-     */
-    private void registerAnnouncementController(ServletContextHandler context) {
-        // Register announcement controller with proper class-specific logger
-        LogManager announcementControllerLogger = LogManager.getInstance(plugin, 
-            org.fourz.rvnkcore.api.controller.AnnouncementController.class);
-        
-        AnnouncementController announcementController = new AnnouncementController(announcementService, announcementControllerLogger);
-        context.addServlet(new ServletHolder(announcementController), "/v1/announcements/*");
+        // Register notification controller
+        registerNotificationController(context);
+
+        // Whitelist management
+        registerWhitelistController(context);
+
+        // Plugin controllers — registered if their API service is available in ServiceRegistry
+        registerBarterShopsController(context);
+        registerLoreController(context);
+        registerRVNKWorldsController(context);
     }
 
     /**
@@ -144,8 +156,85 @@ public class ServletFactory {
         LogManager worldControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.WorldController.class);
         
-        WorldController worldController = new WorldController(worldService, gson, worldControllerLogger);
+        WorldController worldController = new WorldController(worldService, playerWorldService, gson, worldControllerLogger);
         context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
+    }
+
+    /**
+     * Registers the authentication controller for magic link token verification.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerAuthController(ServletContextHandler context) {
+        LogManager authLogger = LogManager.getInstance(plugin, AuthController.class);
+        AuthController authController = new AuthController(authTokenStore, playerService, gson, authLogger);
+        context.addServlet(new ServletHolder(authController), "/v1/auth/*");
+        logger.debug("Auth API controller registered at /v1/auth/*");
+    }
+
+    /**
+     * Registers the notification controller for push subscription management.
+     * The controller resolves PushSubscriptionService lazily from ServiceRegistry at request time.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerNotificationController(ServletContextHandler context) {
+        LogManager notifLogger = LogManager.getInstance(plugin, NotificationController.class);
+        NotificationController controller = new NotificationController(null, gson, notifLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
+        logger.debug("Notification API controller registered at /v1/notifications/*");
+    }
+
+    private void registerWhitelistController(ServletContextHandler context) {
+        LogManager whitelistLogger = LogManager.getInstance(plugin, WhitelistController.class);
+        WhitelistController controller = new WhitelistController(gson, whitelistLogger, plugin);
+        context.addServlet(new ServletHolder(controller), "/v1/whitelist/*");
+        logger.debug("Whitelist API controller registered at /v1/whitelist/*");
+    }
+
+    /**
+     * Registers the BarterShops controller if IBarterShopsApiService is available in ServiceRegistry.
+     * The service is registered by the BarterShops plugin at startup.
+     */
+    private void registerBarterShopsController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, BarterShopsController.class);
+            BarterShopsController controller = new BarterShopsController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/bartershops/*");
+            logger.debug("BarterShops API controller registered at /bartershops/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("BarterShops API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the RVNKWorlds controller if IRVNKWorldsApiService is available in ServiceRegistry.
+     * The service is registered by the RVNKWorlds plugin at startup.
+     */
+    private void registerRVNKWorldsController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, RVNKWorldsController.class);
+            RVNKWorldsController controller = new RVNKWorldsController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/rvnkworlds/*");
+            logger.debug("RVNKWorlds API controller registered at /rvnkworlds/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("RVNKWorlds API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the RVNKLore controller if ILoreApiService is available in ServiceRegistry.
+     * The service is registered by the RVNKLore plugin at startup.
+     */
+    private void registerLoreController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, LoreController.class);
+            LoreController controller = new LoreController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/lore/*");
+            logger.debug("RVNKLore API controller registered at /lore/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("RVNKLore API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
     }
 
     /**
@@ -159,6 +248,9 @@ public class ServletFactory {
 
         // Health check endpoint
         registerHealthCheckEndpoint(context);
+
+        // OpenAPI documentation at /api/docs
+        registerOpenApiDocs(context);
     }
 
     /**
@@ -168,19 +260,26 @@ public class ServletFactory {
      */
     private void registerCorsFilter(ServletContextHandler context) {
         try {
-            // Note: This would require adding the CORS filter dependency
-            // For now, we'll log the intention
-            logger.info("CORS filter would be registered here");
-            logger.info("  - Allowed Origins: " + config.getCorsAllowedOrigins());
-            logger.info("  - Allowed Methods: " + config.getCorsAllowedMethods());
-            
-            // Future implementation:
-            // CrossOriginFilter corsFilter = new CrossOriginFilter();
-            // FilterHolder corsFilterHolder = new FilterHolder(corsFilter);
-            // corsFilterHolder.setInitParameter("allowedOrigins", config.getCorsAllowedOrigins());
-            // corsFilterHolder.setInitParameter("allowedMethods", config.getCorsAllowedMethods());
-            // context.addFilter(corsFilterHolder, "/*", null);
-            
+            CrossOriginFilter corsFilter = new CrossOriginFilter();
+            FilterHolder corsHolder = new FilterHolder(corsFilter);
+
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_ORIGINS_PARAM,
+                    config.getCorsAllowedOrigins());
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_METHODS_PARAM,
+                    config.getCorsAllowedMethods());
+            // X-API-Key must be in allowedHeaders or browsers will block preflight
+            corsHolder.setInitParameter(CrossOriginFilter.ALLOWED_HEADERS_PARAM,
+                    "Content-Type,Authorization,X-API-Key,X-Requested-With,Accept");
+            corsHolder.setInitParameter(CrossOriginFilter.EXPOSED_HEADERS_PARAM,
+                    "Content-Type");
+            // Do not chain preflight OPTIONS — let CrossOriginFilter respond directly
+            corsHolder.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, "false");
+
+            context.addFilter(corsHolder, "/*",
+                    EnumSet.of(DispatcherType.REQUEST, DispatcherType.ASYNC));
+
+            logger.debug("CORS filter registered - Origins: " + config.getCorsAllowedOrigins()
+                    + ", Methods: " + config.getCorsAllowedMethods());
         } catch (Exception e) {
             logger.warning("Failed to register CORS filter: " + e.getMessage());
         }
@@ -199,14 +298,24 @@ public class ServletFactory {
     }
 
     /**
-     * Registers a health check endpoint for monitoring.
+     * Registers the health check endpoint for monitoring.
      *
      * @param context The servlet context to configure
      */
     private void registerHealthCheckEndpoint(ServletContextHandler context) {
-        // Future implementation for health check
-        // HealthCheckServlet healthServlet = new HealthCheckServlet();
-        // context.addServlet(new ServletHolder(healthServlet), "/health");
+        LogManager healthLogger = LogManager.getInstance(plugin, HealthController.class);
+        HealthController healthController = new HealthController(gson, healthLogger);
+        context.addServlet(new ServletHolder(healthController), "/v1/health/*");
+    }
+
+    /**
+     * Registers the OpenAPI documentation handler at /docs/*.
+     * Serves the spec JSON at /api/docs/spec.json and Swagger UI at /api/docs/ui.
+     */
+    private void registerOpenApiDocs(ServletContextHandler context) {
+        OpenApiHandler docsHandler = new OpenApiHandler();
+        context.addServlet(new ServletHolder(docsHandler), "/docs/*");
+        logger.debug("OpenAPI docs registered at " + config.getContextPath() + "/docs/ui");
     }
 
     /**

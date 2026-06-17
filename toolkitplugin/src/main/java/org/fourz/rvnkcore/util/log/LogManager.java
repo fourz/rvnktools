@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 public class LogManager {
 
     private static final ConcurrentMap<String, LogManager> instances = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, Level> pluginDefaultLevels = new ConcurrentHashMap<>();
 
     /** Level string aliases for config file compatibility */
     private static final Map<String, Level> LEVEL_ALIASES = Map.of(
@@ -66,9 +67,10 @@ public class LogManager {
      * @param prefix The log message prefix
      */
     private LogManager(Plugin plugin, String prefix) {
-        this.logger = plugin.getLogger();
+        Logger pluginLogger = plugin.getLogger();
+        this.logger = pluginLogger != null ? pluginLogger : Logger.getLogger("RVNKCore");
         this.prefix = prefix;
-        this.pluginName = plugin.getName();
+        this.pluginName = plugin.getName() != null ? plugin.getName() : "Unknown";
     }
     
     /**
@@ -79,9 +81,14 @@ public class LogManager {
      * @return LogManager instance for the class
      */
     public static LogManager getInstance(Plugin plugin, Class<?> clazz) {
-        String key = plugin.getName() + ":" + clazz.getSimpleName();
-        return instances.computeIfAbsent(key, k -> 
-            new LogManager(plugin, "[" + clazz.getSimpleName() + "] "));
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":" + clazz.getSimpleName();
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "[" + clazz.getSimpleName() + "] ");
+            Level pluginLevel = pluginDefaultLevels.get(name);
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
     
     /**
@@ -92,21 +99,32 @@ public class LogManager {
      * @return LogManager instance for the class
      */
     public static LogManager getInstance(Plugin plugin, String className) {
-        String key = plugin.getName() + ":" + className;
-        return instances.computeIfAbsent(key, k ->
-            new LogManager(plugin, "[" + className + "] "));
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":" + className;
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "[" + className + "] ");
+            Level pluginLevel = pluginDefaultLevels.get(name);
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
 
     /**
      * Gets a LogManager instance for the plugin.
+     * Uses empty prefix since Bukkit already adds [PluginName] automatically.
      *
      * @param plugin The plugin instance
      * @return LogManager instance for the plugin
      */
     public static LogManager getInstance(Plugin plugin) {
-        String key = plugin.getName() + ":Main";
-        return instances.computeIfAbsent(key, k ->
-            new LogManager(plugin, "[" + plugin.getName() + "] "));
+        String name = plugin.getName() != null ? plugin.getName() : "Unknown";
+        String key = name + ":Main";
+        return instances.computeIfAbsent(key, k -> {
+            LogManager lm = new LogManager(plugin, "");
+            Level pluginLevel = pluginDefaultLevels.get(name);
+            if (pluginLevel != null) lm.setLogLevel(pluginLevel);
+            return lm;
+        });
     }
     
     // ========================================================================
@@ -296,6 +314,7 @@ public class LogManager {
      */
     public static void setPluginLogLevel(Plugin plugin, Level level) {
         String pluginPrefix = plugin.getName() + ":";
+        pluginDefaultLevels.put(plugin.getName(), level);
         instances.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(pluginPrefix))
             .forEach(entry -> entry.getValue().setLogLevel(level));
@@ -310,6 +329,7 @@ public class LogManager {
     public static void clearLoggers(Plugin plugin) {
         String pluginPrefix = plugin.getName() + ":";
         instances.keySet().removeIf(key -> key.startsWith(pluginPrefix));
+        pluginDefaultLevels.remove(plugin.getName());
     }
     
     /**

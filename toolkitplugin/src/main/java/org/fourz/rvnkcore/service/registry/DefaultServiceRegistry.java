@@ -35,7 +35,7 @@ public class DefaultServiceRegistry implements ServiceRegistry {
         }
         
         services.put(serviceClass, instance);
-        logger.info("Registered service: " + serviceClass.getSimpleName());
+        logger.debug("Registered service: " + serviceClass.getSimpleName());
     }
     
     @Override

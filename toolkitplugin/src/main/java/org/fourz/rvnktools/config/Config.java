@@ -29,7 +29,10 @@ public class Config {
     private final boolean enableHatCommand;
     private final boolean enableLinkCommand;
     private final boolean enableWorldSwap;
-    
+
+    // Command configuration
+    private final boolean overrideVanillaTp;
+
     private final LogManager logger;
 
     /**
@@ -58,14 +61,18 @@ public class Config {
         this.enableHatCommand = config.getBoolean("features.hat-command", true);
         this.enableLinkCommand = config.getBoolean("features.link-command", true);
         this.enableWorldSwap = config.getBoolean("features.world-swap", true);
-        
+
+        // Load command configuration
+        this.overrideVanillaTp = config.getBoolean("commands.override-vanilla-tp", false);
+
         // Log configuration summary
-        logger.info("RVNKTools configuration loaded - Log Level: " + logLevelStr + 
+        logger.info("RVNKTools configuration loaded - Log Level: " + logLevelStr +
                    ", LogFilter: " + (logFilterEnabled ? "enabled" : "disabled") +
-                   ", Features: announcements=" + enableAnnouncements + 
-                   ", hat=" + enableHatCommand + 
-                   ", link=" + enableLinkCommand + 
-                   ", worldswap=" + enableWorldSwap);
+                   ", Features: announcements=" + enableAnnouncements +
+                   ", hat=" + enableHatCommand +
+                   ", link=" + enableLinkCommand +
+                   ", worldswap=" + enableWorldSwap +
+                   ", /tp override: " + (overrideVanillaTp ? "enabled" : "disabled"));
     }
 
     // Logging configuration getters
@@ -99,20 +106,25 @@ public class Config {
     }
     
     // Feature toggle getters
-    public boolean isAnnouncementsEnabled() { 
-        return enableAnnouncements; 
+    public boolean isAnnouncementsEnabled() {
+        return enableAnnouncements;
     }
-    
-    public boolean isHatCommandEnabled() { 
-        return enableHatCommand; 
+
+    public boolean isHatCommandEnabled() {
+        return enableHatCommand;
     }
-    
-    public boolean isLinkCommandEnabled() { 
-        return enableLinkCommand; 
+
+    public boolean isLinkCommandEnabled() {
+        return enableLinkCommand;
     }
-    
-    public boolean isWorldSwapEnabled() { 
-        return enableWorldSwap; 
+
+    public boolean isWorldSwapEnabled() {
+        return enableWorldSwap;
+    }
+
+    // Command configuration getters
+    public boolean shouldOverrideVanillaTp() {
+        return overrideVanillaTp;
     }
     
     /**

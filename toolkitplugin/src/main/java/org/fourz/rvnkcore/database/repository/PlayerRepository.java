@@ -10,6 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -158,16 +161,15 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             QueryBuilder builder = createQueryBuilder();
             String query = builder.select("*")
                 .from(tableName)
-                .where("current_name LIKE ? OR name_history LIKE ?")
+                .where("current_name LIKE ? ESCAPE '!' OR name_history LIKE ? ESCAPE '!'")
                 .orderBy("current_name", true)
                 .build();
                 
             try (var conn = connectionProvider.getConnection();
                  var stmt = conn.prepareStatement(query)) {
                 
-                String pattern = "%" + namePattern + "%";
-                stmt.setString(1, pattern);
-                stmt.setString(2, pattern);
+                stmt.setString(1, namePattern);
+                stmt.setString(2, namePattern);
                 
                 try (ResultSet rs = stmt.executeQuery()) {
                     List<PlayerDTO> results = new ArrayList<>();
@@ -183,16 +185,33 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         });
     }
     
+    /**
+     * Reads a Timestamp column, returning null for zero-date values (0000-00-00 00:00:00).
+     * MySQL Connector/J 9.x throws by default on zero dates; this prevents cascade failures
+     * for migrated rows. The caller's update path will overwrite null timestamps with current time.
+     */
+    private Timestamp safeGetTimestamp(ResultSet rs, String column) throws SQLException {
+        try {
+            return rs.getTimestamp(column);
+        } catch (SQLException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Zero date value prohibited")) {
+                logger.warning("Zero date in column '" + column + "' — treating as null (row will self-heal on next update)");
+                return null;
+            }
+            throw e;
+        }
+    }
+
     @Override
     protected PlayerDTO mapResultSet(ResultSet rs) throws SQLException {
         PlayerDTO.Builder builder = new PlayerDTO.Builder()
             .id(UUID.fromString(rs.getString("id")))
             .currentName(rs.getString("current_name"))
-            .firstJoin(rs.getTimestamp("first_join"))
-            .lastSeen(rs.getTimestamp("last_seen"))
+            .firstJoin(safeGetTimestamp(rs, "first_join"))
+            .lastSeen(safeGetTimestamp(rs, "last_seen"))
             .currentWorld(rs.getString("current_world"))
             .timesJoined(rs.getInt("times_joined"))
-            .totalPlaytimeSeconds(rs.getLong("total_playtime_seconds"))
+            .totalPlaytimeHours(rs.getFloat("total_playtime_hours"))
             .primaryGroup(rs.getString("primary_group"))
             .banned(rs.getBoolean("banned"));
         
@@ -203,11 +222,17 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             builder.nameHistory(nameHistory);
         }
         
-        // Parse groups from comma-separated string
+        // Parse groups — JSON array preferred, CSV tolerated for legacy rows not yet migrated
         String groupsStr = rs.getString("groups");
         if (groupsStr != null && !groupsStr.trim().isEmpty()) {
-            List<String> groups = Arrays.asList(groupsStr.split(","));
-            builder.groups(groups);
+            String trimmed = groupsStr.trim();
+            if (trimmed.startsWith("[")) {
+                Type listType = new TypeToken<List<String>>(){}.getType();
+                List<String> groups = new Gson().fromJson(trimmed, listType);
+                if (groups != null) builder.groups(groups);
+            } else {
+                builder.groups(Arrays.asList(trimmed.split(",")));
+            }
         }
         
         return builder.build();
@@ -233,8 +258,8 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         // Create a new QueryBuilder instance for thread safety
         QueryBuilder builder = createQueryBuilder();
         return builder.insert(tableName)
-            .columns("id", "current_name", "name_history", "first_join", "last_seen", 
-                    "current_world", "times_joined", "total_playtime_seconds", "primary_group", "groups", "banned")
+            .columns("id", "current_name", "name_history", "first_join", "last_seen",
+                    "current_world", "times_joined", "total_playtime_hours", "primary_group", "groups", "banned")
             .values("?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?")
             .build();
     }
@@ -249,7 +274,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                .set("last_seen", "?")
                .set("current_world", "?")
                .set("times_joined", "?")
-               .set("total_playtime_seconds", "?")
+               .set("total_playtime_hours", "?")
                .set("primary_group", "?")
                .set("groups", "?")
                .set("banned", "?")
@@ -266,9 +291,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setTimestamp(5, entity.getLastSeen());
         stmt.setString(6, entity.getCurrentWorld());
         stmt.setInt(7, entity.getTimesJoined());
-        stmt.setLong(8, entity.getTotalPlaytimeSeconds());
+        stmt.setFloat(8, entity.getTotalPlaytimeHours());
         stmt.setString(9, entity.getPrimaryGroup());
-        stmt.setString(10, String.join(",", entity.getGroups()));
+        stmt.setString(10, new Gson().toJson(entity.getGroups()));
         stmt.setBoolean(11, entity.isBanned());
     }
     
@@ -279,9 +304,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setTimestamp(3, entity.getLastSeen());
         stmt.setString(4, entity.getCurrentWorld());
         stmt.setInt(5, entity.getTimesJoined());
-        stmt.setLong(6, entity.getTotalPlaytimeSeconds());
+        stmt.setFloat(6, entity.getTotalPlaytimeHours());
         stmt.setString(7, entity.getPrimaryGroup());
-        stmt.setString(8, String.join(",", entity.getGroups()));
+        stmt.setString(8, new Gson().toJson(entity.getGroups()));
         stmt.setBoolean(9, entity.isBanned());
         stmt.setString(10, entity.getId().toString()); // WHERE clause
     }

@@ -17,7 +17,7 @@ public class PlayerResponse {
     private LocalDateTime lastSeen;
     private int timesJoined;
     private String currentWorld;
-    private long totalPlaytimeMinutes;
+    private float totalPlaytimeHours;
     private List<String> groups;
     private List<String> visitedWorlds;
 
@@ -37,7 +37,7 @@ public class PlayerResponse {
     public LocalDateTime getLastSeen() { return lastSeen; }
     public int getTimesJoined() { return timesJoined; }
     public String getCurrentWorld() { return currentWorld; }
-    public long getTotalPlaytimeMinutes() { return totalPlaytimeMinutes; }
+    public float getTotalPlaytimeHours() { return totalPlaytimeHours; }
     public List<String> getGroups() { return groups; }
     public List<String> getVisitedWorlds() { return visitedWorlds; }
 
@@ -80,8 +80,8 @@ public class PlayerResponse {
             return this;
         }
 
-        public Builder totalPlaytimeMinutes(long totalPlaytimeMinutes) {
-            response.totalPlaytimeMinutes = totalPlaytimeMinutes;
+        public Builder totalPlaytimeHours(float totalPlaytimeHours) {
+            response.totalPlaytimeHours = totalPlaytimeHours;
             return this;
         }
 

@@ -3,7 +3,7 @@ package org.fourz.rvnktools.command.debug;
 import org.fourz.rvnkcore.integration.MySQLIntegrationVerification;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnktools.command.manager.BaseCommand;
-import org.fourz.rvnktools.util.ChatFormat;
+import org.fourz.rvnkcore.util.ChatFormat;
 import org.bukkit.command.CommandSender;
 
 /**
