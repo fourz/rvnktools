@@ -3,7 +3,7 @@ version: '${project.version}'
 author: fourz
 main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
-api-version: 1.21
+api-version: '26.1'
 website: http://www.fourz.org
 softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault]
 
