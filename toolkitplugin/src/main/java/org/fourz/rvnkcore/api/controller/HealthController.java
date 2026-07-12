@@ -66,6 +66,10 @@ public class HealthController extends HttpServlet {
         LiveDataCache cache = LiveDataCache.getInstance();
         if (cache != null) {
             LiveDataCache.BukkitSnapshot snap = cache.getSnapshot();
+            // #1470: restore onlinePlayers + tps to /v1/health (dropped in the 26.2 rebuild).
+            // Both consumed by the WebUI ServerHealth card and scripts/rvnkcore-api/health.py.
+            data.put("onlinePlayers", snap.onlineCount);
+            data.put("tps", Math.round(snap.tps * 100.0) / 100.0);
             data.put("worldsLoaded", snap.worlds.size());
             data.put("worlds", snap.worlds.stream()
                     .map(w -> Map.of("name", w.name(), "environment", w.environment()))
