@@ -300,7 +300,15 @@ public class WebhookNotifier {
             .build();
 
         httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            .thenAccept(response -> logger.warning(logTag + " -> " + response.statusCode()))
+            .thenAccept(response -> {
+                int status = response.statusCode();
+                // Success (2xx) is routine — log at DEBUG. Only surface non-2xx as WARN (#1454).
+                if (status >= 200 && status < 300) {
+                    logger.debug(logTag + " -> " + status);
+                } else {
+                    logger.warning(logTag + " -> " + status);
+                }
+            })
             .exceptionally(e -> {
                 logger.warning(logTag + " failed: " + e.getMessage());
                 return null;
