@@ -93,6 +93,20 @@ public class LoreController extends HttpServlet {
                 future = apiService.getStats();
             } else if (pathInfo.equals("/health")) {
                 future = apiService.getHealthStatus();
+            } else if (pathInfo.equals("/items")) {
+                // GET /lore/items?name=<display name>
+                String name = req.getParameter("name");
+                if (name == null || name.trim().isEmpty()) {
+                    sendError(resp, 400, "INVALID_REQUEST", "Query param 'name' is required for /items");
+                    return;
+                }
+                future = apiService.getItemByName(name);
+            } else if (pathInfo.matches("^/items/[^/]+$")) {
+                String id = pathInfo.substring("/items/".length());
+                future = apiService.getItemById(id);
+            } else if (pathInfo.matches("^/presets/[^/]+$")) {
+                String questId = pathInfo.substring("/presets/".length());
+                future = apiService.getPresetsForQuest(questId);
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;
@@ -124,6 +138,13 @@ public class LoreController extends HttpServlet {
             if (pathInfo.equals("/") || pathInfo.equals("/submit")) {
                 String body = ApiUtils.readRequestBody(req);
                 ApiResponse<?> response = apiService.submitEntry(body)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else if (pathInfo.matches("^/pools/[^/]+/roll$")) {
+                // POST /lore/pools/{poolId}/roll  body: {"rarityTier":"..."} (optional)
+                String poolId = pathInfo.substring("/pools/".length(), pathInfo.length() - "/roll".length());
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.rollPool(poolId, body)
                     .get(30, TimeUnit.SECONDS);
                 sendApiResponse(resp, response);
             } else {

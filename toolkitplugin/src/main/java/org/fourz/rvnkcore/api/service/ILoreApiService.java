@@ -35,4 +35,18 @@ public interface ILoreApiService {
     CompletableFuture<ApiResponse<?>> getHealthStatus();
 
     CompletableFuture<ApiResponse<?>> getCategories();
+
+    // ── Item surface (#1495) — read + roll, no mint/persist over HTTP ──────────────
+
+    /** Item properties by numeric lore_item id. */
+    CompletableFuture<ApiResponse<?>> getItemById(String id);
+
+    /** Item properties by (case-insensitive) display name. */
+    CompletableFuture<ApiResponse<?>> getItemByName(String name);
+
+    /** Preset item properties bound to a quest id. */
+    CompletableFuture<ApiResponse<?>> getPresetsForQuest(String questId);
+
+    /** Roll a weighted item from an RNG pool; {@code requestBody} may carry {"rarityTier": "..."}. */
+    CompletableFuture<ApiResponse<?>> rollPool(String poolId, String requestBody);
 }
