@@ -37,6 +37,7 @@ public class DatabaseSetup {
     public static final String TABLE_ANNOUNCEMENT_TYPES = "rvnk_announcement_types";
     public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
     public static final String TABLE_PUSH_SUBSCRIPTIONS = "rvnk_push_subscriptions";
+    public static final String TABLE_WEBUI_ACCESS_LOG = "rvnk_webui_access_log";
 
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
         this.connectionProvider = connectionProvider;
@@ -189,6 +190,7 @@ public class DatabaseSetup {
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
         String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
+        String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
 
         String createPlayersTable;
         String createPlayerWorldDataTable;
@@ -200,6 +202,7 @@ public class DatabaseSetup {
         String createNotificationChannelsTable;
         String createPreferenceDefaultsTable;
         String createPushSubscriptionsTable;
+        String createWebuiAccessLogTable;
 
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL-specific table definitions with proper column types
@@ -363,6 +366,20 @@ public class DatabaseSetup {
                 "INDEX idx_push_player (player_id), " +
                 "UNIQUE INDEX idx_push_endpoint (endpoint(255))" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createWebuiAccessLogTable = "CREATE TABLE IF NOT EXISTS " + webuiAccessLogTable + " (" +
+                "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, " +
+                "ign VARCHAR(16) NULL, " +
+                "uuid CHAR(36) NULL, " +
+                "ip_address VARCHAR(45) NOT NULL, " +
+                "country_code CHAR(2) NULL, " +
+                "page_path VARCHAR(255) NOT NULL, " +
+                "action_type VARCHAR(16) NOT NULL DEFAULT 'PAGE_VISIT', " +
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "INDEX idx_webui_access_ign (ign), " +
+                "INDEX idx_webui_access_created_at (created_at), " +
+                "INDEX idx_webui_access_country (country_code)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
             createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
@@ -516,6 +533,17 @@ public class DatabaseSetup {
                 "auth_key TEXT NOT NULL, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
+
+            createWebuiAccessLogTable = "CREATE TABLE IF NOT EXISTS " + webuiAccessLogTable + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "ign TEXT, " +
+                "uuid TEXT, " +
+                "ip_address TEXT NOT NULL, " +
+                "country_code TEXT, " +
+                "page_path TEXT NOT NULL, " +
+                "action_type TEXT NOT NULL DEFAULT 'PAGE_VISIT', " +
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" +
+                ")";
         }
 
         try (var stmt = connection.createStatement()) {
@@ -539,6 +567,8 @@ public class DatabaseSetup {
             stmt.execute(createPreferenceDefaultsTable);
             logger.debug("Creating " + pushSubscriptionsTable + " table...");
             stmt.execute(createPushSubscriptionsTable);
+            logger.debug("Creating " + webuiAccessLogTable + " table...");
+            stmt.execute(createWebuiAccessLogTable);
             logger.debug("All tables created successfully");
         }
     }
@@ -555,6 +585,7 @@ public class DatabaseSetup {
         String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
+        String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
         String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
 
         String[] indexes;
@@ -615,7 +646,11 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_plugin_type ON " + notificationTypesTable + "(plugin_id, notification_type)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_player ON " + notificationChannelsTable + "(player_id)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_plugin_type ON " + notificationChannelsTable + "(plugin_id, notification_type)",
-                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)",
+                // WebUI access log indexes (SQLite only — MySQL uses inline indexes)
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_ign ON " + webuiAccessLogTable + "(ign)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_created_at ON " + webuiAccessLogTable + "(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_country ON " + webuiAccessLogTable + "(country_code)"
             };
         }
 

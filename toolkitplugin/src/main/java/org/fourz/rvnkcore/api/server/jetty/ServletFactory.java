@@ -15,6 +15,7 @@ import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
+import org.fourz.rvnkcore.api.controller.WebUIAccessController;
 import org.fourz.rvnkcore.api.controller.WhitelistController;
 import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.docs.OpenApiHandler;
@@ -23,6 +24,9 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.database.connection.ConnectionProvider;
+import org.fourz.rvnkcore.database.repository.WebUIAccessRepository;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 import java.util.EnumSet;
@@ -140,6 +144,9 @@ public class ServletFactory {
         // Whitelist management
         registerWhitelistController(context);
 
+        // WebUI access logging
+        registerWebUIAccessController(context);
+
         // Plugin controllers — registered if their API service is available in ServiceRegistry
         registerBarterShopsController(context);
         registerLoreController(context);
@@ -183,6 +190,34 @@ public class ServletFactory {
         NotificationController controller = new NotificationController(null, gson, notifLogger);
         context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
         logger.debug("Notification API controller registered at /v1/notifications/*");
+    }
+
+    /**
+     * Registers the WebUIAccessController for WebUI access logging at {@code /v1/webui/*}.
+     *
+     * <p>The controller is constructed with a {@link WebUIAccessRepository} backed by the shared
+     * {@link ConnectionProvider}. The provider is registered in the ServiceRegistry by
+     * {@code CoreServiceFactory} before the API server starts, so it is resolvable here via
+     * {@link RVNKCore#getServiceSafe(Class)} (null-safe; bypasses the {@code coreInitialized}
+     * flag which is still false during API startup). Mirrors how {@code CoreServiceFactory}
+     * builds sibling repositories: {@code new XxxRepository(connectionProvider, plugin)}.</p>
+     */
+    private void registerWebUIAccessController(ServletContextHandler context) {
+        try {
+            ConnectionProvider connectionProvider = RVNKCore.getServiceSafe(ConnectionProvider.class);
+            if (connectionProvider == null) {
+                logger.warning("WebUIAccess API controller not registered: ConnectionProvider unavailable");
+                return;
+            }
+            LogManager controllerLogger = LogManager.getInstance(plugin, WebUIAccessController.class);
+            WebUIAccessRepository repository = new WebUIAccessRepository(connectionProvider, plugin);
+            WebUIAccessController controller = new WebUIAccessController(repository, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/v1/webui/*");
+            logger.debug("WebUIAccess API controller registered at /v1/webui/*");
+        } catch (Throwable e) {
+            logger.warning("WebUIAccess API controller not registered: "
+                    + e.getClass().getName() + ": " + e.getMessage());
+        }
     }
 
     private void registerWhitelistController(ServletContextHandler context) {
