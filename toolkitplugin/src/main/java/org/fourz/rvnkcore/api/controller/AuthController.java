@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * REST API controller for authentication endpoints.
@@ -36,6 +37,14 @@ import java.util.concurrent.TimeUnit;
  * @since 1.5.0
  */
 public class AuthController extends HttpServlet {
+
+    /**
+     * How long a session/token endpoint waits on the async {@code getPlayer} DB lookup before
+     * giving up. Under heavy shared-pool contention (e.g. right after a bulk world reimport) the
+     * lookup can exceed this bound; the endpoint then degrades gracefully with a 503 + retry hint
+     * rather than logging a raw {@link TimeoutException} at ERROR and returning a 500 (#1466).
+     */
+    private static final int PLAYER_LOOKUP_TIMEOUT_SECONDS = 10;
 
     private final AuthTokenStore authTokenStore;
     private final PlayerService playerService;
@@ -184,7 +193,8 @@ public class AuthController extends HttpServlet {
 
         try {
             // Look up the player to get current name and groups
-            Optional<PlayerDTO> optPlayer = playerService.getPlayer(uuid).get(10, TimeUnit.SECONDS);
+            Optional<PlayerDTO> optPlayer =
+                    playerService.getPlayer(uuid).get(PLAYER_LOOKUP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (optPlayer.isEmpty()) {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND", "Player not found");
                 return;
@@ -210,6 +220,12 @@ public class AuthController extends HttpServlet {
             logger.info("Session token generated for " + player.getCurrentName()
                     + " (QR login) from " + ApiUtils.getClientIP(req));
             ApiUtils.sendSuccess(resp, gson, result);
+        } catch (TimeoutException e) {
+            // DB-pool contention (not a real failure) — degrade gracefully so the caller can retry (#1466).
+            logger.warning("Session-token lookup for UUID " + uuid + " timed out after "
+                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) — returning 503");
+            ApiUtils.sendError(resp, gson, 503, "LOOKUP_TIMEOUT",
+                    "Player lookup timed out, please retry");
         } catch (Exception e) {
             logger.error("Failed to generate session token for " + uuid, e);
             ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to generate session token");
@@ -243,7 +259,8 @@ public class AuthController extends HttpServlet {
         }
 
         try {
-            Optional<PlayerDTO> optPlayer = playerService.getPlayer(uuid).get(10, TimeUnit.SECONDS);
+            Optional<PlayerDTO> optPlayer =
+                    playerService.getPlayer(uuid).get(PLAYER_LOOKUP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
             if (optPlayer.isEmpty()) {
                 Map<String, Object> result = new LinkedHashMap<>();
@@ -272,6 +289,13 @@ public class AuthController extends HttpServlet {
             ApiUtils.sendSuccess(resp, gson, result);
 
             logger.debug("Session validated for " + player.getCurrentName() + " (banned=" + banned + ")");
+        } catch (TimeoutException e) {
+            // DB-pool contention (not a real failure) — degrade gracefully so the WebUI/widget can
+            // retry instead of treating the user as logged-out. Logged at WARN, not ERROR (#1466).
+            logger.warning("Session validation for UUID " + uuid + " timed out after "
+                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) — returning 503");
+            ApiUtils.sendError(resp, gson, 503, "LOOKUP_TIMEOUT",
+                    "Player lookup timed out, please retry");
         } catch (Exception e) {
             logger.error("Failed to validate session for UUID " + uuid, e);
             ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Session validation failed");

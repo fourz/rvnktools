@@ -29,6 +29,9 @@ public interface IRVNKWorldsApiService {
     CompletableFuture<ApiResponse<?>> listGroups();
     CompletableFuture<ApiResponse<?>> getGroup(String groupName);
 
+    // Snapshot operations
+    CompletableFuture<ApiResponse<?>> restoreWorldSnapshot(String worldName, String requestBody);
+
     // Metrics & Health
     CompletableFuture<ApiResponse<?>> getMetrics();
     CompletableFuture<ApiResponse<?>> getHealthStatus();

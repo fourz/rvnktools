@@ -3,7 +3,7 @@ version: '${project.version}'
 author: fourz
 main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
-api-version: 1.21
+api-version: '26.1'
 website: http://www.fourz.org
 softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault]
 
@@ -131,25 +131,9 @@ permissions:
   rvnktools.command:
     description: Allows use of rvnktools commands
     default: op
-  rvnktools.command.event:
-    description: Allows teleporting to event worlds
-    default: op
-  rvnktools.command.return:
-    description: Allows returning from event worlds
-    default: op
-  rvnktools.command.broadcast:
-    description: Allows the player to use the broadcast command
-    default: op
-  rvnktools.welcome:
-    description: Allows the player to get welcome messages
-  rvnktools.welcome.newplayer:
-    description: Sends a welcome message to new players
-  rvnktools.command.cyclegamemode:
-    description: Allows the player to use the gmc command
-  rvnktools.command.cycletrainmode:
-    description: Allows the player to use cycle railroad modes
-  rvnktools.command.countdown:
-    description: Allows the player to use the countdown command
+  # NOTE: event/return/broadcast/welcome/welcome.newplayer/cyclegamemode/
+  # cycletrainmode/countdown are declared once each in the categorized sections
+  # below (Trains, Misc commands, Welcome) — do not re-add them here (#1490).
   # ── Teleport ────────────────────────────────────────────────────────────────
   rvnktools.command.tp:
     description: Allows use of /tp and /teleport commands (unified node)

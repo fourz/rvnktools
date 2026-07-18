@@ -135,7 +135,9 @@ public class ApiServerInitializer {
     public void stop() {
         if (apiServer != null) {
             try {
-                // Unregister webhook notifier
+                // Shutdown and unregister webhook notifier
+                WebhookNotifier notifier = registry.getService(WebhookNotifier.class);
+                if (notifier != null) notifier.shutdown();
                 registry.unregisterService(WebhookNotifier.class);
                 // Unregister servlet registration service
                 registry.unregisterService(IServletRegistrationService.class);

@@ -58,12 +58,24 @@ public class LiveDataCache {
                 .map(w -> new WorldSnapshot(w.getName(), w.getEnvironment().name(), w.getPlayers().size()))
                 .collect(Collectors.toList());
 
+        // getTPS() is a Paper-only Server method; this plugin compiles against spigot-api,
+        // so read it reflectively (present at runtime on Paper). Guarded — 0.0 on any failure.
+        double tps = 0.0;
+        try {
+            Object server = Bukkit.getServer();
+            double[] tpsArr = (double[]) server.getClass().getMethod("getTPS").invoke(server);
+            if (tpsArr != null && tpsArr.length > 0) tps = Math.min(tpsArr[0], 20.0);
+        } catch (Exception ignored) {
+            // Non-Paper runtime or API change — leave tps at 0.0.
+        }
+
         ref.set(new BukkitSnapshot(
                 Collections.unmodifiableList(players),
                 Collections.unmodifiableMap(worldGroups),
                 Collections.unmodifiableList(worlds),
                 online.size(),
                 maxPlayers,
+                tps,
                 System.currentTimeMillis()
         ));
     }
@@ -87,24 +99,27 @@ public class LiveDataCache {
 
     public static class BukkitSnapshot {
         static final BukkitSnapshot EMPTY = new BukkitSnapshot(
-                Collections.emptyList(), Collections.emptyMap(), Collections.emptyList(), 0, 0, 0L);
+                Collections.emptyList(), Collections.emptyMap(), Collections.emptyList(), 0, 0, 0.0, 0L);
 
         public final List<PlayerResponse> onlinePlayers;
         public final Map<String, List<Map<String, Object>>> worldGroups;
         public final List<WorldSnapshot> worlds;
         public final int onlineCount;
         public final int maxPlayers;
+        /** 1-minute TPS, captured on the main thread and clamped to 20.0 (#1470). */
+        public final double tps;
         public final long capturedAt;
 
         BukkitSnapshot(List<PlayerResponse> onlinePlayers,
                        Map<String, List<Map<String, Object>>> worldGroups,
                        List<WorldSnapshot> worlds,
-                       int onlineCount, int maxPlayers, long capturedAt) {
+                       int onlineCount, int maxPlayers, double tps, long capturedAt) {
             this.onlinePlayers = onlinePlayers;
             this.worldGroups = worldGroups;
             this.worlds = worlds;
             this.onlineCount = onlineCount;
             this.maxPlayers = maxPlayers;
+            this.tps = tps;
             this.capturedAt = capturedAt;
         }
     }

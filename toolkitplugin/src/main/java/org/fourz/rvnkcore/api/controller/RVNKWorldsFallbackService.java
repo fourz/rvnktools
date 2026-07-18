@@ -151,6 +151,11 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
         return writeUnavailable();
     }
 
+    @Override
+    public CompletableFuture<ApiResponse<?>> restoreWorldSnapshot(String worldName, String requestBody) {
+        return writeUnavailable();
+    }
+
     private static CompletableFuture<ApiResponse<?>> writeUnavailable() {
         return CompletableFuture.completedFuture(
             ApiResponse.error("PLUGIN_NOT_LOADED",
