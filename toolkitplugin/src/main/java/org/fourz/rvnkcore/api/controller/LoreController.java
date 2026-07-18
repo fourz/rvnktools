@@ -101,6 +101,10 @@ public class LoreController extends HttpServlet {
                     return;
                 }
                 future = apiService.getItemByName(name);
+            } else if (pathInfo.matches("^/items/[^/]+/versions$")) {
+                // GET /lore/items/{id}/versions (#1528)
+                String id = pathInfo.substring("/items/".length(), pathInfo.length() - "/versions".length());
+                future = apiService.getItemVersions(id);
             } else if (pathInfo.matches("^/items/[^/]+$")) {
                 String id = pathInfo.substring("/items/".length());
                 future = apiService.getItemById(id);
@@ -153,11 +157,72 @@ public class LoreController extends HttpServlet {
                 ApiResponse<?> response = apiService.rollPool(poolId, body)
                     .get(30, TimeUnit.SECONDS);
                 sendApiResponse(resp, response);
+            } else if (pathInfo.matches("^/items/[^/]+/rollback$")) {
+                // POST /lore/items/{id}/rollback  body: {"version":N} (#1528)
+                String id = pathInfo.substring("/items/".length(), pathInfo.length() - "/rollback".length());
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.rollbackItem(id, body)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Unknown POST endpoint: " + pathInfo);
             }
         } catch (Exception e) {
             logger.error("Error handling Lore API POST: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
+        }
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+        ILoreApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKLore plugin is not loaded");
+            return;
+        }
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+        try {
+            if (pathInfo.matches("^/items/[^/]+$")) {
+                // PUT /lore/items/{id} — versioned update (#1528)
+                String id = pathInfo.substring("/items/".length());
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.updateItem(id, body)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Unknown PUT endpoint: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling Lore API PUT: " + pathInfo, e);
+            sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+        ILoreApiService apiService = getApiService();
+        if (apiService == null) {
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "RVNKLore plugin is not loaded");
+            return;
+        }
+        String pathInfo = req.getPathInfo() != null ? req.getPathInfo() : "/";
+        try {
+            if (pathInfo.matches("^/items/[^/]+$")) {
+                // DELETE /lore/items/{id}?hard=true|false (#1528) — soft-archive by default
+                String id = pathInfo.substring("/items/".length());
+                boolean hard = "true".equalsIgnoreCase(req.getParameter("hard"));
+                ApiResponse<?> response = apiService.deleteItem(id, hard)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+            } else {
+                sendError(resp, 404, "NOT_FOUND", "Unknown DELETE endpoint: " + pathInfo);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling Lore API DELETE: " + pathInfo, e);
             sendError(resp, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
         }
     }

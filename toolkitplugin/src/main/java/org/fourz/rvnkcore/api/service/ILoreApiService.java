@@ -58,4 +58,18 @@ public interface ILoreApiService {
      * Auth-gated by the existing AuthFilter on POST, same as {@link #submitEntry}/{@link #rollPool}.
      */
     CompletableFuture<ApiResponse<?>> createItem(String requestBody);
+
+    // ── Versioned item write surface (#1528) ─────────────────────────────────────
+
+    /** Update an item as a new version (PUT /lore/items/{id}); re-materializes the current instance. */
+    CompletableFuture<ApiResponse<?>> updateItem(String id, String requestBody);
+
+    /** Delete an item (DELETE /lore/items/{id}); {@code hard=false} soft-archives, {@code true} purges. */
+    CompletableFuture<ApiResponse<?>> deleteItem(String id, boolean hard);
+
+    /** Version history for an item (GET /lore/items/{id}/versions). */
+    CompletableFuture<ApiResponse<?>> getItemVersions(String id);
+
+    /** Roll an item back to a prior version (POST /lore/items/{id}/rollback, body {"version":N}). */
+    CompletableFuture<ApiResponse<?>> rollbackItem(String id, String requestBody);
 }
