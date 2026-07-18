@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.WebUIAccessLogDTO;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.database.repository.WebUIAccessRepository;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -140,7 +141,7 @@ public class WebUIAccessController extends HttpServlet {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("id", id);
             logger.debug("Recorded webui access log id=" + id + " (" + dto.getActionType() + ")");
-            ApiUtils.sendJson(resp, gson, 201, result);
+            ApiUtils.sendJson(resp, gson, 201, ApiResponse.success(result));
         } catch (Exception e) {
             logger.error("Failed to record webui access log", e);
             ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to record access log");
@@ -168,7 +169,7 @@ public class WebUIAccessController extends HttpServlet {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("data", qr.getData());
             result.put("total", qr.getTotal());
-            ApiUtils.sendJson(resp, gson, 200, result);
+            ApiUtils.sendJson(resp, gson, 200, ApiResponse.success(result));
         } catch (Exception e) {
             logger.error("Failed to query webui access logs", e);
             ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to query access logs");
