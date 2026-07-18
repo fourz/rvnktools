@@ -140,6 +140,12 @@ public class LoreController extends HttpServlet {
                 ApiResponse<?> response = apiService.submitEntry(body)
                     .get(30, TimeUnit.SECONDS);
                 sendApiResponse(resp, response);
+            } else if (pathInfo.equals("/items")) {
+                // POST /lore/items — mint a single lore item (#1517)
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.createItem(body)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
             } else if (pathInfo.matches("^/pools/[^/]+/roll$")) {
                 // POST /lore/pools/{poolId}/roll  body: {"rarityTier":"..."} (optional)
                 String poolId = pathInfo.substring("/pools/".length(), pathInfo.length() - "/roll".length());
