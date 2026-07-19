@@ -153,9 +153,14 @@ public class WebUIAccessController extends HttpServlet {
         // Previously this did .get(DB_TIMEOUT_SECONDS) on a Jetty request thread. On Event
         // that budget (10s) equalled the HikariCP connection-acquisition timeout, leaving no
         // headroom for the INSERT itself, so every write threw TimeoutException. Worse, each
-        // failure parked a Jetty worker for the full 10s against api.server.max-threads=50 —
-        // so a slow pool could exhaust the API thread pool and take down every endpoint over
-        // a non-critical logging call.
+        // failure parked a Jetty worker for the full 10s — so a slow pool could exhaust the
+        // API thread pool and take down every endpoint over a non-critical logging call.
+        //
+        // NB: this previously cited api.server.max-threads=50 as the pool being exhausted.
+        // That config key is read into ApiConfig but never applied to Jetty — CoreServer
+        // constructs a bare `new Server()`, so the server actually runs Jetty's default
+        // 200-thread pool and the configured 50 is inert (#1558). The exhaustion risk is
+        // real but the headroom is ~4x larger than that number implies.
         //
         // The caller does not read the response body (RVNKWebUI's src/lib/access-log.ts is
         // itself documented fire-and-forget), so 202 Accepted is the honest status: the
