@@ -789,6 +789,69 @@ public class DatabaseSetup {
             }
         }
 
+        // Migration 8: Add holiday_key column to announcements table, and register the
+        // 'holiday' announcement type (#1575 Phase 1).
+        //
+        // NOTE for anyone extending this: the guard below is `columnExists`, which is correct for
+        // ADD COLUMN and WRONG for widening one. A migration that tries to widen an existing
+        // column is a silent no-op here, because columnExists already returns true. This feature
+        // only ever needs ADD COLUMN, which is part of why it was chosen over widening
+        // recurrence_date (#1561).
+        if (!columnExists(connection, announcementsTable, "holiday_key")) {
+            logger.info("Adding 'holiday_key' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + announcementsTable
+                        + " ADD COLUMN holiday_key VARCHAR(32) NULL");
+                } else {
+                    stmt.execute("ALTER TABLE " + announcementsTable
+                        + " ADD COLUMN holiday_key TEXT NULL");
+                }
+                logger.info("Successfully added 'holiday_key' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add holiday_key column: " + e.getMessage());
+            }
+
+            // Index for findByHolidayKey, which backs the duplicate-preset check on create.
+            try (var stmt = connection.createStatement()) {
+                String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_" + prefix
+                    + "announcements_holiday_key ON " + announcementsTable + "(holiday_key)");
+                logger.info("Created index on holiday_key");
+            } catch (SQLException e) {
+                logger.warning("Failed to create holiday_key index: " + e.getMessage());
+            }
+        }
+
+        // Register the 'holiday' type. GET /v1/announcements/types reads this TABLE, not an enum,
+        // so without this row Holiday never appears as a choice in game or on the web and the
+        // whole feature is invisible. Guarded on row presence rather than columnExists, and kept
+        // outside the column guard above so a partially-applied migration still self-heals.
+        String holidayTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        try (var check = connection.prepareStatement(
+                "SELECT 1 FROM " + holidayTypesTable + " WHERE id = ?")) {
+            check.setString(1, "holiday");
+            try (var rs = check.executeQuery()) {
+                if (!rs.next()) {
+                    try (var insert = connection.prepareStatement(
+                            "INSERT INTO " + holidayTypesTable
+                            + " (id, name, prefix, permission, active, display_context) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)")) {
+                        insert.setString(1, "holiday");
+                        insert.setString(2, "Holiday");
+                        insert.setString(3, "&6[Holiday]&r ");
+                        insert.setString(4, "rvnktools.announce.holiday");
+                        insert.setBoolean(5, true);
+                        insert.setString(6, "both");
+                        insert.executeUpdate();
+                        logger.info("Registered 'holiday' announcement type");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("Failed to register 'holiday' announcement type: " + e.getMessage());
+        }
+
         logger.debug("Database migrations completed");
     }
 
