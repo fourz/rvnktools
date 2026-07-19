@@ -365,7 +365,10 @@ public class ConfigLoader {
                 .username(coreConfig.getString("database.mysql.username", ""))
                 .password(coreConfig.getString("database.mysql.password", ""))
                 .useSSL(coreConfig.getBoolean("database.mysql.useSSL", true))
-                .connectionParameters(coreConfig.getString("database.mysql.connectionParameters", ""))
+                // Safety parameters (socketTimeout/connectTimeout/tcpKeepAlive) are merged in
+                // at code level so a fresh deployment cannot come up without them (#1546).
+                .connectionParameters(DatabaseConfig.withRequiredMySqlParams(
+                        coreConfig.getString("database.mysql.connectionParameters", "")))
                 // Connection Pool Configuration
                 .maxConnections(coreConfig.getInt("database.mysql.pool.maxConnections", 20))
                 .minIdleConnections(coreConfig.getInt("database.mysql.pool.minIdleConnections", 5))

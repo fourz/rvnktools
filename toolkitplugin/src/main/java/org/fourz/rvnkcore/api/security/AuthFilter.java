@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Authentication filter for RVNKCore API endpoints.
@@ -28,6 +29,39 @@ public class AuthFilter implements Filter {
     private final Gson gson;
     /** Per-IP throttle (#1043); null when disabled via config. */
     private final RateLimiter rateLimiter;
+
+    /** Minimum gap between rate-limit warnings for the same IP. */
+    private static final long RATE_LIMIT_WARN_INTERVAL_MS = 60_000L;
+    /** Cap on tracked IPs before stale warn-state is pruned. */
+    private static final int RATE_LIMIT_WARN_MAX_TRACKED = 10_000;
+
+    /*
+     * Rate-limit state is deliberately STATIC and shared across every AuthFilter instance.
+     *
+     * AuthFilter is constructed in two places: once by ServletFactory for the fixed API
+     * paths, and again by ServletRegistrationServiceImpl for *each* dynamically registered
+     * servlet path. Per-instance state would therefore mean:
+     *   - the limit is not global — a caller spread across N registered paths would get
+     *     N x the configured allowance;
+     *   - warn state fragments, so a single flood logs once per filter instance;
+     *   - every instance leaks a RateLimiter-Cleanup daemon thread, since the filter has
+     *     no lifecycle hook that shuts its limiter down.
+     * Sharing one limiter across instances fixes all three.
+     */
+    /**
+     * Marks a request as already rate-limit-checked. A single HTTP request can traverse more
+     * than one AuthFilter instance (ServletFactory registers one for the fixed paths and
+     * ServletRegistrationServiceImpl registers another per servlet path), and without this
+     * guard each pass would consume another token from the shared bucket — halving the
+     * effective limit on any double-filtered path. One request must cost exactly one token.
+     */
+    private static final String RATE_LIMIT_CHECKED_ATTR = "org.fourz.rvnkcore.rateLimitChecked";
+
+    private static final Object RATE_LIMITER_LOCK = new Object();
+    private static RateLimiter sharedRateLimiter;
+    private static int sharedRateLimitPerMinute;
+    /** Per-IP warn state: {lastWarnMs, suppressedSinceWarn, suppressedToReport}. */
+    private static final ConcurrentHashMap<String, long[]> rateLimitWarnState = new ConcurrentHashMap<>();
 
     /**
      * Creates an AuthFilter with API key authentication.
@@ -52,14 +86,33 @@ public class AuthFilter implements Filter {
             logger.info("IP whitelist disabled - allowing all IPs");
         }
 
-        // Per-IP throttling (#1043)
+        // Per-IP throttling (#1043) — shared across all AuthFilter instances.
         if (config.isRateLimitEnabled()) {
             int perMinute = config.getRateLimitRequestsPerMinute();
-            this.rateLimiter = RateLimiter.forRequestsPerMinute(perMinute);
-            logger.info("API rate limiting enabled - " + perMinute + " requests/minute per IP");
+            this.rateLimiter = acquireSharedRateLimiter(perMinute);
+            logger.info("API rate limiting enabled - " + perMinute + " requests/minute per IP (shared)");
         } else {
             this.rateLimiter = null;
             logger.info("API rate limiting disabled");
+        }
+    }
+
+    /**
+     * Returns the process-wide {@link RateLimiter}, creating it on first use and replacing
+     * it only when the configured limit changes (e.g. across a config reload). The previous
+     * limiter is shut down on replacement so its cleanup thread does not leak.
+     */
+    private static RateLimiter acquireSharedRateLimiter(int perMinute) {
+        synchronized (RATE_LIMITER_LOCK) {
+            if (sharedRateLimiter == null || sharedRateLimitPerMinute != perMinute) {
+                if (sharedRateLimiter != null) {
+                    sharedRateLimiter.shutdown();
+                    rateLimitWarnState.clear();
+                }
+                sharedRateLimiter = RateLimiter.forRequestsPerMinute(perMinute);
+                sharedRateLimitPerMinute = perMinute;
+            }
+            return sharedRateLimiter;
         }
     }
 
@@ -86,10 +139,13 @@ public class AuthFilter implements Filter {
         // Per-IP throttling (#1043). Deliberately runs BEFORE the whitelist and API-key
         // checks so an unauthenticated flood — including API-key brute-forcing — is
         // throttled too. The health endpoint returns above and is never throttled.
-        if (rateLimiter != null && !rateLimiter.isAllowed(clientIP)) {
-            logger.warning("API rate limit exceeded for IP: " + clientIP + " on " + method + " " + requestURI);
-            sendRateLimited(httpResponse);
-            return;
+        if (rateLimiter != null && httpRequest.getAttribute(RATE_LIMIT_CHECKED_ATTR) == null) {
+            httpRequest.setAttribute(RATE_LIMIT_CHECKED_ATTR, Boolean.TRUE);
+            if (!rateLimiter.isAllowed(clientIP)) {
+                warnRateLimited(clientIP, method, requestURI);
+                sendRateLimited(httpResponse);
+                return;
+            }
         }
 
         // Check IP whitelist if enabled
@@ -124,6 +180,47 @@ public class AuthFilter implements Filter {
         
         // Authentication successful, continue with request
         chain.doFilter(request, response);
+    }
+
+    /**
+     * Logs a rate-limit rejection at most once per IP per minute, reporting how many
+     * further rejections were swallowed in the meantime (#1043 follow-up).
+     *
+     * <p>Warning per rejection made the log itself an amplifier: a verification flood of
+     * 1200 requests produced ~548 WARN lines in six seconds. Under a real attack that
+     * buries every other line in the log — the denial-of-service succeeds against the
+     * operator's visibility even though the API held.
+     */
+    private void warnRateLimited(String clientIP, String method, String requestURI) {
+        long now = System.currentTimeMillis();
+
+        // Bound memory against rotating/spoofed source IPs.
+        if (rateLimitWarnState.size() > RATE_LIMIT_WARN_MAX_TRACKED) {
+            rateLimitWarnState.entrySet()
+                    .removeIf(e -> now - e.getValue()[0] > RATE_LIMIT_WARN_INTERVAL_MS);
+        }
+
+        long[] state = rateLimitWarnState.compute(clientIP, (ip, prev) -> {
+            if (prev == null) {
+                return new long[]{now, 0L, 0L};
+            }
+            if (now - prev[0] >= RATE_LIMIT_WARN_INTERVAL_MS) {
+                // Window reopened — emit, and report what was suppressed while it was closed.
+                return new long[]{now, 0L, prev[1]};
+            }
+            // Still inside the window — count it and stay quiet.
+            return new long[]{prev[0], prev[1] + 1L, -1L};
+        });
+
+        if (state[2] < 0) {
+            return;
+        }
+
+        String suppressed = state[2] > 0
+                ? " (" + state[2] + " further rejections suppressed in the previous minute)"
+                : "";
+        logger.warning("API rate limit exceeded for IP: " + clientIP
+                + " on " + method + " " + requestURI + suppressed);
     }
 
     /**

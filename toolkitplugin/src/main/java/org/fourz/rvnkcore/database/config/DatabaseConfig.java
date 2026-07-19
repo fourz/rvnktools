@@ -83,6 +83,59 @@ public class DatabaseConfig {
     public String getPassword() { return password; }
     public boolean isUseSSL() { return useSSL; }
     public String getConnectionParameters() { return connectionParameters; }
+
+    /**
+     * JDBC parameters that must always be present on a MySQL connection, in order (#1546).
+     * <p>RVNKCore's MySQL is cross-host on every environment. Without {@code socketTimeout}
+     * the driver blocks forever on a read from a dropped or stalled connection, HikariCP
+     * cannot reclaim it, and the pool degrades until exhaustion — leak detection logs the
+     * leak but does not recover it.
+     */
+    private static final String[][] REQUIRED_MYSQL_PARAMS = {
+            {"socketTimeout", "30000"},
+            {"connectTimeout", "10000"},
+            {"tcpKeepAlive", "true"},
+    };
+
+    /**
+     * Merges the required MySQL safety parameters into a configured parameter string,
+     * preserving any value the operator has already set explicitly (#1546).
+     *
+     * <p>Applied as a code-level default so a fresh deployment is safe without manual
+     * config editing. Every environment previously had to be patched by hand, which is
+     * how RVNK Dev ended up running for months without a socket timeout.
+     *
+     * @param configured the raw {@code connectionParameters} value; may be null or empty
+     * @return the parameter string with any missing required parameters appended
+     */
+    public static String withRequiredMySqlParams(String configured) {
+        String params = (configured == null) ? "" : configured.trim();
+        StringBuilder merged = new StringBuilder(params);
+        for (String[] param : REQUIRED_MYSQL_PARAMS) {
+            if (!hasParam(params, param[0])) {
+                if (merged.length() > 0) {
+                    merged.append('&');
+                }
+                merged.append(param[0]).append('=').append(param[1]);
+            }
+        }
+        return merged.toString();
+    }
+
+    /** True when {@code key=} appears as a parameter name (not inside another value). */
+    private static boolean hasParam(String params, String key) {
+        if (params.isEmpty()) {
+            return false;
+        }
+        for (String pair : params.split("&")) {
+            int eq = pair.indexOf('=');
+            String name = (eq >= 0) ? pair.substring(0, eq) : pair;
+            if (name.trim().equalsIgnoreCase(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
     public int getMaxConnections() { return maxConnections; }
     public int getMinIdleConnections() { return minIdleConnections; }
     public long getConnectionTimeoutMs() { return connectionTimeoutMs; }
