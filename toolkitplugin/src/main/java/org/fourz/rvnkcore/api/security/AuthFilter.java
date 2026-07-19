@@ -49,13 +49,20 @@ public class AuthFilter implements Filter {
      * Sharing one limiter across instances fixes all three.
      */
     /**
-     * Marks a request as already rate-limit-checked. A single HTTP request can traverse more
-     * than one AuthFilter instance (ServletFactory registers one for the fixed paths and
-     * ServletRegistrationServiceImpl registers another per servlet path), and without this
-     * guard each pass would consume another token from the shared bucket — halving the
-     * effective limit on any double-filtered path. One request must cost exactly one token.
+     * Marks a request as already processed by an AuthFilter (#1547).
+     *
+     * <p>A single request can traverse more than one AuthFilter instance: ServletFactory
+     * blanket-registers one on {@code /v1/*}, while ServletRegistrationServiceImpl adds
+     * another for each dynamically registered path. Paths registered under {@code /v1/}
+     * — currently {@code /v1/events/*}, {@code /v1/announcements/*} and
+     * {@code /v1/support/*} — are therefore covered twice.
+     *
+     * <p>Every instance is built from the same {@link ApiConfig}, so a second pass would
+     * re-run the IP whitelist check and the constant-time key comparison, log the request
+     * again, and consume a second token from the shared rate-limit bucket. Short-circuiting
+     * on this attribute guarantees exactly one authentication and one token per request.
      */
-    private static final String RATE_LIMIT_CHECKED_ATTR = "org.fourz.rvnkcore.rateLimitChecked";
+    private static final String AUTH_APPLIED_ATTR = "org.fourz.rvnkcore.authFilterApplied";
 
     private static final Object RATE_LIMITER_LOCK = new Object();
     private static RateLimiter sharedRateLimiter;
@@ -122,7 +129,15 @@ public class AuthFilter implements Filter {
         
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
-        
+
+        // Already authenticated by an earlier AuthFilter in this chain (#1547) — every
+        // instance shares the same config, so a second pass is pure duplicated work.
+        if (httpRequest.getAttribute(AUTH_APPLIED_ATTR) != null) {
+            chain.doFilter(request, response);
+            return;
+        }
+        httpRequest.setAttribute(AUTH_APPLIED_ATTR, Boolean.TRUE);
+
         String clientIP = ApiUtils.getClientIP(httpRequest);
         String method = httpRequest.getMethod();
         String requestURI = httpRequest.getRequestURI();
@@ -139,13 +154,10 @@ public class AuthFilter implements Filter {
         // Per-IP throttling (#1043). Deliberately runs BEFORE the whitelist and API-key
         // checks so an unauthenticated flood — including API-key brute-forcing — is
         // throttled too. The health endpoint returns above and is never throttled.
-        if (rateLimiter != null && httpRequest.getAttribute(RATE_LIMIT_CHECKED_ATTR) == null) {
-            httpRequest.setAttribute(RATE_LIMIT_CHECKED_ATTR, Boolean.TRUE);
-            if (!rateLimiter.isAllowed(clientIP)) {
-                warnRateLimited(clientIP, method, requestURI);
-                sendRateLimited(httpResponse);
-                return;
-            }
+        if (rateLimiter != null && !rateLimiter.isAllowed(clientIP)) {
+            warnRateLimited(clientIP, method, requestURI);
+            sendRateLimited(httpResponse);
+            return;
         }
 
         // Check IP whitelist if enabled
