@@ -36,7 +36,18 @@ import java.util.concurrent.TimeUnit;
 public class WebUIAccessController extends HttpServlet {
 
     /** How long to wait on the async DB operation before degrading to a 500/503. */
-    private static final int DB_TIMEOUT_SECONDS = 10;
+    /**
+     * Budget for the blocking GET query (#1545).
+     *
+     * <p>Must exceed the HikariCP connection-acquisition timeout, otherwise the wait for a
+     * pooled connection can consume the entire budget before the query even starts. That is
+     * exactly what broke the POST path: this was 10s while Event's {@code connectionTimeoutMs}
+     * is also 10000, leaving zero headroom. Dev's pool allows up to 30s, so the budget has to
+     * clear that too.
+     *
+     * <p>The POST path no longer uses this — it dispatches without blocking.
+     */
+    private static final int DB_TIMEOUT_SECONDS = 45;
 
     /** Valid {@code action_type} values; anything else is rejected with 400. */
     private static final Set<String> VALID_ACTION_TYPES = Set.of("LOGIN", "PAGE_VISIT", "ADMIN_ACTION");
@@ -136,16 +147,41 @@ public class WebUIAccessController extends HttpServlet {
                 .actionType(actionType)
                 .build();
 
-        try {
-            Long id = repository.insert(dto).get(DB_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("id", id);
-            logger.debug("Recorded webui access log id=" + id + " (" + dto.getActionType() + ")");
-            ApiUtils.sendJson(resp, gson, 201, ApiResponse.success(result));
-        } catch (Exception e) {
-            logger.error("Failed to record webui access log", e);
-            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Failed to record access log");
-        }
+        // Access logging is fire-and-forget telemetry, so the write is dispatched without
+        // blocking the request thread (#1545).
+        //
+        // Previously this did .get(DB_TIMEOUT_SECONDS) on a Jetty request thread. On Event
+        // that budget (10s) equalled the HikariCP connection-acquisition timeout, leaving no
+        // headroom for the INSERT itself, so every write threw TimeoutException. Worse, each
+        // failure parked a Jetty worker for the full 10s against api.server.max-threads=50 —
+        // so a slow pool could exhaust the API thread pool and take down every endpoint over
+        // a non-critical logging call.
+        //
+        // The caller does not read the response body (RVNKWebUI's src/lib/access-log.ts is
+        // itself documented fire-and-forget), so 202 Accepted is the honest status: the
+        // request was accepted, durability is not being confirmed.
+        repository.insert(dto).whenComplete((id, error) -> {
+            if (error != null) {
+                logger.error("Failed to record webui access log ("
+                        + dto.getActionType() + " " + dto.getPagePath() + ")", unwrapCause(error));
+            } else {
+                logger.debug("Recorded webui access log id=" + id + " (" + dto.getActionType() + ")");
+            }
+        });
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("accepted", true);
+        ApiUtils.sendJson(resp, gson, 202, ApiResponse.success(result));
+    }
+
+    /**
+     * Unwraps the {@link java.util.concurrent.CompletionException} wrapper the async pipeline
+     * adds, so the log shows the real failure rather than the wrapper.
+     */
+    private Throwable unwrapCause(Throwable error) {
+        return (error instanceof java.util.concurrent.CompletionException && error.getCause() != null)
+                ? error.getCause()
+                : error;
     }
 
     /**
