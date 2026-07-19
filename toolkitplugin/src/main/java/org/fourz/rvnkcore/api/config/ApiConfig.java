@@ -32,6 +32,8 @@ public class ApiConfig {
     private final int connectionTimeout;
     private final boolean useForwardedHeaders;
     private final String[] allowedIPs;
+    private final boolean rateLimitEnabled;
+    private final int rateLimitRequestsPerMinute;
     private final String[] sanHostnames;
     private final Level apiLogLevel;
     private final Level globalLogLevel;
@@ -78,6 +80,11 @@ public class ApiConfig {
         // Parse allowed IPs
         String allowedIPsStr = config.getString("api.security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
+
+        // Per-IP request throttling (#1043). Configurable rather than hardcoded so the
+        // limit can be tuned per environment without a rebuild.
+        this.rateLimitEnabled = config.getBoolean("api.security.rate-limit.enabled", true);
+        this.rateLimitRequestsPerMinute = config.getInt("api.security.rate-limit.requests-per-minute", 600);
 
         // Parse SAN hostnames for TLS cert generation (includes api.host if not localhost)
         this.sanHostnames = parseSanHostnames(host, config.getString("api.https.san-hostnames", ""));
@@ -145,6 +152,11 @@ public class ApiConfig {
         String allowedIPsStr = apiSection.getString("security.allowed-ips", "");
         this.allowedIPs = allowedIPsStr.isEmpty() ? new String[0] : allowedIPsStr.split(",");
 
+        // Per-IP request throttling (#1043). Configurable rather than hardcoded so the
+        // limit can be tuned per environment without a rebuild.
+        this.rateLimitEnabled = apiSection.getBoolean("security.rate-limit.enabled", true);
+        this.rateLimitRequestsPerMinute = apiSection.getInt("security.rate-limit.requests-per-minute", 600);
+
         // Parse SAN hostnames for TLS cert generation (includes api.host if not localhost)
         this.sanHostnames = parseSanHostnames(host, apiSection.getString("https.san-hostnames", ""));
 
@@ -180,6 +192,8 @@ public class ApiConfig {
     public int getConnectionTimeout() { return connectionTimeout; }
     public boolean isUseForwardedHeaders() { return useForwardedHeaders; }
     public String[] getAllowedIPs() { return allowedIPs; }
+    public boolean isRateLimitEnabled() { return rateLimitEnabled; }
+    public int getRateLimitRequestsPerMinute() { return rateLimitRequestsPerMinute; }
     public String[] getSanHostnames() { return sanHostnames; }
 
     /**

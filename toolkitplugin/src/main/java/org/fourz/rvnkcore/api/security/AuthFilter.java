@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.ratelimit.RateLimiter;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
@@ -25,6 +26,8 @@ public class AuthFilter implements Filter {
     private final LogManager logger;
     private final boolean ipWhitelistEnabled;
     private final Gson gson;
+    /** Per-IP throttle (#1043); null when disabled via config. */
+    private final RateLimiter rateLimiter;
 
     /**
      * Creates an AuthFilter with API key authentication.
@@ -48,6 +51,16 @@ public class AuthFilter implements Filter {
         } else {
             logger.info("IP whitelist disabled - allowing all IPs");
         }
+
+        // Per-IP throttling (#1043)
+        if (config.isRateLimitEnabled()) {
+            int perMinute = config.getRateLimitRequestsPerMinute();
+            this.rateLimiter = RateLimiter.forRequestsPerMinute(perMinute);
+            logger.info("API rate limiting enabled - " + perMinute + " requests/minute per IP");
+        } else {
+            this.rateLimiter = null;
+            logger.info("API rate limiting disabled");
+        }
     }
 
     @Override
@@ -67,6 +80,15 @@ public class AuthFilter implements Filter {
         // Health endpoint is public — allow unauthenticated probes (Caddy, uptime monitors)
         if (requestURI.endsWith("/v1/health") || requestURI.contains("/v1/health/")) {
             chain.doFilter(request, response);
+            return;
+        }
+
+        // Per-IP throttling (#1043). Deliberately runs BEFORE the whitelist and API-key
+        // checks so an unauthenticated flood — including API-key brute-forcing — is
+        // throttled too. The health endpoint returns above and is never throttled.
+        if (rateLimiter != null && !rateLimiter.isAllowed(clientIP)) {
+            logger.warning("API rate limit exceeded for IP: " + clientIP + " on " + method + " " + requestURI);
+            sendRateLimited(httpResponse);
             return;
         }
 
@@ -102,6 +124,18 @@ public class AuthFilter implements Filter {
         
         // Authentication successful, continue with request
         chain.doFilter(request, response);
+    }
+
+    /**
+     * Sends a 429 using the canonical ApiResponse envelope (#1043).
+     */
+    private void sendRateLimited(HttpServletResponse response) throws IOException {
+        response.setStatus(429);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Retry-After", "60");
+        response.getWriter().write(gson.toJson(
+                ApiResponse.error("RATE_LIMITED", "Too many requests.")));
     }
 
     /**
