@@ -30,7 +30,11 @@ database:
     username: root
     password: ""
     useSSL: true
-    connectionParameters: allowPublicKeyRetrieval=true
+    # socketTimeout/connectTimeout/tcpKeepAlive are merged in automatically if omitted
+    # (#1546) — RVNKCore's MySQL is typically cross-host, and without a socket timeout a
+    # stalled connection blocks forever and leaks from the pool. Override only if you
+    # know you need different values.
+    connectionParameters: allowPublicKeyRetrieval=true&socketTimeout=30000&connectTimeout=10000&tcpKeepAlive=true
     pool:
       maxConnections: 20
       minIdleConnections: 5

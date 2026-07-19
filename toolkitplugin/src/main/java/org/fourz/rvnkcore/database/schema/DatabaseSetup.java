@@ -37,6 +37,7 @@ public class DatabaseSetup {
     public static final String TABLE_ANNOUNCEMENT_TYPES = "rvnk_announcement_types";
     public static final String TABLE_SCHEMA_VERSION = "rvnk_schema_version";
     public static final String TABLE_PUSH_SUBSCRIPTIONS = "rvnk_push_subscriptions";
+    public static final String TABLE_WEBUI_ACCESS_LOG = "rvnk_webui_access_log";
 
     public DatabaseSetup(ConnectionProvider connectionProvider, Plugin plugin) {
         this.connectionProvider = connectionProvider;
@@ -189,6 +190,7 @@ public class DatabaseSetup {
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
         String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
+        String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
 
         String createPlayersTable;
         String createPlayerWorldDataTable;
@@ -200,6 +202,7 @@ public class DatabaseSetup {
         String createNotificationChannelsTable;
         String createPreferenceDefaultsTable;
         String createPushSubscriptionsTable;
+        String createWebuiAccessLogTable;
 
         if ("MySQL".equalsIgnoreCase(databaseType)) {
             // MySQL-specific table definitions with proper column types
@@ -363,6 +366,20 @@ public class DatabaseSetup {
                 "INDEX idx_push_player (player_id), " +
                 "UNIQUE INDEX idx_push_endpoint (endpoint(255))" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            createWebuiAccessLogTable = "CREATE TABLE IF NOT EXISTS " + webuiAccessLogTable + " (" +
+                "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, " +
+                "ign VARCHAR(16) NULL, " +
+                "uuid CHAR(36) NULL, " +
+                "ip_address VARCHAR(45) NOT NULL, " +
+                "country_code CHAR(2) NULL, " +
+                "page_path VARCHAR(255) NOT NULL, " +
+                "action_type VARCHAR(16) NOT NULL DEFAULT 'PAGE_VISIT', " +
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "INDEX idx_webui_access_ign (ign), " +
+                "INDEX idx_webui_access_created_at (created_at), " +
+                "INDEX idx_webui_access_country (country_code)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
             createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
@@ -516,6 +533,17 @@ public class DatabaseSetup {
                 "auth_key TEXT NOT NULL, " +
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
+
+            createWebuiAccessLogTable = "CREATE TABLE IF NOT EXISTS " + webuiAccessLogTable + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "ign TEXT, " +
+                "uuid TEXT, " +
+                "ip_address TEXT NOT NULL, " +
+                "country_code TEXT, " +
+                "page_path TEXT NOT NULL, " +
+                "action_type TEXT NOT NULL DEFAULT 'PAGE_VISIT', " +
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" +
+                ")";
         }
 
         try (var stmt = connection.createStatement()) {
@@ -539,6 +567,8 @@ public class DatabaseSetup {
             stmt.execute(createPreferenceDefaultsTable);
             logger.debug("Creating " + pushSubscriptionsTable + " table...");
             stmt.execute(createPushSubscriptionsTable);
+            logger.debug("Creating " + webuiAccessLogTable + " table...");
+            stmt.execute(createWebuiAccessLogTable);
             logger.debug("All tables created successfully");
         }
     }
@@ -555,6 +585,7 @@ public class DatabaseSetup {
         String notificationTypesTable = table(TABLE_PLAYER_NOTIFICATION_TYPES);
         String notificationChannelsTable = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
+        String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
         String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
 
         String[] indexes;
@@ -615,7 +646,11 @@ public class DatabaseSetup {
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "notif_types_plugin_type ON " + notificationTypesTable + "(plugin_id, notification_type)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_player ON " + notificationChannelsTable + "(player_id)",
                 "CREATE INDEX IF NOT EXISTS idx_" + prefix + "channels_plugin_type ON " + notificationChannelsTable + "(plugin_id, notification_type)",
-                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)"
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "defaults_plugin ON " + preferenceDefaultsTable + "(plugin_id)",
+                // WebUI access log indexes (SQLite only — MySQL uses inline indexes)
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_ign ON " + webuiAccessLogTable + "(ign)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_created_at ON " + webuiAccessLogTable + "(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_" + prefix + "webui_access_country ON " + webuiAccessLogTable + "(country_code)"
             };
         }
 
@@ -752,6 +787,69 @@ public class DatabaseSetup {
             } catch (SQLException e) {
                 logger.warning("Failed to add recurrence_date column: " + e.getMessage());
             }
+        }
+
+        // Migration 8: Add holiday_key column to announcements table, and register the
+        // 'holiday' announcement type (#1575 Phase 1).
+        //
+        // NOTE for anyone extending this: the guard below is `columnExists`, which is correct for
+        // ADD COLUMN and WRONG for widening one. A migration that tries to widen an existing
+        // column is a silent no-op here, because columnExists already returns true. This feature
+        // only ever needs ADD COLUMN, which is part of why it was chosen over widening
+        // recurrence_date (#1561).
+        if (!columnExists(connection, announcementsTable, "holiday_key")) {
+            logger.info("Adding 'holiday_key' column to " + announcementsTable);
+            try (var stmt = connection.createStatement()) {
+                if ("MySQL".equalsIgnoreCase(databaseType)) {
+                    stmt.execute("ALTER TABLE " + announcementsTable
+                        + " ADD COLUMN holiday_key VARCHAR(32) NULL");
+                } else {
+                    stmt.execute("ALTER TABLE " + announcementsTable
+                        + " ADD COLUMN holiday_key TEXT NULL");
+                }
+                logger.info("Successfully added 'holiday_key' column");
+            } catch (SQLException e) {
+                logger.warning("Failed to add holiday_key column: " + e.getMessage());
+            }
+
+            // Index for findByHolidayKey, which backs the duplicate-preset check on create.
+            try (var stmt = connection.createStatement()) {
+                String prefix = getTablePrefix().isEmpty() ? "" : getTablePrefix();
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_" + prefix
+                    + "announcements_holiday_key ON " + announcementsTable + "(holiday_key)");
+                logger.info("Created index on holiday_key");
+            } catch (SQLException e) {
+                logger.warning("Failed to create holiday_key index: " + e.getMessage());
+            }
+        }
+
+        // Register the 'holiday' type. GET /v1/announcements/types reads this TABLE, not an enum,
+        // so without this row Holiday never appears as a choice in game or on the web and the
+        // whole feature is invisible. Guarded on row presence rather than columnExists, and kept
+        // outside the column guard above so a partially-applied migration still self-heals.
+        String holidayTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        try (var check = connection.prepareStatement(
+                "SELECT 1 FROM " + holidayTypesTable + " WHERE id = ?")) {
+            check.setString(1, "holiday");
+            try (var rs = check.executeQuery()) {
+                if (!rs.next()) {
+                    try (var insert = connection.prepareStatement(
+                            "INSERT INTO " + holidayTypesTable
+                            + " (id, name, prefix, permission, active, display_context) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)")) {
+                        insert.setString(1, "holiday");
+                        insert.setString(2, "Holiday");
+                        insert.setString(3, "&6[Holiday]&r ");
+                        insert.setString(4, "rvnktools.announce.holiday");
+                        insert.setBoolean(5, true);
+                        insert.setString(6, "both");
+                        insert.executeUpdate();
+                        logger.info("Registered 'holiday' announcement type");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("Failed to register 'holiday' announcement type: " + e.getMessage());
         }
 
         logger.debug("Database migrations completed");

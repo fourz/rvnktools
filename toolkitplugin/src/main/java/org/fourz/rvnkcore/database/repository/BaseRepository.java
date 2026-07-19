@@ -115,7 +115,10 @@ public abstract class BaseRepository<T, ID> {
                     try {
                         T entity = mapResultSet(rs);
                         results.add(entity);
-                        logger.debug("Mapped row " + rowCount + " for table " + tableName);
+                        // No per-row success log: volume scales with result-set size and
+                        // synchronous log I/O backpressures the DB worker thread (#1548).
+                        // The summary below reports the count; the catch below names the
+                        // offending row number when a mapping actually fails.
                     } catch (SQLException mapEx) {
                         logger.error("Failed to map result set row " + rowCount + " for table: " + tableName, mapEx);
                         throw mapEx;

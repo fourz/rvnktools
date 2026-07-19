@@ -45,6 +45,16 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
     
     // Reference to the servlet context (set when server starts)
     private volatile ServletContextHandler servletContext;
+
+    /**
+     * One AuthFilter reused across every authenticated registration (#1547).
+     *
+     * <p>Previously a new instance was built per path, which multiplied the filter's
+     * internal state — most visibly the rate limiter, whose cleanup thread then leaked
+     * once per registration. Every instance is constructed from the same {@link ApiConfig},
+     * so a single shared instance is equivalent and cheaper.
+     */
+    private volatile AuthFilter sharedAuthFilter;
     
     // Server running state
     private volatile boolean serverRunning = false;
@@ -199,8 +209,26 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
     }
 
     /**
+     * Returns the shared {@link AuthFilter}, creating it on first authenticated
+     * registration (#1547).
+     */
+    private AuthFilter authFilter() {
+        AuthFilter filter = sharedAuthFilter;
+        if (filter == null) {
+            synchronized (this) {
+                filter = sharedAuthFilter;
+                if (filter == null) {
+                    filter = new AuthFilter(config, plugin, gson);
+                    sharedAuthFilter = filter;
+                }
+            }
+        }
+        return filter;
+    }
+
+    /**
      * Applies a single servlet registration to the context.
-     * When requireAuth is true, an AuthFilter is added for the servlet's path.
+     * When requireAuth is true, the shared AuthFilter is added for the servlet's path.
      */
     private boolean applyRegistration(String pathSpec, ServletRegistration registration) {
         try {
@@ -210,8 +238,19 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
             servletContext.addServlet(holder, pathSpec);
 
             if (registration.requireAuth()) {
-                AuthFilter authFilter = new AuthFilter(config, plugin, gson);
-                FilterHolder filterHolder = new FilterHolder(authFilter);
+                // The blanket mapping in ServletFactory already covers everything under /v1/ and
+                // friends, so this registration is redundant for those paths. It is harmless —
+                // #1547's request-scoped guard means one authentication and one rate-limit token
+                // per request either way — but the overlap was previously invisible and cost real
+                // debugging time. Say so rather than registering silently (#1551).
+                String covering = org.fourz.rvnkcore.api.security.AuthPathPatterns.coveringPattern(pathSpec);
+                if (covering != null) {
+                    logger.warning("Auth filter for " + pathSpec + " is redundant: already covered by"
+                            + " the blanket mapping " + covering + " (#1551). Registering anyway —"
+                            + " harmless, but the duplicate mapping is intentional to document.");
+                }
+
+                FilterHolder filterHolder = new FilterHolder(authFilter());
                 filterHolder.setName("auth_" + registration.displayName() + "_" + pathSpec.hashCode());
                 servletContext.addFilter(filterHolder, pathSpec,
                         EnumSet.of(DispatcherType.REQUEST, DispatcherType.ASYNC));

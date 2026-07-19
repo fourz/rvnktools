@@ -49,4 +49,27 @@ public interface ILoreApiService {
 
     /** Roll a weighted item from an RNG pool; {@code requestBody} may carry {"rarityTier": "..."}. */
     CompletableFuture<ApiResponse<?>> rollPool(String poolId, String requestBody);
+
+    /**
+     * Mint a single lore item from a JSON body (#1517) — the write verb for the item surface.
+     * Body: {material, name, itemType?, rarity?, lore?[], pages?[], enchantments?{ns:lvl},
+     * enchantmentTier?, glow?, customModelData?, description?, createdBy?}. Creates a lore_entry
+     * (type ITEM) + lore_item, returning the created item in the same shape as {@link #getItemById}.
+     * Auth-gated by the existing AuthFilter on POST, same as {@link #submitEntry}/{@link #rollPool}.
+     */
+    CompletableFuture<ApiResponse<?>> createItem(String requestBody);
+
+    // ── Versioned item write surface (#1528) ─────────────────────────────────────
+
+    /** Update an item as a new version (PUT /lore/items/{id}); re-materializes the current instance. */
+    CompletableFuture<ApiResponse<?>> updateItem(String id, String requestBody);
+
+    /** Delete an item (DELETE /lore/items/{id}); {@code hard=false} soft-archives, {@code true} purges. */
+    CompletableFuture<ApiResponse<?>> deleteItem(String id, boolean hard);
+
+    /** Version history for an item (GET /lore/items/{id}/versions). */
+    CompletableFuture<ApiResponse<?>> getItemVersions(String id);
+
+    /** Roll an item back to a prior version (POST /lore/items/{id}/rollback, body {"version":N}). */
+    CompletableFuture<ApiResponse<?>> rollbackItem(String id, String requestBody);
 }

@@ -2,9 +2,19 @@ toolkitplugin/dependency-reduced-pom.xml
 rvnktools.jar
 .vscode/bak
 shared-backup/
+# Bare 'docs' matches at ANY depth, which silently swallowed the Java package
+# org/fourz/rvnkcore/api/docs/ — source files that ServletFactory imports (#1597).
+# The result was a repo that could not build from a clean clone while building fine
+# on any machine that happened to have the untracked files on disk.
+# Intent is the metamake doc trees; source is negated below.
 docs
 !toolkitplugin/docs/
 !toolkitplugin/docs/**
+# Never ignore source. A directory must be re-included before anything inside it can
+# be — git does not descend into an excluded directory, so a file-level negation alone
+# would not work here.
+!toolkitplugin/src/**/docs/
+!toolkitplugin/src/**/docs/**
 toolkitplugin/target/rvnktools-1.3.0-alpha.jar
 toolkitplugin/target/original-rvnkcore-1.3.0-alpha.jar
 nul
