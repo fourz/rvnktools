@@ -106,13 +106,14 @@ public class ServletFactory {
             registerCorsFilter(context);
         }
 
-        // Add authentication filter for all API endpoints (single shared instance)
+        // Add authentication filter for all API endpoints (single shared instance).
+        // Patterns live in AuthPathPatterns so ServletRegistrationServiceImpl can detect when a
+        // dynamically registered path is already covered here and warn instead of silently
+        // double-registering (#1551).
         FilterHolder authHolder = new FilterHolder(new AuthFilter(config, plugin, gson));
-        context.addFilter(authHolder, "/v1/*", null);
-        context.addFilter(authHolder, "/bartershops/*", null);
-        context.addFilter(authHolder, "/lore/*", null);
-        context.addFilter(authHolder, "/rvnkworlds/*", null);
-        context.addFilter(authHolder, "/docs/*", null);
+        for (String pattern : org.fourz.rvnkcore.api.security.AuthPathPatterns.BLANKET_PATTERNS) {
+            context.addFilter(authHolder, pattern, null);
+        }
     }
 
     /**

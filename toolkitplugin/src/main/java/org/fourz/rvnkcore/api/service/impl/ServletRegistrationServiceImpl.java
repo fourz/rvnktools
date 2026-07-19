@@ -238,6 +238,18 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
             servletContext.addServlet(holder, pathSpec);
 
             if (registration.requireAuth()) {
+                // The blanket mapping in ServletFactory already covers everything under /v1/ and
+                // friends, so this registration is redundant for those paths. It is harmless —
+                // #1547's request-scoped guard means one authentication and one rate-limit token
+                // per request either way — but the overlap was previously invisible and cost real
+                // debugging time. Say so rather than registering silently (#1551).
+                String covering = org.fourz.rvnkcore.api.security.AuthPathPatterns.coveringPattern(pathSpec);
+                if (covering != null) {
+                    logger.warning("Auth filter for " + pathSpec + " is redundant: already covered by"
+                            + " the blanket mapping " + covering + " (#1551). Registering anyway —"
+                            + " harmless, but the duplicate mapping is intentional to document.");
+                }
+
                 FilterHolder filterHolder = new FilterHolder(authFilter());
                 filterHolder.setName("auth_" + registration.displayName() + "_" + pathSpec.hashCode());
                 servletContext.addFilter(filterHolder, pathSpec,
