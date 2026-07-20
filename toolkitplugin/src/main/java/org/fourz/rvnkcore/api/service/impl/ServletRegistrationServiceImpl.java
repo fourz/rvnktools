@@ -62,6 +62,9 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
     /**
      * Internal record to track servlet registrations.
      */
+    /** Path -> permanently-bound wrapper. Survives plugin reloads; only the delegate swaps. */
+    private final Map<String, DelegatingServlet> boundWrappers = new ConcurrentHashMap<>();
+
     private record ServletRegistration(
         HttpServlet servlet,
         String displayName,
@@ -139,13 +142,24 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
         }
         
         String normalizedPath = normalizePath(pathSpec);
-        
-        // Check if already registered
-        if (registeredServlets.containsKey(normalizedPath)) {
-            logger.warning("Servlet already registered at path: " + normalizedPath);
-            return false;
+
+        // Re-registration swaps the delegate behind the already-bound wrapper (#1604).
+        //
+        // This used to return false and log "Servlet already registered". Jetty cannot remove a
+        // servlet from a started ServletContextHandler, so the previously-bound servlet stayed
+        // mapped and kept serving the OLD plugin's classes after a hot reload — while the plugin
+        // logged Enabled and the endpoint returned 200. A deployed REST fix simply had no effect,
+        // which reads as "the fix doesn't work" rather than "the fix was never loaded".
+        DelegatingServlet existing = boundWrappers.get(normalizedPath);
+        if (existing != null) {
+            existing.setDelegate(servlet, servletContext);
+            registeredServlets.put(normalizedPath,
+                    new ServletRegistration(servlet, displayName, requireAuth, true));
+            logger.info("Servlet at " + normalizedPath + " rebound to " + displayName
+                    + " (hot swap) — previous delegate replaced");
+            return true;
         }
-        
+
         // Create registration
         ServletRegistration registration = new ServletRegistration(servlet, displayName, requireAuth, false);
         registeredServlets.put(normalizedPath, registration);
@@ -166,17 +180,83 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
     @Override
     public boolean unregisterServlet(String pathSpec) {
         String normalizedPath = normalizePath(pathSpec);
-        
+
         ServletRegistration removed = registeredServlets.remove(normalizedPath);
         if (removed != null) {
             logger.debug("Unregistered external servlet at: " + normalizedPath);
-            // Note: Actual servlet removal from Jetty requires server restart
-            if (removed.applied()) {
-                logger.warning("Servlet was active - full removal requires server restart");
+            // Clear the delegate rather than trying to unbind — Jetty cannot remove a servlet
+            // from a started context. The wrapper stays mapped and answers 503 until something
+            // registers again, instead of serving a dead plugin's classes (#1604).
+            DelegatingServlet wrapper = boundWrappers.get(normalizedPath);
+            if (wrapper != null) {
+                wrapper.clearDelegate();
+                logger.debug("Cleared delegate for " + normalizedPath + " — path now returns 503");
             }
             return true;
         }
         return false;
+    }
+
+    /**
+     * A permanently-bound servlet whose target can be replaced.
+     *
+     * <p>Jetty cannot remove a servlet from a started {@code ServletContextHandler}, so anything
+     * bound directly is bound for the JVM's lifetime. Binding this wrapper instead means a plugin
+     * reload swaps the delegate while the mapping stays put — REST endpoints then pick up new code
+     * the same way commands and event handlers already did.
+     *
+     * <p>Before this, a hot reload left the previous plugin's servlet serving requests while the
+     * plugin reported itself enabled: the deployed fix was present in the jar and unreachable.
+     *
+     * <p>{@code delegate} is volatile because Jetty request threads read it while the server thread
+     * swaps it during a reload.
+     */
+    private final class DelegatingServlet extends HttpServlet {
+        private final String pathSpec;
+        private volatile HttpServlet delegate;
+
+        DelegatingServlet(String pathSpec) {
+            this.pathSpec = pathSpec;
+        }
+
+        void setDelegate(HttpServlet next, ServletContextHandler context) {
+            if (next != null && context != null) {
+                try {
+                    // Give the delegate a real ServletConfig — without init() its
+                    // getServletContext()/getInitParameter() calls NPE.
+                    next.init(new jakarta.servlet.ServletConfig() {
+                        @Override public String getServletName() { return pathSpec; }
+                        @Override public jakarta.servlet.ServletContext getServletContext() {
+                            return context.getServletContext();
+                        }
+                        @Override public String getInitParameter(String name) { return null; }
+                        @Override public java.util.Enumeration<String> getInitParameterNames() {
+                            return java.util.Collections.emptyEnumeration();
+                        }
+                    });
+                } catch (Exception e) {
+                    logger.error("Failed to init delegate servlet for " + pathSpec, e);
+                }
+            }
+            this.delegate = next;
+        }
+
+        void clearDelegate() {
+            this.delegate = null;
+        }
+
+        @Override
+        public void service(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse resp)
+                throws jakarta.servlet.ServletException, java.io.IOException {
+            HttpServlet current = delegate;
+            if (current == null) {
+                if (resp instanceof jakarta.servlet.http.HttpServletResponse http) {
+                    http.sendError(503, "No handler registered for " + pathSpec);
+                }
+                return;
+            }
+            current.service(req, resp);
+        }
     }
 
     @Override
@@ -232,7 +312,14 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
      */
     private boolean applyRegistration(String pathSpec, ServletRegistration registration) {
         try {
-            ServletHolder holder = new ServletHolder(registration.servlet());
+            // Bind a stable wrapper rather than the servlet itself. Jetty can never unbind it,
+            // which is fine — the wrapper outlives every plugin reload and only its delegate
+            // changes (#1604).
+            DelegatingServlet wrapper = new DelegatingServlet(pathSpec);
+            wrapper.setDelegate(registration.servlet(), servletContext);
+            boundWrappers.put(pathSpec, wrapper);
+
+            ServletHolder holder = new ServletHolder(wrapper);
             holder.setName(registration.displayName() + "_" + pathSpec.hashCode());
 
             servletContext.addServlet(holder, pathSpec);
