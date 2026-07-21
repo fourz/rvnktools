@@ -30,6 +30,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
     private HikariDataSource dataSource;
     private final DatabaseConfig config;
     private final LogManager logger;
+    private final String poolOwner;
     private final ReentrantLock initializationLock = new ReentrantLock();
     private volatile boolean initialized = false;
     
@@ -43,6 +44,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
     public MySQLConnectionProvider(DatabaseConfig config, Plugin plugin) {
         this.config = validateConfig(config);
         this.logger = LogManager.getInstance(plugin);
+        this.poolOwner = (plugin != null) ? plugin.getName() : "unknown";
         initializeDataSource();
     }
     
@@ -163,8 +165,12 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.addDataSourceProperty("elideSetAutoCommits", "true");
             hikariConfig.addDataSourceProperty("maintainTimeStats", "false");
             
-            // Pool naming for monitoring
-            hikariConfig.setPoolName("RVNKCore-MySQL-Pool");
+            // Pool naming for monitoring — include the owning plugin so logs are attributable
+            // (#1629). Every plugin builds its own pool through this provider but they all used to
+            // share the literal name "RVNKCore-MySQL-Pool", making it impossible to tell whose pool
+            // a shutdown/leak line referred to — which is how #1629 was first misdiagnosed as one
+            // shared pool being torn down under everyone.
+            hikariConfig.setPoolName("RVNKCore-MySQL-Pool-" + poolOwner);
             
             this.dataSource = new HikariDataSource(hikariConfig);
             this.initialized = true;
@@ -248,9 +254,17 @@ public class MySQLConnectionProvider implements ConnectionProvider {
         params.add("allowMultiQueries=true");
         params.add("allowPublicKeyRetrieval=true");
         
-        // Add custom connection parameters if provided
-        if (config.getConnectionParameters() != null && !config.getConnectionParameters().trim().isEmpty()) {
-            params.add(config.getConnectionParameters());
+        // Always apply the required MySQL safety params (socketTimeout / connectTimeout /
+        // tcpKeepAlive), merging with any operator-set connectionParameters (#1629 P4 / #1546).
+        // Applied HERE at the provider level — not only in RVNKCore's ConfigLoader — so every pool
+        // is protected, including plugins that build their own DatabaseConfig (RVNKWorlds, RVNKLore)
+        // and never called withRequiredMySqlParams. Without socketTimeout a dropped cross-host
+        // connection blocks the driver forever, HikariCP cannot reclaim it, and the pool degrades
+        // until exhaustion — the exact failure behind the #1629 leak. withRequiredMySqlParams is
+        // idempotent (skips any param already present), so double-application is harmless.
+        String requiredParams = DatabaseConfig.withRequiredMySqlParams(config.getConnectionParameters());
+        if (!requiredParams.isEmpty()) {
+            params.add(requiredParams);
         }
         
         url.append("?").append(String.join("&", params));
