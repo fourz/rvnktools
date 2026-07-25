@@ -7,6 +7,8 @@ import org.fourz.rvnkcore.api.event.PlayerBanListener;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
 import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
+import org.fourz.rvnkcore.event.ChatRelayListener;
+import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -210,6 +212,17 @@ public class RVNKToolsInitializer {
                 // Register ban detection listener
                 PlayerBanListener banListener = new PlayerBanListener(registry, logger);
                 plugin.getServer().getPluginManager().registerEvents(banListener, plugin);
+
+                // Register cross-server chat relay capture listener.
+                // The ChatRelayService is registered in phase 1 by ApiServerInitializer.
+                ChatRelayService chatRelayService = RVNKCore.getServiceSafe(ChatRelayService.class);
+                if (chatRelayService != null) {
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new ChatRelayListener(chatRelayService), plugin);
+                    logger.info("Chat relay capture listener registered");
+                } else {
+                    logger.warning("Chat relay capture listener not registered: ChatRelayService unavailable");
+                }
 
                 // Register LuckPerms integration
                 try {

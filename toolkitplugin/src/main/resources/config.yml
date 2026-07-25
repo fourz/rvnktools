@@ -88,6 +88,27 @@ webhook:
                            # uses webhook.secret for HMAC auth — no separate token needed
 
 # ──────────────────────────────────────────
+# Cross-Server Chat Relay
+# ──────────────────────────────────────────
+# Shares a "global" chat channel between RVNKCore servers (e.g. Event <-> prod) over the
+# existing Jetty HTTP API. Local chat stays on its own server. A line beginning with the
+# channel-trigger is relayed to peers; everything else is local-only.
+# Peers authenticate with the destination server's X-API-Key (same header AuthFilter checks
+# on /v1/*), sent as the egress X-API-Key header — no separate HMAC secret.
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+chat-relay:
+  enabled: false
+  server-id: ""            # This server's identity/tag source (e.g. "event", "prod")
+  channel-trigger: "!"     # Prefix that marks a chat line as global (stripped before relay)
+  dedup-cache-size: 512    # Bounded LRU of recent msgIds for loop/duplicate suppression
+  timeout-ms: 3000         # Per-peer HTTP timeout
+  peers: []                # List of peer servers. Example (uncomment and fill in):
+  #  - id: "prod"                                          # peer's chat-relay.server-id
+  #    tag: "P"                                            # short tag rendered on relayed lines
+  #    url: "https://<prod-host>:<port>/v1/chat/inbound"   # peer inbound endpoint
+  #    api-key: "<peer-x-api-key>"                         # peer's api.auth.key
+
+# ──────────────────────────────────────────
 # RVNKTools Settings
 # ──────────────────────────────────────────
 

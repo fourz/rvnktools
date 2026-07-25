@@ -5,6 +5,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
@@ -34,6 +35,7 @@ public class ConfigLoader {
     private DatabaseConfig cachedDatabaseConfig;
     private ApiConfig cachedApiConfig;
     private WebhookConfig cachedWebhookConfig;
+    private ChatRelayConfig cachedChatRelayConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -337,8 +339,28 @@ public class ConfigLoader {
     }
 
     /**
+     * Gets the chat relay configuration instance with caching.
+     *
+     * @return ChatRelayConfig instance
+     */
+    public ChatRelayConfig getChatRelayConfig() {
+        if (cachedChatRelayConfig != null) {
+            return cachedChatRelayConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection chatRelaySection = coreConfig.getConfigurationSection("chat-relay");
+        cachedChatRelayConfig = ChatRelayConfig.fromConfigurationSection(chatRelaySection);
+        logger.debug("Chat relay configuration loaded and cached");
+        return cachedChatRelayConfig;
+    }
+
+    /**
      * Gets the database configuration instance with caching.
-     * 
+     *
      * @return DatabaseConfig instance
      */
     public DatabaseConfig getDatabaseConfig() {
@@ -412,6 +434,7 @@ public class ConfigLoader {
         cachedApiConfig = null;
         cachedDatabaseConfig = null;
         cachedWebhookConfig = null;
+        cachedChatRelayConfig = null;
     }
     
     /**

@@ -10,6 +10,7 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.controller.AuthController;
 import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.ChatRelayController;
 import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.NotificationController;
@@ -142,6 +143,9 @@ public class ServletFactory {
         // Register notification controller
         registerNotificationController(context);
 
+        // Register cross-server chat relay controller
+        registerChatRelayController(context);
+
         // Whitelist management
         registerWhitelistController(context);
 
@@ -191,6 +195,20 @@ public class ServletFactory {
         NotificationController controller = new NotificationController(null, gson, notifLogger);
         context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
         logger.debug("Notification API controller registered at /v1/notifications/*");
+    }
+
+    /**
+     * Registers the chat relay controller for inbound cross-server chat at {@code /v1/chat/*}.
+     * The controller resolves ChatRelayService lazily from ServiceRegistry at request time.
+     * Guarded by the existing AuthFilter (X-API-Key) via the {@code /v1/*} blanket pattern.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerChatRelayController(ServletContextHandler context) {
+        LogManager chatLogger = LogManager.getInstance(plugin, ChatRelayController.class);
+        ChatRelayController controller = new ChatRelayController(gson, chatLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/chat/*");
+        logger.debug("Chat relay API controller registered at /v1/chat/*");
     }
 
     /**
