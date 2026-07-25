@@ -6,6 +6,7 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
+import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
@@ -36,6 +37,7 @@ public class ConfigLoader {
     private ApiConfig cachedApiConfig;
     private WebhookConfig cachedWebhookConfig;
     private ChatRelayConfig cachedChatRelayConfig;
+    private TransferConfig cachedTransferConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -359,6 +361,26 @@ public class ConfigLoader {
     }
 
     /**
+     * Gets the transfer configuration instance with caching.
+     *
+     * @return TransferConfig instance
+     */
+    public TransferConfig getTransferConfig() {
+        if (cachedTransferConfig != null) {
+            return cachedTransferConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection transferSection = coreConfig.getConfigurationSection("transfer");
+        cachedTransferConfig = TransferConfig.fromConfigurationSection(transferSection);
+        logger.debug("Transfer configuration loaded and cached");
+        return cachedTransferConfig;
+    }
+
+    /**
      * Gets the database configuration instance with caching.
      *
      * @return DatabaseConfig instance
@@ -435,6 +457,7 @@ public class ConfigLoader {
         cachedDatabaseConfig = null;
         cachedWebhookConfig = null;
         cachedChatRelayConfig = null;
+        cachedTransferConfig = null;
     }
     
     /**

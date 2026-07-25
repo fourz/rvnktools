@@ -7,9 +7,13 @@ import org.fourz.rvnkcore.api.event.PlayerBanListener;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
 import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
+import org.fourz.rvnkcore.command.ServerTransferCommand;
+import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.event.ChatRelayListener;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
+import org.fourz.rvnkcore.service.transfer.TransferService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnktools.command.manager.CommandManager;
@@ -98,6 +102,10 @@ public class RVNKToolsInitializer {
         // Initialize LogFilter BEFORE CommandManager to ensure service is available
         initializeLogFilter();
         logger.debug("  + LogFilter initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        // Register TransferService BEFORE commands so ServerTransferCommand can resolve it
+        initializeTransferService();
+        logger.debug("  + TransferService initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
@@ -259,6 +267,26 @@ public class RVNKToolsInitializer {
         }
     }
 
+    /**
+     * Loads the transfer configuration and registers the {@link TransferService}.
+     *
+     * <p>Registered before the command framework so {@link ServerTransferCommand} can resolve the
+     * service at registration time. The shipped default is disabled — seed the {@code transfer}
+     * section on each live server's config.</p>
+     */
+    private void initializeTransferService() {
+        try {
+            ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+            TransferConfig transferConfig = configLoader.getTransferConfig();
+            transferConfig.validate(logger);
+            TransferService transferService = new TransferService(plugin, transferConfig, logger);
+            registry.registerService(TransferService.class, transferService);
+            logger.info("TransferService registered (enabled=" + transferConfig.isEnabled() + ")");
+        } catch (Exception e) {
+            logger.error("Failed to initialize TransferService", e);
+        }
+    }
+
     private void registerBundledComponentCommands() {
         try {
             // Register PlayerPreferencesCommand
@@ -267,6 +295,11 @@ public class RVNKToolsInitializer {
                 PlayerPreferencesCommand prefCommand = new PlayerPreferencesCommand(plugin);
                 commandManager.registerCommand(prefCommand);
                 logger.info("PlayerPreferencesCommand registered");
+
+                // Register cross-server transfer command (/server transfer <target>)
+                ServerTransferCommand transferCommand = new ServerTransferCommand(plugin);
+                commandManager.registerCommand(transferCommand);
+                logger.info("ServerTransferCommand registered");
             }
 
         } catch (Exception e) {

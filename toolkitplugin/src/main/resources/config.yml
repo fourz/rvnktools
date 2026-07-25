@@ -109,6 +109,27 @@ chat-relay:
   #    api-key: "<peer-x-api-key>"                         # peer's api.auth.key
 
 # ──────────────────────────────────────────
+# Native Cross-Server Transfer (movement only)
+# ──────────────────────────────────────────
+# Sends a player to another RVNK server via Minecraft's native Transfer packet
+# (Player#transfer(host, port)) — no proxy. MVP scope is MOVEMENT ONLY: inventory,
+# economy and quest state do NOT travel; the player arrives with the destination's data.
+# Requires accepts-transfers=true in server.properties on the DESTINATION (needs a restart).
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+transfer:
+  enabled: false
+  cooldown-seconds: 10               # Per-player minimum seconds between transfers
+  permission: "rvnkcore.transfer"    # Permission node required to transfer
+  confirm: true                      # Require "/server transfer <target> confirm" to proceed
+  targets: {}                        # Named destinations. Example (uncomment and fill in):
+  #  prod:
+  #    host: "<prod-host>"
+  #    port: 25680
+  #  event:
+  #    host: "<event-host>"
+  #    port: 25724
+
+# ──────────────────────────────────────────
 # RVNKTools Settings
 # ──────────────────────────────────────────
 
