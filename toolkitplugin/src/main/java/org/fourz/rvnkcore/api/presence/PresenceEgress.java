@@ -108,6 +108,20 @@ public class PresenceEgress {
      *
      * @param dto The roster snapshot to relay
      */
+    /**
+     * Logs an egress result, downgrading "peer has no presence endpoint" (404/405 — an older RVNKCore
+     * that predates presence) to debug so it doesn't spam WARN every heartbeat.
+     */
+    private void reportStatus(String logTag, int status) {
+        if (status >= 200 && status < 300) {
+            logger.debug(logTag + " -> " + status);
+        } else if (status == 404 || status == 405) {
+            logger.debug(logTag + " -> " + status + " (peer has no presence endpoint)");
+        } else {
+            logger.warning(logTag + " -> " + status);
+        }
+    }
+
     public void send(PresenceDTO dto) {
         if (dto == null) return;
         String payload = GSON.toJson(dto);
@@ -133,14 +147,7 @@ public class PresenceEgress {
                 .timeout(Duration.ofMillis(config.getTimeoutMs()))
                 .build();
             httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(response -> {
-                    int status = response.statusCode();
-                    if (status >= 200 && status < 300) {
-                        logger.debug(logTag + " -> " + status);
-                    } else {
-                        logger.warning(logTag + " -> " + status);
-                    }
-                })
+                .thenAccept(response -> reportStatus(logTag, response.statusCode()))
                 .exceptionally(e -> {
                     logger.warning(logTag + " failed: " + e.getMessage());
                     return null;
@@ -169,12 +176,7 @@ public class PresenceEgress {
                 try (OutputStream os = conn.getOutputStream()) {
                     os.write(body);
                 }
-                int status = conn.getResponseCode();
-                if (status >= 200 && status < 300) {
-                    logger.debug(logTag + " -> " + status);
-                } else {
-                    logger.warning(logTag + " -> " + status);
-                }
+                reportStatus(logTag, conn.getResponseCode());
             } catch (Exception e) {
                 logger.warning(logTag + " failed: " + e.getMessage());
             } finally {
