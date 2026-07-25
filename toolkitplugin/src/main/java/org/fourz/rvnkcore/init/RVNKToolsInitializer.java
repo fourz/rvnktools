@@ -240,8 +240,19 @@ public class RVNKToolsInitializer {
                 org.fourz.rvnkcore.service.presence.PresenceService presenceService =
                         RVNKCore.getServiceSafe(org.fourz.rvnkcore.service.presence.PresenceService.class);
                 if (presenceService != null && presenceService.isActive()) {
+                    // Persistent per-player sidebar visibility preference (#1728).
+                    org.fourz.rvnkcore.api.service.PlayerPreferencesService presencePrefs =
+                            RVNKCore.getServiceSafe(org.fourz.rvnkcore.api.service.PlayerPreferencesService.class);
+                    if (presencePrefs != null) {
+                        presencePrefs.registerNotificationTypes(
+                                org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_PLUGIN_ID,
+                                java.util.List.of(new org.fourz.rvnkcore.api.model.NotificationTypeDefinition(
+                                        org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_PLUGIN_ID,
+                                        org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_TYPE,
+                                        "Cross-server player list sidebar", true)));
+                    }
                     org.fourz.rvnkcore.service.presence.PresenceScoreboard presenceScoreboard =
-                            new org.fourz.rvnkcore.service.presence.PresenceScoreboard(plugin, logger);
+                            new org.fourz.rvnkcore.service.presence.PresenceScoreboard(plugin, logger, presencePrefs);
                     presenceService.setOnChange(() -> presenceScoreboard.render(
                             presenceService.getMergedRoster(), presenceService.totalCount()));
                     plugin.getServer().getPluginManager().registerEvents(

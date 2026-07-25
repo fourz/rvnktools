@@ -54,7 +54,7 @@ public class PresenceListener implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> {
             service.broadcastLocalRoster();
             scoreboard.render(service.getMergedRoster(), service.totalCount());
-            scoreboard.apply(player);
+            scoreboard.loadAndApply(player);
         });
     }
 
