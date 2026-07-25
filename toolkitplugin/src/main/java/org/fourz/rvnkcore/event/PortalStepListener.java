@@ -130,8 +130,9 @@ public class PortalStepListener implements Listener {
 
     /**
      * Safety net: cancel vanilla nether teleportation for registered cross-server portal blocks and
-     * begin the charge-up. Runs even on an already-cancelled event and scans the entry column so
-     * creative-mode instant fires cannot slip through to the Nether.
+     * begin the charge-up. Runs even on an already-cancelled event and scans a 3x3 horizontal
+     * neighbourhood of the entry column so creative-mode instant fires and frame-edge rounding cannot
+     * slip through to the Nether.
      *
      * @param event The player portal event
      */
@@ -149,12 +150,21 @@ public class PortalStepListener implements Listener {
         int by = from.getBlockY();
         int bz = from.getBlockZ();
 
+        // Scan a 3x3 horizontal neighbourhood at each vertical offset. The player's from-block can round
+        // to a column one off the portal plane (sub-block position at the frame edge), which let vanilla's
+        // nether teleport slip through intermittently on servers without RVNKWorlds' portal handling
+        // (e.g. nations). Widening the scan makes the cancel deterministic — the transfer always wins
+        // the race to the Nether (#1722).
         for (int dy = -1; dy <= 3; dy++) {
-            Optional<PortalDTO> portal = portalService.getPortal(world, bx, by + dy, bz);
-            if (portal.isPresent()) {
-                event.setCancelled(true); // Never let vanilla send them to the Nether.
-                beginTransfer(event.getPlayer(), portal.get());
-                return;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    Optional<PortalDTO> portal = portalService.getPortal(world, bx + dx, by + dy, bz + dz);
+                    if (portal.isPresent()) {
+                        event.setCancelled(true); // Never let vanilla send them to the Nether.
+                        beginTransfer(event.getPlayer(), portal.get());
+                        return;
+                    }
+                }
             }
         }
     }
