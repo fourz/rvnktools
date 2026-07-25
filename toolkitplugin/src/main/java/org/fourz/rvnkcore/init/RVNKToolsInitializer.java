@@ -235,6 +235,24 @@ public class RVNKToolsInitializer {
                     logger.warning("Chat relay capture listener not registered: ChatRelayService unavailable");
                 }
 
+                // Register cross-server presence (#1728): sidebar + join/quit republish + /list override.
+                // PresenceService is registered in phase 1 by ApiServerInitializer.
+                org.fourz.rvnkcore.service.presence.PresenceService presenceService =
+                        RVNKCore.getServiceSafe(org.fourz.rvnkcore.service.presence.PresenceService.class);
+                if (presenceService != null && presenceService.isActive()) {
+                    org.fourz.rvnkcore.service.presence.PresenceScoreboard presenceScoreboard =
+                            new org.fourz.rvnkcore.service.presence.PresenceScoreboard(plugin, logger);
+                    presenceService.setOnChange(() -> presenceScoreboard.render(
+                            presenceService.getMergedRoster(), presenceService.totalCount()));
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new org.fourz.rvnkcore.event.PresenceListener(plugin, presenceService, presenceScoreboard),
+                            plugin);
+                    presenceService.startHeartbeat();
+                    logger.info("Cross-server presence registered (sidebar + /list override)");
+                } else {
+                    logger.debug("Presence not registered (chat relay disabled or no peers)");
+                }
+
                 // Register cross-server portal listeners (sign registration + step detection).
                 // The PortalService is registered in phase 1 by CoreServiceFactory; gate on its
                 // presence so the listeners are only active when portals are configured.

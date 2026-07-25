@@ -304,6 +304,12 @@ public class RVNKCoreCommand extends BaseCommand {
                         cfg.getConfigurationSection("chat-relay")));
                 refreshed++;
             }
+            if (reg.hasService(org.fourz.rvnkcore.service.presence.PresenceService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.presence.PresenceService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.ChatRelayConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("chat-relay")));
+                refreshed++;
+            }
             sender.sendMessage(ChatFormat.colorize(
                 "&7   • &a✓ &fCross-server services refreshed: " + refreshed));
 

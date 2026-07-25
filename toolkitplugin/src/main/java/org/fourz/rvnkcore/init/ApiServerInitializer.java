@@ -140,6 +140,15 @@ public class ApiServerInitializer {
             registry.registerService(ChatRelayService.class,
                     new ChatRelayService(plugin, chatRelayConfig, chatRelayEgress, logger));
 
+            // Register cross-server presence service (#1728) — reuses the chat relay peer set / auth /
+            // TLS. Registered here (phase 1) so RVNKToolsInitializer (phase 2) can wire its listener,
+            // scoreboard and heartbeat.
+            org.fourz.rvnkcore.api.presence.PresenceEgress presenceEgress =
+                    new org.fourz.rvnkcore.api.presence.PresenceEgress(chatRelayConfig, logger);
+            registry.registerService(org.fourz.rvnkcore.service.presence.PresenceService.class,
+                    new org.fourz.rvnkcore.service.presence.PresenceService(
+                            plugin, chatRelayConfig, presenceEgress, logger));
+
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");
         } catch (Exception e) {
@@ -159,6 +168,11 @@ public class ApiServerInitializer {
                 registry.unregisterService(WebhookNotifier.class);
                 // Unregister chat relay service
                 registry.unregisterService(ChatRelayService.class);
+                // Stop + unregister presence service
+                org.fourz.rvnkcore.service.presence.PresenceService presence =
+                        registry.getService(org.fourz.rvnkcore.service.presence.PresenceService.class);
+                if (presence != null) presence.stopHeartbeat();
+                registry.unregisterService(org.fourz.rvnkcore.service.presence.PresenceService.class);
                 // Unregister servlet registration service
                 registry.unregisterService(IServletRegistrationService.class);
 

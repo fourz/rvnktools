@@ -146,6 +146,9 @@ public class ServletFactory {
         // Register cross-server chat relay controller
         registerChatRelayController(context);
 
+        // Register cross-server presence controller (#1728)
+        registerPresenceController(context);
+
         // Whitelist management
         registerWhitelistController(context);
 
@@ -209,6 +212,21 @@ public class ServletFactory {
         ChatRelayController controller = new ChatRelayController(gson, chatLogger);
         context.addServlet(new ServletHolder(controller), "/v1/chat/*");
         logger.debug("Chat relay API controller registered at /v1/chat/*");
+    }
+
+    /**
+     * Registers the presence controller for inbound cross-server rosters at {@code /v1/presence/*}
+     * (#1728). Resolves PresenceService lazily from ServiceRegistry; AuthFilter-gated via {@code /v1/*}.
+     *
+     * @param context the servlet context
+     */
+    private void registerPresenceController(ServletContextHandler context) {
+        LogManager presenceLogger = LogManager.getInstance(plugin,
+                org.fourz.rvnkcore.api.controller.PresenceController.class);
+        org.fourz.rvnkcore.api.controller.PresenceController controller =
+                new org.fourz.rvnkcore.api.controller.PresenceController(gson, presenceLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/presence/*");
+        logger.debug("Presence API controller registered at /v1/presence/*");
     }
 
     /**
