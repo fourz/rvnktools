@@ -6,6 +6,7 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
+import org.fourz.rvnkcore.api.config.PortalConfig;
 import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
@@ -38,6 +39,7 @@ public class ConfigLoader {
     private WebhookConfig cachedWebhookConfig;
     private ChatRelayConfig cachedChatRelayConfig;
     private TransferConfig cachedTransferConfig;
+    private PortalConfig cachedPortalConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -381,6 +383,26 @@ public class ConfigLoader {
     }
 
     /**
+     * Gets the portal configuration instance with caching.
+     *
+     * @return PortalConfig instance
+     */
+    public PortalConfig getPortalConfig() {
+        if (cachedPortalConfig != null) {
+            return cachedPortalConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection portalSection = coreConfig.getConfigurationSection("portal");
+        cachedPortalConfig = PortalConfig.fromConfigurationSection(portalSection);
+        logger.debug("Portal configuration loaded and cached");
+        return cachedPortalConfig;
+    }
+
+    /**
      * Gets the database configuration instance with caching.
      *
      * @return DatabaseConfig instance
@@ -458,6 +480,7 @@ public class ConfigLoader {
         cachedWebhookConfig = null;
         cachedChatRelayConfig = null;
         cachedTransferConfig = null;
+        cachedPortalConfig = null;
     }
     
     /**

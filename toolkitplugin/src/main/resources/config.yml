@@ -130,6 +130,22 @@ transfer:
   #    port: 25724
 
 # ──────────────────────────────────────────
+# Cross-Server Portals (trigger block + sign)
+# ──────────────────────────────────────────
+# A trigger block (default DIAMOND_BLOCK) plus a sign whose first line is the sign-header and
+# which names a target server. Stepping on the block transfers the player via the existing
+# TransferService, so the named target must also exist under 'transfer.targets' above.
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+portal:
+  enabled: false
+  trigger-block: "DIAMOND_BLOCK"     # Material name; must resolve to a placeable block
+  sign-header: "[server]"            # First sign line that marks a sign as a portal target
+  # permissions:
+  #   create: "rvnkcore.portal.create"   # Permission to create a portal
+  #   delete: "rvnkcore.portal.delete"   # Permission to delete a portal
+  #   use: "rvnkcore.portal.use"         # Permission to trigger a portal
+
+# ──────────────────────────────────────────
 # RVNKTools Settings
 # ──────────────────────────────────────────
 

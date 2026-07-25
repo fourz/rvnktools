@@ -321,3 +321,21 @@ permissions:
   rvnkcore.transfer:
     description: Allows use of /server transfer to move between RVNK servers
     default: op
+
+  # ── Cross-Server Portals (rvnkcore.*) ────────────────────────────────────
+  rvnkcore.portal.create:
+    description: Allows creating a cross-server portal
+    default: op
+  rvnkcore.portal.delete:
+    description: Allows deleting a cross-server portal
+    default: op
+  rvnkcore.portal.use:
+    description: Allows triggering a cross-server portal
+    default: true
+  rvnkcore.portal.*:
+    description: All cross-server portal permissions
+    default: op
+    children:
+      rvnkcore.portal.create: true
+      rvnkcore.portal.delete: true
+      rvnkcore.portal.use: true

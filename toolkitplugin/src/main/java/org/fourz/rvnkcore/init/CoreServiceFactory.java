@@ -8,13 +8,17 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
+import org.fourz.rvnkcore.database.repository.PortalRepository;
 import org.fourz.rvnkcore.database.repository.PushSubscriptionRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
+import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
@@ -52,6 +56,9 @@ public class CoreServiceFactory {
 
     // Track MojangAPI for shutdown
     private MojangAPI mojangAPI;
+
+    // Track PortalService for shutdown (clears its in-memory index)
+    private PortalService portalService;
 
     /**
      * Creates a new CoreServiceFactory.
@@ -107,8 +114,11 @@ public class CoreServiceFactory {
         registerPushSubscriptionService(registry);
         logger.debug("  + PushSubscriptionService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerPortalService(registry);
+        logger.debug("  + PortalService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
+        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService, PortalService (" + totalTime + "ms)");
     }
 
     /**
@@ -120,6 +130,11 @@ public class CoreServiceFactory {
             mojangAPI.shutdown();
             mojangAPI = null;
             logger.info("MojangAPI shutdown complete");
+        }
+        if (portalService != null) {
+            portalService.clear();
+            portalService = null;
+            logger.info("PortalService index cleared");
         }
     }
 
@@ -241,6 +256,35 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register PushSubscriptionService", e);
             throw new RuntimeException("PushSubscriptionService registration failed", e);
+        }
+    }
+
+    /**
+     * Registers the {@link PortalService} for cross-server portals.
+     *
+     * <p>Builds the {@link PortalRepository} on the shared {@link ConnectionProvider}, loads the
+     * {@link PortalConfig}, and populates the service's in-memory index from the database. The DB is
+     * already initialized at this point (setupDatabase runs before this factory), so
+     * {@code loadIndex()} can safely ensure the schema and read existing rows. The shipped default
+     * is disabled — seed the {@code portal} section on each live server's config.</p>
+     */
+    private void registerPortalService(ServiceRegistry registry) {
+        try {
+            ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+            PortalConfig portalConfig = configLoader.getPortalConfig();
+            portalConfig.validate(logger);
+
+            PortalRepository portalRepository = new PortalRepository(connectionProvider, plugin);
+            LogManager portalLogger = LogManager.getInstance(plugin, PortalService.class);
+            portalService = new PortalService(plugin, portalConfig, portalRepository, portalLogger);
+            portalService.loadIndex();
+
+            registry.registerService(PortalService.class, portalService);
+            logger.info("PortalService registered (enabled=" + portalConfig.isEnabled()
+                    + ", portals=" + portalService.getPortalCount() + ")");
+        } catch (Exception e) {
+            logger.error("Failed to register PortalService", e);
+            throw new RuntimeException("PortalService registration failed", e);
         }
     }
 
