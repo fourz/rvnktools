@@ -11,7 +11,10 @@ import org.fourz.rvnkcore.command.ServerTransferCommand;
 import org.fourz.rvnkcore.config.ConfigLoader;
 import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.event.ChatRelayListener;
+import org.fourz.rvnkcore.event.PortalSignListener;
+import org.fourz.rvnkcore.event.PortalStepListener;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
+import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.transfer.TransferService;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -230,6 +233,21 @@ public class RVNKToolsInitializer {
                     logger.info("Chat relay capture listener registered");
                 } else {
                     logger.warning("Chat relay capture listener not registered: ChatRelayService unavailable");
+                }
+
+                // Register cross-server portal listeners (sign registration + step detection).
+                // The PortalService is registered in phase 1 by CoreServiceFactory; gate on its
+                // presence so the listeners are only active when portals are configured.
+                PortalService portalService = RVNKCore.getServiceSafe(PortalService.class);
+                if (portalService != null) {
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new PortalSignListener(plugin), plugin);
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new PortalStepListener(plugin), plugin);
+                    logger.info("Cross-server portal listeners registered (enabled="
+                            + portalService.getConfig().isEnabled() + ")");
+                } else {
+                    logger.warning("Portal listeners not registered: PortalService unavailable");
                 }
 
                 // Register LuckPerms integration
