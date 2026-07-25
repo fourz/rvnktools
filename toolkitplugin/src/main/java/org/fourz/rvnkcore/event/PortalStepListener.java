@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPortalEnterEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -21,6 +22,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -61,6 +63,13 @@ public class PortalStepListener implements Listener {
 
     /** Per-player last trigger timestamp (epoch millis). */
     private final Map<UUID, Long> lastTrigger = new ConcurrentHashMap<>();
+
+    /**
+     * Players who just arrived via a cross-server transfer and may be standing in the return portal.
+     * They are not re-transferred until they step <b>out</b> of the portal once — otherwise a player
+     * whose arrival location is inside a portal ping-pongs between servers.
+     */
+    private final Set<UUID> arrivalGrace = ConcurrentHashMap.newKeySet();
 
     /**
      * Creates a new PortalStepListener.
@@ -155,8 +164,18 @@ public class PortalStepListener implements Listener {
         if (portal == null) {
             portal = matchPortal(portalService, feet.getRelative(BlockFace.UP));
         }
-        if (portal == null) return;
 
+        UUID uuid = event.getPlayer().getUniqueId();
+        if (arrivalGrace.contains(uuid)) {
+            // Once they have stepped fully out of the portal, the grace is over and a later
+            // re-entry may transfer them again.
+            if (portal == null) {
+                arrivalGrace.remove(uuid);
+            }
+            return;
+        }
+
+        if (portal == null) return;
         triggerTransfer(event.getPlayer(), portal);
     }
 
@@ -180,6 +199,8 @@ public class PortalStepListener implements Listener {
      */
     private void triggerTransfer(Player player, PortalDTO portal) {
         UUID uuid = player.getUniqueId();
+        // Just arrived via transfer and still inside the return portal — do not bounce them back.
+        if (arrivalGrace.contains(uuid)) return;
         long now = System.currentTimeMillis();
         Long last = lastTrigger.get(uuid);
         if (last != null && (now - last) < TRIGGER_DEBOUNCE_MS) return;
@@ -204,12 +225,28 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Removes the player's debounce entry on disconnect to prevent map growth.
+     * Marks a player who arrived via a cross-server transfer so they are not immediately re-transferred
+     * if their arrival location is inside a portal (the ping-pong guard). Cleared once they step out
+     * of the portal (see {@link #onPlayerMove}).
+     *
+     * @param event The join event
+     */
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        if (event.getPlayer().isTransferred()) {
+            arrivalGrace.add(event.getPlayer().getUniqueId());
+        }
+    }
+
+    /**
+     * Removes the player's debounce and arrival-grace entries on disconnect to prevent map growth.
      *
      * @param event The quit event
      */
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        lastTrigger.remove(event.getPlayer().getUniqueId());
+        UUID uuid = event.getPlayer().getUniqueId();
+        lastTrigger.remove(uuid);
+        arrivalGrace.remove(uuid);
     }
 }
