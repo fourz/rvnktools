@@ -30,8 +30,8 @@ import java.util.function.Consumer;
 public class ChatRelayService {
 
     private final Plugin plugin;
-    private final ChatRelayConfig config;
-    private final ChatRelayEgress egress;
+    private volatile ChatRelayConfig config;
+    private volatile ChatRelayEgress egress;
     private final LogManager logger;
 
     // Bounded insertion-ordered dedup set (eldest evicted first). Guarded by its own monitor.
@@ -80,6 +80,21 @@ public class ChatRelayService {
     /** @return true when an external chatroom consumer has been registered. */
     public boolean hasExternalConsumer() {
         return externalConsumer != null;
+    }
+
+    /**
+     * Swaps in a freshly-parsed configuration (e.g. from {@code /rvnkcore reload}) so peer / server-id /
+     * insecure-tls changes take effect without a restart (#1743). Rebuilds the egress client so new
+     * peers and TLS settings apply. No-op on null. The registered consumer and dedup cache are kept.
+     *
+     * @param newConfig the new chat-relay configuration
+     */
+    public void refreshConfig(ChatRelayConfig newConfig) {
+        if (newConfig == null) return;
+        this.config = newConfig;
+        this.egress = new ChatRelayEgress(newConfig, logger);
+        logger.info("ChatRelayService config refreshed — server-id=" + config.getServerId()
+            + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls());
     }
 
     /**

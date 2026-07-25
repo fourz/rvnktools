@@ -48,7 +48,7 @@ public class TransferService {
     }
 
     private final Plugin plugin;
-    private final TransferConfig config;
+    private volatile TransferConfig config;
     private final LogManager logger;
 
     /** Per-player last successful transfer timestamp (epoch millis) for cooldown enforcement. */
@@ -132,5 +132,17 @@ public class TransferService {
     /** @return the backing transfer configuration. */
     public TransferConfig getConfig() {
         return config;
+    }
+
+    /**
+     * Swaps in a freshly-parsed configuration (e.g. from {@code /rvnkcore reload}) so target/permission
+     * changes take effect without a restart (#1743). No-op on null. Cooldown state is preserved.
+     *
+     * @param newConfig the new transfer configuration
+     */
+    public void refreshConfig(TransferConfig newConfig) {
+        if (newConfig == null) return;
+        this.config = newConfig;
+        logger.info("TransferService config refreshed — targets: " + config.getTargetNames());
     }
 }

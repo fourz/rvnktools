@@ -61,7 +61,7 @@ public class PortalService {
     }
 
     private final Plugin plugin;
-    private final PortalConfig config;
+    private volatile PortalConfig config;
     private final PortalRepository repository;
     private final LogManager logger;
 
@@ -349,6 +349,20 @@ public class PortalService {
      */
     public PortalConfig getConfig() {
         return config;
+    }
+
+    /**
+     * Swaps in a freshly-parsed configuration (e.g. from {@code /rvnkcore reload}) so trigger-block /
+     * sign-header / permission changes take effect without a restart (#1743). No-op on null. The
+     * in-memory portal index is unaffected (existing portals stay registered).
+     *
+     * @param newConfig the new portal configuration
+     */
+    public void refreshConfig(PortalConfig newConfig) {
+        if (newConfig == null) return;
+        this.config = newConfig;
+        logger.info("PortalService config refreshed — trigger=" + config.getTriggerBlock()
+            + ", header=" + config.getSignHeader());
     }
 
     /**

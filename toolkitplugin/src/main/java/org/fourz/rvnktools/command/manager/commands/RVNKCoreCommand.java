@@ -280,6 +280,33 @@ public class RVNKCoreCommand extends BaseCommand {
             rvnkCore.reloadConfig();
             sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &fConfig reloaded"));
 
+            // Push refreshed config into the cross-server services so transfer/portal/chat-relay
+            // changes take effect without a full restart (#1743). Previously reload only re-read
+            // config.yml while these services kept the config captured at construction.
+            org.bukkit.configuration.file.FileConfiguration cfg = rvnkCore.getConfig();
+            ServiceRegistry reg = rvnkCore.getServiceRegistry();
+            int refreshed = 0;
+            if (reg.hasService(org.fourz.rvnkcore.service.transfer.TransferService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.transfer.TransferService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.TransferConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("transfer")));
+                refreshed++;
+            }
+            if (reg.hasService(org.fourz.rvnkcore.service.portal.PortalService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.portal.PortalService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.PortalConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("portal")));
+                refreshed++;
+            }
+            if (reg.hasService(org.fourz.rvnkcore.service.chatrelay.ChatRelayService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.chatrelay.ChatRelayService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.ChatRelayConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("chat-relay")));
+                refreshed++;
+            }
+            sender.sendMessage(ChatFormat.colorize(
+                "&7   • &a✓ &fCross-server services refreshed: " + refreshed));
+
             // Verify services survived
             String[] services = rvnkCore.getServiceRegistry().getRegisteredServices();
             sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &fServices still active: " + services.length));
