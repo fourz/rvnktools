@@ -226,3 +226,11 @@ teleport:
   warmup-seconds: 3
   # Cooldown between TPA requests (seconds)
   cooldown-seconds: 10
+
+# Human-readable world display names for the /rvnkworlds/worlds REST endpoint.
+# Only consulted by RVNKCore's built-in fallback that serves that endpoint when the
+# RVNKWorlds plugin is NOT loaded on this server (e.g. nations). When RVNKWorlds IS
+# loaded, its own worlds.yml display_names take precedence and this section is unused.
+# Format: <bukkit-world-name>: <Display Name>   (case-insensitive; blank = raw name)
+world-display-names:
+  southmesa: Bankrekka
