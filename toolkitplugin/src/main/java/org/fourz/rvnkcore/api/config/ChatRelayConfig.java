@@ -35,15 +35,17 @@ public class ChatRelayConfig {
     private final String channelTrigger;
     private final int dedupCacheSize;
     private final int timeoutMs;
+    private final boolean insecureTls;
     private final List<Peer> peers;
 
     private ChatRelayConfig(boolean enabled, String serverId, String channelTrigger,
-                            int dedupCacheSize, int timeoutMs, List<Peer> peers) {
+                            int dedupCacheSize, int timeoutMs, boolean insecureTls, List<Peer> peers) {
         this.enabled = enabled;
         this.serverId = serverId != null ? serverId.trim() : "";
         this.channelTrigger = (channelTrigger != null && !channelTrigger.isEmpty()) ? channelTrigger : "!";
         this.dedupCacheSize = dedupCacheSize > 0 ? dedupCacheSize : 512;
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 3000;
+        this.insecureTls = insecureTls;
         this.peers = peers != null ? Collections.unmodifiableList(peers) : Collections.emptyList();
     }
 
@@ -55,7 +57,7 @@ public class ChatRelayConfig {
      */
     public static ChatRelayConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new ChatRelayConfig(false, "", "!", 512, 3000, Collections.emptyList());
+            return new ChatRelayConfig(false, "", "!", 512, 3000, false, Collections.emptyList());
         }
 
         List<Peer> peers = new ArrayList<>();
@@ -95,6 +97,7 @@ public class ChatRelayConfig {
             section.getString("channel-trigger", "!"),
             section.getInt("dedup-cache-size", 512),
             section.getInt("timeout-ms", 3000),
+            section.getBoolean("insecure-tls", false),
             peers
         );
     }
@@ -120,6 +123,11 @@ public class ChatRelayConfig {
         }
         if (peers.isEmpty()) {
             logger.warning("Chat relay enabled but no peers configured — nothing will be relayed");
+        }
+        if (insecureTls) {
+            logger.warning("Chat relay insecure-tls is ON — peer TLS certificates are NOT verified "
+                + "(self-signed peers accepted). Only use on a trusted server-to-server network; the "
+                + "egress X-API-Key would be exposed to a man-in-the-middle.");
         }
         for (Peer peer : peers) {
             if (peer.url() == null || peer.url().trim().isEmpty()) {
@@ -164,5 +172,6 @@ public class ChatRelayConfig {
     public String getChannelTrigger() { return channelTrigger; }
     public int getDedupCacheSize() { return dedupCacheSize; }
     public int getTimeoutMs() { return timeoutMs; }
+    public boolean isInsecureTls() { return insecureTls; }
     public List<Peer> getPeers() { return peers; }
 }
