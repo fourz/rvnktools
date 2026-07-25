@@ -18,6 +18,8 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.api.config.TransferConfig;
+import org.fourz.rvnkcore.api.model.PortalDTO;
 import org.fourz.rvnkcore.service.portal.PortalFrameBuilder;
 import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.transfer.TransferService;
@@ -80,6 +82,22 @@ public class PortalSignListener implements Listener {
         if (portalService == null) return;
         PortalConfig config = portalService.getConfig();
         if (config == null || !config.isEnabled()) return;
+
+        // Autoheal: if this sign is already a registered portal (PDC-stamped), re-editing it restores
+        // the portal display and keeps the portal — the sign cannot be vandalised or its info wiped.
+        BlockState existingState = event.getBlock().getState();
+        if (existingState instanceof Sign existingSign) {
+            String existingId = existingSign.getPersistentDataContainer()
+                    .get(portalIdKey, PersistentDataType.STRING);
+            if (existingId != null) {
+                portalService.getPortalById(existingId).ifPresent(p -> {
+                    String[] lines = buildDisplayLines(
+                            RVNKCore.getServiceSafe(TransferService.class), p.getTargetServer(), existingId);
+                    for (int i = 0; i < 4; i++) event.setLine(i, lines[i]);
+                });
+                return;
+            }
+        }
 
         String header = event.getLine(0);
         if (header == null || !header.trim().equalsIgnoreCase(config.getSignHeader())) {
@@ -151,18 +169,11 @@ public class PortalSignListener implements Listener {
 
         final String portalId = result.portal().getPortalId();
 
-        // Reformat the sign to a friendly display: [server] | destination world | destination server.
-        org.fourz.rvnkcore.api.config.TransferConfig.Target tgt =
-                transferService.getConfig().resolveTarget(targetServer);
-        String display = (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
-                ? tgt.display() : targetServer;
-        String world = (tgt != null && tgt.world() != null && !tgt.world().isEmpty())
-                ? tgt.world() : "";
-        String shortId = portalId.length() >= 8 ? portalId.substring(0, 8) : portalId;
-        event.setLine(0, "§9[server]");
-        event.setLine(1, "§a" + display);
-        event.setLine(2, world.isEmpty() ? "" : "§7" + world);
-        event.setLine(3, "§8" + shortId);
+        // Reformat the sign to a friendly display: [server] | destination server | world | id.
+        String[] lines = buildDisplayLines(transferService, targetServer, portalId);
+        for (int i = 0; i < 4; i++) {
+            event.setLine(i, lines[i]);
+        }
 
         // Defer the PDC stamp one tick: the sign's text/state is finalized after this event returns.
         Bukkit.getScheduler().runTask(plugin, () -> stampSign(signBlock, portalId));
@@ -235,23 +246,29 @@ public class PortalSignListener implements Listener {
     }
 
     /**
-     * Resolves this server's id for the portal sign's origin line, from the webhook config's
-     * {@code server-id} (set per environment: dev/event/prod). Falls back to {@code "here"} when
-     * unavailable.
+     * Builds the four portal-sign display lines: {@code [server]} / friendly server name / world / id.
+     * Shared by creation and by the re-edit autoheal so a portal sign always shows the same info.
      *
-     * @return this server's id, or {@code "here"}
+     * @param transferService The transfer service (for the target's friendly name/world); may be null
+     * @param targetServer    The target server name
+     * @param portalId        The portal id (drives the short-id line)
+     * @return four legacy-coded sign lines
      */
-    private String resolveOriginId() {
-        try {
-            org.fourz.rvnkcore.api.config.WebhookConfig wh =
-                    org.fourz.rvnkcore.config.ConfigLoader.getInstance(plugin).getWebhookConfig();
-            if (wh != null && wh.getServerId() != null && !wh.getServerId().isBlank()) {
-                return wh.getServerId();
-            }
-        } catch (Exception ignored) {
-            // Best-effort cosmetic; fall through to the default.
-        }
-        return "here";
+    private String[] buildDisplayLines(TransferService transferService, String targetServer, String portalId) {
+        TransferConfig.Target tgt = transferService != null
+                ? transferService.getConfig().resolveTarget(targetServer) : null;
+        String display = (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
+                ? tgt.display() : targetServer;
+        String world = (tgt != null && tgt.world() != null && !tgt.world().isEmpty())
+                ? tgt.world() : "";
+        String shortId = (portalId != null && portalId.length() >= 8)
+                ? portalId.substring(0, 8) : (portalId != null ? portalId : "");
+        return new String[]{
+                "§9[server]",
+                "§a" + display,
+                world.isEmpty() ? "" : "§7" + world,
+                "§8" + shortId
+        };
     }
 
     /**

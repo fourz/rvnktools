@@ -1,7 +1,12 @@
 package org.fourz.rvnkcore.event;
 
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -13,8 +18,10 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.scheduler.BukkitTask;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.api.model.PortalDTO;
 import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.transfer.TransferService;
@@ -30,44 +37,47 @@ import java.util.concurrent.ConcurrentHashMap;
  * Detects players walking through a framed cross-server portal and transfers them (#1709/#1714).
  *
  * <p>A framed portal stands the player <b>inside</b> its lit {@code NETHER_PORTAL} interior, which
- * vanilla would treat as a nether portal and send them to the Nether. Porting RVNKWorlds'
- * {@code PortalListener} model (three layers, so the transfer always wins the race to the Nether):</p>
+ * vanilla would treat as a nether portal. Porting RVNKWorlds' {@code PortalListener} model in three
+ * layers so the transfer always wins the race to the Nether:</p>
  * <ol>
- *   <li><b>{@link #onEntityPortalEnter}</b> ({@code LOWEST}) — the primary trigger. Fires the instant
- *       the player's body enters a registered portal block, <b>before</b> vanilla's teleport timer.</li>
- *   <li><b>{@link #onPlayerPortal}</b> ({@code HIGHEST}, {@code ignoreCancelled=false}) — the safety
- *       net. Vanilla can fire {@code PlayerPortalEvent} instantly in creative mode; this cancels it
- *       whenever a registered portal block sits in the entry column (scanning <b>Y-1..Y+3</b> to cover
- *       2–4 block-tall frames and creative entry angles), so the player never routes to the Nether.</li>
- *   <li><b>{@link #onPlayerMove}</b> ({@code NORMAL}) — a tertiary trigger for a player who ends up
- *       standing in the portal without an enter event (e.g. teleported in).</li>
+ *   <li><b>{@link #onEntityPortalEnter}</b> ({@code LOWEST}) — primary trigger, before vanilla's timer.</li>
+ *   <li><b>{@link #onPlayerPortal}</b> ({@code HIGHEST}, {@code ignoreCancelled=false}) — cancels the
+ *       nether route whenever a registered portal block is in the entry column (Y-1..Y+3).</li>
+ *   <li><b>{@link #onPlayerMove}</b> ({@code NORMAL}) — tertiary trigger for a player standing in the
+ *       portal without an enter event.</li>
  * </ol>
  *
- * <p>Suppression is gated strictly on the O(1) index membership, so the server's real nether portals
- * are never in the index and pass through unaffected. A per-player debounce keeps repeated
- * enter/move ticks from firing more than one transfer.</p>
+ * <h3>Charge-up</h3>
+ * <p>Entering does not transfer instantly: it starts a short <b>charge-up</b> ({@link #CHARGE_TICKS})
+ * with portal particles, a rising portal hum, and an action-bar countdown. Stepping out of the portal
+ * cancels it. This gives a visible portal effect and a moment to back out.</p>
+ *
+ * <h3>Arrival guard</h3>
+ * <p>A player who arrives via transfer standing inside the return portal is placed in an
+ * {@code arrivalGrace} set and is not re-transferred until they step out once — otherwise they
+ * ping-pong between servers.</p>
  *
  * @since 1.5.25
  */
 public class PortalStepListener implements Listener {
 
-    /**
-     * Per-player debounce window in milliseconds. {@code EntityPortalEnterEvent} fires every tick the
-     * player stands in the portal, so this must be long enough to swallow the burst while still
-     * allowing a deliberate re-entry.
-     */
+    /** Charge-up duration in ticks before the transfer fires (20 ticks = 1 second). */
+    private static final int CHARGE_TICKS = 40;
+    /** Effect/countdown tick interval. */
+    private static final long EFFECT_INTERVAL = 5L;
+    /** Debounce window after a completed transfer (ms). */
     private static final long TRIGGER_DEBOUNCE_MS = 2000L;
 
     private final RVNKCore plugin;
     private final LogManager logger;
 
-    /** Per-player last trigger timestamp (epoch millis). */
+    /** Per-player last completed-transfer timestamp (epoch millis). */
     private final Map<UUID, Long> lastTrigger = new ConcurrentHashMap<>();
-
+    /** Players currently charging up a transfer -> their running task. */
+    private final Map<UUID, BukkitTask> charging = new ConcurrentHashMap<>();
     /**
      * Players who just arrived via a cross-server transfer and may be standing in the return portal.
-     * They are not re-transferred until they step <b>out</b> of the portal once — otherwise a player
-     * whose arrival location is inside a portal ping-pongs between servers.
+     * Not re-transferred until they step <b>out</b> of the portal once.
      */
     private final Set<UUID> arrivalGrace = ConcurrentHashMap.newKeySet();
 
@@ -82,15 +92,14 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Primary trigger: the player's body enters a portal block. Fires before vanilla's nether timer,
-     * so a registered cross-server portal block transfers the player immediately.
+     * Primary trigger: the player's body enters a portal block. Begins the charge-up before vanilla's
+     * nether timer.
      *
      * @param event The entity portal enter event
      */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onEntityPortalEnter(EntityPortalEnterEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-
         PortalService portalService = RVNKCore.getServiceSafe(PortalService.class);
         if (portalService == null) return;
         PortalConfig config = portalService.getConfig();
@@ -98,16 +107,14 @@ public class PortalStepListener implements Listener {
 
         Block block = event.getLocation().getBlock();
         if (block.getType() != Material.NETHER_PORTAL) return;
-
         PortalDTO portal = matchPortal(portalService, block);
         if (portal == null) return;
-
-        triggerTransfer(player, portal);
+        beginTransfer(player, portal);
     }
 
     /**
      * Safety net: cancel vanilla nether teleportation for registered cross-server portal blocks and
-     * fire the transfer. Runs even on an already-cancelled event and scans the whole entry column so
+     * begin the charge-up. Runs even on an already-cancelled event and scans the entry column so
      * creative-mode instant fires cannot slip through to the Nether.
      *
      * @param event The player portal event
@@ -126,20 +133,19 @@ public class PortalStepListener implements Listener {
         int by = from.getBlockY();
         int bz = from.getBlockZ();
 
-        // Scan Y-1..Y+3 to cover 2-4 block tall frames and creative-mode entry angles.
         for (int dy = -1; dy <= 3; dy++) {
             Optional<PortalDTO> portal = portalService.getPortal(world, bx, by + dy, bz);
             if (portal.isPresent()) {
                 event.setCancelled(true); // Never let vanilla send them to the Nether.
-                triggerTransfer(event.getPlayer(), portal.get());
+                beginTransfer(event.getPlayer(), portal.get());
                 return;
             }
         }
     }
 
     /**
-     * Tertiary trigger: a player standing in a registered portal block (e.g. teleported in) with no
-     * enter event. Cheap block-boundary guard first, then O(1) index lookups for feet and eye.
+     * Tertiary trigger + housekeeping. Clears arrival grace once the player steps out of the portal,
+     * and begins a charge-up for a player standing in a portal block with no enter event.
      *
      * @param event The player move event
      */
@@ -167,16 +173,14 @@ public class PortalStepListener implements Listener {
 
         UUID uuid = event.getPlayer().getUniqueId();
         if (arrivalGrace.contains(uuid)) {
-            // Once they have stepped fully out of the portal, the grace is over and a later
-            // re-entry may transfer them again.
             if (portal == null) {
-                arrivalGrace.remove(uuid);
+                arrivalGrace.remove(uuid); // stepped out — grace over
             }
             return;
         }
 
         if (portal == null) return;
-        triggerTransfer(event.getPlayer(), portal);
+        beginTransfer(event.getPlayer(), portal);
     }
 
     /**
@@ -192,28 +196,78 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Applies the per-player debounce and dispatches the cross-server transfer.
+     * True when the player is currently standing in a registered portal block (feet or eye).
+     */
+    private boolean stillInPortal(Player player, PortalService portalService) {
+        Block feet = player.getLocation().getBlock();
+        return matchPortal(portalService, feet) != null
+                || matchPortal(portalService, feet.getRelative(BlockFace.UP)) != null;
+    }
+
+    /**
+     * Starts the charge-up: portal particles + hum + an action-bar countdown, then the transfer. A
+     * no-op if the player is in arrival grace, already charging, or within the post-transfer debounce.
+     * Cancels itself if the player leaves the portal before it completes.
      *
      * @param player The player standing in the portal
      * @param portal The portal they are in
      */
-    private void triggerTransfer(Player player, PortalDTO portal) {
+    private void beginTransfer(Player player, PortalDTO portal) {
         UUID uuid = player.getUniqueId();
-        // Just arrived via transfer and still inside the return portal — do not bounce them back.
         if (arrivalGrace.contains(uuid)) return;
+        if (charging.containsKey(uuid)) return;
         long now = System.currentTimeMillis();
         Long last = lastTrigger.get(uuid);
         if (last != null && (now - last) < TRIGGER_DEBOUNCE_MS) return;
-        lastTrigger.put(uuid, now);
-
-        String targetServer = portal.getTargetServer();
 
         TransferService transferService = RVNKCore.getServiceSafe(TransferService.class);
         if (transferService == null) {
             player.sendMessage("§cCross-server transfer is unavailable.");
             return;
         }
+        final String targetServer = portal.getTargetServer();
+        final String display = friendlyName(transferService, targetServer);
 
+        if (CHARGE_TICKS <= 0) {
+            lastTrigger.put(uuid, now);
+            doTransfer(player, targetServer);
+            return;
+        }
+
+        player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_TRIGGER, 0.7f, 1.2f);
+        final int[] elapsed = {0};
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            Player p = Bukkit.getPlayer(uuid);
+            PortalService ps = RVNKCore.getServiceSafe(PortalService.class);
+            if (p == null || ps == null || !stillInPortal(p, ps)) {
+                cancelCharge(uuid);
+                return;
+            }
+            elapsed[0] += (int) EFFECT_INTERVAL;
+            Location loc = p.getLocation().add(0, 1, 0);
+            p.getWorld().spawnParticle(Particle.REVERSE_PORTAL, loc, 25, 0.4, 0.8, 0.4, 0.08);
+            p.playSound(p.getLocation(), Sound.BLOCK_PORTAL_AMBIENT, 0.5f, 1.6f);
+            int remainSecs = Math.max(1, (CHARGE_TICKS - elapsed[0] + 19) / 20);
+            actionBar(p, "§dTransferring to §f" + display + "§d in " + remainSecs + "s...");
+            if (elapsed[0] >= CHARGE_TICKS) {
+                cancelCharge(uuid);
+                lastTrigger.put(uuid, System.currentTimeMillis());
+                p.playSound(p.getLocation(), Sound.BLOCK_PORTAL_TRAVEL, 0.6f, 1.4f);
+                doTransfer(p, targetServer);
+            }
+        }, 0L, EFFECT_INTERVAL);
+        charging.put(uuid, task);
+    }
+
+    /**
+     * Performs the actual native transfer and reports the result.
+     */
+    private void doTransfer(Player player, String targetServer) {
+        TransferService transferService = RVNKCore.getServiceSafe(TransferService.class);
+        if (transferService == null) {
+            player.sendMessage("§cCross-server transfer is unavailable.");
+            return;
+        }
         TransferService.TransferResult result = transferService.transfer(player, targetServer);
         player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
         if (result.isSuccess()) {
@@ -225,9 +279,34 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Marks a player who arrived via a cross-server transfer so they are not immediately re-transferred
-     * if their arrival location is inside a portal (the ping-pong guard). Cleared once they step out
-     * of the portal (see {@link #onPlayerMove}).
+     * Resolves the friendly display name of a transfer target (falls back to the raw name).
+     */
+    private String friendlyName(TransferService transferService, String targetServer) {
+        TransferConfig.Target tgt = transferService.getConfig().resolveTarget(targetServer);
+        return (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
+                ? tgt.display() : targetServer;
+    }
+
+    /** Sends a legacy-coded action-bar message, best-effort. */
+    private void actionBar(Player player, String message) {
+        try {
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(message));
+        } catch (Throwable ignored) {
+            // Action bar is cosmetic; never let it break the charge-up.
+        }
+    }
+
+    /** Cancels and clears a player's running charge-up task. */
+    private void cancelCharge(UUID uuid) {
+        BukkitTask task = charging.remove(uuid);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    /**
+     * Marks a transferred arrival so they are not immediately re-transferred if they land inside a
+     * portal (the ping-pong guard).
      *
      * @param event The join event
      */
@@ -239,7 +318,7 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Removes the player's debounce and arrival-grace entries on disconnect to prevent map growth.
+     * Cleans up per-player state on disconnect.
      *
      * @param event The quit event
      */
@@ -248,5 +327,6 @@ public class PortalStepListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         lastTrigger.remove(uuid);
         arrivalGrace.remove(uuid);
+        cancelCharge(uuid);
     }
 }

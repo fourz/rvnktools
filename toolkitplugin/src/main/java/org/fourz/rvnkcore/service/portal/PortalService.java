@@ -1,6 +1,9 @@
 package org.fourz.rvnkcore.service.portal;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.config.PortalConfig;
 import org.fourz.rvnkcore.api.model.PortalDTO;
@@ -62,8 +65,17 @@ public class PortalService {
     private final PortalRepository repository;
     private final LogManager logger;
 
-    /** In-memory index: {@code world:x:y:z} -> portal. Authoritative for runtime lookups. */
+    /**
+     * In-memory index: {@code world:x:y:z} -> portal. Authoritative for runtime lookups. Every
+     * interior portal block of a framed portal is registered here so walk-through detection is O(1).
+     */
     private final Map<String, PortalDTO> index = new ConcurrentHashMap<>();
+
+    /** Portal-id -> portal, so a framed portal can be removed by its (sign-stamped) id in one call. */
+    private final Map<String, PortalDTO> byId = new ConcurrentHashMap<>();
+
+    /** Shared frame filler/clearer, used to return interior blocks to AIR on delete. */
+    private final PortalFrameBuilder frameBuilder = new PortalFrameBuilder();
 
     /**
      * Creates a new PortalService.
@@ -94,11 +106,22 @@ public class PortalService {
         }
 
         index.clear();
+        byId.clear();
         List<PortalDTO> portals = repository.listAll();
         for (PortalDTO portal : portals) {
-            index.put(locationKey(portal.getWorld(), portal.getX(), portal.getY(), portal.getZ()), portal);
+            byId.put(portal.getPortalId(), portal);
+            List<int[]> blocks = portal.getPortalBlocks();
+            if (blocks == null || blocks.isEmpty()) {
+                // Legacy single-block portal: the trigger is the anchor block itself.
+                index.put(locationKey(portal.getWorld(), portal.getX(), portal.getY(), portal.getZ()), portal);
+            } else {
+                for (int[] b : blocks) {
+                    index.put(locationKey(portal.getWorld(), b[0], b[1], b[2]), portal);
+                }
+            }
         }
-        logger.info("Portal index loaded: " + index.size() + " portal(s) (enabled=" + config.isEnabled() + ")");
+        logger.info("Portal index loaded: " + byId.size() + " portal(s), " + index.size()
+                + " portal block(s) (enabled=" + config.isEnabled() + ")");
     }
 
     /**
@@ -127,6 +150,16 @@ public class PortalService {
      */
     public Optional<PortalDTO> getPortal(String world, int x, int y, int z) {
         return Optional.ofNullable(index.get(locationKey(world, x, y, z)));
+    }
+
+    /**
+     * Returns a portal by its id (used to re-heal a portal sign's display).
+     *
+     * @param portalId The portal id
+     * @return the portal, or empty
+     */
+    public Optional<PortalDTO> getPortalById(String portalId) {
+        return Optional.ofNullable(byId.get(portalId));
     }
 
     /**
@@ -161,6 +194,7 @@ public class PortalService {
 
         // Index is source of truth at runtime — update it first so detection works immediately.
         index.put(key, portal);
+        byId.put(portal.getPortalId(), portal);
 
         boolean persisted = repository.create(portal);
         if (!persisted) {
@@ -172,6 +206,108 @@ public class PortalService {
 
         logger.info("Portal created at " + key + " -> '" + targetServer + "' by " + ownerUuid);
         return new PortalResult(Status.SUCCESS, "Portal created targeting '" + targetServer + "'.", portal);
+    }
+
+    /**
+     * Creates a multi-block framed portal and registers every interior block for walk-through
+     * detection.
+     *
+     * <p>The {@code anchor} coordinates identify the frame block the registration sign is mounted on
+     * (the row identity); {@code interior} is the list of enclosed {@code NETHER_PORTAL} block
+     * locations that trigger the transfer. All interior blocks are added to the in-memory index
+     * (authoritative) before the DB write, so detection works immediately even if persistence
+     * fails. The caller is responsible for filling the interior with portal material.</p>
+     *
+     * @param world        The world name
+     * @param anchorX      Anchor (sign mount) block X
+     * @param anchorY      Anchor block Y
+     * @param anchorZ      Anchor block Z
+     * @param targetServer The target server name (resolved later by TransferService)
+     * @param ownerUuid    The creating player's UUID string (may be null)
+     * @param interior     Interior portal-block locations as {@code int[]{x, y, z}} (must be non-empty)
+     * @return a {@link PortalResult} describing the outcome
+     */
+    public PortalResult createFramePortal(String world, int anchorX, int anchorY, int anchorZ,
+                                          String targetServer, String ownerUuid, List<int[]> interior) {
+        if (!config.isEnabled()) {
+            return new PortalResult(Status.DISABLED, "Cross-server portals are disabled on this server.", null);
+        }
+        if (interior == null || interior.isEmpty()) {
+            return new PortalResult(Status.NOT_FOUND, "No portal interior to register.", null);
+        }
+
+        // Reject if any interior block already belongs to a registered portal.
+        for (int[] b : interior) {
+            String key = locationKey(world, b[0], b[1], b[2]);
+            if (index.containsKey(key)) {
+                return new PortalResult(Status.ALREADY_EXISTS,
+                        "A portal already occupies that space.", index.get(key));
+            }
+        }
+
+        PortalDTO portal = new PortalDTO(
+                UUID.randomUUID().toString(), world, anchorX, anchorY, anchorZ, targetServer, ownerUuid,
+                System.currentTimeMillis());
+        portal.setPortalBlocks(interior);
+
+        // Index every interior block first (source of truth at runtime).
+        byId.put(portal.getPortalId(), portal);
+        for (int[] b : interior) {
+            index.put(locationKey(world, b[0], b[1], b[2]), portal);
+        }
+
+        boolean persisted = repository.create(portal);
+        if (!persisted) {
+            logger.warning("Framed portal " + portal.getPortalId()
+                    + " added to in-memory index but failed to persist — will resync on reload");
+            return new PortalResult(Status.PERSIST_FAILED,
+                    "Portal lit in memory but could not be saved — check the database.", portal);
+        }
+
+        logger.info("Framed portal created (" + interior.size() + " blocks) in " + world
+                + " anchor " + anchorX + "," + anchorY + "," + anchorZ
+                + " -> '" + targetServer + "' by " + ownerUuid);
+        return new PortalResult(Status.SUCCESS, "Portal lit, targeting '" + targetServer + "'.", portal);
+    }
+
+    /**
+     * Deletes a portal by its id: removes every index entry, returns its interior
+     * {@code NETHER_PORTAL} blocks to {@code AIR}, and deletes the persisted row.
+     *
+     * @param portalId The portal id (as stamped on the registration sign)
+     * @return true if a portal with that id was present and removed
+     */
+    public boolean deletePortalById(String portalId) {
+        PortalDTO portal = byId.remove(portalId);
+        if (portal == null) {
+            return false;
+        }
+
+        World world = Bukkit.getWorld(portal.getWorld());
+        List<int[]> blocks = portal.getPortalBlocks();
+        if (blocks == null || blocks.isEmpty()) {
+            // Legacy single-block portal.
+            index.remove(locationKey(portal.getWorld(), portal.getX(), portal.getY(), portal.getZ()));
+        } else {
+            for (int[] b : blocks) {
+                index.remove(locationKey(portal.getWorld(), b[0], b[1], b[2]));
+                if (world != null) {
+                    Block blk = world.getBlockAt(b[0], b[1], b[2]);
+                    if (blk.getType() == Material.NETHER_PORTAL) {
+                        blk.setType(Material.AIR, false);
+                    }
+                }
+            }
+        }
+
+        boolean persisted = repository.deleteById(portalId);
+        if (!persisted) {
+            logger.warning("Portal " + portalId
+                    + " removed from in-memory index but DB delete did not confirm — will resync on reload");
+        } else {
+            logger.info("Portal deleted (id " + portalId + ")");
+        }
+        return true;
     }
 
     /**
@@ -189,6 +325,7 @@ public class PortalService {
         if (removed == null) {
             return false;
         }
+        byId.remove(removed.getPortalId());
 
         boolean persisted = repository.deleteByLocation(world, x, y, z);
         if (!persisted) {
@@ -215,10 +352,17 @@ public class PortalService {
     }
 
     /**
-     * @return the number of portals currently held in the in-memory index
+     * @return the number of logical portals currently held in the in-memory index
      */
     public int getPortalCount() {
-        return index.size();
+        return byId.size();
+    }
+
+    /**
+     * @return the shared frame builder used to fill/clear portal interiors
+     */
+    public PortalFrameBuilder getFrameBuilder() {
+        return frameBuilder;
     }
 
     /**
@@ -226,6 +370,7 @@ public class PortalService {
      */
     public void clear() {
         index.clear();
+        byId.clear();
     }
 
     /**
