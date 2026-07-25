@@ -18,9 +18,12 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.service.portal.PortalFrameBuilder;
 import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.transfer.TransferService;
 import org.fourz.rvnkcore.util.log.LogManager;
+
+import java.util.Optional;
 
 /**
  * Registers and removes cross-server portals from signs (#1713).
@@ -123,23 +126,51 @@ public class PortalSignListener implements Listener {
             return;
         }
 
-        PortalService.PortalResult result = portalService.createPortal(
+        // Detect the framed interior built out of the trigger material around the sign's mount block.
+        PortalFrameBuilder frameBuilder = portalService.getFrameBuilder();
+        Optional<PortalFrameBuilder.Frame> frameOpt = frameBuilder.detect(triggerBlock, triggerMaterial);
+        if (frameOpt.isEmpty()) {
+            player.sendMessage("§cNo valid " + triggerMaterial.name()
+                    + " portal frame around this sign.");
+            return;
+        }
+        PortalFrameBuilder.Frame frame = frameOpt.get();
+
+        PortalService.PortalResult result = portalService.createFramePortal(
                 triggerBlock.getWorld().getName(),
                 triggerBlock.getX(), triggerBlock.getY(), triggerBlock.getZ(),
-                targetServer, player.getUniqueId().toString());
+                targetServer, player.getUniqueId().toString(), frame.interior());
 
         if (!result.isSuccess()) {
             player.sendMessage("§c" + result.message());
             return;
         }
 
+        // Light the interior with portal material once registration succeeds.
+        frameBuilder.fill(triggerBlock.getWorld(), frame.interior(), frame.axis());
+
         final String portalId = result.portal().getPortalId();
+
+        // Reformat the sign to a friendly display: [server] | destination world | destination server.
+        org.fourz.rvnkcore.api.config.TransferConfig.Target tgt =
+                transferService.getConfig().resolveTarget(targetServer);
+        String display = (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
+                ? tgt.display() : targetServer;
+        String world = (tgt != null && tgt.world() != null && !tgt.world().isEmpty())
+                ? tgt.world() : "";
+        String shortId = portalId.length() >= 8 ? portalId.substring(0, 8) : portalId;
+        event.setLine(0, "§9[server]");
+        event.setLine(1, "§a" + display);
+        event.setLine(2, world.isEmpty() ? "" : "§7" + world);
+        event.setLine(3, "§8" + shortId);
+
         // Defer the PDC stamp one tick: the sign's text/state is finalized after this event returns.
         Bukkit.getScheduler().runTask(plugin, () -> stampSign(signBlock, portalId));
 
-        player.sendMessage("§aCross-server portal to '" + targetServer + "' created.");
-        logger.info("Portal sign registered by " + player.getName() + " -> '" + targetServer
-                + "' at " + triggerBlock.getWorld().getName() + " "
+        player.sendMessage("§aCross-server portal to '" + targetServer + "' lit.");
+        logger.info("Framed portal registered by " + player.getName() + " -> '" + targetServer
+                + "' (" + frame.interior().size() + " blocks, axis " + frame.axis() + ") at "
+                + triggerBlock.getWorld().getName() + " "
                 + triggerBlock.getX() + "," + triggerBlock.getY() + "," + triggerBlock.getZ());
     }
 
@@ -173,11 +204,9 @@ public class PortalSignListener implements Listener {
             return;
         }
 
-        // The portal's trigger location is the block the sign is still mounted on.
-        Block triggerBlock = resolveMountBlock(block);
-        boolean removed = triggerBlock != null && portalService.deletePortal(
-                triggerBlock.getWorld().getName(),
-                triggerBlock.getX(), triggerBlock.getY(), triggerBlock.getZ());
+        // Remove by the id stamped on the sign: clears all index entries and returns the interior
+        // NETHER_PORTAL blocks to AIR.
+        boolean removed = portalService.deletePortalById(portalId);
 
         if (removed) {
             player.sendMessage("§aCross-server portal removed.");
@@ -203,6 +232,26 @@ public class PortalSignListener implements Listener {
             return signBlock.getRelative(BlockFace.DOWN);
         }
         return null;
+    }
+
+    /**
+     * Resolves this server's id for the portal sign's origin line, from the webhook config's
+     * {@code server-id} (set per environment: dev/event/prod). Falls back to {@code "here"} when
+     * unavailable.
+     *
+     * @return this server's id, or {@code "here"}
+     */
+    private String resolveOriginId() {
+        try {
+            org.fourz.rvnkcore.api.config.WebhookConfig wh =
+                    org.fourz.rvnkcore.config.ConfigLoader.getInstance(plugin).getWebhookConfig();
+            if (wh != null && wh.getServerId() != null && !wh.getServerId().isBlank()) {
+                return wh.getServerId();
+            }
+        } catch (Exception ignored) {
+            // Best-effort cosmetic; fall through to the default.
+        }
+        return "here";
     }
 
     /**

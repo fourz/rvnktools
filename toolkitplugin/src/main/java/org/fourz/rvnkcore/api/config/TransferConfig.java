@@ -26,12 +26,15 @@ import java.util.Map;
 public class TransferConfig {
 
     /**
-     * A single transfer destination: a name mapped to a public {@code host:port}.
+     * A single transfer destination: a name mapped to a public {@code host:port}, plus friendly
+     * display metadata for portal signs.
      *
-     * @param host The destination server host (public address the client reconnects to)
-     * @param port The destination server port
+     * @param host    The destination server host (public address the client reconnects to)
+     * @param port    The destination server port
+     * @param display Friendly server name for signs/messages (e.g. {@code "Nations"}); defaults to the target name
+     * @param world   Friendly destination world/realm name for signs (informational; may be empty)
      */
-    public record Target(String host, int port) {
+    public record Target(String host, int port, String display, String world) {
     }
 
     private final boolean enabled;
@@ -73,7 +76,9 @@ public class TransferConfig {
                 }
                 targets.put(name, new Target(
                         target.getString("host", ""),
-                        target.getInt("port", 25565)
+                        target.getInt("port", 25565),
+                        target.getString("display", name),
+                        target.getString("world", "")
                 ));
             }
         }
