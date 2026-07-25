@@ -52,10 +52,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * with portal particles, a rising portal hum, and an action-bar countdown. Stepping out of the portal
  * cancels it. This gives a visible portal effect and a moment to back out.</p>
  *
+ * <h3>Egress ejection (#1726)</h3>
+ * <p>Departure fires while the player stands on the {@code DIAMOND_BLOCK} trigger, and the ARG worlds
+ * are mirror-coordinate, so a naive transfer round-trips the player onto a trigger on both ends — an
+ * immediate re-transfer (ping-pong) and, if they log off there, a transfer-on-login loop. Before the
+ * native transfer we teleport the player one block in front of the portal facing outward
+ * ({@link #ejectFromTrigger}); Bukkit persists that off-trigger position on the disconnect. With both
+ * ends ejecting on egress, arrivals settle one block clear of the mirrored trigger.</p>
+ *
  * <h3>Arrival guard</h3>
- * <p>A player who arrives via transfer standing inside the return portal is placed in an
- * {@code arrivalGrace} set and is not re-transferred until they step out once — otherwise they
- * ping-pong between servers.</p>
+ * <p>Retained as a transient safety net for a player arriving on a pre-fix (stale) trigger: they are
+ * placed in an {@code arrivalGrace} set and not re-transferred until they step out once.</p>
  *
  * @since 1.5.25
  */
@@ -80,6 +87,11 @@ public class PortalStepListener implements Listener {
      * Not re-transferred until they step <b>out</b> of the portal once.
      */
     private final Set<UUID> arrivalGrace = ConcurrentHashMap.newKeySet();
+    /**
+     * Per-player entry location captured when a charge-up begins, used to compute the egress
+     * ejection point (#1726) — the direction the player walked <b>into</b> the portal.
+     */
+    private final Map<UUID, Location> entryLoc = new ConcurrentHashMap<>();
 
     /**
      * Creates a new PortalStepListener.
@@ -238,6 +250,11 @@ public class PortalStepListener implements Listener {
         final String targetServer = portal.getTargetServer();
         final String display = friendlyName(transferService, targetServer);
 
+        // #1726: remember the direction the player walked in, so egress can eject them clear of the
+        // trigger (charge-up ticks re-enter here but return at the charging guard above, so this is
+        // captured once — at entry).
+        entryLoc.putIfAbsent(uuid, player.getLocation().clone());
+
         if (CHARGE_TICKS <= 0) {
             lastTrigger.put(uuid, now);
             doTransfer(player, targetServer);
@@ -251,6 +268,7 @@ public class PortalStepListener implements Listener {
             PortalService ps = RVNKCore.getServiceSafe(PortalService.class);
             if (p == null || ps == null || !stillInPortal(p, ps)) {
                 cancelCharge(uuid);
+                entryLoc.remove(uuid); // stepped out — drop the captured entry so it can't stale-eject later
                 return;
             }
             elapsed[0] += (int) EFFECT_INTERVAL;
@@ -278,6 +296,12 @@ public class PortalStepListener implements Listener {
             player.sendMessage("§cCross-server transfer is unavailable.");
             return;
         }
+        // #1726: eject the player 1 block in front of the portal, facing outward, BEFORE the native
+        // transfer. player.transfer() disconnects the client immediately, so Bukkit's playerdata save
+        // captures this off-trigger position. Because the ARG worlds are mirror-coordinate, the player
+        // reappears 1 block clear of the mirrored trigger — no arrival re-trigger and, since the saved
+        // last-location is no longer the DIAMOND_BLOCK, no transfer-on-login loop.
+        ejectFromTrigger(player);
         TransferService.TransferResult result = transferService.transfer(player, targetServer);
         player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
         if (result.isSuccess()) {
@@ -286,6 +310,51 @@ public class PortalStepListener implements Listener {
             logger.debug("Portal walk-through transfer rejected for " + player.getName()
                     + " -> '" + targetServer + "': " + result.status());
         }
+    }
+
+    /**
+     * Ejects the player one block in front of the portal, facing outward (#1726).
+     *
+     * <p>"In front" is the apron the player walked in from — one block back along their captured entry
+     * look direction — and "outward" is that same direction (entry yaw + 180°), so they never face the
+     * trigger. Snapped to the dominant cardinal axis and centred on the block. Called synchronously at
+     * egress so the resulting position is what Bukkit persists on the transfer disconnect.</p>
+     *
+     * @param player The player about to be transferred
+     */
+    private void ejectFromTrigger(Player player) {
+        UUID uuid = player.getUniqueId();
+        Location entry = entryLoc.remove(uuid);
+        Location base = player.getLocation();
+        if (base.getWorld() == null) return;
+        float yaw = (entry != null) ? entry.getYaw() : base.getYaw();
+        int[] look = cardinal(yaw); // {dx, dz} the player walked IN
+        Location eject = new Location(
+                base.getWorld(),
+                base.getBlockX() + 0.5 - look[0], // one block back along the approach
+                base.getBlockY(),
+                base.getBlockZ() + 0.5 - look[1],
+                yaw + 180f,                        // face outward, away from the trigger
+                0f);
+        try {
+            player.teleport(eject);
+        } catch (Throwable t) {
+            logger.debug("Egress eject teleport failed for " + player.getName() + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * Returns the dominant horizontal cardinal direction {@code {dx, dz}} a yaw points along
+     * (unit step on one axis; the other is zero).
+     */
+    private int[] cardinal(float yaw) {
+        double rad = Math.toRadians(yaw);
+        double x = -Math.sin(rad); // Minecraft: yaw 0 → +Z (south), 90 → -X (west)
+        double z = Math.cos(rad);
+        if (Math.abs(x) >= Math.abs(z)) {
+            return new int[]{x >= 0 ? 1 : -1, 0};
+        }
+        return new int[]{0, z >= 0 ? 1 : -1};
     }
 
     /**
@@ -337,6 +406,7 @@ public class PortalStepListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         lastTrigger.remove(uuid);
         arrivalGrace.remove(uuid);
+        entryLoc.remove(uuid);
         cancelCharge(uuid);
     }
 }
