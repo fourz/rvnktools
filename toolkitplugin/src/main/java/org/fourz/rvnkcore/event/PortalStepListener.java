@@ -7,8 +7,11 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -52,17 +55,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * with portal particles, a rising portal hum, and an action-bar countdown. Stepping out of the portal
  * cancels it. This gives a visible portal effect and a moment to back out.</p>
  *
- * <h3>Egress ejection (#1726)</h3>
+ * <h3>Arrival ejection (#1726)</h3>
  * <p>Departure fires while the player stands on the {@code DIAMOND_BLOCK} trigger, and the ARG worlds
- * are mirror-coordinate, so a naive transfer round-trips the player onto a trigger on both ends — an
- * immediate re-transfer (ping-pong) and, if they log off there, a transfer-on-login loop. Before the
- * native transfer we teleport the player one block in front of the portal facing outward
- * ({@link #ejectFromTrigger}); Bukkit persists that off-trigger position on the disconnect. With both
- * ends ejecting on egress, arrivals settle one block clear of the mirrored trigger.</p>
+ * are mirror-coordinate, so a naive transfer deposits the player onto a trigger on the far end — an
+ * immediate re-transfer (ping-pong) and, if they log off there, a transfer-on-login loop. On join, if
+ * the player is standing in a registered portal, {@link #computeExitLocation} places them one block in
+ * front of it facing outward — the outward direction read deterministically from the frame's wall sign
+ * ({@link #resolveOutwardFace}), stepping out to a spot with solid ground and headroom. This fires for
+ * <b>any</b> join, so it also covers the case {@code arrivalGrace} alone missed: a player who logged off
+ * inside a portal and rejoins normally (where {@link Player#isTransferred()} is {@code false}).</p>
  *
  * <h3>Arrival guard</h3>
- * <p>Retained as a transient safety net for a player arriving on a pre-fix (stale) trigger: they are
- * placed in an {@code arrivalGrace} set and not re-transferred until they step out once.</p>
+ * <p>{@code arrivalGrace} is armed synchronously on join (before the one-tick eject defer) and retained
+ * as a transient fallback when no safe exit can be computed: the player is not re-transferred until they
+ * step out of the portal once.</p>
  *
  * @since 1.5.25
  */
@@ -74,6 +80,9 @@ public class PortalStepListener implements Listener {
     private static final long EFFECT_INTERVAL = 5L;
     /** Debounce window after a completed transfer (ms). */
     private static final long TRIGGER_DEBOUNCE_MS = 2000L;
+    /** Horizontal faces scanned around the anchor to find the portal sign / outward direction. */
+    private static final BlockFace[] HORIZONTAL =
+            {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
 
     private final RVNKCore plugin;
     private final LogManager logger;
@@ -87,11 +96,6 @@ public class PortalStepListener implements Listener {
      * Not re-transferred until they step <b>out</b> of the portal once.
      */
     private final Set<UUID> arrivalGrace = ConcurrentHashMap.newKeySet();
-    /**
-     * Per-player entry location captured when a charge-up begins, used to compute the egress
-     * ejection point (#1726) — the direction the player walked <b>into</b> the portal.
-     */
-    private final Map<UUID, Location> entryLoc = new ConcurrentHashMap<>();
 
     /**
      * Creates a new PortalStepListener.
@@ -250,11 +254,6 @@ public class PortalStepListener implements Listener {
         final String targetServer = portal.getTargetServer();
         final String display = friendlyName(transferService, targetServer);
 
-        // #1726: remember the direction the player walked in, so egress can eject them clear of the
-        // trigger (charge-up ticks re-enter here but return at the charging guard above, so this is
-        // captured once — at entry).
-        entryLoc.putIfAbsent(uuid, player.getLocation().clone());
-
         if (CHARGE_TICKS <= 0) {
             lastTrigger.put(uuid, now);
             doTransfer(player, targetServer);
@@ -268,7 +267,6 @@ public class PortalStepListener implements Listener {
             PortalService ps = RVNKCore.getServiceSafe(PortalService.class);
             if (p == null || ps == null || !stillInPortal(p, ps)) {
                 cancelCharge(uuid);
-                entryLoc.remove(uuid); // stepped out — drop the captured entry so it can't stale-eject later
                 return;
             }
             elapsed[0] += (int) EFFECT_INTERVAL;
@@ -296,12 +294,6 @@ public class PortalStepListener implements Listener {
             player.sendMessage("§cCross-server transfer is unavailable.");
             return;
         }
-        // #1726: eject the player 1 block in front of the portal, facing outward, BEFORE the native
-        // transfer. player.transfer() disconnects the client immediately, so Bukkit's playerdata save
-        // captures this off-trigger position. Because the ARG worlds are mirror-coordinate, the player
-        // reappears 1 block clear of the mirrored trigger — no arrival re-trigger and, since the saved
-        // last-location is no longer the DIAMOND_BLOCK, no transfer-on-login loop.
-        ejectFromTrigger(player);
         TransferService.TransferResult result = transferService.transfer(player, targetServer);
         player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
         if (result.isSuccess()) {
@@ -310,51 +302,6 @@ public class PortalStepListener implements Listener {
             logger.debug("Portal walk-through transfer rejected for " + player.getName()
                     + " -> '" + targetServer + "': " + result.status());
         }
-    }
-
-    /**
-     * Ejects the player one block in front of the portal, facing outward (#1726).
-     *
-     * <p>"In front" is the apron the player walked in from — one block back along their captured entry
-     * look direction — and "outward" is that same direction (entry yaw + 180°), so they never face the
-     * trigger. Snapped to the dominant cardinal axis and centred on the block. Called synchronously at
-     * egress so the resulting position is what Bukkit persists on the transfer disconnect.</p>
-     *
-     * @param player The player about to be transferred
-     */
-    private void ejectFromTrigger(Player player) {
-        UUID uuid = player.getUniqueId();
-        Location entry = entryLoc.remove(uuid);
-        Location base = player.getLocation();
-        if (base.getWorld() == null) return;
-        float yaw = (entry != null) ? entry.getYaw() : base.getYaw();
-        int[] look = cardinal(yaw); // {dx, dz} the player walked IN
-        Location eject = new Location(
-                base.getWorld(),
-                base.getBlockX() + 0.5 - look[0], // one block back along the approach
-                base.getBlockY(),
-                base.getBlockZ() + 0.5 - look[1],
-                yaw + 180f,                        // face outward, away from the trigger
-                0f);
-        try {
-            player.teleport(eject);
-        } catch (Throwable t) {
-            logger.debug("Egress eject teleport failed for " + player.getName() + ": " + t.getMessage());
-        }
-    }
-
-    /**
-     * Returns the dominant horizontal cardinal direction {@code {dx, dz}} a yaw points along
-     * (unit step on one axis; the other is zero).
-     */
-    private int[] cardinal(float yaw) {
-        double rad = Math.toRadians(yaw);
-        double x = -Math.sin(rad); // Minecraft: yaw 0 → +Z (south), 90 → -X (west)
-        double z = Math.cos(rad);
-        if (Math.abs(x) >= Math.abs(z)) {
-            return new int[]{x >= 0 ? 1 : -1, 0};
-        }
-        return new int[]{0, z >= 0 ? 1 : -1};
     }
 
     /**
@@ -384,15 +331,159 @@ public class PortalStepListener implements Listener {
     }
 
     /**
-     * Marks a transferred arrival so they are not immediately re-transferred if they land inside a
-     * portal (the ping-pong guard).
+     * Ejects a player who joins standing inside a registered portal to a safe spot <b>1 block in front
+     * of the portal, facing out</b> (#1726), keeping the arrival-grace guard as a fallback.
+     *
+     * <p>Fixes the portal loop for both paths at once: a transfer arrival that lands in the return
+     * portal, and — the case {@code arrivalGrace} alone missed — a player who logged off inside a
+     * portal and rejoins <b>normally</b> (so {@link Player#isTransferred()} is {@code false} and grace
+     * was never armed). In both cases the saved location is a trigger block that the first move would
+     * re-fire; placing them clear of the frame on join prevents the ping-pong and the
+     * transfer-on-login loop.</p>
      *
      * @param event The join event
      */
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        if (event.getPlayer().isTransferred()) {
-            arrivalGrace.add(event.getPlayer().getUniqueId());
+        final Player player = event.getPlayer();
+        final UUID uuid = player.getUniqueId();
+        // Arm the guard synchronously so a portal-enter/move on the join tick cannot fire a transfer
+        // during the one-tick defer below (the defer lets the arrival chunk load before block reads).
+        arrivalGrace.add(uuid);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                arrivalGrace.remove(uuid);
+                return;
+            }
+            PortalService ps = RVNKCore.getServiceSafe(PortalService.class);
+            PortalDTO portal = (ps != null) ? portalAtPlayer(player, ps) : null;
+            if (portal == null) {
+                arrivalGrace.remove(uuid); // joined clear of any portal — nothing to guard
+                return;
+            }
+            Location exit = computeExitLocation(portal, player);
+            if (exit != null) {
+                player.teleport(exit);
+                arrivalGrace.remove(uuid);
+                logger.info("Portal arrival eject: " + player.getName()
+                        + " placed in front of portal " + portal.getPortalId());
+                return;
+            }
+            // No safe exit computed — keep grace so they don't instantly re-transfer while standing in
+            // the portal; onPlayerMove clears it when they step out.
+            logger.debug("Portal arrival: no safe exit for " + player.getName()
+                    + " at portal " + portal.getPortalId() + " — holding arrival grace");
+        });
+    }
+
+    /**
+     * Returns the registered portal the player is standing in (feet or eye block), or null.
+     *
+     * @param player        The player to test
+     * @param portalService The portal service
+     * @return the portal at the player, or null
+     */
+    private PortalDTO portalAtPlayer(Player player, PortalService portalService) {
+        Block feet = player.getLocation().getBlock();
+        PortalDTO portal = matchPortal(portalService, feet);
+        if (portal == null) {
+            portal = matchPortal(portalService, feet.getRelative(BlockFace.UP));
+        }
+        return portal;
+    }
+
+    /**
+     * Computes a safe standing location 1+ blocks in front of the portal, facing outward (#1726).
+     * Steps outward from the player's block along the sign's outward face until a block with solid
+     * ground and two clear blocks above is found.
+     *
+     * @param portal The portal the player is in
+     * @param player The player to eject
+     * @return the exit location, or null when the world is unloaded or no safe stand is nearby
+     */
+    private Location computeExitLocation(PortalDTO portal, Player player) {
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null) return null;
+        BlockFace out = resolveOutwardFace(world, portal);
+        if (out == null) return null;
+
+        Block base = player.getLocation().getBlock();
+        for (int step = 1; step <= 3; step++) {
+            Block cand = base.getRelative(out.getModX() * step, 0, out.getModZ() * step);
+            Block ground = findGround(cand);
+            if (ground != null && isSafeStand(ground)) {
+                Location loc = ground.getLocation().add(0.5, 1, 0.5);
+                loc.setYaw(yawOf(out));
+                loc.setPitch(0f);
+                return loc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolves the portal's outward-facing direction from the wall sign on its anchor block. A wall
+     * sign's {@code getFacing()} points away from the frame — the "out" direction.
+     *
+     * @param world  The portal's world
+     * @param portal The portal
+     * @return the outward horizontal face, or null when no wall sign is found on the anchor
+     */
+    private BlockFace resolveOutwardFace(World world, PortalDTO portal) {
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        for (BlockFace face : HORIZONTAL) {
+            BlockData data = anchor.getRelative(face).getBlockData();
+            if (data instanceof WallSign wallSign) {
+                return wallSign.getFacing();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds the solid floor block at or just below the candidate column (searching down a few blocks).
+     *
+     * @param candidate The candidate column block
+     * @return the solid block whose top a player would stand on, or null
+     */
+    private Block findGround(Block candidate) {
+        for (int dy = 0; dy >= -3; dy--) {
+            Block b = candidate.getRelative(0, dy, 0);
+            if (b.getType().isSolid()) {
+                return b;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * True when the two blocks above {@code ground} are clear (and not portal blocks), so a player can
+     * stand there without suffocating or re-entering a portal.
+     *
+     * @param ground The floor block
+     * @return whether the spot above ground is safe to stand
+     */
+    private boolean isSafeStand(Block ground) {
+        Block feet = ground.getRelative(BlockFace.UP);
+        Block head = feet.getRelative(BlockFace.UP);
+        return !feet.getType().isSolid() && !head.getType().isSolid()
+                && feet.getType() != Material.NETHER_PORTAL
+                && head.getType() != Material.NETHER_PORTAL;
+    }
+
+    /**
+     * Maps a horizontal block face to the yaw a player needs to look in that direction.
+     *
+     * @param face The horizontal face
+     * @return the corresponding yaw
+     */
+    private float yawOf(BlockFace face) {
+        switch (face) {
+            case SOUTH: return 0f;
+            case WEST:  return 90f;
+            case NORTH: return 180f;
+            case EAST:  return -90f;
+            default:    return 0f;
         }
     }
 
@@ -406,7 +497,6 @@ public class PortalStepListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         lastTrigger.remove(uuid);
         arrivalGrace.remove(uuid);
-        entryLoc.remove(uuid);
         cancelCharge(uuid);
     }
 }
