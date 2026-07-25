@@ -19,6 +19,14 @@ public class ChatMessageDTO {
     private String message;
     private long timestamp;
 
+    // ── Chatroom fields (#1729). Optional; older relay payloads omit them. ──
+    /** Room the line was sent in: {@code GLOBAL} / {@code SERVER} / {@code WORLD}. */
+    private String room;
+    /** Sender's world name (for WORLD-scoped routing and detail-mode rendering). */
+    private String world;
+    /** Friendly origin-server label stamped by the sender (e.g. {@code nations}, {@code event}). */
+    private String serverLabel;
+
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
     }
@@ -52,4 +60,13 @@ public class ChatMessageDTO {
     public String getSenderName() { return senderName; }
     public String getMessage() { return message; }
     public long getTimestamp() { return timestamp; }
+
+    public String getRoom() { return room; }
+    public void setRoom(String room) { this.room = room; }
+
+    public String getWorld() { return world; }
+    public void setWorld(String world) { this.world = world; }
+
+    public String getServerLabel() { return serverLabel; }
+    public void setServerLabel(String serverLabel) { this.serverLabel = serverLabel; }
 }

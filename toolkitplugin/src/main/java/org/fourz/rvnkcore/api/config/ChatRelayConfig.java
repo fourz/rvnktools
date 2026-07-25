@@ -32,16 +32,21 @@ public class ChatRelayConfig {
 
     private final boolean enabled;
     private final String serverId;
+    private final String serverLabel;
     private final String channelTrigger;
     private final int dedupCacheSize;
     private final int timeoutMs;
     private final boolean insecureTls;
     private final List<Peer> peers;
 
-    private ChatRelayConfig(boolean enabled, String serverId, String channelTrigger,
+    private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
                             int dedupCacheSize, int timeoutMs, boolean insecureTls, List<Peer> peers) {
         this.enabled = enabled;
         this.serverId = serverId != null ? serverId.trim() : "";
+        // Friendly label for THIS server (e.g. "nations", "event"); stamped on outgoing chatroom
+        // messages and used for local rendering. Defaults to the server-id when unset.
+        this.serverLabel = (serverLabel != null && !serverLabel.trim().isEmpty())
+                ? serverLabel.trim() : this.serverId;
         this.channelTrigger = (channelTrigger != null && !channelTrigger.isEmpty()) ? channelTrigger : "!";
         this.dedupCacheSize = dedupCacheSize > 0 ? dedupCacheSize : 512;
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 3000;
@@ -57,7 +62,7 @@ public class ChatRelayConfig {
      */
     public static ChatRelayConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new ChatRelayConfig(false, "", "!", 512, 3000, false, Collections.emptyList());
+            return new ChatRelayConfig(false, "", "", "!", 512, 3000, false, Collections.emptyList());
         }
 
         List<Peer> peers = new ArrayList<>();
@@ -94,6 +99,7 @@ public class ChatRelayConfig {
         return new ChatRelayConfig(
             section.getBoolean("enabled", false),
             section.getString("server-id", ""),
+            section.getString("server-label", ""),
             section.getString("channel-trigger", "!"),
             section.getInt("dedup-cache-size", 512),
             section.getInt("timeout-ms", 3000),
@@ -169,6 +175,7 @@ public class ChatRelayConfig {
 
     public boolean isEnabled() { return enabled; }
     public String getServerId() { return serverId; }
+    public String getServerLabel() { return serverLabel; }
     public String getChannelTrigger() { return channelTrigger; }
     public int getDedupCacheSize() { return dedupCacheSize; }
     public int getTimeoutMs() { return timeoutMs; }

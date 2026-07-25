@@ -477,11 +477,18 @@ public class PlayerPreferencesRepository {
                         rs.getInt("quiet_hours_end")
                 ));
 
-                // Parse metadata if present
+                // Parse metadata "k=v,k=v" back into the map so individual keys round-trip
+                // (upsertCorePreferences serializes in this format). Keys/values must not contain
+                // ',' or '='; that is fine for enum-style prefs like chat-display-mode. (#1729)
                 String metadataStr = rs.getString("metadata");
                 if (metadataStr != null && !metadataStr.isEmpty()) {
                     Map<String, String> metadata = new HashMap<>();
-                    metadata.put("raw", metadataStr);
+                    for (String pair : metadataStr.split(",")) {
+                        int eq = pair.indexOf('=');
+                        if (eq > 0) {
+                            metadata.put(pair.substring(0, eq), pair.substring(eq + 1));
+                        }
+                    }
                     dto.setMetadata(metadata);
                 }
 

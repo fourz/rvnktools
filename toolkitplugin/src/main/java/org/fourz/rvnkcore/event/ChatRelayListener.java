@@ -39,6 +39,9 @@ public class ChatRelayListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         if (relayService == null) return;
+        // Stand down when an external chatroom consumer (e.g. RVNKEvents) owns chat routing — it runs
+        // its own listener and calls ChatRelayService.relay() directly. Avoids double egress. (#1729)
+        if (relayService.hasExternalConsumer()) return;
         relayService.relayOutbound(event.getPlayer(), event.getMessage());
     }
 }

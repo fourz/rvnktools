@@ -14,6 +14,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Cross-server chat relay service.
@@ -37,6 +38,11 @@ public class ChatRelayService {
     private final Set<String> dedupCache = Collections.synchronizedSet(new LinkedHashSet<>());
     private final int dedupCacheSize;
 
+    // Optional external inbound consumer (e.g. RVNKEvents chatroom). When registered, RVNKCore hands
+    // off inbound relayed messages to it (main thread) instead of the legacy local broadcast, and the
+    // built-in !-trigger listener stands down — the consumer owns chat routing/rendering. (#1729)
+    private volatile Consumer<ChatMessageDTO> externalConsumer;
+
     /**
      * Creates a new ChatRelayService.
      *
@@ -51,6 +57,57 @@ public class ChatRelayService {
         this.egress = egress;
         this.logger = logger;
         this.dedupCacheSize = config.getDedupCacheSize();
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Chatroom contract (#1729) — RVNKEvents owns rooms/rendering; RVNKCore = transport.
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Registers an external consumer (e.g. RVNKEvents' chatroom) to receive inbound relayed
+     * messages. While one is registered, {@link #receiveInbound} delegates to it on the main thread
+     * instead of broadcasting locally, and the built-in {@code !}-trigger listener stands down.
+     *
+     * @param consumer The inbound message consumer, or null to clear and restore built-in behaviour
+     */
+    public void registerChatConsumer(Consumer<ChatMessageDTO> consumer) {
+        this.externalConsumer = consumer;
+        logger.info("Chat relay consumer " + (consumer != null ? "registered" : "cleared")
+            + " — " + (consumer != null ? "external chatroom owns routing/rendering"
+                                        : "built-in !-trigger relay active"));
+    }
+
+    /** @return true when an external chatroom consumer has been registered. */
+    public boolean hasExternalConsumer() {
+        return externalConsumer != null;
+    }
+
+    /**
+     * Relays a fully-built chat message to all peers. Used by an external chatroom that has already
+     * classified the line (room/world/label). Records the id for dedup, then dispatches via egress.
+     *
+     * @param dto The message to relay (must carry a {@code msgId})
+     */
+    public void relay(ChatMessageDTO dto) {
+        if (!config.isEnabled() || dto == null || dto.getMsgId() == null) return;
+        markSeen(dto.getMsgId());
+        egress.send(dto);
+    }
+
+    /** @return this server's id (e.g. {@code event}, {@code prod}). */
+    public String getServerId() { return config.getServerId(); }
+
+    /** @return this server's friendly label (e.g. {@code event}, {@code nations}). */
+    public String getServerLabel() { return config.getServerLabel(); }
+
+    /**
+     * Resolves a friendly label for an origin server-id from the configured peer tags.
+     *
+     * @param originServerId The origin server-id
+     * @return the peer tag, or the id itself when no peer matches
+     */
+    public String resolveServerLabel(String originServerId) {
+        return config.resolvePeerTag(originServerId);
     }
 
     /**
@@ -116,6 +173,19 @@ public class ChatRelayService {
         }
         if (!markSeen(dto.getMsgId())) {
             logger.debug("Chat relay inbound skipped (duplicate): " + dto.getMsgId());
+            return;
+        }
+
+        // Fallback-stamp the friendly label from peer config when the origin did not (older payloads).
+        if (dto.getServerLabel() == null || dto.getServerLabel().isEmpty()) {
+            dto.setServerLabel(config.resolvePeerTag(dto.getOriginServerId()));
+        }
+
+        // Delegate to the external chatroom consumer (RVNKEvents) when registered — it owns rendering.
+        Consumer<ChatMessageDTO> consumer = this.externalConsumer;
+        if (consumer != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
+            logger.debug("Chat relay inbound -> external consumer (" + dto.getMsgId() + ")");
             return;
         }
 
