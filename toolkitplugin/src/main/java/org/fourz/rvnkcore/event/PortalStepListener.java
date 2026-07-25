@@ -220,6 +220,16 @@ public class PortalStepListener implements Listener {
         Long last = lastTrigger.get(uuid);
         if (last != null && (now - last) < TRIGGER_DEBOUNCE_MS) return;
 
+        // #1723: enforce portal.use in the step path (the node was defined in PortalConfig but never
+        // checked). Stamp lastTrigger on denial so the per-tick move trigger can't spam the message.
+        PortalService permPortalService = RVNKCore.getServiceSafe(PortalService.class);
+        PortalConfig portalConfig = permPortalService != null ? permPortalService.getConfig() : null;
+        if (portalConfig != null && !player.hasPermission(portalConfig.getPermissionUse())) {
+            lastTrigger.put(uuid, now);
+            player.sendMessage("§cYou don't have permission to use cross-server portals.");
+            return;
+        }
+
         TransferService transferService = RVNKCore.getServiceSafe(TransferService.class);
         if (transferService == null) {
             player.sendMessage("§cCross-server transfer is unavailable.");
