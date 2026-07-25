@@ -1,11 +1,19 @@
 package org.fourz.rvnkcore.api.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Data Transfer Object for a cross-server portal.
  *
- * <p>A portal is a trigger block at a fixed world location that, when stepped on, transfers the
- * player to a named target server (resolved by the existing {@code TransferService}). This DTO is
- * the persistence/transport shape; the trigger-detection listeners are built separately (#1713/#1714).</p>
+ * <p>A portal is a framed structure at a fixed world location that, when a player walks through its
+ * lit interior, transfers the player to a named target server (resolved by the existing
+ * {@code TransferService}). This DTO is the persistence/transport shape.</p>
+ *
+ * <p>The {@code x/y/z} triple is the portal <b>anchor</b> — the frame block the registration sign is
+ * mounted on, used as the row identity and for logging. The interior {@code NETHER_PORTAL} block
+ * locations that actually trigger the transfer are carried separately in {@link #getPortalBlocks()}
+ * so a framed portal (many blocks) can be rebuilt into the runtime index (#1709).</p>
  *
  * <p>Lives in {@code api/model} alongside {@link PlayerWorldDataDTO} to match the DTO convention.</p>
  *
@@ -21,6 +29,12 @@ public class PortalDTO {
     private String targetServer;
     private String ownerUuid;
     private long createdAt;
+
+    /**
+     * Interior portal-block locations for a framed portal, each as an {@code int[]{x, y, z}}.
+     * Empty for a legacy single-block portal (whose trigger is the anchor {@code x/y/z}).
+     */
+    private List<int[]> portalBlocks = new ArrayList<>();
 
     /**
      * Creates an empty PortalDTO. Use setters or the full constructor to populate.
@@ -114,6 +128,21 @@ public class PortalDTO {
 
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    /**
+     * @return the interior portal-block locations ({@code int[]{x, y, z}}); never null, empty for a
+     *         legacy single-block portal
+     */
+    public List<int[]> getPortalBlocks() {
+        return portalBlocks;
+    }
+
+    /**
+     * @param portalBlocks the interior portal-block locations; a null value is stored as an empty list
+     */
+    public void setPortalBlocks(List<int[]> portalBlocks) {
+        this.portalBlocks = (portalBlocks != null) ? portalBlocks : new ArrayList<>();
     }
 
     @Override

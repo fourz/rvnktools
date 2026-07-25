@@ -83,7 +83,8 @@ public class PortalRepository {
                     "z INT NOT NULL, " +
                     "target_server VARCHAR(255) NOT NULL, " +
                     "owner_uuid VARCHAR(36), " +
-                    "created_at BIGINT NOT NULL DEFAULT 0" +
+                    "created_at BIGINT NOT NULL DEFAULT 0, " +
+                    "portal_blocks TEXT" +
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             createTable = "CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (" +
@@ -94,7 +95,8 @@ public class PortalRepository {
                     "z INTEGER NOT NULL, " +
                     "target_server TEXT NOT NULL, " +
                     "owner_uuid TEXT, " +
-                    "created_at INTEGER NOT NULL DEFAULT 0" +
+                    "created_at INTEGER NOT NULL DEFAULT 0, " +
+                    "portal_blocks TEXT" +
                     ")";
         }
 
@@ -106,6 +108,13 @@ public class PortalRepository {
              var stmt = conn.createStatement()) {
             stmt.execute(createTable);
             stmt.execute(createIndex);
+            // Migrate pre-#1709 tables that predate the framed-portal block list. Neither dialect can
+            // rely on "ADD COLUMN IF NOT EXISTS" (SQLite has no such clause; stock MySQL rejects it),
+            // so probe the column first and add it only when absent.
+            if (!columnExists(conn, mysql, "portal_blocks")) {
+                stmt.execute("ALTER TABLE " + TABLE_NAME + " ADD COLUMN portal_blocks TEXT");
+                logger.info("Portal schema migrated: added portal_blocks column");
+            }
             fallbackTracker.recordSuccess();
             logger.info("Portal schema ensured (" + (mysql ? "MySQL" : "SQLite") + ")");
         } catch (SQLException e) {
@@ -116,6 +125,42 @@ public class PortalRepository {
     }
 
     /**
+     * Tests whether a column already exists on {@link #TABLE_NAME}.
+     *
+     * <p>Dialect-safe probe used by the guarded migration: SQLite reports columns via
+     * {@code PRAGMA table_info}; MySQL via {@code information_schema.COLUMNS} scoped to the current
+     * schema. Both avoid the non-portable {@code ADD COLUMN IF NOT EXISTS} clause.</p>
+     *
+     * @param conn   an open connection to reuse
+     * @param mysql  true when the active dialect is MySQL
+     * @param column the column name to test for
+     * @return true if the column is present
+     * @throws SQLException if the probe query fails
+     */
+    private boolean columnExists(Connection conn, boolean mysql, String column) throws SQLException {
+        if (mysql) {
+            String sql = "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, TABLE_NAME);
+                stmt.setString(2, column);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
+            }
+        }
+        try (PreparedStatement stmt = conn.prepareStatement("PRAGMA table_info(" + TABLE_NAME + ")");
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Persists a new portal row.
      *
      * @param portal The portal to insert
@@ -123,8 +168,8 @@ public class PortalRepository {
      */
     public boolean create(PortalDTO portal) {
         String sql = "INSERT INTO " + TABLE_NAME
-                + " (portal_id, world, x, y, z, target_server, owner_uuid, created_at)"
-                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                + " (portal_id, world, x, y, z, target_server, owner_uuid, created_at, portal_blocks)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, portal.getPortalId());
@@ -135,6 +180,7 @@ public class PortalRepository {
             stmt.setString(6, portal.getTargetServer());
             stmt.setString(7, portal.getOwnerUuid());
             stmt.setLong(8, portal.getCreatedAt());
+            stmt.setString(9, serializeBlocks(portal.getPortalBlocks()));
             stmt.executeUpdate();
             fallbackTracker.recordSuccess();
             return true;
@@ -261,7 +307,7 @@ public class PortalRepository {
      * @throws SQLException if a column read fails
      */
     private PortalDTO mapResultSet(ResultSet rs) throws SQLException {
-        return new PortalDTO(
+        PortalDTO portal = new PortalDTO(
                 rs.getString("portal_id"),
                 rs.getString("world"),
                 rs.getInt("x"),
@@ -271,5 +317,58 @@ public class PortalRepository {
                 rs.getString("owner_uuid"),
                 rs.getLong("created_at")
         );
+        portal.setPortalBlocks(deserializeBlocks(rs.getString("portal_blocks")));
+        return portal;
+    }
+
+    /**
+     * Serializes a list of interior block coordinates to the compact storage form
+     * {@code "x:y:z;x:y:z;..."}. A null or empty list serializes to an empty string.
+     *
+     * @param blocks the interior block coordinates ({@code int[]{x, y, z}})
+     * @return the serialized string (never null)
+     */
+    private String serializeBlocks(List<int[]> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int[] b : blocks) {
+            if (sb.length() > 0) {
+                sb.append(';');
+            }
+            sb.append(b[0]).append(':').append(b[1]).append(':').append(b[2]);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Parses the compact {@code "x:y:z;x:y:z;..."} storage form back into a coordinate list.
+     * Malformed or empty input yields an empty list (a legacy single-block portal row).
+     *
+     * @param raw the serialized string (may be null)
+     * @return the parsed interior block coordinates (never null)
+     */
+    private List<int[]> deserializeBlocks(String raw) {
+        List<int[]> blocks = new ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return blocks;
+        }
+        for (String triple : raw.split(";")) {
+            String[] parts = triple.split(":");
+            if (parts.length != 3) {
+                continue;
+            }
+            try {
+                blocks.add(new int[]{
+                        Integer.parseInt(parts[0].trim()),
+                        Integer.parseInt(parts[1].trim()),
+                        Integer.parseInt(parts[2].trim())
+                });
+            } catch (NumberFormatException ignored) {
+                // Skip a corrupt triple rather than fail the whole load.
+            }
+        }
+        return blocks;
     }
 }
