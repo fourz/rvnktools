@@ -128,6 +128,11 @@ transfer:
   cooldown-seconds: 10               # Per-player minimum seconds between transfers
   permission: "rvnkcore.transfer"    # Permission node required to transfer
   confirm: true                      # Require "/server transfer <target> confirm" to proceed
+  # Themed notices for a network crossing (ASCII only — the MC font renders smart punctuation as
+  # ?-diamonds, #1753). {player} is substituted. The vanilla "left the game"/"joined the game"
+  # messages are suppressed either way; blank here only skips the themed announcement.
+  broadcast-message: "&d{player} &7was whisked away across the network..."   # on the server they LEAVE (#1763)
+  arrival-message: "&d{player} &7steps through from across the network..."   # on the server they ARRIVE at (#1782)
   targets: {}                        # Named destinations. Example (uncomment and fill in):
   #  prod:
   #    host: "<prod-host>"

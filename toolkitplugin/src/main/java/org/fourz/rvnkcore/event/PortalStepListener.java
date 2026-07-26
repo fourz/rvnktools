@@ -357,6 +357,22 @@ public class PortalStepListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         final Player player = event.getPlayer();
         final UUID uuid = player.getUniqueId();
+
+        // #1782: a player arriving via the native transfer packet is CROSSING the network, not logging
+        // in — suppress the vanilla "joined the game" so it matches the themed departure (#1763), and
+        // announce the arrival instead when configured. isTransferred() is false for ordinary logins,
+        // so normal join messages are untouched.
+        if (player.isTransferred()) {
+            event.setJoinMessage(null);
+            TransferService ats = RVNKCore.getServiceSafe(TransferService.class);
+            TransferConfig atc = (ats != null) ? ats.getConfig() : null;
+            String arrival = (atc != null) ? atc.getArrivalMessage() : null;
+            if (arrival != null && !arrival.isBlank()) {
+                Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&',
+                        arrival.replace("{player}", player.getName())));
+            }
+        }
+
         // Arm the guard synchronously so a portal-enter/move on the join tick cannot fire a transfer
         // during the one-tick defer below (the defer lets the arrival chunk load before block reads).
         arrivalGrace.add(uuid);

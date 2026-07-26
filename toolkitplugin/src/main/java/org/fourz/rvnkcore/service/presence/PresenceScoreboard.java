@@ -148,18 +148,30 @@ public class PresenceScoreboard {
      * @return true if the sidebar is now shown, false if hidden
      */
     public boolean toggle(Player player) {
+        return setShown(player, !shown(player.getUniqueId()));
+    }
+
+    /**
+     * Sets the sidebar visibility explicitly and persists the choice (#1783). Idempotent — unlike
+     * {@link #toggle}, calling it twice with the same value leaves the state unchanged, which is what
+     * {@code /list on} and {@code /list off} need for macros and scripted use.
+     *
+     * @param player the player
+     * @param show   true to show the sidebar, false to hide it
+     * @return the resulting visibility (equal to {@code show})
+     */
+    public boolean setShown(Player player, boolean show) {
         UUID id = player.getUniqueId();
-        boolean next = !shown(id);
-        showCache.put(id, next);
-        applyNow(player, next);
+        showCache.put(id, show);
+        applyNow(player, show);
         if (prefs != null) {
-            prefs.setNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE, next).exceptionally(e -> {
+            prefs.setNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE, show).exceptionally(e -> {
                 logger.warning("Failed to persist presence sidebar preference for " + player.getName()
                         + ": " + e.getMessage());
                 return null;
             });
         }
-        return next;
+        return show;
     }
 
     /** Clears cached visibility on quit. */

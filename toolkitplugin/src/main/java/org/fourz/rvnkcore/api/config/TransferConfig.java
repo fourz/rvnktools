@@ -48,12 +48,21 @@ public class TransferConfig {
      * substituted. Blank suppresses the broadcast (the vanilla quit message is still hidden either way).
      */
     private final String broadcastMessage;
+    /**
+     * Themed broadcast shown on the DESTINATION when a transferred player arrives (#1782), with
+     * {@code {player}} substituted. Blank suppresses the announcement — the vanilla "joined the game"
+     * message is hidden either way, since a transfer is a crossing rather than a login.
+     */
+    private final String arrivalMessage;
 
     /** Default themed transfer broadcast — ASCII-safe (no smart punctuation, #1753). */
     public static final String DEFAULT_BROADCAST = "&d{player} &7was whisked away across the network...";
+    /** Default themed arrival broadcast — ASCII-safe (#1753). */
+    public static final String DEFAULT_ARRIVAL = "&d{player} &7steps through from across the network...";
 
     private TransferConfig(boolean enabled, int cooldownSeconds, String permission,
-                           boolean confirm, Map<String, Target> targets, String broadcastMessage) {
+                           boolean confirm, Map<String, Target> targets, String broadcastMessage,
+                           String arrivalMessage) {
         this.enabled = enabled;
         this.cooldownSeconds = cooldownSeconds > 0 ? cooldownSeconds : 10;
         this.permission = (permission != null && !permission.trim().isEmpty())
@@ -62,6 +71,7 @@ public class TransferConfig {
         this.targets = targets != null
                 ? Collections.unmodifiableMap(targets) : Collections.emptyMap();
         this.broadcastMessage = (broadcastMessage != null) ? broadcastMessage : DEFAULT_BROADCAST;
+        this.arrivalMessage = (arrivalMessage != null) ? arrivalMessage : DEFAULT_ARRIVAL;
     }
 
     /**
@@ -72,7 +82,8 @@ public class TransferConfig {
      */
     public static TransferConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new TransferConfig(false, 10, "rvnkcore.transfer", true, Collections.emptyMap(), DEFAULT_BROADCAST);
+            return new TransferConfig(false, 10, "rvnkcore.transfer", true, Collections.emptyMap(),
+                    DEFAULT_BROADCAST, DEFAULT_ARRIVAL);
         }
 
         Map<String, Target> targets = new LinkedHashMap<>();
@@ -98,7 +109,8 @@ public class TransferConfig {
                 section.getString("permission", "rvnkcore.transfer"),
                 section.getBoolean("confirm", true),
                 targets,
-                section.getString("broadcast-message", DEFAULT_BROADCAST)
+                section.getString("broadcast-message", DEFAULT_BROADCAST),
+                section.getString("arrival-message", DEFAULT_ARRIVAL)
         );
     }
 
@@ -164,4 +176,5 @@ public class TransferConfig {
     public boolean isConfirmRequired() { return confirm; }
     public Map<String, Target> getTargets() { return targets; }
     public String getBroadcastMessage() { return broadcastMessage; }
+    public String getArrivalMessage() { return arrivalMessage; }
 }

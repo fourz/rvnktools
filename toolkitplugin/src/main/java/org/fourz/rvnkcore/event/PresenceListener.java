@@ -11,6 +11,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.ServerCommandEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.model.PresenceDTO;
 import org.fourz.rvnkcore.service.presence.PresenceScoreboard;
@@ -75,22 +76,60 @@ public class PresenceListener implements Listener {
         if (cmd == null) return;
         if (cmd.equals("list") || cmd.equals("glist")) {
             event.setCancelled(true);
-            if (hasToggleArg(event.getMessage())) {
-                boolean shown = scoreboard.toggle(event.getPlayer());
+            String arg = sidebarArg(event.getMessage());
+            if (arg != null) {
+                boolean shown = arg.equals("toggle")
+                        ? scoreboard.toggle(event.getPlayer())
+                        : scoreboard.setShown(event.getPlayer(), arg.equals("on"));
                 event.getPlayer().sendMessage(shown
                         ? ChatColor.GREEN + "Network sidebar shown."
-                        : ChatColor.GRAY + "Network sidebar hidden. Use /list toggle to show it again.");
+                        : ChatColor.GRAY + "Network sidebar hidden. Use /list on to show it again.");
             } else {
                 sendRoster(event.getPlayer());
             }
         }
     }
 
-    /** True when the command's first argument is "toggle". */
-    private static boolean hasToggleArg(String raw) {
-        if (raw == null) return false;
+    /** Sidebar sub-arguments accepted by {@code /list} and {@code /glist} (#1783). */
+    private static final List<String> SIDEBAR_ARGS = List.of("toggle", "on", "off");
+
+    /**
+     * Returns the normalised sidebar sub-argument ({@code toggle} / {@code on} / {@code off}) when the
+     * command carries one, else null (meaning "print the roster"). {@code on}/{@code off} are explicit
+     * and idempotent; {@code toggle} flips.
+     */
+    private static String sidebarArg(String raw) {
+        if (raw == null) return null;
         String[] parts = raw.trim().split("\\s+");
-        return parts.length >= 2 && parts[1].equalsIgnoreCase("toggle");
+        if (parts.length < 2) return null;
+        String arg = parts[1].toLowerCase(Locale.ROOT);
+        return SIDEBAR_ARGS.contains(arg) ? arg : null;
+    }
+
+    /**
+     * Supplies completions for the overridden {@code /list} / {@code /glist} (#1783). The override runs
+     * on {@link PlayerCommandPreprocessEvent}, which intercepts execution only — vanilla {@code /list}
+     * owns its own completions, so the sidebar arguments are invisible without this handler.
+     *
+     * @param event the tab-complete event
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onTabComplete(TabCompleteEvent event) {
+        String buffer = event.getBuffer();
+        String cmd = commandWord(buffer);
+        if (cmd == null || !(cmd.equals("list") || cmd.equals("glist"))) return;
+
+        String[] parts = buffer.split("\\s+", -1);
+        // Only complete the FIRST argument: "/list <here>". parts[0] is the command itself.
+        if (parts.length != 2) return;
+
+        String prefix = parts[1].toLowerCase(Locale.ROOT);
+        List<String> matches = SIDEBAR_ARGS.stream()
+                .filter(a -> a.startsWith(prefix))
+                .collect(Collectors.toList());
+        if (!matches.isEmpty()) {
+            event.setCompletions(matches);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
