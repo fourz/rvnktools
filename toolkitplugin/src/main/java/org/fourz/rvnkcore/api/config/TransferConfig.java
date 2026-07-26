@@ -43,9 +43,17 @@ public class TransferConfig {
     private final boolean confirm;
     /** Case-preserving map of target name to destination (insertion ordered). */
     private final Map<String, Target> targets;
+    /**
+     * Themed broadcast shown on the source server when a player transfers (#1763), with {@code {player}}
+     * substituted. Blank suppresses the broadcast (the vanilla quit message is still hidden either way).
+     */
+    private final String broadcastMessage;
+
+    /** Default themed transfer broadcast — ASCII-safe (no smart punctuation, #1753). */
+    public static final String DEFAULT_BROADCAST = "&d{player} &7was whisked away across the network...";
 
     private TransferConfig(boolean enabled, int cooldownSeconds, String permission,
-                           boolean confirm, Map<String, Target> targets) {
+                           boolean confirm, Map<String, Target> targets, String broadcastMessage) {
         this.enabled = enabled;
         this.cooldownSeconds = cooldownSeconds > 0 ? cooldownSeconds : 10;
         this.permission = (permission != null && !permission.trim().isEmpty())
@@ -53,6 +61,7 @@ public class TransferConfig {
         this.confirm = confirm;
         this.targets = targets != null
                 ? Collections.unmodifiableMap(targets) : Collections.emptyMap();
+        this.broadcastMessage = (broadcastMessage != null) ? broadcastMessage : DEFAULT_BROADCAST;
     }
 
     /**
@@ -63,7 +72,7 @@ public class TransferConfig {
      */
     public static TransferConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new TransferConfig(false, 10, "rvnkcore.transfer", true, Collections.emptyMap());
+            return new TransferConfig(false, 10, "rvnkcore.transfer", true, Collections.emptyMap(), DEFAULT_BROADCAST);
         }
 
         Map<String, Target> targets = new LinkedHashMap<>();
@@ -88,7 +97,8 @@ public class TransferConfig {
                 section.getInt("cooldown-seconds", 10),
                 section.getString("permission", "rvnkcore.transfer"),
                 section.getBoolean("confirm", true),
-                targets
+                targets,
+                section.getString("broadcast-message", DEFAULT_BROADCAST)
         );
     }
 
@@ -153,4 +163,5 @@ public class TransferConfig {
     public String getPermission() { return permission; }
     public boolean isConfirmRequired() { return confirm; }
     public Map<String, Target> getTargets() { return targets; }
+    public String getBroadcastMessage() { return broadcastMessage; }
 }

@@ -332,7 +332,10 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
                 // debugging time. Say so rather than registering silently (#1551).
                 String covering = org.fourz.rvnkcore.api.security.AuthPathPatterns.coveringPattern(pathSpec);
                 if (covering != null) {
-                    logger.warning("Auth filter for " + pathSpec + " is redundant: already covered by"
+                    // #1742: intentional + harmless (the blanket /v1/* AuthFilter already covers this
+                    // path, #1551), so log at DEBUG — emitting it at WARN on every boot of every server
+                    // was pure noise that trains operators to ignore warnings.
+                    logger.debug("Auth filter for " + pathSpec + " is redundant: already covered by"
                             + " the blanket mapping " + covering + " (#1551). Registering anyway —"
                             + " harmless, but the duplicate mapping is intentional to document.");
                 }

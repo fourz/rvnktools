@@ -53,6 +53,21 @@ public class TransferService {
 
     /** Per-player last successful transfer timestamp (epoch millis) for cooldown enforcement. */
     private final ConcurrentHashMap<UUID, Long> lastTransfer = new ConcurrentHashMap<>();
+    /**
+     * Players whose imminent disconnect is a cross-server transfer, not a real quit (#1763). A quit
+     * handler suppresses the vanilla leave message and broadcasts the themed notice for these.
+     */
+    private final java.util.Set<UUID> transferring = ConcurrentHashMap.newKeySet();
+
+    /** True when the player's pending disconnect is a transfer (checked by the quit handler). */
+    public boolean isTransferring(UUID playerId) {
+        return transferring.contains(playerId);
+    }
+
+    /** Clears a player's transfer flag (called once the quit is handled, or if it never happens). */
+    public void clearTransferring(UUID playerId) {
+        transferring.remove(playerId);
+    }
 
     /**
      * Creates a new TransferService.
@@ -112,6 +127,13 @@ public class TransferService {
         // Record cooldown before dispatch; a sent transfer disconnects the client immediately.
         lastTransfer.put(player.getUniqueId(), now);
 
+        // #1763: flag the imminent disconnect as a transfer so the quit handler suppresses the vanilla
+        // leave message and broadcasts the themed notice. Auto-expire in case the transfer fails and no
+        // quit follows.
+        final UUID transferId = player.getUniqueId();
+        transferring.add(transferId);
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> transferring.remove(transferId), 200L);
+
         // Audit at the call site (no PlayerTransferEvent exists on spigot-api).
         logger.info("Transfer: " + player.getName() + " (" + player.getUniqueId() + ") -> '"
                 + targetName.toLowerCase() + "' (" + target.host() + ":" + target.port() + ")");
@@ -119,6 +141,7 @@ public class TransferService {
         try {
             player.transfer(target.host(), target.port());
         } catch (Exception e) {
+            transferring.remove(transferId);
             logger.error("Transfer failed for " + player.getName() + " -> " + targetName, e);
             lastTransfer.remove(player.getUniqueId());
             return new TransferResult(Status.DISABLED, "Transfer failed — see server log.");

@@ -505,6 +505,21 @@ public class PortalStepListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
+
+        // #1763: a transfer disconnect is not a real quit — suppress the vanilla leave message and
+        // broadcast the themed notice so cross-server travel reads as "moved on the network", not "quit".
+        TransferService ts = RVNKCore.getServiceSafe(TransferService.class);
+        if (ts != null && ts.isTransferring(uuid)) {
+            event.setQuitMessage(null);
+            TransferConfig tc = ts.getConfig();
+            String template = (tc != null) ? tc.getBroadcastMessage() : null;
+            if (template != null && !template.isBlank()) {
+                Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&',
+                        template.replace("{player}", event.getPlayer().getName())));
+            }
+            ts.clearTransferring(uuid);
+        }
+
         lastTrigger.remove(uuid);
         arrivalGrace.remove(uuid);
         cancelCharge(uuid);
