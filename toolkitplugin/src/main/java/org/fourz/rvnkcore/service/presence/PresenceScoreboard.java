@@ -210,24 +210,36 @@ public class PresenceScoreboard {
     private void applyNumberStyle(Objective obj) {
         try {
             Class<?> numberFormat = Class.forName("io.papermc.paper.scoreboard.numbers.NumberFormat");
-            Class<?> styleApplicable = Class.forName("net.kyori.adventure.text.format.StyleBuilderApplicable");
-            Class<?> namedColor = Class.forName("net.kyori.adventure.text.format.NamedTextColor");
 
-            Object black = namedColor.getField("BLACK").get(null);
-            Object applicables = java.lang.reflect.Array.newInstance(styleApplicable, 1);
-            java.lang.reflect.Array.set(applicables, 0, black);
+            // blank() hides the score outright — simpler and more reliable than styling it black, and
+            // visually the same result (the number stops competing with the name column).
+            Object format = numberFormat.getMethod("blank").invoke(null);
 
-            Object format = numberFormat
-                    .getMethod("styled", applicables.getClass())
-                    .invoke(null, applicables);
+            // Resolve the setter on the PUBLIC Objective interface, not obj.getClass(): the runtime
+            // class is CraftObjective, which is not an exported/accessible type, so a Method resolved
+            // from it fails with IllegalAccessException on invoke. Paper adds numberFormat to the
+            // Objective interface itself, so this both compiles (spigot-api) and works (Paper).
+            Class<?> objectiveApi = Class.forName("org.bukkit.scoreboard.Objective");
+            objectiveApi.getMethod("numberFormat", numberFormat).invoke(obj, format);
 
-            obj.getClass().getMethod("numberFormat", numberFormat).invoke(obj, format);
+            if (!numberStyleLogged) {
+                numberStyleLogged = true;
+                logger.info("Presence sidebar: score numbers hidden via Paper NumberFormat");
+            }
         } catch (Throwable t) {
-            // Non-Paper runtime or an API change — leave the default red numbers visible.
-            logger.debug("Sidebar number styling unavailable (" + t.getClass().getSimpleName()
-                    + ") — scores stay visible");
+            // Non-Paper runtime or an API change — leave the default red numbers visible. Logged once
+            // at WARNING (not debug) so a silent regression here is actually noticeable.
+            if (!numberStyleLogged) {
+                numberStyleLogged = true;
+                logger.warning("Presence sidebar: could not hide score numbers ("
+                        + t.getClass().getSimpleName() + ": " + t.getMessage()
+                        + ") — they will render in red");
+            }
         }
     }
+
+    /** Guards the one-shot log in {@link #applyNumberStyle} — render() runs on every presence change. */
+    private boolean numberStyleLogged = false;
 
     /** Clears cached visibility on quit. */
     public void forget(UUID id) {
