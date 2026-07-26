@@ -24,6 +24,10 @@ import java.io.IOException;
  *   <li>{@code POST /v1/chat/inbound} — Accept a relayed chat message from a peer server</li>
  *   <li>{@code POST /v1/chat/broadcast} — Inject a bot/persona line that mirrors to this server and
  *       every peer (used by the chatbot; #1769). Body: {@code {message, senderName?, label?}}</li>
+ *   <li>{@code POST /v1/chat/server} — Post a bot line into the SERVER room: this server only,
+ *       never relayed (#1777). Body: {@code {message, senderName?}}</li>
+ *   <li>{@code POST /v1/chat/world} — Post a bot line into the WORLD room: scoped to one world,
+ *       relayed to peers only when world-relay allows (#1777). Body: {@code {message, senderName?, world}}</li>
  * </ul>
  *
  * <p>The {@link ChatRelayService} is resolved lazily from the ServiceRegistry at request time,
@@ -65,6 +69,10 @@ public class ChatRelayController extends HttpServlet {
                 handleInbound(req, resp);
             } else if (pathInfo != null && pathInfo.equals("/broadcast")) {
                 handleBroadcast(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/server")) {
+                handleRoom(req, resp, "SERVER");
+            } else if (pathInfo != null && pathInfo.equals("/world")) {
+                handleRoom(req, resp, "WORLD");
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: POST " + pathInfo);
@@ -158,6 +166,58 @@ public class ChatRelayController extends HttpServlet {
 
         service.broadcast(message, optString(obj, "senderName"), optString(obj, "label"), components);
         ApiUtils.sendSuccess(resp, gson, "Broadcast accepted");
+    }
+
+    /**
+     * Handles {@code POST /v1/chat/server} and {@code POST /v1/chat/world} (#1777): posts a bot/persona
+     * line into a chat room, delivered by the RVNKEvents chatroom so it renders exactly like player room
+     * chat (per-viewer display modes, world scoping, WORLD-relay allowlist).
+     *
+     * <p>Body: {@code {message, senderName?}} plus {@code world} for the WORLD route. Room posts are
+     * plain text — {@code components} is rejected here and belongs on {@code /broadcast}.</p>
+     *
+     * @param room {@code SERVER} or {@code WORLD}
+     */
+    private void handleRoom(HttpServletRequest req, HttpServletResponse resp, String room)
+            throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+
+        String body = ApiUtils.readRequestBody(req);
+
+        JsonObject obj;
+        try {
+            obj = gson.fromJson(body, JsonObject.class);
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid JSON body");
+            return;
+        }
+
+        if (obj != null && obj.has("components") && !obj.get("components").isJsonNull()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                    "Room posts are plain text — use 'message'. Styled 'components' is supported on "
+                    + "POST /v1/chat/broadcast only.");
+            return;
+        }
+
+        String message = optString(obj, "message");
+        if (message == null || message.isBlank()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required field: message");
+            return;
+        }
+
+        String world = optString(obj, "world");
+        if ("WORLD".equals(room) && (world == null || world.isBlank())) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                    "Missing required field for a WORLD post: world");
+            return;
+        }
+
+        service.injectRoom(room, world, optString(obj, "senderName"), message);
+        ApiUtils.sendSuccess(resp, gson, room + " post accepted");
     }
 
     /** Reads an optional, non-null string member from a JSON object, or null when absent/null. */

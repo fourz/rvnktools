@@ -43,6 +43,10 @@ public class ChatRelayService {
     // built-in !-trigger listener stands down — the consumer owns chat routing/rendering. (#1729)
     private volatile Consumer<ChatMessageDTO> externalConsumer;
 
+    // Optional room injector (#1777): RVNKEvents delivers bot posts into the SERVER/WORLD rooms with
+    // per-viewer rendering + world-relay. Null => injectRoom falls back to the flat bot-format render.
+    private volatile Consumer<ChatMessageDTO> roomInjector;
+
     /**
      * Creates a new ChatRelayService.
      *
@@ -80,6 +84,78 @@ public class ChatRelayService {
     /** @return true when an external chatroom consumer has been registered. */
     public boolean hasExternalConsumer() {
         return externalConsumer != null;
+    }
+
+    /**
+     * Registers the room injector (#1777) — the outbound mirror of {@link #registerChatConsumer}.
+     * RVNKEvents implements it to deliver bot posts into the SERVER/WORLD rooms with the same
+     * per-viewer rendering (and world-relay) that player room chat gets. While none is registered,
+     * {@link #injectRoom} falls back to the flat bot-format render so a standalone RVNKCore still
+     * shows the line.
+     *
+     * @param injector the room-delivery consumer, or null to clear
+     */
+    public void registerRoomInjector(Consumer<ChatMessageDTO> injector) {
+        this.roomInjector = injector;
+        logger.info("Chat room injector " + (injector != null ? "registered" : "cleared")
+            + " — " + (injector != null ? "bot room posts render via the chatroom"
+                                        : "bot room posts fall back to bot-format"));
+    }
+
+    /** @return true when a room injector (RVNKEvents chatroom) has been registered. */
+    public boolean hasRoomInjector() {
+        return roomInjector != null;
+    }
+
+    /**
+     * Posts a bot/persona line into a chat room (#1777). Unlike {@link #broadcast}, this is delivered
+     * by the registered room injector (RVNKEvents) so it renders exactly like player room chat —
+     * per-viewer display modes, world scoping, and the WORLD-relay allowlist.
+     *
+     * <p>SERVER lines never leave this server. WORLD lines are scoped to {@code world} locally and are
+     * relayed to peers only by the injector, when world-relay allows it. This method deliberately does
+     * NOT call egress itself — room routing is the injector's decision.</p>
+     *
+     * @param room       {@code SERVER} or {@code WORLD}
+     * @param world      the target world name (required for WORLD; ignored for SERVER)
+     * @param senderName the persona name (defaults to {@code Bot})
+     * @param message    the message text (required; blank is ignored)
+     */
+    public void injectRoom(String room, String world, String senderName, String message) {
+        if (message == null || message.isBlank()) return;
+
+        String roomName = (room != null && !room.isBlank()) ? room.trim().toUpperCase() : "SERVER";
+        String sender = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Bot";
+
+        String msgId = UUID.randomUUID().toString();
+        markSeen(msgId);
+
+        ChatMessageDTO dto = new ChatMessageDTO(
+            msgId,
+            config.getServerId(),
+            roomName.toLowerCase(),
+            null,
+            sender,
+            message,
+            System.currentTimeMillis()
+        );
+        dto.setRoom(roomName);
+        dto.setWorld(world);
+        dto.setServerLabel(config.getServerLabel());
+
+        Consumer<ChatMessageDTO> injector = this.roomInjector;
+        if (injector != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> injector.accept(dto));
+            logger.debug("Chat room inject: " + roomName
+                + (world != null && !world.isEmpty() ? ":" + world : "")
+                + " by " + sender + " (" + msgId + ")");
+            return;
+        }
+
+        // No chatroom present — degrade to the flat bot-format render (local only).
+        dto.setLabel(roomName);
+        renderBot(dto);
+        logger.debug("Chat room inject fallback (no injector): " + roomName + " (" + msgId + ")");
     }
 
     /**
