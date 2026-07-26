@@ -78,12 +78,25 @@ public class PresenceListener implements Listener {
             event.setCancelled(true);
             String arg = sidebarArg(event.getMessage());
             if (arg != null) {
-                boolean shown = arg.equals("toggle")
-                        ? scoreboard.toggle(event.getPlayer())
-                        : scoreboard.setShown(event.getPlayer(), arg.equals("on"));
-                event.getPlayer().sendMessage(shown
-                        ? ChatColor.GREEN + "Network sidebar shown."
-                        : ChatColor.GRAY + "Network sidebar hidden. Use /list on to show it again.");
+                Player player = event.getPlayer();
+                if (arg.equals("toggle")) {
+                    boolean shown = scoreboard.toggle(player);
+                    player.sendMessage(shown
+                            ? ChatColor.GREEN + "Network roster: sidebar."
+                            : ChatColor.GRAY + "Network roster hidden. Use /list sidebar or /list tab.");
+                } else {
+                    // sidebar | tab | off | on (on is an alias for sidebar) — #1793
+                    PresenceScoreboard.Surface target =
+                            PresenceScoreboard.Surface.parse(arg, PresenceScoreboard.Surface.SIDEBAR);
+                    scoreboard.setSurface(player, target);
+                    switch (target) {
+                        case SIDEBAR -> player.sendMessage(ChatColor.GREEN + "Network roster: sidebar.");
+                        case TAB -> player.sendMessage(ChatColor.GREEN
+                                + "Network roster moved to the tab list — hold Tab to see it.");
+                        case OFF -> player.sendMessage(ChatColor.GRAY
+                                + "Network roster hidden. Use /list sidebar or /list tab.");
+                    }
+                }
             } else {
                 sendRoster(event.getPlayer());
             }
@@ -91,7 +104,7 @@ public class PresenceListener implements Listener {
     }
 
     /** Sidebar sub-arguments accepted by {@code /list} and {@code /glist} (#1783). */
-    private static final List<String> SIDEBAR_ARGS = List.of("toggle", "on", "off");
+    private static final List<String> SIDEBAR_ARGS = List.of("sidebar", "tab", "off", "toggle", "on");
 
     /**
      * Returns the normalised sidebar sub-argument ({@code toggle} / {@code on} / {@code off}) when the

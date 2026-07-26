@@ -43,8 +43,8 @@ public class PresenceScoreboard {
     private final Scoreboard board;
     private Objective objective;
 
-    /** Cached per-player visibility (true = show). Absent → default shown. */
-    private final Map<UUID, Boolean> showCache = new ConcurrentHashMap<>();
+    /** Cached per-player surface. Absent → default SIDEBAR. */
+    private final Map<UUID, Surface> surfaceCache = new ConcurrentHashMap<>();
 
     /**
      * @param plugin owning plugin
@@ -60,34 +60,88 @@ public class PresenceScoreboard {
         this.objective.setDisplaySlot(DisplaySlot.SIDEBAR);
     }
 
-    /** True when the player's cached preference says show (default on). */
+    /** Where a player wants the network roster drawn (#1793). */
+    public enum Surface {
+        /** Right-of-screen scoreboard sidebar (default; always visible). */
+        SIDEBAR,
+        /** Tab-list footer — zero screen cost, visible while holding Tab. */
+        TAB,
+        /** Not shown at all. */
+        OFF;
+
+        /** Parses a token, falling back to {@code def} for anything unrecognised. */
+        public static Surface parse(String token, Surface def) {
+            if (token == null) return def;
+            switch (token.trim().toLowerCase(java.util.Locale.ROOT)) {
+                case "sidebar": case "side": case "on":  return SIDEBAR;
+                case "tab": case "list":                 return TAB;
+                case "off": case "none": case "hide":    return OFF;
+                default:                                 return def;
+            }
+        }
+
+        public String token() { return name().toLowerCase(java.util.Locale.ROOT); }
+    }
+
+    /** Metadata key holding the chosen surface. Stored beside the legacy boolean, not replacing it. */
+    public static final String PREF_SURFACE_KEY = "presence-surface";
+
+    /** The player's cached surface (default SIDEBAR). */
+    private Surface surface(UUID id) {
+        return surfaceCache.getOrDefault(id, Surface.SIDEBAR);
+    }
+
+    /** True when the player's cached preference draws the sidebar. */
     private boolean shown(UUID id) {
-        return showCache.getOrDefault(id, Boolean.TRUE);
+        return surface(id) == Surface.SIDEBAR;
     }
 
     /**
-     * Loads the player's persisted visibility preference and applies the sidebar accordingly. Called on
-     * join; async, resolves on the main thread.
+     * Loads the player's persisted surface preference and applies it. Called on join; async, resolves on
+     * the main thread.
+     *
+     * <p><b>Migration (#1793):</b> the surface is stored in preference metadata, but earlier builds only
+     * had the boolean {@code presence_sidebar} notification type. When the metadata key is absent we
+     * derive the surface from that boolean — enabled becomes {@code SIDEBAR}, disabled becomes
+     * {@code OFF} — so nobody's existing on/off choice is silently reset to the default.</p>
      *
      * @param player the joining player
      */
     public void loadAndApply(Player player) {
         UUID id = player.getUniqueId();
         if (prefs == null) {
-            showCache.put(id, Boolean.TRUE);
-            applyNow(player, true);
+            surfaceCache.put(id, Surface.SIDEBAR);
+            applyNow(player, Surface.SIDEBAR);
             return;
         }
-        prefs.isNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE).thenAccept(enabled -> {
-            boolean show = enabled == null || enabled;
-            showCache.put(id, show);
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                Player p = Bukkit.getPlayer(id);
-                if (p != null) applyNow(p, show);
+        prefs.getPreferences(id, PREF_PLUGIN_ID).thenAccept(dto -> {
+            String stored = (dto != null && dto.getMetadata() != null)
+                    ? dto.getMetadata().get(PREF_SURFACE_KEY) : null;
+
+            if (stored != null && !stored.isBlank()) {
+                applyResolved(id, Surface.parse(stored, Surface.SIDEBAR));
+                return;
+            }
+            // No surface recorded yet — inherit the legacy boolean so an existing "off" is respected.
+            prefs.isNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE).thenAccept(enabled -> {
+                boolean on = enabled == null || enabled;
+                applyResolved(id, on ? Surface.SIDEBAR : Surface.OFF);
+            }).exceptionally(e -> {
+                applyResolved(id, Surface.SIDEBAR);
+                return null;
             });
         }).exceptionally(e -> {
-            showCache.put(id, Boolean.TRUE);
+            applyResolved(id, Surface.SIDEBAR);
             return null;
+        });
+    }
+
+    /** Caches the resolved surface and applies it on the main thread. */
+    private void applyResolved(UUID id, Surface resolved) {
+        surfaceCache.put(id, resolved);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) applyNow(p, resolved);
         });
     }
 
@@ -137,10 +191,37 @@ public class PresenceScoreboard {
             score--;
         }
 
+        // Tab footer carries the same roster for players on the TAB surface (#1793). The tab LIST itself
+        // only enumerates local players — remote ones cannot be real rows without packet work — so the
+        // merged roster lives in the footer text instead.
+        lastTabFooter = ChatColor.GOLD + "" + ChatColor.BOLD + "Network"
+                + ChatColor.GRAY + " (" + total + ")\n"
+                + String.join("\n", lines);
+
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (shown(p.getUniqueId())) {
-                p.setScoreboard(board);
+            switch (surface(p.getUniqueId())) {
+                case SIDEBAR -> p.setScoreboard(board);
+                case TAB -> p.setPlayerListHeaderFooter("", lastTabFooter);
+                case OFF -> { /* nothing to refresh */ }
             }
+        }
+    }
+
+    /** Most recent tab-footer text, reused when a player switches onto the TAB surface between renders. */
+    private volatile String lastTabFooter = "";
+
+    /**
+     * Applies a surface to one player, clearing whichever surface they are leaving (#1793) — without
+     * this a switch would leave a stale sidebar or a stale tab footer behind.
+     */
+    private void applyNow(Player player, Surface target) {
+        // Always clear the tab footer first; it is re-set below only when TAB is the target.
+        if (target != Surface.TAB) {
+            player.setPlayerListHeaderFooter("", "");
+        }
+        applyNow(player, target == Surface.SIDEBAR);
+        if (target == Surface.TAB) {
+            player.setPlayerListHeaderFooter("", lastTabFooter);
         }
     }
 
@@ -164,6 +245,36 @@ public class PresenceScoreboard {
     }
 
     /**
+     * Sets the player's roster surface and persists it (#1793).
+     *
+     * @param player  the player
+     * @param target  the surface to switch to
+     * @return the surface now in effect
+     */
+    public Surface setSurface(Player player, Surface target) {
+        UUID id = player.getUniqueId();
+        surfaceCache.put(id, target);
+        applyNow(player, target);
+
+        if (prefs != null) {
+            // Persist the surface in metadata, and keep the legacy boolean in step so anything still
+            // reading presence_sidebar (or an older build during a rollback) sees a consistent state.
+            prefs.getPreferences(id, PREF_PLUGIN_ID).thenAccept(dto -> {
+                if (dto == null) return;
+                dto.getMetadata().put(PREF_SURFACE_KEY, target.token());
+                prefs.savePreferences(dto);
+            }).exceptionally(e -> {
+                logger.warning("Failed to persist presence surface for " + player.getName()
+                        + ": " + e.getMessage());
+                return null;
+            });
+            prefs.setNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE, target != Surface.OFF)
+                 .exceptionally(e -> null);
+        }
+        return target;
+    }
+
+    /**
      * Sets the sidebar visibility explicitly and persists the choice (#1783). Idempotent — unlike
      * {@link #toggle}, calling it twice with the same value leaves the state unchanged, which is what
      * {@code /list on} and {@code /list off} need for macros and scripted use.
@@ -174,8 +285,9 @@ public class PresenceScoreboard {
      */
     public boolean setShown(Player player, boolean show) {
         UUID id = player.getUniqueId();
-        showCache.put(id, show);
-        applyNow(player, show);
+        Surface target = show ? Surface.SIDEBAR : Surface.OFF;
+        surfaceCache.put(id, target);
+        applyNow(player, target);
         if (prefs != null) {
             prefs.setNotificationEnabled(id, PREF_PLUGIN_ID, PREF_TYPE, show).exceptionally(e -> {
                 logger.warning("Failed to persist presence sidebar preference for " + player.getName()
@@ -243,7 +355,7 @@ public class PresenceScoreboard {
 
     /** Clears cached visibility on quit. */
     public void forget(UUID id) {
-        showCache.remove(id);
+        surfaceCache.remove(id);
     }
 
     private static String safeName(String name) {
