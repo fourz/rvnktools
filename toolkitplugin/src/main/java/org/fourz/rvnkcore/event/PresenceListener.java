@@ -111,9 +111,16 @@ public class PresenceListener implements Listener {
      * on {@link PlayerCommandPreprocessEvent}, which intercepts execution only — vanilla {@code /list}
      * owns its own completions, so the sidebar arguments are invisible without this handler.
      *
+     * <p>Runs at {@link EventPriority#HIGHEST} deliberately: handlers fire lowest-to-highest, so the
+     * <b>last</b> writer wins. At LOWEST, Paper's own {@code /list} completer (which offers
+     * {@code uuids}) ran afterwards and overwrote ours — the completions showed {@code uuids} instead
+     * of the sidebar arguments. We replace the list outright rather than merging, because the override
+     * cancels {@code /list} execution and always prints the roster, so {@code uuids} would be a
+     * suggestion that does nothing.</p>
+     *
      * @param event the tab-complete event
      */
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTabComplete(TabCompleteEvent event) {
         String buffer = event.getBuffer();
         String cmd = commandWord(buffer);
