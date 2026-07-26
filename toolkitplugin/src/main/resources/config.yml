@@ -106,6 +106,8 @@ chat-relay:
   # {label} (bracket tag), {sender} (persona name), {message}. A single broadcast mirrors to this
   # server AND every peer, rendered identically. NOTE: adding this key here does NOT reach a server
   # that already has a config.yml (#1563) — the coded default below applies until an operator adds it.
+  # A broadcast may instead carry a tellraw JSON "components" payload (#1773); those render styled via
+  # `tellraw @a <components>` (full colour/hover/click) and BYPASS this bot-format entirely.
   bot-format: "&8[&d{label}&8]&r &d{sender}&7: &f{message}"
   peers: []                # List of peer servers. Example (uncomment and fill in):
   #  - id: "prod"                                          # peer's chat-relay.server-id

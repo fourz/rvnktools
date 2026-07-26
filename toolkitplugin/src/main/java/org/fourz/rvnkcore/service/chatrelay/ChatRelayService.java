@@ -110,18 +110,26 @@ public class ChatRelayService {
     }
 
     /**
-     * Broadcasts a bot/persona line to this server and every peer (#1769). Unlike player chat, a REST
-     * injection has no local chat event to piggyback on, so the origin renders locally itself; peers
+     * Broadcasts a bot/persona line to this server and every peer (#1769, #1773). Unlike player chat, a
+     * REST injection has no local chat event to piggyback on, so the origin renders locally itself; peers
      * render it in {@link #receiveInbound} via the {@code BOT}-room branch. The line carries {@code
      * room=BOT}, this server's id as origin, and a fresh {@code msgId} for dedup. Fan-out to peers only
      * happens when the relay is enabled; a standalone server still shows the line locally.
      *
-     * @param message    The message text (required; blank is ignored)
+     * <p>When {@code components} is a non-blank tellraw JSON string, every server renders it via
+     * {@code tellraw @a <components>} (full colour/hover/click); otherwise it falls back to {@code
+     * message} + {@code chat-relay.bot-format}. Sending both lets peers still on a pre-1.5.43 build
+     * degrade to the flat text.</p>
+     *
+     * @param message    The plain-text fallback (used when components is blank, and by older peers)
      * @param senderName The persona name substituted as {@code {sender}} (defaults to {@code Bot})
      * @param label      The bracket tag substituted as {@code {label}} (defaults to {@code Bot})
+     * @param components Raw tellraw JSON (array/object) for a styled line, or null/blank for plain text
      */
-    public void broadcast(String message, String senderName, String label) {
-        if (message == null || message.isBlank()) return;
+    public void broadcast(String message, String senderName, String label, String components) {
+        boolean hasText = message != null && !message.isBlank();
+        boolean hasComponents = components != null && !components.isBlank();
+        if (!hasText && !hasComponents) return;
 
         String msgId = UUID.randomUUID().toString();
         markSeen(msgId);
@@ -141,16 +149,37 @@ public class ChatRelayService {
         dto.setRoom("BOT");
         dto.setLabel(tag);
         dto.setServerLabel(config.getServerLabel());
+        if (hasComponents) {
+            dto.setComponents(components);
+        }
 
         // Origin local echo (main thread — the inbound REST POST is handled off-thread by Jetty).
-        String formatted = formatBot(dto);
-        Bukkit.getScheduler().runTask(plugin, () -> Bukkit.broadcastMessage(ChatFormat.colorize(formatted)));
+        renderBot(dto);
 
         // Fan out to peers (no-op with no peers / relay disabled).
         if (config.isEnabled()) {
             egress.send(dto);
         }
-        logger.debug("Chat broadcast (bot): [" + tag + "] " + sender + " (" + msgId + ")");
+        logger.debug("Chat broadcast (bot): [" + tag + "] " + sender
+            + (hasComponents ? " [styled]" : "") + " (" + msgId + ")");
+    }
+
+    /**
+     * Renders a {@code BOT}-room line on the main thread: as a styled {@code tellraw @a <components>}
+     * when the DTO carries tellraw JSON (#1773), otherwise as a flat {@code bot-format} broadcast.
+     *
+     * @param dto The BOT-room message
+     */
+    private void renderBot(ChatMessageDTO dto) {
+        String comp = dto.getComponents();
+        if (comp != null && !comp.isBlank()) {
+            final String json = comp;
+            Bukkit.getScheduler().runTask(plugin, () ->
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tellraw @a " + json));
+        } else {
+            final String line = formatBot(dto);
+            Bukkit.getScheduler().runTask(plugin, () -> Bukkit.broadcastMessage(ChatFormat.colorize(line)));
+        }
     }
 
     /**
@@ -257,12 +286,14 @@ public class ChatRelayService {
             dto.setServerLabel(config.resolvePeerTag(dto.getOriginServerId()));
         }
 
-        // BOT-room lines (#1769) render via bot-format and BYPASS the external chatroom consumer — a
-        // persona broadcast is not a player chat line and must look identical on every tier.
+        // BOT-room lines (#1769, #1773) render via renderBot (styled tellraw when components are present,
+        // else bot-format) and BYPASS the external chatroom consumer — a persona broadcast is not a
+        // player chat line and must look identical on every tier.
         if ("BOT".equalsIgnoreCase(dto.getRoom())) {
-            String botLine = formatBot(dto);
-            Bukkit.getScheduler().runTask(plugin, () -> Bukkit.broadcastMessage(ChatFormat.colorize(botLine)));
-            logger.debug("Chat relay inbound bot broadcast (" + dto.getMsgId() + ")");
+            renderBot(dto);
+            logger.debug("Chat relay inbound bot broadcast"
+                + (dto.getComponents() != null && !dto.getComponents().isBlank() ? " [styled]" : "")
+                + " (" + dto.getMsgId() + ")");
             return;
         }
 

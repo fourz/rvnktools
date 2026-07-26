@@ -31,6 +31,12 @@ public class ChatMessageDTO {
      * {@code chat-relay.bot-format} as {@code {label}}. Ignored for player chat. (#1769)
      */
     private String label;
+    /**
+     * Raw tellraw JSON (array or object) for a styled {@code BOT}-room line (#1773). When present,
+     * receivers render it via {@code tellraw @a <components>} — full colour/hover/click — instead of
+     * the flat {@code bot-format}. Null falls back to {@link #message} + {@code bot-format}.
+     */
+    private String components;
 
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
@@ -77,4 +83,7 @@ public class ChatMessageDTO {
 
     public String getLabel() { return label; }
     public void setLabel(String label) { this.label = label; }
+
+    public String getComponents() { return components; }
+    public void setComponents(String components) { this.components = components; }
 }

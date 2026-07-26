@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import jakarta.servlet.http.HttpServlet;
@@ -100,10 +101,15 @@ public class ChatRelayController extends HttpServlet {
         ApiUtils.sendSuccess(resp, gson, "Message accepted");
     }
 
+    /** Upper bound on the serialized {@code components} JSON, guarding the console tellraw dispatch. */
+    private static final int MAX_COMPONENTS_LEN = 8000;
+
     /**
      * Handles {@code POST /v1/chat/broadcast}: injects a bot/persona line that mirrors to this server
-     * and every peer (#1769). The caller (chatbot) POSTs {@code {message, senderName?, label?}} to any
-     * one tier; the mesh distributes. Only {@code message} is required.
+     * and every peer (#1769, #1773). The caller (chatbot) POSTs {@code {message?, senderName?, label?,
+     * components?}} to any one tier; the mesh distributes. At least one of {@code message} or {@code
+     * components} is required — {@code components} (a tellraw JSON array/object) renders styled via
+     * {@code tellraw @a}; {@code message} is the flat-text fallback.
      */
     private void handleBroadcast(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         ChatRelayService service = getService();
@@ -123,12 +129,34 @@ public class ChatRelayController extends HttpServlet {
         }
 
         String message = optString(obj, "message");
-        if (message == null || message.isBlank()) {
-            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required field: message");
+
+        // Optional styled components: must be a tellraw JSON array/object. Re-serialize compact,
+        // strip newlines (single-line console dispatch), and bound the length.
+        String components = null;
+        if (obj != null && obj.has("components") && !obj.get("components").isJsonNull()) {
+            JsonElement compEl = obj.get("components");
+            if (!compEl.isJsonArray() && !compEl.isJsonObject()) {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                        "components must be a tellraw JSON array or object");
+                return;
+            }
+            components = gson.toJson(compEl).replace("\r", "").replace("\n", "");
+            if (components.length() > MAX_COMPONENTS_LEN) {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                        "components too large (max " + MAX_COMPONENTS_LEN + " chars)");
+                return;
+            }
+        }
+
+        boolean hasMessage = message != null && !message.isBlank();
+        boolean hasComponents = components != null && !components.isBlank();
+        if (!hasMessage && !hasComponents) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                    "Provide 'message' and/or 'components'");
             return;
         }
 
-        service.broadcast(message, optString(obj, "senderName"), optString(obj, "label"));
+        service.broadcast(message, optString(obj, "senderName"), optString(obj, "label"), components);
         ApiUtils.sendSuccess(resp, gson, "Broadcast accepted");
     }
 
