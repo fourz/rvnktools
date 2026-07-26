@@ -26,6 +26,11 @@ public class ChatMessageDTO {
     private String world;
     /** Friendly origin-server label stamped by the sender (e.g. {@code nations}, {@code event}). */
     private String serverLabel;
+    /**
+     * Bracket tag for {@code BOT}-room lines (e.g. {@code Bot}), substituted into
+     * {@code chat-relay.bot-format} as {@code {label}}. Ignored for player chat. (#1769)
+     */
+    private String label;
 
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
@@ -69,4 +74,7 @@ public class ChatMessageDTO {
 
     public String getServerLabel() { return serverLabel; }
     public void setServerLabel(String serverLabel) { this.serverLabel = serverLabel; }
+
+    public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
 }

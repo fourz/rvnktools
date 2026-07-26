@@ -1,6 +1,7 @@
 package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +21,8 @@ import java.io.IOException;
  * <h3>Endpoints</h3>
  * <ul>
  *   <li>{@code POST /v1/chat/inbound} — Accept a relayed chat message from a peer server</li>
+ *   <li>{@code POST /v1/chat/broadcast} — Inject a bot/persona line that mirrors to this server and
+ *       every peer (used by the chatbot; #1769). Body: {@code {message, senderName?, label?}}</li>
  * </ul>
  *
  * <p>The {@link ChatRelayService} is resolved lazily from the ServiceRegistry at request time,
@@ -59,6 +62,8 @@ public class ChatRelayController extends HttpServlet {
         try {
             if (pathInfo != null && pathInfo.equals("/inbound")) {
                 handleInbound(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/broadcast")) {
+                handleBroadcast(req, resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: POST " + pathInfo);
@@ -93,5 +98,45 @@ public class ChatRelayController extends HttpServlet {
 
         service.receiveInbound(dto);
         ApiUtils.sendSuccess(resp, gson, "Message accepted");
+    }
+
+    /**
+     * Handles {@code POST /v1/chat/broadcast}: injects a bot/persona line that mirrors to this server
+     * and every peer (#1769). The caller (chatbot) POSTs {@code {message, senderName?, label?}} to any
+     * one tier; the mesh distributes. Only {@code message} is required.
+     */
+    private void handleBroadcast(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+
+        String body = ApiUtils.readRequestBody(req);
+
+        JsonObject obj;
+        try {
+            obj = gson.fromJson(body, JsonObject.class);
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid JSON body");
+            return;
+        }
+
+        String message = optString(obj, "message");
+        if (message == null || message.isBlank()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required field: message");
+            return;
+        }
+
+        service.broadcast(message, optString(obj, "senderName"), optString(obj, "label"));
+        ApiUtils.sendSuccess(resp, gson, "Broadcast accepted");
+    }
+
+    /** Reads an optional, non-null string member from a JSON object, or null when absent/null. */
+    private static String optString(JsonObject obj, String key) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return null;
+        }
+        return obj.get(key).getAsString();
     }
 }

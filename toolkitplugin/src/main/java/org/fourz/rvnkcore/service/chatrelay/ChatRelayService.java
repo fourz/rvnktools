@@ -109,6 +109,67 @@ public class ChatRelayService {
         egress.send(dto);
     }
 
+    /**
+     * Broadcasts a bot/persona line to this server and every peer (#1769). Unlike player chat, a REST
+     * injection has no local chat event to piggyback on, so the origin renders locally itself; peers
+     * render it in {@link #receiveInbound} via the {@code BOT}-room branch. The line carries {@code
+     * room=BOT}, this server's id as origin, and a fresh {@code msgId} for dedup. Fan-out to peers only
+     * happens when the relay is enabled; a standalone server still shows the line locally.
+     *
+     * @param message    The message text (required; blank is ignored)
+     * @param senderName The persona name substituted as {@code {sender}} (defaults to {@code Bot})
+     * @param label      The bracket tag substituted as {@code {label}} (defaults to {@code Bot})
+     */
+    public void broadcast(String message, String senderName, String label) {
+        if (message == null || message.isBlank()) return;
+
+        String msgId = UUID.randomUUID().toString();
+        markSeen(msgId);
+
+        String sender = (senderName != null && !senderName.isBlank()) ? senderName.trim() : "Bot";
+        String tag = (label != null && !label.isBlank()) ? label.trim() : "Bot";
+
+        ChatMessageDTO dto = new ChatMessageDTO(
+            msgId,
+            config.getServerId(),
+            "bot",
+            null,
+            sender,
+            message,
+            System.currentTimeMillis()
+        );
+        dto.setRoom("BOT");
+        dto.setLabel(tag);
+        dto.setServerLabel(config.getServerLabel());
+
+        // Origin local echo (main thread — the inbound REST POST is handled off-thread by Jetty).
+        String formatted = formatBot(dto);
+        Bukkit.getScheduler().runTask(plugin, () -> Bukkit.broadcastMessage(ChatFormat.colorize(formatted)));
+
+        // Fan out to peers (no-op with no peers / relay disabled).
+        if (config.isEnabled()) {
+            egress.send(dto);
+        }
+        logger.debug("Chat broadcast (bot): [" + tag + "] " + sender + " (" + msgId + ")");
+    }
+
+    /**
+     * Renders a {@code BOT}-room line via {@code chat-relay.bot-format}, substituting {@code {label}},
+     * {@code {sender}}, and {@code {message}}. Colour codes are applied by the caller.
+     *
+     * @param dto The BOT-room message
+     * @return the substituted (not-yet-colourised) format string
+     */
+    private String formatBot(ChatMessageDTO dto) {
+        String label = (dto.getLabel() != null && !dto.getLabel().isEmpty()) ? dto.getLabel() : "Bot";
+        String sender = (dto.getSenderName() != null && !dto.getSenderName().isEmpty()) ? dto.getSenderName() : "Bot";
+        String message = dto.getMessage() != null ? dto.getMessage() : "";
+        return config.getBotFormat()
+            .replace("{label}", label)
+            .replace("{sender}", sender)
+            .replace("{message}", message);
+    }
+
     /** @return this server's id (e.g. {@code event}, {@code prod}). */
     public String getServerId() { return config.getServerId(); }
 
@@ -194,6 +255,15 @@ public class ChatRelayService {
         // Fallback-stamp the friendly label from peer config when the origin did not (older payloads).
         if (dto.getServerLabel() == null || dto.getServerLabel().isEmpty()) {
             dto.setServerLabel(config.resolvePeerTag(dto.getOriginServerId()));
+        }
+
+        // BOT-room lines (#1769) render via bot-format and BYPASS the external chatroom consumer — a
+        // persona broadcast is not a player chat line and must look identical on every tier.
+        if ("BOT".equalsIgnoreCase(dto.getRoom())) {
+            String botLine = formatBot(dto);
+            Bukkit.getScheduler().runTask(plugin, () -> Bukkit.broadcastMessage(ChatFormat.colorize(botLine)));
+            logger.debug("Chat relay inbound bot broadcast (" + dto.getMsgId() + ")");
+            return;
         }
 
         // Delegate to the external chatroom consumer (RVNKEvents) when registered — it owns rendering.

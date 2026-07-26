@@ -30,6 +30,12 @@ public class ChatRelayConfig {
     public record Peer(String id, String tag, String url, String apiKey) {
     }
 
+    /**
+     * Default render for {@code BOT}-room broadcast lines (#1769). ASCII-safe (no smart punctuation,
+     * #1753). Placeholders: {@code {label}} (bracket tag), {@code {sender}} (persona), {@code {message}}.
+     */
+    public static final String DEFAULT_BOT_FORMAT = "&8[&d{label}&8]&r &d{sender}&7: &f{message}";
+
     private final boolean enabled;
     private final String serverId;
     private final String serverLabel;
@@ -37,10 +43,12 @@ public class ChatRelayConfig {
     private final int dedupCacheSize;
     private final int timeoutMs;
     private final boolean insecureTls;
+    private final String botFormat;
     private final List<Peer> peers;
 
     private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
-                            int dedupCacheSize, int timeoutMs, boolean insecureTls, List<Peer> peers) {
+                            int dedupCacheSize, int timeoutMs, boolean insecureTls, String botFormat,
+                            List<Peer> peers) {
         this.enabled = enabled;
         this.serverId = serverId != null ? serverId.trim() : "";
         // Friendly label for THIS server (e.g. "nations", "event"); stamped on outgoing chatroom
@@ -51,6 +59,7 @@ public class ChatRelayConfig {
         this.dedupCacheSize = dedupCacheSize > 0 ? dedupCacheSize : 512;
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 3000;
         this.insecureTls = insecureTls;
+        this.botFormat = (botFormat != null && !botFormat.isEmpty()) ? botFormat : DEFAULT_BOT_FORMAT;
         this.peers = peers != null ? Collections.unmodifiableList(peers) : Collections.emptyList();
     }
 
@@ -62,7 +71,8 @@ public class ChatRelayConfig {
      */
     public static ChatRelayConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new ChatRelayConfig(false, "", "", "!", 512, 3000, false, Collections.emptyList());
+            return new ChatRelayConfig(false, "", "", "!", 512, 3000, false, DEFAULT_BOT_FORMAT,
+                    Collections.emptyList());
         }
 
         List<Peer> peers = new ArrayList<>();
@@ -104,6 +114,7 @@ public class ChatRelayConfig {
             section.getInt("dedup-cache-size", 512),
             section.getInt("timeout-ms", 3000),
             section.getBoolean("insecure-tls", false),
+            section.getString("bot-format", DEFAULT_BOT_FORMAT),
             peers
         );
     }
@@ -180,5 +191,6 @@ public class ChatRelayConfig {
     public int getDedupCacheSize() { return dedupCacheSize; }
     public int getTimeoutMs() { return timeoutMs; }
     public boolean isInsecureTls() { return insecureTls; }
+    public String getBotFormat() { return botFormat; }
     public List<Peer> getPeers() { return peers; }
 }

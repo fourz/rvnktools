@@ -102,6 +102,11 @@ chat-relay:
   channel-trigger: "!"     # Prefix that marks a chat line as global (stripped before relay)
   dedup-cache-size: 512    # Bounded LRU of recent msgIds for loop/duplicate suppression
   timeout-ms: 3000         # Per-peer HTTP timeout
+  # Render for bot/persona lines injected via POST /v1/chat/broadcast (#1769). Placeholders:
+  # {label} (bracket tag), {sender} (persona name), {message}. A single broadcast mirrors to this
+  # server AND every peer, rendered identically. NOTE: adding this key here does NOT reach a server
+  # that already has a config.yml (#1563) — the coded default below applies until an operator adds it.
+  bot-format: "&8[&d{label}&8]&r &d{sender}&7: &f{message}"
   peers: []                # List of peer servers. Example (uncomment and fill in):
   #  - id: "prod"                                          # peer's chat-relay.server-id
   #    tag: "P"                                            # short tag rendered on relayed lines
