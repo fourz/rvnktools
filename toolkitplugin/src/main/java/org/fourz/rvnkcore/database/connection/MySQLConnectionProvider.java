@@ -55,6 +55,14 @@ public class MySQLConnectionProvider implements ConnectionProvider {
         try {
             Connection conn = dataSource.getConnection();
             if (!conn.isValid(5)) {
+                // #1766: return the dead connection to the pool (HikariCP evicts it) before failing —
+                // throwing while it is still checked out leaks it, and repeated validation failures on
+                // a cross-host drop exhaust the pool (the "Apparent connection leak" warnings).
+                try {
+                    conn.close();
+                } catch (SQLException closeEx) {
+                    logger.debug("Failed to close invalid connection: " + closeEx.getMessage());
+                }
                 throw new SQLException("Connection validation failed");
             }
             return conn;
