@@ -105,15 +105,27 @@ public class PresenceScoreboard {
         objective = board.registerNewObjective("netlist", "dummy",
                 TITLE + ChatColor.GRAY + " (" + total + ")");
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        applyNumberStyle(objective);
 
+        // Flat, column-aligned roster (#1786): "<name padded> <server letter>", one row per player,
+        // instead of a per-server header block. The server is a single letter (T/E/N) so the name
+        // column stays wide and the eye can scan one list rather than nested groups.
         List<String> lines = new java.util.ArrayList<>();
+        int nameWidth = 0;
         for (PresenceService.ServerGroup g : groups) {
-            String header = (g.isLocal() ? ChatColor.GREEN : ChatColor.AQUA) + "["
-                    + ChatColor.WHITE + g.getLabel() + (g.isLocal() ? ChatColor.GREEN : ChatColor.AQUA) + "] "
-                    + ChatColor.GRAY + g.getPlayers().size();
-            lines.add(header);
             for (PresenceDTO.Entry e : g.getPlayers()) {
-                lines.add(ChatColor.GRAY + " " + ChatColor.WHITE + safeName(e.getName()));
+                nameWidth = Math.max(nameWidth, safeName(e.getName()).length());
+            }
+        }
+        nameWidth = Math.min(nameWidth, 16);   // MC name cap; keeps padding sane on odd data
+
+        for (PresenceService.ServerGroup g : groups) {
+            String letter = serverLetter(g.getLabel());
+            ChatColor letterColor = g.isLocal() ? ChatColor.GREEN : ChatColor.AQUA;
+            for (PresenceDTO.Entry e : g.getPlayers()) {
+                String name = safeName(e.getName());
+                String pad = " ".repeat(Math.max(1, nameWidth - name.length() + 2));
+                lines.add(ChatColor.WHITE + name + pad + letterColor + letter);
                 if (lines.size() >= MAX_LINES) break;
             }
             if (lines.size() >= MAX_LINES) break;
@@ -172,6 +184,49 @@ public class PresenceScoreboard {
             });
         }
         return show;
+    }
+
+    /**
+     * Single-letter server code for the roster's right-hand column (#1786) — {@code test→T},
+     * {@code event→E}, {@code nations→N}. Uses the first character of the configured label so a new
+     * server needs no code change.
+     */
+    private static String serverLetter(String label) {
+        if (label == null || label.isEmpty()) return "?";
+        return label.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * Styles the sidebar's score numbers black so they read as background rather than data (#1786).
+     *
+     * <p>Minecraft always renders sidebar scores, in red, and there is no way to suppress them through
+     * spigot-api — which is what RVNKCore compiles against. Paper does expose
+     * {@code Objective#numberFormat}, and every RVNK tier runs Paper, so this reaches it reflectively:
+     * compile against spigot, use the richer API when the runtime provides it. If anything is missing
+     * the numbers simply stay red, which is the current behaviour — never a startup failure.</p>
+     *
+     * <p>Swap {@code BLACK} for {@code RED} (or drop the call) to make the numbers prominent again.</p>
+     */
+    private void applyNumberStyle(Objective obj) {
+        try {
+            Class<?> numberFormat = Class.forName("io.papermc.paper.scoreboard.numbers.NumberFormat");
+            Class<?> styleApplicable = Class.forName("net.kyori.adventure.text.format.StyleBuilderApplicable");
+            Class<?> namedColor = Class.forName("net.kyori.adventure.text.format.NamedTextColor");
+
+            Object black = namedColor.getField("BLACK").get(null);
+            Object applicables = java.lang.reflect.Array.newInstance(styleApplicable, 1);
+            java.lang.reflect.Array.set(applicables, 0, black);
+
+            Object format = numberFormat
+                    .getMethod("styled", applicables.getClass())
+                    .invoke(null, applicables);
+
+            obj.getClass().getMethod("numberFormat", numberFormat).invoke(obj, format);
+        } catch (Throwable t) {
+            // Non-Paper runtime or an API change — leave the default red numbers visible.
+            logger.debug("Sidebar number styling unavailable (" + t.getClass().getSimpleName()
+                    + ") — scores stay visible");
+        }
     }
 
     /** Clears cached visibility on quit. */

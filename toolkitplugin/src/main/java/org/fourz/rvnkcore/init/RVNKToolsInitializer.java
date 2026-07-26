@@ -21,7 +21,6 @@ import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
@@ -207,7 +206,8 @@ public class RVNKToolsInitializer {
     }
 
     private void registerEventListeners() {
-        plugin.getServer().getPluginManager().registerEvents(new JoinListener(plugin), plugin);
+        // JoinListener moved to RVNKEvents (#1788) — player-facing welcome/join messaging is
+        // announcement content, which RVNKEvents owns. Do not re-register it here.
         plugin.getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), plugin);
 
         // Register core tracking listeners

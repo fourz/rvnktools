@@ -298,10 +298,8 @@ permissions:
     default: op
 
   # ── Welcome ──────────────────────────────────────────────────────────────
-  rvnktools.welcome:
-    description: Allows player to receive welcome messages
-  rvnktools.welcome.newplayer:
-    description: Sends welcome message to new players
+  # MOVED to RVNKEvents as rvnkevents.welcome{,.newplayer} (#1788). Nodes retained here only as a
+  # breadcrumb; JoinListener no longer lives in this plugin. Remove after the tiers are re-granted.
 
   # ── Preferences (rvnkcore.*) ─────────────────────────────────────────────
   rvnkcore.prefs:
