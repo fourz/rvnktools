@@ -105,6 +105,11 @@ public class RVNKCoreCommand extends BaseCommand {
             case "migrate":
                 handleMigrate(sender, args.length > 1 ? args[1].toLowerCase() : "");
                 break;
+            case "netban":
+                handleNetBan(sender,
+                        args.length > 1 ? args[1].toLowerCase() : "",
+                        args.length > 2 ? args[2] : "");
+                break;
             default:
                 sender.sendMessage(ChatFormat.colorize("&c✖ Unknown subcommand: " + sub));
                 sendHelp(sender);
@@ -255,6 +260,71 @@ public class RVNKCoreCommand extends BaseCommand {
         reportPlayerServerState(sender);
         reportPreferenceRows(sender);
         reportClusterConnectivity(sender);
+    }
+
+    /**
+     * Views and edits the network-wide ban flag (#1814).
+     *
+     * <p><b>Why this exists:</b> {@code PlayerBanListener} only ever sets {@code banned = true}, on
+     * detecting a kick-due-to-ban. Nothing ever cleared it. Minecraft's {@code /pardon} lifts the
+     * local vanilla ban but does not touch the cluster roster, so before this command a network ban
+     * was <b>irreversible without a direct database edit</b> — and because
+     * {@link org.fourz.rvnkcore.api.event.ClusterBanListener} checks the flag on every server, that
+     * included the tier the ban was issued from.</p>
+     *
+     * <p>Works on offline players: the lookup is by stored name, not by online player.</p>
+     *
+     * <p>Usage: {@code /rvnkcore netban <add|remove|check> <player>}</p>
+     */
+    private void handleNetBan(CommandSender sender, String action, String playerName) {
+        if (playerName.isEmpty()
+                || !(action.equals("add") || action.equals("remove") || action.equals("check"))) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&c✖ Usage: /rvnkcore netban <add|remove|check> <player>"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Network-wide ban flag. Separate from Minecraft's per-server /ban —"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   /pardon does NOT clear this, use 'netban remove'."));
+            return;
+        }
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                var found = svc.getPlayerByName(playerName).get();
+                if (found.isEmpty()) {
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&c✖ No player named '" + playerName + "' in the network roster"));
+                    return;
+                }
+                org.fourz.rvnkcore.api.model.PlayerDTO dto = found.get();
+
+                if (action.equals("check")) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + dto.getCurrentName()
+                            + " network ban: " + (dto.isBanned() ? "&cBANNED" : "&anot banned")));
+                    return;
+                }
+
+                boolean target = action.equals("add");
+                if (dto.isBanned() == target) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + dto.getCurrentName()
+                            + " is already " + (target ? "banned" : "not banned") + " — no change"));
+                    return;
+                }
+
+                dto.setBanned(target);
+                svc.savePlayer(dto).get();
+                sender.sendMessage(ChatFormat.colorize("&a✓ " + dto.getCurrentName()
+                        + " network ban " + (target ? "&cSET" : "&aCLEARED")));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Applies on every server in the cluster. Minecraft's own per-server"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   ban list is unaffected — use /ban and /pardon for that separately."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ netban failed: " + e.getMessage()));
+            }
+        });
     }
 
     /**
