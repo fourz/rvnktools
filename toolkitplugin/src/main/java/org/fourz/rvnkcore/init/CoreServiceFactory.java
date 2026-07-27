@@ -118,6 +118,26 @@ public class CoreServiceFactory {
     }
 
     /**
+     * Provider that owns the player preference tables (#1813).
+     *
+     * <p>Gated separately from identity so the local row counts can be inspected before anything
+     * moves. Falls back to the local pool otherwise.</p>
+     *
+     * <p>Note {@code isPlayerPreferencesShared()} already requires identity to be shared: the
+     * preference tables have a foreign key into {@code rvnk_players} and can only live where that
+     * table lives.</p>
+     */
+    private ConnectionProvider preferencesProvider() {
+        if (clusterConnectionProvider != null
+                && ConfigLoader.getInstance(plugin).isPlayerPreferencesShared()) {
+            logger.info("Player preferences are cluster-shared — "
+                    + clusterConnectionProvider.describeTarget());
+            return clusterConnectionProvider;
+        }
+        return connectionProvider;
+    }
+
+    /**
      * Registers all core services with the provided ServiceRegistry.
      *
      * <p>Services are registered in dependency order:</p>
@@ -250,7 +270,13 @@ public class CoreServiceFactory {
      */
     private void registerPlayerPreferencesService(ServiceRegistry registry) {
         try {
-            PlayerPreferencesRepository prefsRepository = new PlayerPreferencesRepository(connectionProvider, plugin);
+            // Preferences follow identity (#1813). Their FK chain roots in rvnk_players, so they
+            // must live in whichever database holds it — splitting them would leave the constraint
+            // pointing across databases, which InnoDB cannot enforce. Reusing identityProvider()
+            // rather than the cluster pool directly means that invariant holds automatically in
+            // both configurations, including when the cut-over flag is off.
+            PlayerPreferencesRepository prefsRepository =
+                    new PlayerPreferencesRepository(preferencesProvider(), plugin);
             LogManager prefsLogger = LogManager.getInstance(plugin, DefaultPlayerPreferencesService.class);
             DefaultPlayerPreferencesService prefsService = new DefaultPlayerPreferencesService(prefsRepository, prefsLogger);
 

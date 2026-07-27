@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.init;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.event.ClusterBanListener;
 import org.fourz.rvnkcore.api.event.PlayerBanListener;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
@@ -223,6 +224,12 @@ public class RVNKToolsInitializer {
                 // Register ban detection listener
                 PlayerBanListener banListener = new PlayerBanListener(registry, logger);
                 plugin.getServer().getPluginManager().registerEvents(banListener, plugin);
+
+                // Enforce the network-wide ban flag at login (#1814). Minecraft's own ban list is
+                // per-server, so without this a player banned on one tier can simply hop to another.
+                ClusterBanListener clusterBanListener = new ClusterBanListener(registry, logger);
+                plugin.getServer().getPluginManager().registerEvents(clusterBanListener, plugin);
+                logger.info("Network ban enforcement listener registered");
 
                 // Register cross-server chat relay capture listener.
                 // The ChatRelayService is registered in phase 1 by ApiServerInitializer.

@@ -150,6 +150,15 @@ public class DatabaseSetup {
             // rvnk_player_server_state. They are kept rather than dropped so the cut-over stays
             // reversible; dropping them is a separate, later step.
             TABLE_PLAYERS,
+            // Player preferences (#1813). Unblocked by #1812: these carry a foreign key into
+            // rvnk_players, so they could not move while the player table was per-server — the
+            // constraint would have pointed at the authoritative server's roster and rejected
+            // preferences for anyone who had never joined it. With identity now network-wide the
+            // FK resolves correctly and the chain moves as a unit.
+            TABLE_PLAYER_PREFERENCES,
+            TABLE_PLAYER_NOTIFICATION_TYPES,
+            TABLE_PLAYER_NOTIFICATION_CHANNELS,
+            TABLE_PREFERENCE_DEFAULTS,
     };
 
     /**
@@ -176,7 +185,11 @@ public class DatabaseSetup {
 
             stmt.execute(announcementsDdl());
             stmt.execute(announcementTypesDdl());
+            // rvnk_players must exist before the preference tables — their FK chain roots in it.
             stmt.execute(playersDdl());
+            for (String ddl : preferenceDdl()) {
+                stmt.execute(ddl);
+            }
 
             logger.info("Cluster-shared schema ready (" + CLUSTER_SHARED_TABLES.length + " tables)");
         } catch (SQLException e) {
@@ -225,6 +238,112 @@ public class DatabaseSetup {
             "target_groups TEXT, " +
             "metadata TEXT" +
             ")";
+    }
+
+    /**
+     * DDL for the four preference tables, in dependency order (#1813).
+     *
+     * <p>Returned as an ordered array because the foreign keys chain:
+     * {@code notification_channels} → {@code notification_types} → {@code player_preferences} →
+     * {@code rvnk_players}. Creating them out of order fails on MySQL.</p>
+     *
+     * <p>{@code preference_defaults} has no foreign key and is plugin-scoped rather than
+     * player-scoped, but travels with the set because it is meaningless apart from it.</p>
+     *
+     * <p>Shared by the primary schema pass and the cluster pass so the two cannot drift.</p>
+     */
+    private String[] preferenceDdl() {
+        String playersTable = table(TABLE_PLAYERS);
+        String prefs = table(TABLE_PLAYER_PREFERENCES);
+        String types = table(TABLE_PLAYER_NOTIFICATION_TYPES);
+        String channels = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
+        String defaults = table(TABLE_PREFERENCE_DEFAULTS);
+
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return new String[]{
+                "CREATE TABLE IF NOT EXISTS " + prefs + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "master_enabled BOOLEAN DEFAULT FALSE, " +
+                    "quiet_hours_start INT DEFAULT -1, " +
+                    "quiet_hours_end INT DEFAULT -1, " +
+                    "metadata TEXT, " +
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                    "PRIMARY KEY (player_id, plugin_id), " +
+                    "INDEX idx_player_prefs_player (player_id), " +
+                    "INDEX idx_player_prefs_plugin (plugin_id), " +
+                    "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + types + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "notification_type VARCHAR(64) NOT NULL, " +
+                    "enabled BOOLEAN DEFAULT TRUE, " +
+                    "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                    "INDEX idx_notif_types_player (player_id), " +
+                    "INDEX idx_notif_types_plugin_type (plugin_id, notification_type), " +
+                    "FOREIGN KEY (player_id, plugin_id) REFERENCES " + prefs + "(player_id, plugin_id) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + channels + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "notification_type VARCHAR(64) NOT NULL, " +
+                    "channel_name VARCHAR(32) NOT NULL, " +
+                    "enabled BOOLEAN DEFAULT TRUE, " +
+                    "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                    "INDEX idx_channels_player (player_id), " +
+                    "INDEX idx_channels_plugin_type (plugin_id, notification_type), " +
+                    "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + types + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + defaults + " (" +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "preference_key VARCHAR(64) NOT NULL, " +
+                    "preference_value TEXT NOT NULL, " +
+                    "description TEXT, " +
+                    "PRIMARY KEY (plugin_id, preference_key), " +
+                    "INDEX idx_defaults_plugin (plugin_id)" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            };
+        }
+        return new String[]{
+            "CREATE TABLE IF NOT EXISTS " + prefs + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "master_enabled BOOLEAN DEFAULT FALSE, " +
+                "quiet_hours_start INTEGER DEFAULT -1, " +
+                "quiet_hours_end INTEGER DEFAULT -1, " +
+                "metadata TEXT, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, plugin_id), " +
+                "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + types + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                "FOREIGN KEY (player_id, plugin_id) REFERENCES " + prefs + "(player_id, plugin_id) ON DELETE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + channels + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "channel_name TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + types + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + defaults + " (" +
+                "plugin_id TEXT NOT NULL, " +
+                "preference_key TEXT NOT NULL, " +
+                "preference_value TEXT NOT NULL, " +
+                "description TEXT, " +
+                "PRIMARY KEY (plugin_id, preference_key)" +
+                ")",
+        };
     }
 
     /**

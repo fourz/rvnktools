@@ -253,7 +253,35 @@ public class RVNKCoreCommand extends BaseCommand {
         }
 
         reportPlayerServerState(sender);
+        reportPreferenceRows(sender);
         reportClusterConnectivity(sender);
+    }
+
+    /**
+     * Reports preference row counts in the LOCAL database (#1813).
+     *
+     * <p>Deliberately always queries the local pool, not whichever provider preferences are
+     * currently served from. Before the cut-over that is the live data; after it, it is what was
+     * left behind — and knowing whether anything was stranded is the whole question. A count taken
+     * from the active provider would report the cluster's rows either way and answer nothing.</p>
+     */
+    private void reportPreferenceRows(CommandSender sender) {
+        try (java.sql.Connection conn = rvnkCore.getService(
+                org.fourz.rvnkcore.database.connection.ConnectionProvider.class).getConnection();
+             java.sql.Statement stmt = conn.createStatement();
+             java.sql.ResultSet rs = stmt.executeQuery(
+                 "SELECT (SELECT COUNT(*) FROM rvnk_player_preferences) AS prefs, "
+                 + "(SELECT COUNT(*) FROM rvnk_player_notification_types) AS types, "
+                 + "(SELECT COUNT(*) FROM rvnk_player_notification_channels) AS channels")) {
+            if (rs.next()) {
+                sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &flocal preferences: &e"
+                        + rs.getLong("prefs") + " &fpref, &e" + rs.getLong("types")
+                        + " &ftype, &e" + rs.getLong("channels") + " &fchannel row(s)"));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   • &8- &7local preferences: unavailable (" + e.getMessage() + ")"));
+        }
     }
 
     /**

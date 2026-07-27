@@ -559,6 +559,29 @@ public class ConfigLoader {
     }
 
     /**
+     * Whether player <b>preferences</b> are read from the cluster database (#1813).
+     *
+     * <p>Its own flag, default <b>false</b>, for the same reason identity has one: flipping it moves
+     * where every preference row is read from, and a member's existing local rows would appear to
+     * vanish — players would find their chat display, list surface and announcement mutes reset.</p>
+     *
+     * <p>Requires {@link #isPlayerIdentityShared()}. The preference tables carry a foreign key into
+     * {@code rvnk_players}, so they can only live where that table lives; enabling preferences while
+     * identity is still local would point the constraint across databases, which InnoDB cannot
+     * enforce.</p>
+     *
+     * <p>Intended sequence: deploy with this off → check the counts in {@code /rvnkcore db} → decide
+     * whether the local rows need carrying over → enable → restart.</p>
+     */
+    public boolean isPlayerPreferencesShared() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.share-player-preferences", false)
+                && isPlayerIdentityShared();
+    }
+
+    /**
      * Connection details for the cluster database, used only by {@code member} servers.
      *
      * <p>Authoritative servers never call this — they reuse the primary provider, so the cluster

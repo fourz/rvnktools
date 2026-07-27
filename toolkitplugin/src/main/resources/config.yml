@@ -83,6 +83,15 @@ cluster:
   # Per-server activity (world, joins, playtime, last_seen) is NOT affected either way — it always
   # stays in the local rvnk_player_server_state table.
   share-player-identity: false
+  # Whether player preferences (chat display, /list surface, announcement mutes) come from the
+  # cluster database. Requires share-player-identity — the preference tables have a foreign key
+  # into rvnk_players and can only live where that table lives.
+  #
+  # Own flag, default false, for the same reason as identity: flipping it moves where every
+  # preference row is read from, so a member's existing local rows would appear to vanish and
+  # players would find their settings reset. Deploy, check the counts in /rvnkcore db, decide
+  # whether anything needs carrying over, then enable.
+  share-player-preferences: false
   mysql:
     host: ""
     port: 3306
