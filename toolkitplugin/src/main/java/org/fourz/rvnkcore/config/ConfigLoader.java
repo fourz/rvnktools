@@ -464,6 +464,37 @@ public class ConfigLoader {
         return cachedDatabaseConfig;
     }
 
+    /**
+     * This server's identity within the network, used to scope per-server rows (#1811).
+     *
+     * <p>There is no dedicated setting for this. Rather than introduce a fourth place to name the
+     * same server — and a fourth chance for the names to disagree — this reuses the identifiers
+     * already deployed and agreed across tiers:</p>
+     *
+     * <ol>
+     *   <li>{@code chat-relay.server-id} — set on every tier (dev / event / prod) and already the
+     *       de-facto network identity: peers address each other by it.</li>
+     *   <li>{@code webhook.server-id} — the same value, used by the WebUI cache tags.</li>
+     *   <li>{@code "local"} — standalone server with neither configured.</li>
+     * </ol>
+     *
+     * <p>Read directly from config rather than via {@code ChatRelayConfig} because that config is
+     * only populated when the relay is enabled, and a server's identity must not depend on whether
+     * an unrelated feature is switched on.</p>
+     *
+     * @return the server identifier, never null or blank
+     */
+    public String getServerId() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String id = coreConfig.getString("chat-relay.server-id", "");
+        if (id == null || id.isBlank()) {
+            id = coreConfig.getString("webhook.server-id", "");
+        }
+        return (id == null || id.isBlank()) ? "local" : id.trim();
+    }
+
     // ============================================================
     // CLUSTER (shared network data) — #1796 Phase 2
     // ============================================================

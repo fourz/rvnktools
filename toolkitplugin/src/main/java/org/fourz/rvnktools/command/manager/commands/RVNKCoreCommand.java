@@ -249,7 +249,34 @@ public class RVNKCoreCommand extends BaseCommand {
             sender.sendMessage(ChatFormat.colorize("&c✖ Failed to access PlayerService: " + e.getMessage()));
         }
 
+        reportPlayerServerState(sender);
         reportClusterConnectivity(sender);
+    }
+
+    /**
+     * Reports the per-server player activity mirror (#1811).
+     *
+     * <p>During the additive phase nothing reads {@code rvnk_player_server_state}, so without this
+     * there is no way to tell a working dual-write from a silently failing one until #1812 cuts
+     * reads over and finds the table empty. Prints the row count and the newest {@code last_seen}
+     * so the mirror can be confirmed to be filling before anything depends on it.</p>
+     */
+    private void reportPlayerServerState(CommandSender sender) {
+        try (java.sql.Connection conn = rvnkCore.getService(
+                org.fourz.rvnkcore.database.connection.ConnectionProvider.class).getConnection();
+             java.sql.Statement stmt = conn.createStatement();
+             java.sql.ResultSet rs = stmt.executeQuery(
+                 "SELECT COUNT(*) AS n, COUNT(DISTINCT server_id) AS servers, MAX(last_seen) AS newest "
+                 + "FROM rvnk_player_server_state")) {
+            if (rs.next()) {
+                sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &fper-server state: &e"
+                        + rs.getLong("n") + " &frow(s) across &e" + rs.getInt("servers")
+                        + " &fserver(s), newest &7" + rs.getString("newest")));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   • &c✖ &fper-server state unavailable: " + e.getMessage()));
+        }
     }
 
     /**

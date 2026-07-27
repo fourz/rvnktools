@@ -39,10 +39,91 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * @param queryBuilder The query builder for database operations
      * @param plugin The plugin instance for logging
      */
-    public PlayerRepository(ConnectionProvider connectionProvider, 
-                          QueryBuilder queryBuilder, 
+    public PlayerRepository(ConnectionProvider connectionProvider,
+                          QueryBuilder queryBuilder,
                           Plugin plugin) {
+        this(connectionProvider, queryBuilder, plugin, "local");
+    }
+
+    /**
+     * Constructor with an explicit server identity (#1811).
+     *
+     * @param connectionProvider The database connection provider
+     * @param queryBuilder The query builder for database operations
+     * @param plugin The plugin instance for logging
+     * @param serverId This server's identity, used to scope per-server activity rows
+     */
+    public PlayerRepository(ConnectionProvider connectionProvider,
+                          QueryBuilder queryBuilder,
+                          Plugin plugin,
+                          String serverId) {
         super(connectionProvider, queryBuilder, TABLE_NAME, PlayerDTO.class, plugin);
+        this.serverId = (serverId == null || serverId.isBlank()) ? "local" : serverId;
+    }
+
+    /** This server's identity, scoping rows in {@code rvnk_player_server_state}. */
+    private final String serverId;
+
+    /**
+     * Saves the player, then mirrors the per-server activity columns into
+     * {@code rvnk_player_server_state} (#1811).
+     *
+     * <p><b>Dual-write, deliberately.</b> This phase is additive: {@code rvnk_players} keeps its
+     * {@code current_world}, {@code times_joined}, {@code total_playtime_hours} and
+     * {@code last_seen} columns, and every read still comes from them, so behaviour is unchanged.
+     * The mirror simply accumulates so that #1812 can switch reads over against data that is
+     * already warm, rather than cutting over and backfilling in the same step.</p>
+     *
+     * <p>A mirror failure is logged but never propagated — it must not be able to break player
+     * saves during a migration that is supposed to be invisible. It is logged at WARNING rather
+     * than debug precisely so an empty mirror is noticed before #1812 relies on it.</p>
+     */
+    @Override
+    public CompletableFuture<PlayerDTO> save(PlayerDTO entity) {
+        return super.save(entity).thenApply(saved -> {
+            mirrorServerState(saved);
+            return saved;
+        });
+    }
+
+    /**
+     * Upserts this server's activity row for the player. Best-effort; see {@link #save}.
+     */
+    private void mirrorServerState(PlayerDTO player) {
+        if (player == null || player.getId() == null) {
+            return;
+        }
+        boolean mysql = "mysql".equalsIgnoreCase(connectionProvider.getDatabaseType());
+        String sql = mysql
+            ? "INSERT INTO rvnk_player_server_state "
+                + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
+                + "VALUES (?, ?, ?, ?, ?, ?) "
+                + "ON DUPLICATE KEY UPDATE current_world = VALUES(current_world), "
+                + "times_joined = VALUES(times_joined), "
+                + "total_playtime_hours = VALUES(total_playtime_hours), "
+                + "last_seen = VALUES(last_seen)"
+            : "INSERT INTO rvnk_player_server_state "
+                + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
+                + "VALUES (?, ?, ?, ?, ?, ?) "
+                + "ON CONFLICT(player_id, server_id) DO UPDATE SET current_world = excluded.current_world, "
+                + "times_joined = excluded.times_joined, "
+                + "total_playtime_hours = excluded.total_playtime_hours, "
+                + "last_seen = excluded.last_seen";
+
+        try (var conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, player.getId().toString());
+            stmt.setString(2, serverId);
+            stmt.setString(3, player.getCurrentWorld());
+            stmt.setInt(4, player.getTimesJoined());
+            stmt.setFloat(5, player.getTotalPlaytimeHours());
+            Timestamp lastSeen = player.getLastSeen();
+            stmt.setTimestamp(6, lastSeen != null ? lastSeen : Timestamp.valueOf(LocalDateTime.now()));
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            logger.warning("Failed to mirror per-server state for " + player.getId()
+                    + " (#1811 dual-write; rvnk_players is unaffected): " + e.getMessage());
+        }
     }
     
     /**

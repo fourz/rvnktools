@@ -29,6 +29,15 @@ public class DatabaseSetup {
     public static final String TABLE_WORLDS = "rvnk_worlds";
     public static final String TABLE_PLAYERS = "rvnk_players";
     public static final String TABLE_PLAYER_WORLD_DATA = "rvnk_player_world_data";
+    /**
+     * Per-server player activity (#1811). Always LOCAL — never cluster-shared.
+     *
+     * <p>Holds the columns of {@code rvnk_players} whose values are meaningful only on the server
+     * that produced them: {@code current_world}, {@code times_joined},
+     * {@code total_playtime_hours}, {@code last_seen}. Sharing those would be silent data loss —
+     * two tiers writing their own playtime would clobber each other's total.</p>
+     */
+    public static final String TABLE_PLAYER_SERVER_STATE = "rvnk_player_server_state";
     public static final String TABLE_ANNOUNCEMENTS = "rvnk_announcements";
     public static final String TABLE_PLAYER_PREFERENCES = "rvnk_player_preferences";
     public static final String TABLE_PLAYER_NOTIFICATION_TYPES = "rvnk_player_notification_types";
@@ -325,7 +334,9 @@ public class DatabaseSetup {
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
         String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
         String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
+        String playerServerStateTable = table(TABLE_PLAYER_SERVER_STATE);
 
+        String createPlayerServerStateTable;
         String createPlayersTable;
         String createPlayerWorldDataTable;
         String createWorldsTable;
@@ -485,6 +496,23 @@ public class DatabaseSetup {
                 "INDEX idx_webui_access_created_at (created_at), " +
                 "INDEX idx_webui_access_country (country_code)" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            // Per-server player activity (#1811). Deliberately NO foreign key to rvnk_players:
+            // once identity is cluster-shared (#1812) that table lives in a different database,
+            // and InnoDB cannot constrain across databases on separate hosts. Integrity is
+            // application-level here by necessity, not oversight.
+            createPlayerServerStateTable = "CREATE TABLE IF NOT EXISTS " + playerServerStateTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "server_id VARCHAR(32) NOT NULL, " +
+                "current_world VARCHAR(255), " +
+                "times_joined INT DEFAULT 1, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, server_id), " +
+                "INDEX idx_player_server_state_player (player_id), " +
+                "INDEX idx_player_server_state_last_seen (last_seen)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
             createPlayersTable = "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
@@ -620,6 +648,18 @@ public class DatabaseSetup {
                 "action_type TEXT NOT NULL DEFAULT 'PAGE_VISIT', " +
                 "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" +
                 ")";
+
+            // See the MySQL branch for why there is no foreign key to rvnk_players (#1811).
+            createPlayerServerStateTable = "CREATE TABLE IF NOT EXISTS " + playerServerStateTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "server_id TEXT NOT NULL, " +
+                "current_world TEXT, " +
+                "times_joined INTEGER DEFAULT 1, " +
+                "total_playtime_hours REAL DEFAULT 0.0, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, server_id)" +
+                ")";
         }
 
         try (var stmt = connection.createStatement()) {
@@ -645,6 +685,8 @@ public class DatabaseSetup {
             stmt.execute(createPushSubscriptionsTable);
             logger.debug("Creating " + webuiAccessLogTable + " table...");
             stmt.execute(createWebuiAccessLogTable);
+            logger.debug("Creating " + playerServerStateTable + " table...");
+            stmt.execute(createPlayerServerStateTable);
             logger.debug("All tables created successfully");
         }
     }

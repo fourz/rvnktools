@@ -91,6 +91,15 @@ public class CoreServiceFactory {
     }
 
     /**
+     * This server's network identity, used to scope per-server player activity rows (#1811).
+     *
+     * @return the server identifier, never blank
+     */
+    private String serverId() {
+        return ConfigLoader.getInstance(plugin).getServerId();
+    }
+
+    /**
      * Registers all core services with the provided ServiceRegistry.
      *
      * <p>Services are registered in dependency order:</p>
@@ -174,7 +183,7 @@ public class CoreServiceFactory {
         try {
             logger.debug("Constructing PlayerService with dependencies...");
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin, serverId());
             DefaultPlayerService playerService = new DefaultPlayerService(playerRepository, plugin);
 
             registry.registerService(PlayerService.class, playerService);
@@ -190,7 +199,7 @@ public class CoreServiceFactory {
     private void registerPlayerWorldService(ServiceRegistry registry) {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin, serverId());
             PlayerWorldDataRepository worldDataRepository = new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
             DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
 
