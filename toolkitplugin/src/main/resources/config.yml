@@ -43,6 +43,53 @@ database:
       maxLifetimeMs: 1800000
       leakDetectionMs: 60000
 
+# ---------------------------------------------------------------------------
+# Cluster-shared data (#1796 Phase 2)
+#
+# Lets a group of servers share ONE set of network-wide tables while every server keeps its own
+# per-server data. Disabled by default: RVNKCore then behaves exactly as it always has, with a
+# single pool and a single database.
+#
+# Roles:
+#   authoritative - this server HOSTS the cluster database. It reuses the primary pool above, so
+#                   being the cluster home costs no extra connections and needs no cluster.mysql
+#                   block at all.
+#   member        - this server CONNECTS OUT to the authoritative server's database. Fill in
+#                   cluster.mysql below with the authoritative server's credentials.
+#
+# Currently shared: rvnk_announcements, rvnk_announcement_types.
+#
+# NOT shared, and not a matter of preference: rvnk_players, rvnk_worlds, rvnk_player_world_data
+# and rvnk_cross_server_portal are per-server by nature. Note that rvnk_player_preferences is also
+# excluded despite being conceptually server-agnostic — it has a foreign key into rvnk_players, so
+# it cannot move unless the player table moves with it.
+#
+# If the cluster database is unreachable, this server still starts normally and only the
+# cluster-backed features degrade. The local database is never affected.
+# ---------------------------------------------------------------------------
+cluster:
+  enabled: false
+  role: member
+  mysql:
+    host: ""
+    port: 3306
+    database: ""
+    username: ""
+    password: ""
+    useSSL: false
+    # socketTimeout/connectTimeout/tcpKeepAlive are merged in automatically (#1546). The cluster
+    # link is cross-host by definition, so these matter more here than anywhere else.
+    connectionParameters: allowPublicKeyRetrieval=true
+    pool:
+      # Smaller than the primary pool on purpose — the cluster serves a narrow set of low-traffic
+      # content tables, not the hot per-player path.
+      maxConnections: 5
+      minIdleConnections: 1
+      connectionTimeoutMs: 10000
+      idleTimeoutMs: 120000
+      maxLifetimeMs: 180000
+      leakDetectionMs: 60000
+
 # API Configuration
 api:
   enabled: false

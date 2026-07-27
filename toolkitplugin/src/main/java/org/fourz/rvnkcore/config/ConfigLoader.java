@@ -35,6 +35,7 @@ public class ConfigLoader {
     
     // Cached configurations to prevent duplicate loading
     private DatabaseConfig cachedDatabaseConfig;
+    private DatabaseConfig cachedClusterDatabaseConfig;
     private ApiConfig cachedApiConfig;
     private WebhookConfig cachedWebhookConfig;
     private ChatRelayConfig cachedChatRelayConfig;
@@ -462,7 +463,97 @@ public class ConfigLoader {
         logger.debug("Database configuration loaded and cached: " + dbType);
         return cachedDatabaseConfig;
     }
-    
+
+    // ============================================================
+    // CLUSTER (shared network data) — #1796 Phase 2
+    // ============================================================
+
+    /** Cluster role: this server owns the cluster database. */
+    public static final String CLUSTER_ROLE_AUTHORITATIVE = "authoritative";
+    /** Cluster role: this server connects to another server's cluster database. */
+    public static final String CLUSTER_ROLE_MEMBER = "member";
+
+    /**
+     * Whether cluster-shared data is enabled on this server.
+     *
+     * <p>When false (the default) RVNKCore behaves exactly as before: one pool, one database,
+     * everything local. Nothing about the cluster feature is reachable.</p>
+     */
+    public boolean isClusterEnabled() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.enabled", false);
+    }
+
+    /**
+     * This server's role in the cluster — {@value #CLUSTER_ROLE_AUTHORITATIVE} (it hosts the
+     * cluster database) or {@value #CLUSTER_ROLE_MEMBER} (it connects out to one).
+     *
+     * <p>Anything unrecognised is treated as {@code member}, because a member that cannot connect
+     * fails loudly, whereas mis-classifying a member as authoritative would silently point
+     * cluster reads at the local database and produce a second divergent data set — the exact
+     * failure this whole cluster effort exists to undo (#1795).</p>
+     */
+    public String getClusterRole() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String role = coreConfig.getString("cluster.role", CLUSTER_ROLE_MEMBER);
+        return CLUSTER_ROLE_AUTHORITATIVE.equalsIgnoreCase(role)
+                ? CLUSTER_ROLE_AUTHORITATIVE
+                : CLUSTER_ROLE_MEMBER;
+    }
+
+    /**
+     * Connection details for the cluster database, used only by {@code member} servers.
+     *
+     * <p>Authoritative servers never call this — they reuse the primary provider, so the cluster
+     * costs them no additional connections.</p>
+     *
+     * <p>The required MySQL safety parameters are merged in here for the same reason as the primary
+     * config (#1546): the cluster link is by definition cross-host, and without {@code socketTimeout}
+     * a stalled read blocks the calling thread forever and leaks the connection.</p>
+     *
+     * @return the cluster DatabaseConfig, or null when the cluster mysql block is absent
+     */
+    public DatabaseConfig getClusterDatabaseConfig() {
+        if (cachedClusterDatabaseConfig != null) {
+            return cachedClusterDatabaseConfig;
+        }
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String host = coreConfig.getString("cluster.mysql.host");
+        String database = coreConfig.getString("cluster.mysql.database");
+        if (host == null || host.isBlank() || database == null || database.isBlank()) {
+            return null;
+        }
+
+        cachedClusterDatabaseConfig = DatabaseConfig.builder()
+                .type("mysql")
+                .host(host)
+                .port(coreConfig.getInt("cluster.mysql.port", 3306))
+                .database(database)
+                .username(coreConfig.getString("cluster.mysql.username", ""))
+                .password(coreConfig.getString("cluster.mysql.password", ""))
+                .useSSL(coreConfig.getBoolean("cluster.mysql.useSSL", false))
+                .connectionParameters(DatabaseConfig.withRequiredMySqlParams(
+                        coreConfig.getString("cluster.mysql.connectionParameters", "")))
+                // Deliberately smaller than the primary pool: the cluster serves a narrow set of
+                // low-traffic content tables, not the hot per-player path.
+                .maxConnections(coreConfig.getInt("cluster.mysql.pool.maxConnections", 5))
+                .minIdleConnections(coreConfig.getInt("cluster.mysql.pool.minIdleConnections", 1))
+                .connectionTimeoutMs(coreConfig.getLong("cluster.mysql.pool.connectionTimeoutMs", 10000L))
+                .idleTimeoutMs(coreConfig.getLong("cluster.mysql.pool.idleTimeoutMs", 120000L))
+                .maxLifetimeMs(coreConfig.getLong("cluster.mysql.pool.maxLifetimeMs", 180000L))
+                .leakDetectionMs(coreConfig.getLong("cluster.mysql.pool.leakDetectionMs", 60000L))
+                .build();
+
+        logger.debug("Cluster database configuration loaded and cached: " + host + "/" + database);
+        return cachedClusterDatabaseConfig;
+    }
+
     /**
      * Reloads the configuration from disk.
      * Invalidates all cached configurations to force fresh parsing.
@@ -477,6 +568,7 @@ public class ConfigLoader {
         // Invalidate caches so subsequent calls re-parse from the fresh config
         cachedApiConfig = null;
         cachedDatabaseConfig = null;
+        cachedClusterDatabaseConfig = null;
         cachedWebhookConfig = null;
         cachedChatRelayConfig = null;
         cachedTransferConfig = null;

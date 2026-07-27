@@ -10,6 +10,7 @@ import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.api.config.PortalConfig;
 import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
@@ -51,6 +52,8 @@ import org.fourz.rvnkcore.util.log.LogManager;
 public class CoreServiceFactory {
 
     private final ConnectionProvider connectionProvider;
+    /** Pool for network-shared tables; null when clustering is off (#1796 Phase 2). */
+    private final ClusterConnectionProvider clusterConnectionProvider;
     private final JavaPlugin plugin;
     private final LogManager logger;
 
@@ -67,7 +70,22 @@ public class CoreServiceFactory {
      * @param plugin The plugin instance for logging and scheduling
      */
     public CoreServiceFactory(ConnectionProvider connectionProvider, JavaPlugin plugin) {
+        this(connectionProvider, null, plugin);
+    }
+
+    /**
+     * Creates a new CoreServiceFactory with an optional cluster provider.
+     *
+     * @param connectionProvider        The database connection provider
+     * @param clusterConnectionProvider Pool for network-shared tables, or null when clustering is
+     *                                  disabled or could not be established
+     * @param plugin                    The plugin instance for logging and scheduling
+     */
+    public CoreServiceFactory(ConnectionProvider connectionProvider,
+                              ClusterConnectionProvider clusterConnectionProvider,
+                              JavaPlugin plugin) {
         this.connectionProvider = connectionProvider;
+        this.clusterConnectionProvider = clusterConnectionProvider;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
     }
@@ -92,6 +110,17 @@ public class CoreServiceFactory {
         // Expose ConnectionProvider so dependent plugins (e.g. RVNKEvents) can borrow the shared connection pool
         registry.registerService(ConnectionProvider.class, connectionProvider);
         logger.debug("  + ConnectionProvider registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        // Cluster pool for network-shared tables. Registered under its own class key because the
+        // registry is keyed by Class and therefore holds exactly one ConnectionProvider (#1796).
+        // Absent when clustering is off — consumers must fall back to the primary provider, which
+        // is the normal single-server case rather than an error.
+        if (clusterConnectionProvider != null) {
+            registry.registerService(ClusterConnectionProvider.class, clusterConnectionProvider);
+            logger.debug("  + ClusterConnectionProvider registered — "
+                    + clusterConnectionProvider.describeTarget()
+                    + " (" + (System.currentTimeMillis() - startTime) + "ms)");
+        }
 
         registerPlayerService(registry);
         logger.debug("  + PlayerService registered (" + (System.currentTimeMillis() - startTime) + "ms)");

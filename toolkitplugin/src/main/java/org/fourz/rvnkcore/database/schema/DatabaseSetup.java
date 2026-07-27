@@ -115,6 +115,140 @@ public class DatabaseSetup {
         }
     }
 
+    // ============================================================
+    // CLUSTER-SHARED SCHEMA (#1796 Phase 2)
+    // ============================================================
+
+    /**
+     * Tables that may be served by the {@code ClusterConnectionProvider} — one set network-wide
+     * rather than one set per server.
+     *
+     * <p><b>Membership is not a matter of taste.</b> A table qualifies only if it has no foreign
+     * key into per-server data. Both entries here are self-contained content tables with no FKs at
+     * all.</p>
+     *
+     * <p>{@code rvnk_player_preferences} is deliberately absent even though it is conceptually
+     * server-agnostic: it carries {@code FOREIGN KEY (player_id) REFERENCES rvnk_players(id)}, and
+     * {@code rvnk_players} is per-server. Creating it here would point that constraint at the
+     * authoritative server's roster, and writing preferences for a player who has never joined
+     * that server would fail.</p>
+     */
+    public static final String[] CLUSTER_SHARED_TABLES = {
+            TABLE_ANNOUNCEMENTS,
+            TABLE_ANNOUNCEMENT_TYPES,
+    };
+
+    /**
+     * Creates <b>only</b> the cluster-shared tables in the cluster database.
+     *
+     * <p>Deliberately not {@link #initializeDatabase()}. That method builds the entire schema —
+     * including {@code rvnk_players}, {@code rvnk_worlds} and the preference tables — and running
+     * it against the cluster connection would create a second, competing copy of the per-server
+     * schema in the authoritative database. On a member server those tables would then sit there
+     * empty and shadow nothing, and on the authoritative server the DDL is already applied.</p>
+     *
+     * <p>Idempotent: every statement is {@code CREATE TABLE IF NOT EXISTS}. Safe to run on an
+     * authoritative server where the tables already exist from the primary schema pass.</p>
+     *
+     * @param clusterProvider the cluster connection provider
+     * @throws SQLException if the cluster database cannot be reached or the DDL fails
+     */
+    public void initializeClusterTables(ConnectionProvider clusterProvider) throws SQLException {
+        try (Connection connection = clusterProvider.getConnection();
+             var stmt = connection.createStatement()) {
+
+            logger.info("Ensuring cluster-shared tables exist: "
+                    + String.join(", ", CLUSTER_SHARED_TABLES));
+
+            stmt.execute(announcementsDdl());
+            stmt.execute(announcementTypesDdl());
+
+            logger.info("Cluster-shared schema ready (" + CLUSTER_SHARED_TABLES.length + " tables)");
+        } catch (SQLException e) {
+            logger.error("Failed to initialize cluster-shared schema", e);
+            throw e;
+        }
+    }
+
+    /**
+     * DDL for {@code rvnk_announcements}. Shared by the primary schema pass and the cluster pass so
+     * the two cannot drift into different column definitions for the same logical table.
+     */
+    private String announcementsDdl() {
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "title VARCHAR(500), " +
+                "message TEXT NOT NULL, " +
+                "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "scheduled_for TIMESTAMP NULL, " +
+                "expires_at TIMESTAMP NULL, " +
+                "interval_seconds INT DEFAULT 0, " +
+                "target_worlds TEXT, " +
+                "target_groups TEXT, " +
+                "metadata TEXT" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "title TEXT, " +
+            "message TEXT NOT NULL, " +
+            "type TEXT NOT NULL DEFAULT 'general', " +
+            "active BOOLEAN DEFAULT TRUE, " +
+            "pinned BOOLEAN DEFAULT FALSE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "scheduled_for TIMESTAMP NULL, " +
+            "expires_at TIMESTAMP NULL, " +
+            "interval_seconds INTEGER DEFAULT 0, " +
+            "target_worlds TEXT, " +
+            "target_groups TEXT, " +
+            "metadata TEXT" +
+            ")";
+    }
+
+    /**
+     * DDL for {@code rvnk_announcement_types}. See {@link #announcementsDdl()}.
+     */
+    private String announcementTypesDdl() {
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id VARCHAR(50) PRIMARY KEY, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "prefix VARCHAR(200), " +
+                "suffix VARCHAR(200), " +
+                "permission VARCHAR(200), " +
+                "list_fee INT DEFAULT 0, " +
+                "weekly_fee INT DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "name TEXT NOT NULL, " +
+            "prefix TEXT, " +
+            "suffix TEXT, " +
+            "permission TEXT, " +
+            "list_fee INTEGER DEFAULT 0, " +
+            "weekly_fee INTEGER DEFAULT 0, " +
+            "active BOOLEAN DEFAULT TRUE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "metadata TEXT, " +
+            "display_context TEXT NOT NULL DEFAULT 'both'" +
+            ")";
+    }
+
     /**
      * Quick check to see if schema already exists without detailed logging.
      */
@@ -277,37 +411,8 @@ public class DatabaseSetup {
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
-                "id VARCHAR(36) PRIMARY KEY, " +
-                "title VARCHAR(500), " +
-                "message TEXT NOT NULL, " +
-                "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "pinned BOOLEAN DEFAULT FALSE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                "scheduled_for TIMESTAMP NULL, " +
-                "expires_at TIMESTAMP NULL, " +
-                "interval_seconds INT DEFAULT 0, " +
-                "target_worlds TEXT, " +
-                "target_groups TEXT, " +
-                "metadata TEXT" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-
-            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
-                "id VARCHAR(50) PRIMARY KEY, " +
-                "name VARCHAR(100) NOT NULL, " +
-                "prefix VARCHAR(200), " +
-                "suffix VARCHAR(200), " +
-                "permission VARCHAR(200), " +
-                "list_fee INT DEFAULT 0, " +
-                "weekly_fee INT DEFAULT 0, " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                "metadata TEXT, " +
-                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            createAnnouncementsTable = announcementsDdl();
+            createAnnouncementTypesTable = announcementTypesDdl();
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
                 "player_id VARCHAR(36) NOT NULL, " +
@@ -453,37 +558,8 @@ public class DatabaseSetup {
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
 
-            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
-                "id TEXT PRIMARY KEY, " +
-                "title TEXT, " +
-                "message TEXT NOT NULL, " +
-                "type TEXT NOT NULL DEFAULT 'general', " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "pinned BOOLEAN DEFAULT FALSE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "scheduled_for TIMESTAMP NULL, " +
-                "expires_at TIMESTAMP NULL, " +
-                "interval_seconds INTEGER DEFAULT 0, " +
-                "target_worlds TEXT, " +
-                "target_groups TEXT, " +
-                "metadata TEXT" +
-                ")";
-
-            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
-                "id TEXT PRIMARY KEY, " +
-                "name TEXT NOT NULL, " +
-                "prefix TEXT, " +
-                "suffix TEXT, " +
-                "permission TEXT, " +
-                "list_fee INTEGER DEFAULT 0, " +
-                "weekly_fee INTEGER DEFAULT 0, " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "metadata TEXT, " +
-                "display_context TEXT NOT NULL DEFAULT 'both'" +
-                ")";
+            createAnnouncementsTable = announcementsDdl();
+            createAnnouncementTypesTable = announcementTypesDdl();
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
                 "player_id TEXT NOT NULL, " +

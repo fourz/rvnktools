@@ -5,6 +5,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.mojang.MojangAPI;
+import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.CommandManager;
@@ -246,6 +247,57 @@ public class RVNKCoreCommand extends BaseCommand {
                 });
         } catch (Exception e) {
             sender.sendMessage(ChatFormat.colorize("&c✖ Failed to access PlayerService: " + e.getMessage()));
+        }
+
+        reportClusterConnectivity(sender);
+    }
+
+    /**
+     * Reports cluster-shared database state, if clustering is enabled (#1796 Phase 2).
+     *
+     * <p>Deliberately runs a <b>real query against the cluster tables</b> and prints the row counts
+     * rather than reporting "connected". A provider can hold a valid connection and still be aimed
+     * at the wrong database or a schema that was never created — a status line would look identical
+     * in every one of those cases. Phase 1 produced two bugs that reported success while the data
+     * was not where it claimed to be (#1797, #1804); the counts here are what actually distinguish
+     * a working cluster from a plausible-looking one.</p>
+     */
+    private void reportClusterConnectivity(CommandSender sender) {
+        ClusterConnectionProvider cluster;
+        try {
+            cluster = rvnkCore.getService(ClusterConnectionProvider.class);
+        } catch (Exception e) {
+            cluster = null;
+        }
+
+        if (cluster == null) {
+            sender.sendMessage(ChatFormat.colorize("&7   • &8- &7Cluster: disabled (all data local)"));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Cluster-Shared Database"));
+        sender.sendMessage(ChatFormat.colorize("&7   • &f Role: &b"
+                + (cluster.isAuthoritative() ? "authoritative" : "member")
+                + " &7— " + cluster.describeTarget()));
+
+        long startMs = System.currentTimeMillis();
+        try (java.sql.Connection conn = cluster.getConnection()) {
+            for (String table : org.fourz.rvnkcore.database.schema.DatabaseSetup.CLUSTER_SHARED_TABLES) {
+                try (java.sql.Statement stmt = conn.createStatement();
+                     java.sql.ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + table)) {
+                    long rows = rs.next() ? rs.getLong(1) : -1;
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&7   • &a✓ &f" + table + ": &e" + rows + " &frow(s)"));
+                } catch (java.sql.SQLException e) {
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&7   • &c✖ &f" + table + ": " + e.getMessage()));
+                }
+            }
+            sender.sendMessage(ChatFormat.colorize("&a✓ Result: Cluster reachable ("
+                    + (System.currentTimeMillis() - startMs) + "ms)"));
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ Result: Cluster unreachable — " + e.getMessage()));
+            sender.sendMessage(ChatFormat.colorize("&7   Local database is unaffected."));
         }
     }
 

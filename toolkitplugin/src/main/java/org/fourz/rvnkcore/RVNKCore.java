@@ -6,8 +6,11 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
 import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.database.config.DatabaseConfig;
+import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
+import org.fourz.rvnkcore.database.connection.DelegatingClusterConnectionProvider;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
 import org.fourz.rvnkcore.init.ApiServerInitializer;
 import org.fourz.rvnkcore.init.RVNKToolsInitializer;
@@ -62,6 +65,8 @@ public class RVNKCore extends JavaPlugin implements Listener {
     private ServiceRegistry serviceRegistry;
     private ConfigLoader coreConfigLoader;
     private ConnectionProvider connectionProvider;
+    /** Second pool for network-shared tables; null when clustering is disabled or unavailable (#1796). */
+    private ClusterConnectionProvider clusterConnectionProvider;
     private boolean coreInitialized = false;
 
     // Initializers (SOLID: delegated responsibilities)
@@ -126,7 +131,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
             setupDatabase();
 
             // Register core services via factory
-            coreServiceFactory = new CoreServiceFactory(connectionProvider, this);
+            coreServiceFactory = new CoreServiceFactory(connectionProvider, clusterConnectionProvider, this);
             coreServiceFactory.registerAllServices(serviceRegistry);
 
             // Start API server via initializer
@@ -151,9 +156,66 @@ public class RVNKCore extends JavaPlugin implements Listener {
             databaseSetup.initializeDatabase();
 
             logger.info("Database setup completed using " + connectionProvider.getClass().getSimpleName());
+
+            setupClusterDatabase(factory, databaseSetup);
         } catch (Exception e) {
             logger.error("Failed to setup database", e);
             throw new RuntimeException("Database setup failed", e);
+        }
+    }
+
+    /**
+     * Builds the cluster connection provider for network-shared tables, when enabled (#1796 Phase 2).
+     *
+     * <p><b>Failure here is not fatal.</b> If the cluster database is unreachable the server still
+     * starts with its local database fully intact — cluster-backed features degrade, the rest of the
+     * plugin is unaffected. Aborting startup instead would mean a hiccup on the authoritative
+     * server's database could take every other server in the network offline with it, which is a far
+     * worse outcome than a missing announcements list.</p>
+     */
+    private void setupClusterDatabase(ConnectionProviderFactory factory, DatabaseSetup databaseSetup) {
+        if (!coreConfigLoader.isClusterEnabled()) {
+            logger.debug("Cluster-shared data disabled; using the local database for everything");
+            return;
+        }
+
+        String role = coreConfigLoader.getClusterRole();
+        try {
+            if (ConfigLoader.CLUSTER_ROLE_AUTHORITATIVE.equals(role)) {
+                // The cluster database IS this server's database — reuse the primary pool so the
+                // authoritative server pays nothing for being the cluster home.
+                clusterConnectionProvider = DelegatingClusterConnectionProvider.authoritative(connectionProvider);
+            } else {
+                DatabaseConfig clusterConfig = coreConfigLoader.getClusterDatabaseConfig();
+                if (clusterConfig == null) {
+                    logger.warning("cluster.enabled=true with role=member but cluster.mysql.host/database "
+                            + "are not set — cluster features disabled, local database unaffected");
+                    return;
+                }
+                ConnectionProvider clusterPool = factory.createConnectionProvider(clusterConfig);
+                clusterConnectionProvider = DelegatingClusterConnectionProvider.member(
+                        clusterPool, clusterConfig.getHost() + "/" + clusterConfig.getDatabase());
+            }
+
+            databaseSetup.initializeClusterTables(clusterConnectionProvider);
+            logger.info("Cluster-shared data enabled — " + clusterConnectionProvider.describeTarget());
+
+        } catch (Exception e) {
+            logger.error("Cluster database setup failed (role=" + role + ") — cluster features "
+                    + "disabled; this server's local database is unaffected", e);
+            closeClusterProviderQuietly();
+        }
+    }
+
+    /** Closes a half-built cluster provider so a failed setup cannot leak its pool. */
+    private void closeClusterProviderQuietly() {
+        if (clusterConnectionProvider != null) {
+            try {
+                clusterConnectionProvider.close();
+            } catch (Exception ignored) {
+                // Already in a failure path; nothing useful to do with a close error.
+            }
+            clusterConnectionProvider = null;
         }
     }
 
@@ -173,6 +235,15 @@ public class RVNKCore extends JavaPlugin implements Listener {
             // Shutdown core services (MojangAPI, etc.)
             if (coreServiceFactory != null) {
                 coreServiceFactory.shutdown();
+            }
+
+            // Close the cluster pool first. On a member server this owns a real pool; on an
+            // authoritative server it only wraps the primary and closing it is a no-op, so the
+            // primary below stays valid either way.
+            if (clusterConnectionProvider != null) {
+                clusterConnectionProvider.close();
+                clusterConnectionProvider = null;
+                logger.info("Cluster database connections closed");
             }
 
             // Close database connections
