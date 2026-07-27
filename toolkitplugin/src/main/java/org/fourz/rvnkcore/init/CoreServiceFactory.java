@@ -201,7 +201,7 @@ public class CoreServiceFactory {
         try {
             logger.debug("Constructing PlayerService with dependencies...");
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, queryBuilder, plugin, serverId());
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
             DefaultPlayerService playerService = new DefaultPlayerService(playerRepository, plugin);
 
             registry.registerService(PlayerService.class, playerService);
@@ -217,7 +217,7 @@ public class CoreServiceFactory {
     private void registerPlayerWorldService(ServiceRegistry registry) {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, queryBuilder, plugin, serverId());
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
             PlayerWorldDataRepository worldDataRepository = new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
             DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
 

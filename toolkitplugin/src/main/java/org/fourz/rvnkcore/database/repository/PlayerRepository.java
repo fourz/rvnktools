@@ -75,12 +75,43 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                           QueryBuilder queryBuilder,
                           Plugin plugin,
                           String serverId) {
+        this(identityProvider, localProvider, null, queryBuilder, plugin, serverId);
+    }
+
+    /**
+     * Full constructor (#1812).
+     *
+     * @param identityProvider provider currently serving {@code rvnk_players} — the cluster pool
+     *                         once {@code cluster.share-player-identity} is on, else the local pool
+     * @param localProvider    provider for {@code rvnk_player_server_state}, <b>always</b> local
+     * @param clusterProvider  the cluster pool when one exists, <b>regardless of the cut-over
+     *                         flag</b>; null when clustering is off
+     * @param queryBuilder     the query builder for database operations
+     * @param plugin           the plugin instance for logging
+     * @param serverId         this server's identity, scoping the activity rows
+     */
+    public PlayerRepository(ConnectionProvider identityProvider,
+                          ConnectionProvider localProvider,
+                          ConnectionProvider clusterProvider,
+                          QueryBuilder queryBuilder,
+                          Plugin plugin,
+                          String serverId) {
         // BaseRepository drives every identity query, so handing it the identity provider moves
         // rvnk_players wholesale without touching a single inherited method.
         super(identityProvider, queryBuilder, TABLE_NAME, PlayerDTO.class, plugin);
         this.localProvider = localProvider != null ? localProvider : identityProvider;
+        this.clusterProvider = clusterProvider;
         this.serverId = (serverId == null || serverId.isBlank()) ? "local" : serverId;
     }
+
+    /**
+     * The cluster pool, held independently of which provider is currently serving identity.
+     *
+     * <p>The union migration must run <b>before</b> {@code cluster.share-player-identity} is
+     * enabled — that is the whole point of the flag. So it cannot rely on the active identity
+     * provider having become the cluster one; it needs the destination directly.</p>
+     */
+    private final ConnectionProvider clusterProvider;
 
     /** This server's identity, scoping rows in {@code rvnk_player_server_state}. */
     private final String serverId;
@@ -291,10 +322,14 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * @return counts and per-player notes
      */
     public IdentityUnionResult unionIdentityIntoCluster() {
-        if (!identityIsRemote()) {
+        if (clusterProvider == null) {
             throw new IllegalStateException(
-                "This server's identity database is already the cluster database — nothing to "
-                + "union. Run this on a member server.");
+                "No cluster pool on this server — enable cluster.enabled first.");
+        }
+        if (clusterProvider == localProvider) {
+            throw new IllegalStateException(
+                "This server IS the cluster database (authoritative) — its players are already the "
+                + "cluster roster. Run this on a member server.");
         }
 
         int inserted = 0;
@@ -303,7 +338,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         IdentityUnionResult result;
 
         try (var localConn = localProvider.getConnection();
-             var clusterConn = connectionProvider.getConnection();
+             var clusterConn = clusterProvider.getConnection();
              PreparedStatement read = localConn.prepareStatement(
                  "SELECT id, current_name, name_history, first_join, primary_group, groups, banned "
                  + "FROM rvnk_players")) {
