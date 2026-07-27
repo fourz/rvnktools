@@ -36,11 +36,19 @@ database:
     # know you need different values.
     connectionParameters: allowPublicKeyRetrieval=true&socketTimeout=30000&connectTimeout=10000&tcpKeepAlive=true
     pool:
+      # Tuned for a CROSS-HOST MySQL (#1817). Network gear between the game server and a remote
+      # database silently drops idle TCP connections with no FIN, so long-lived idle connections
+      # come back dead ("Connection validation failed" / "No operations allowed after connection
+      # closed"). NOT the MySQL wait_timeout — that is 28800s (8h) on our servers, so Hikari's
+      # "consider a shorter maxLifetime" hint points the wrong way. Retiring idle connections early
+      # is the effective lever, which makes idleTimeout the important value.
+      #
+      # These are the values proven stable on the live tiers. Raise only for a same-host database.
       maxConnections: 20
       minIdleConnections: 5
       connectionTimeoutMs: 30000
-      idleTimeoutMs: 600000
-      maxLifetimeMs: 1800000
+      idleTimeoutMs: 120000
+      maxLifetimeMs: 180000
       leakDetectionMs: 60000
 
 # ---------------------------------------------------------------------------
