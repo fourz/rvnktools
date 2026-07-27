@@ -264,12 +264,19 @@ public class RVNKCoreCommand extends BaseCommand {
      * instead of firing on whichever server happens to restart first.</p>
      */
     private void handleMigrate(CommandSender sender, String what) {
+        if ("playeridentity".equals(what)) {
+            handleMigrateIdentity(sender);
+            return;
+        }
         if (!"playerstate".equals(what)) {
-            sender.sendMessage(ChatFormat.colorize("&c✖ Usage: /rvnkcore migrate playerstate"));
             sender.sendMessage(ChatFormat.colorize(
-                    "&7   Copies per-server activity from rvnk_players into rvnk_player_server_state."));
+                    "&c✖ Usage: /rvnkcore migrate <playerstate|playeridentity>"));
             sender.sendMessage(ChatFormat.colorize(
-                    "&7   Idempotent, gap-filling only, safe with players online."));
+                    "&7   playerstate    — copy per-server activity into rvnk_player_server_state"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   playeridentity — union this server's players into the cluster roster"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Both are idempotent and safe with players online."));
             return;
         }
 
@@ -286,6 +293,36 @@ public class RVNKCoreCommand extends BaseCommand {
                 sender.sendMessage(ChatFormat.colorize("&7   Run &f/rvnkcore db&7 to confirm the totals."));
             } catch (Exception e) {
                 sender.sendMessage(ChatFormat.colorize("&c✖ Backfill failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Unions this server's player identity into the cluster roster (#1812).
+     *
+     * <p>Prints every change rather than just totals: this rewrites live player records, and an
+     * operator should be able to see exactly which players were inserted and whose
+     * {@code first_join} moved, without going to the database to find out.</p>
+     */
+    private void handleMigrateIdentity(CommandSender sender) {
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Unioning player identity into the cluster..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                var r = svc.unionIdentityIntoCluster();
+                for (String note : r.notes) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + note));
+                }
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — examined &e" + r.examined
+                        + "&f, inserted &e" + r.inserted
+                        + "&f, first_join corrected &e" + r.firstJoinCorrected));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Nothing was deleted and no name was overwritten."));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Enable &fcluster.share-player-identity&7 and restart to cut over."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Union failed: " + e.getMessage()));
             }
         });
     }

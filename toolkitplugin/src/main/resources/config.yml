@@ -70,6 +70,19 @@ database:
 cluster:
   enabled: false
   role: member
+  # Whether player IDENTITY (rvnk_players) is read from the cluster database.
+  #
+  # Deliberately separate from `enabled` and default false, because turning it on changes where
+  # every player record lives. A member that flips this before its local players have been unioned
+  # into the cluster would see them as absent and start creating fresh records, losing first_join
+  # and name history.
+  #
+  # Sequence: deploy -> /rvnkcore migrate playeridentity -> verify -> set true -> restart.
+  # On the authoritative server it is a no-op (the cluster DB is already the local one).
+  #
+  # Per-server activity (world, joins, playtime, last_seen) is NOT affected either way — it always
+  # stays in the local rvnk_player_server_state table.
+  share-player-identity: false
   mysql:
     host: ""
     port: 3306

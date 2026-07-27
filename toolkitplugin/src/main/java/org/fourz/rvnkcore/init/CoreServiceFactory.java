@@ -100,6 +100,24 @@ public class CoreServiceFactory {
     }
 
     /**
+     * Provider that owns {@code rvnk_players} (#1812).
+     *
+     * <p>The cluster pool once {@code cluster.share-player-identity} is enabled and a cluster pool
+     * exists, otherwise the local one. Gated by its own flag rather than riding on
+     * {@code cluster.enabled}, because a member that starts reading identity from the cluster before
+     * its local rows have been unioned would treat those players as new and create fresh records,
+     * losing {@code first_join} and name history.</p>
+     */
+    private ConnectionProvider identityProvider() {
+        if (clusterConnectionProvider != null
+                && ConfigLoader.getInstance(plugin).isPlayerIdentityShared()) {
+            logger.info("Player identity is cluster-shared — " + clusterConnectionProvider.describeTarget());
+            return clusterConnectionProvider;
+        }
+        return connectionProvider;
+    }
+
+    /**
      * Registers all core services with the provided ServiceRegistry.
      *
      * <p>Services are registered in dependency order:</p>
@@ -183,7 +201,7 @@ public class CoreServiceFactory {
         try {
             logger.debug("Constructing PlayerService with dependencies...");
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin, serverId());
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, queryBuilder, plugin, serverId());
             DefaultPlayerService playerService = new DefaultPlayerService(playerRepository, plugin);
 
             registry.registerService(PlayerService.class, playerService);
@@ -199,7 +217,7 @@ public class CoreServiceFactory {
     private void registerPlayerWorldService(ServiceRegistry registry) {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin, serverId());
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, queryBuilder, plugin, serverId());
             PlayerWorldDataRepository worldDataRepository = new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
             DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
 

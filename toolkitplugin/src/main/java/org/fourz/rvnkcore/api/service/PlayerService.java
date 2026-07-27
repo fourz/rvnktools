@@ -176,4 +176,18 @@ public interface PlayerService {
      * @since 1.5.55
      */
     int backfillServerState();
+
+    /**
+     * Unions this server's local identity rows into the cluster's {@code rvnk_players} (#1812).
+     *
+     * <p>Inserts players the cluster does not have, and corrects {@code first_join} backwards where
+     * this server saw the player earlier. Never deletes or overwrites a name. Only meaningful on a
+     * member server; throws if this server's identity database is already the cluster one.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return counts and per-player notes describing exactly what changed
+     * @since 1.5.56
+     */
+    org.fourz.rvnkcore.database.repository.PlayerRepository.IdentityUnionResult unionIdentityIntoCluster();
 }

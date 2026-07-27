@@ -57,12 +57,39 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                           QueryBuilder queryBuilder,
                           Plugin plugin,
                           String serverId) {
-        super(connectionProvider, queryBuilder, TABLE_NAME, PlayerDTO.class, plugin);
+        this(connectionProvider, connectionProvider, queryBuilder, plugin, serverId);
+    }
+
+    /**
+     * Constructor separating identity storage from per-server activity storage (#1812).
+     *
+     * @param identityProvider provider for {@code rvnk_players} — the cluster pool once identity is
+     *                         shared, otherwise the local pool
+     * @param localProvider    provider for {@code rvnk_player_server_state}, <b>always</b> local
+     * @param queryBuilder     the query builder for database operations
+     * @param plugin           the plugin instance for logging
+     * @param serverId         this server's identity, scoping the activity rows
+     */
+    public PlayerRepository(ConnectionProvider identityProvider,
+                          ConnectionProvider localProvider,
+                          QueryBuilder queryBuilder,
+                          Plugin plugin,
+                          String serverId) {
+        // BaseRepository drives every identity query, so handing it the identity provider moves
+        // rvnk_players wholesale without touching a single inherited method.
+        super(identityProvider, queryBuilder, TABLE_NAME, PlayerDTO.class, plugin);
+        this.localProvider = localProvider != null ? localProvider : identityProvider;
         this.serverId = (serverId == null || serverId.isBlank()) ? "local" : serverId;
     }
 
     /** This server's identity, scoping rows in {@code rvnk_player_server_state}. */
     private final String serverId;
+
+    /**
+     * Connection for {@code rvnk_player_server_state}. Always the local pool, even when identity
+     * lives in the cluster database — per-server activity must never leave the server it describes.
+     */
+    private final ConnectionProvider localProvider;
 
     /**
      * Saves the player, then mirrors the per-server activity columns into
@@ -140,7 +167,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     /** Loads this server's mirror rows into {@link #stateCache}. Never throws. */
     private void loadStateCache() {
         java.util.Map<UUID, ServerState> loaded = new java.util.HashMap<>();
-        try (var conn = connectionProvider.getConnection();
+        try (var conn = localProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                  "SELECT player_id, current_world, times_joined, total_playtime_hours, last_seen "
                  + "FROM rvnk_player_server_state WHERE server_id = ?")) {
@@ -184,14 +211,28 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * @return number of rows inserted
      */
     public int backfillServerState() {
-        boolean mysql = "mysql".equalsIgnoreCase(connectionProvider.getDatabaseType());
+        // Refuse once identity has moved to the cluster. This copies the legacy volatile columns
+        // out of rvnk_players, and after the cut-over those columns belong to the AUTHORITATIVE
+        // server — copying them into a member's local state would stamp nations' playtime and
+        // world onto this server's rows. The statement is also a single-connection INSERT..SELECT,
+        // which cannot span two databases.
+        //
+        // This is not a limitation to work around: the backfill is a one-time pre-cut-over step,
+        // and by this point it has already run.
+        if (identityIsRemote()) {
+            throw new IllegalStateException(
+                "Per-server backfill is not available once player identity is cluster-shared — "
+                + "rvnk_players now holds the authoritative server's activity values, not this "
+                + "server's. Run this before enabling cluster.share-player-identity.");
+        }
+        boolean mysql = "mysql".equalsIgnoreCase(localProvider.getDatabaseType());
         String sql = (mysql ? "INSERT IGNORE INTO " : "INSERT OR IGNORE INTO ")
             + "rvnk_player_server_state "
             + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
             + "SELECT id, ?, current_world, times_joined, total_playtime_hours, last_seen "
             + "FROM rvnk_players";
 
-        try (var conn = connectionProvider.getConnection();
+        try (var conn = localProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, serverId);
             int inserted = stmt.executeUpdate();
@@ -205,6 +246,153 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         }
     }
 
+    /** True when identity lives somewhere other than this server's own database. */
+    private boolean identityIsRemote() {
+        return connectionProvider != localProvider;
+    }
+
+    /**
+     * Result of an identity union, so the operator sees what actually changed (#1812).
+     */
+    public static final class IdentityUnionResult {
+        public final int inserted;
+        public final int firstJoinCorrected;
+        public final int examined;
+        public final List<String> notes = new ArrayList<>();
+
+        IdentityUnionResult(int inserted, int firstJoinCorrected, int examined) {
+            this.inserted = inserted;
+            this.firstJoinCorrected = firstJoinCorrected;
+            this.examined = examined;
+        }
+    }
+
+    /**
+     * Unions this server's local identity rows into the cluster's {@code rvnk_players} (#1812).
+     *
+     * <p>Merge rules, applied per UUID:</p>
+     * <ul>
+     *   <li><b>Absent in the cluster</b> — inserted verbatim, carrying this server's
+     *       {@code first_join}, {@code name_history} and {@code banned}.</li>
+     *   <li><b>Present, local {@code first_join} is earlier</b> — {@code first_join} is corrected
+     *       backwards. A player's first join to the network is the earliest across all of it.</li>
+     *   <li><b>Present, otherwise</b> — left untouched.</li>
+     * </ul>
+     *
+     * <p><b>Never destructive.</b> Nothing is deleted, no balance-style value is overwritten, and
+     * {@code current_name} is not forced: the census before this migration showed identical names on
+     * every overlapping UUID, so "latest name wins" had nothing to decide and a blind overwrite
+     * would only add risk. Name history is merged additively — entries are unioned, never removed.
+     * </p>
+     *
+     * <p>Reads explicitly from the local provider rather than whichever one is currently active, so
+     * it produces the same result before or after the cut-over flag is flipped.</p>
+     *
+     * @return counts and per-player notes
+     */
+    public IdentityUnionResult unionIdentityIntoCluster() {
+        if (!identityIsRemote()) {
+            throw new IllegalStateException(
+                "This server's identity database is already the cluster database — nothing to "
+                + "union. Run this on a member server.");
+        }
+
+        int inserted = 0;
+        int corrected = 0;
+        int examined = 0;
+        IdentityUnionResult result;
+
+        try (var localConn = localProvider.getConnection();
+             var clusterConn = connectionProvider.getConnection();
+             PreparedStatement read = localConn.prepareStatement(
+                 "SELECT id, current_name, name_history, first_join, primary_group, groups, banned "
+                 + "FROM rvnk_players")) {
+
+            PreparedStatement findRemote = clusterConn.prepareStatement(
+                "SELECT first_join, name_history FROM rvnk_players WHERE id = ?");
+            PreparedStatement insertRemote = clusterConn.prepareStatement(
+                "INSERT INTO rvnk_players (id, current_name, name_history, first_join, last_seen, "
+                + "current_world, times_joined, total_playtime_hours, primary_group, groups, banned) "
+                + "VALUES (?, ?, ?, ?, ?, NULL, 0, 0.0, ?, ?, ?)");
+            PreparedStatement fixFirstJoin = clusterConn.prepareStatement(
+                "UPDATE rvnk_players SET first_join = ?, name_history = ? WHERE id = ?");
+
+            result = new IdentityUnionResult(0, 0, 0);
+
+            try (ResultSet rs = read.executeQuery()) {
+                while (rs.next()) {
+                    examined++;
+                    String id = rs.getString("id");
+                    String name = rs.getString("current_name");
+                    String history = rs.getString("name_history");
+                    Timestamp firstJoin = rs.getTimestamp("first_join");
+
+                    findRemote.setString(1, id);
+                    try (ResultSet remote = findRemote.executeQuery()) {
+                        if (!remote.next()) {
+                            insertRemote.setString(1, id);
+                            insertRemote.setString(2, name);
+                            insertRemote.setString(3, history);
+                            insertRemote.setTimestamp(4, firstJoin);
+                            // last_seen must be non-null; identity carries no activity of its own,
+                            // so seed it from first_join. Real values live in the local mirror.
+                            insertRemote.setTimestamp(5, firstJoin != null
+                                    ? firstJoin : Timestamp.valueOf(LocalDateTime.now()));
+                            insertRemote.setString(6, rs.getString("primary_group"));
+                            insertRemote.setString(7, rs.getString("groups"));
+                            insertRemote.setBoolean(8, rs.getBoolean("banned"));
+                            insertRemote.executeUpdate();
+                            inserted++;
+                            result.notes.add("+ inserted " + name);
+                            continue;
+                        }
+
+                        Timestamp remoteFirstJoin = remote.getTimestamp("first_join");
+                        String mergedHistory = mergeHistory(remote.getString("name_history"), history);
+                        boolean earlier = firstJoin != null
+                                && (remoteFirstJoin == null || firstJoin.before(remoteFirstJoin));
+
+                        if (earlier) {
+                            fixFirstJoin.setTimestamp(1, firstJoin);
+                            fixFirstJoin.setString(2, mergedHistory);
+                            fixFirstJoin.setString(3, id);
+                            fixFirstJoin.executeUpdate();
+                            corrected++;
+                            result.notes.add("~ " + name + " first_join " + remoteFirstJoin
+                                    + " -> " + firstJoin);
+                        }
+                    }
+                }
+            }
+
+            findRemote.close();
+            insertRemote.close();
+            fixFirstJoin.close();
+        } catch (SQLException e) {
+            logger.error("Identity union failed", e);
+            throw new RuntimeException("Identity union failed: " + e.getMessage(), e);
+        }
+
+        IdentityUnionResult out = new IdentityUnionResult(inserted, corrected, examined);
+        out.notes.addAll(result.notes);
+        logger.info("Identity union: examined " + examined + ", inserted " + inserted
+                + ", first_join corrected " + corrected + " (#1812)");
+        return out;
+    }
+
+    /** Unions two comma-separated name histories, preserving order and dropping duplicates. */
+    private static String mergeHistory(String remote, String local) {
+        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>();
+        for (String src : new String[]{remote, local}) {
+            if (src == null || src.isBlank()) continue;
+            for (String part : src.split(",")) {
+                String t = part.trim();
+                if (!t.isEmpty()) merged.add(t);
+            }
+        }
+        return String.join(",", merged);
+    }
+
     /**
      * Upserts this server's activity row for the player. Best-effort; see {@link #save}.
      */
@@ -212,7 +400,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         if (player == null || player.getId() == null) {
             return;
         }
-        boolean mysql = "mysql".equalsIgnoreCase(connectionProvider.getDatabaseType());
+        boolean mysql = "mysql".equalsIgnoreCase(localProvider.getDatabaseType());
         String sql = mysql
             ? "INSERT INTO rvnk_player_server_state "
                 + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
@@ -229,7 +417,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                 + "total_playtime_hours = excluded.total_playtime_hours, "
                 + "last_seen = excluded.last_seen";
 
-        try (var conn = connectionProvider.getConnection();
+        try (var conn = localProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, player.getId().toString());
             stmt.setString(2, serverId);

@@ -271,4 +271,10 @@ public class DefaultPlayerService implements PlayerService {
     public int backfillServerState() {
         return playerRepository.backfillServerState();
     }
+
+    /** {@inheritDoc} */
+    @Override
+    public org.fourz.rvnkcore.database.repository.PlayerRepository.IdentityUnionResult unionIdentityIntoCluster() {
+        return playerRepository.unionIdentityIntoCluster();
+    }
 }

@@ -145,6 +145,11 @@ public class DatabaseSetup {
     public static final String[] CLUSTER_SHARED_TABLES = {
             TABLE_ANNOUNCEMENTS,
             TABLE_ANNOUNCEMENT_TYPES,
+            // Player IDENTITY only (#1812). The per-server activity columns still physically exist
+            // on this table but are dead once identity is shared — live values live in the local
+            // rvnk_player_server_state. They are kept rather than dropped so the cut-over stays
+            // reversible; dropping them is a separate, later step.
+            TABLE_PLAYERS,
     };
 
     /**
@@ -171,6 +176,7 @@ public class DatabaseSetup {
 
             stmt.execute(announcementsDdl());
             stmt.execute(announcementTypesDdl());
+            stmt.execute(playersDdl());
 
             logger.info("Cluster-shared schema ready (" + CLUSTER_SHARED_TABLES.length + " tables)");
         } catch (SQLException e) {
@@ -218,6 +224,50 @@ public class DatabaseSetup {
             "target_worlds TEXT, " +
             "target_groups TEXT, " +
             "metadata TEXT" +
+            ")";
+    }
+
+    /**
+     * DDL for {@code rvnk_players}, shared by the primary schema pass and the cluster pass (#1812).
+     *
+     * <p>Retains the per-server activity columns even though they are dead once identity is shared.
+     * Keeping them means the cut-over is reversible by flipping
+     * {@code cluster.share-player-identity} back off; dropping them is a deliberate later step, not
+     * a side effect of this migration.</p>
+     */
+    private String playersDdl() {
+        String playersTable = table(TABLE_PLAYERS);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "current_name VARCHAR(255) NOT NULL, " +
+                "name_history TEXT, " +
+                "first_join TIMESTAMP NOT NULL, " +
+                "last_seen TIMESTAMP NOT NULL, " +
+                "current_world VARCHAR(255), " +
+                "times_joined INT DEFAULT 1, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
+                "primary_group VARCHAR(255) DEFAULT 'default', " +
+                "groups TEXT, " +
+                "banned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "current_name TEXT NOT NULL, " +
+            "name_history TEXT DEFAULT '', " +
+            "first_join TIMESTAMP NOT NULL, " +
+            "last_seen TIMESTAMP NOT NULL, " +
+            "current_world TEXT, " +
+            "times_joined INTEGER DEFAULT 1, " +
+            "total_playtime_hours REAL DEFAULT 0.0, " +
+            "primary_group TEXT DEFAULT 'default', " +
+            "groups TEXT, " +
+            "banned BOOLEAN DEFAULT FALSE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
             ")";
     }
 

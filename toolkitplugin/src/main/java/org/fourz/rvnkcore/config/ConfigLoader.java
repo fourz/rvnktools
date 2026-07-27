@@ -537,6 +537,28 @@ public class ConfigLoader {
     }
 
     /**
+     * Whether player <b>identity</b> is read from and written to the cluster database (#1812).
+     *
+     * <p>Separate from {@link #isClusterEnabled()} and default <b>false</b>, because turning it on
+     * changes where every player record lives. A member server that flips this before its local
+     * identity rows have been unioned into the cluster would see those players as absent and start
+     * creating fresh records for them, losing {@code first_join} and name history.</p>
+     *
+     * <p>Intended sequence: deploy with this off → run {@code /rvnkcore migrate playeridentity} →
+     * verify the union → enable → restart. On the authoritative server it is a no-op, since the
+     * cluster database is already the local one.</p>
+     *
+     * <p>Per-server activity is unaffected either way — it always stays in the local
+     * {@code rvnk_player_server_state}.</p>
+     */
+    public boolean isPlayerIdentityShared() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.share-player-identity", false);
+    }
+
+    /**
      * Connection details for the cluster database, used only by {@code member} servers.
      *
      * <p>Authoritative servers never call this — they reuse the primary provider, so the cluster
