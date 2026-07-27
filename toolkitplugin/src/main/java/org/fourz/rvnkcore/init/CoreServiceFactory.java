@@ -127,14 +127,39 @@ public class CoreServiceFactory {
      * preference tables have a foreign key into {@code rvnk_players} and can only live where that
      * table lives.</p>
      */
-    private ConnectionProvider preferencesProvider() {
-        if (clusterConnectionProvider != null
-                && ConfigLoader.getInstance(plugin).isPlayerPreferencesShared()) {
-            logger.info("Player preferences are cluster-shared — "
-                    + clusterConnectionProvider.describeTarget());
-            return clusterConnectionProvider;
+    private ConnectionProvider preferencesProvider(ServiceRegistry registry) {
+        if (clusterConnectionProvider == null
+                || !ConfigLoader.getInstance(plugin).isPlayerPreferencesShared()) {
+            return connectionProvider;
         }
-        return connectionProvider;
+
+        // Carry any local rows across BEFORE switching the read source (#1813).
+        //
+        // Identity deliberately used an operator-run command, because that union corrects
+        // first_join and therefore makes a judgement an operator should time and see. This one is
+        // insert-only and non-destructive — there is nothing to adjudicate — so requiring a
+        // separate command would only create an ordering footgun: enable the flag first and a
+        // member's preferences appear to vanish. Doing it here makes the order impossible to get
+        // wrong.
+        if (clusterConnectionProvider != connectionProvider) {
+            try {
+                int[] moved = registry.getService(PlayerService.class).unionPreferencesIntoCluster();
+                if (moved[0] + moved[1] + moved[2] > 0) {
+                    logger.info("Carried local preferences into the cluster before cut-over — "
+                            + moved[0] + " pref, " + moved[1] + " type, " + moved[2] + " channel row(s)");
+                }
+            } catch (Exception e) {
+                // Serve preferences locally rather than cut over to a cluster that may be missing
+                // this server's rows. A visibly unchanged setup beats silently resetting everyone.
+                logger.error("Preference union failed — keeping preferences LOCAL for this boot; "
+                        + "no settings were lost", e);
+                return connectionProvider;
+            }
+        }
+
+        logger.info("Player preferences are cluster-shared — "
+                + clusterConnectionProvider.describeTarget());
+        return clusterConnectionProvider;
     }
 
     /**
@@ -276,7 +301,7 @@ public class CoreServiceFactory {
             // rather than the cluster pool directly means that invariant holds automatically in
             // both configurations, including when the cut-over flag is off.
             PlayerPreferencesRepository prefsRepository =
-                    new PlayerPreferencesRepository(preferencesProvider(), plugin);
+                    new PlayerPreferencesRepository(preferencesProvider(registry), plugin);
             LogManager prefsLogger = LogManager.getInstance(plugin, DefaultPlayerPreferencesService.class);
             DefaultPlayerPreferencesService prefsService = new DefaultPlayerPreferencesService(prefsRepository, prefsLogger);
 
