@@ -258,6 +258,34 @@ public class RVNKCoreCommand extends BaseCommand {
     }
 
     /**
+     * Carries this server's local player preferences into the cluster (#1813).
+     *
+     * <p>Insert-only — see {@code unionPreferencesIntoCluster}. Run after
+     * {@code migrate playeridentity} and before enabling
+     * {@code cluster.share-player-preferences}.</p>
+     */
+    private void handleMigratePrefs(CommandSender sender) {
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Unioning player preferences into the cluster..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                int[] r = svc.unionPreferencesIntoCluster();
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — &e" + r[0]
+                        + " &fpref, &e" + r[1] + " &ftype, &e" + r[2] + " &fchannel row(s) inserted"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Rows the cluster already had were left as-is — a preference set on two"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   servers has no objectively correct winner, so none was picked."));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Enable &fcluster.share-player-preferences&7 and restart to cut over."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Union failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
      * Reports preference row counts in the LOCAL database (#1813).
      *
      * <p>Deliberately always queries the local pool, not whichever provider preferences are
@@ -296,9 +324,13 @@ public class RVNKCoreCommand extends BaseCommand {
             handleMigrateIdentity(sender);
             return;
         }
+        if ("playerprefs".equals(what)) {
+            handleMigratePrefs(sender);
+            return;
+        }
         if (!"playerstate".equals(what)) {
             sender.sendMessage(ChatFormat.colorize(
-                    "&c✖ Usage: /rvnkcore migrate <playerstate|playeridentity>"));
+                    "&c✖ Usage: /rvnkcore migrate <playerstate|playeridentity|playerprefs>"));
             sender.sendMessage(ChatFormat.colorize(
                     "&7   playerstate    — copy per-server activity into rvnk_player_server_state"));
             sender.sendMessage(ChatFormat.colorize(

@@ -415,6 +415,77 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         return out;
     }
 
+    /**
+     * Unions this server's local player preferences into the cluster (#1813).
+     *
+     * <p><b>Insert-only.</b> Rows the cluster already has are left exactly as they are. Unlike
+     * {@code first_join}, where "earliest wins" is objectively correct, a preference set on two
+     * servers has no right answer — if someone muted announcements here and unmuted them there,
+     * neither value is more true. Overwriting would silently pick a winner, so the authoritative
+     * tier keeps what it has and only genuinely absent rows are carried over.</p>
+     *
+     * <p>Runs in foreign-key order: preferences, then notification types, then channels. Requires
+     * the identity union to have run first — every {@code player_id} must already exist in the
+     * cluster roster or the FK rejects the insert.</p>
+     *
+     * <p>Idempotent and safe with players online.</p>
+     *
+     * @return counts per table: {@code [preferences, types, channels]}
+     */
+    public int[] unionPreferencesIntoCluster() {
+        if (clusterProvider == null) {
+            throw new IllegalStateException(
+                "No cluster pool on this server — enable cluster.enabled first.");
+        }
+        if (clusterProvider == localProvider) {
+            throw new IllegalStateException(
+                "This server IS the cluster database (authoritative) — its preferences are already "
+                + "the cluster's. Run this on a member server.");
+        }
+
+        // (source table, column list) in FK-dependency order.
+        String[][] tables = {
+            {"rvnk_player_preferences",
+             "player_id, plugin_id, master_enabled, quiet_hours_start, quiet_hours_end, metadata"},
+            {"rvnk_player_notification_types",
+             "player_id, plugin_id, notification_type, enabled"},
+            {"rvnk_player_notification_channels",
+             "player_id, plugin_id, notification_type, channel_name, enabled"},
+        };
+
+        int[] inserted = new int[tables.length];
+
+        try (var localConn = localProvider.getConnection();
+             var clusterConn = clusterProvider.getConnection()) {
+
+            for (int t = 0; t < tables.length; t++) {
+                String table = tables[t][0];
+                String cols = tables[t][1];
+                String placeholders = cols.replaceAll("[^,]+", "?");
+
+                try (PreparedStatement read = localConn.prepareStatement(
+                        "SELECT " + cols + " FROM " + table);
+                     PreparedStatement write = clusterConn.prepareStatement(
+                        "INSERT IGNORE INTO " + table + " (" + cols + ") VALUES (" + placeholders + ")");
+                     ResultSet rs = read.executeQuery()) {
+
+                    int colCount = rs.getMetaData().getColumnCount();
+                    while (rs.next()) {
+                        for (int c = 1; c <= colCount; c++) {
+                            write.setObject(c, rs.getObject(c));
+                        }
+                        inserted[t] += write.executeUpdate();
+                    }
+                }
+                logger.info("Preference union: " + table + " — " + inserted[t] + " row(s) inserted");
+            }
+        } catch (SQLException e) {
+            logger.error("Preference union failed", e);
+            throw new RuntimeException("Preference union failed: " + e.getMessage(), e);
+        }
+        return inserted;
+    }
+
     /** Unions two comma-separated name histories, preserving order and dropping duplicates. */
     private static String mergeHistory(String remote, String local) {
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>();

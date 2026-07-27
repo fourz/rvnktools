@@ -190,4 +190,18 @@ public interface PlayerService {
      * @since 1.5.56
      */
     org.fourz.rvnkcore.database.repository.PlayerRepository.IdentityUnionResult unionIdentityIntoCluster();
+
+    /**
+     * Unions this server's local player preferences into the cluster (#1813).
+     *
+     * <p>Insert-only — the cluster keeps any row it already has. Requires the identity union to
+     * have run first, since every player must exist in the cluster roster for the foreign key to
+     * accept the insert.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return rows inserted per table: {@code [preferences, types, channels]}
+     * @since 1.5.60
+     */
+    int[] unionPreferencesIntoCluster();
 }

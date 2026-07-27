@@ -277,4 +277,10 @@ public class DefaultPlayerService implements PlayerService {
     public org.fourz.rvnkcore.database.repository.PlayerRepository.IdentityUnionResult unionIdentityIntoCluster() {
         return playerRepository.unionIdentityIntoCluster();
     }
+
+    /** {@inheritDoc} */
+    @Override
+    public int[] unionPreferencesIntoCluster() {
+        return playerRepository.unionPreferencesIntoCluster();
+    }
 }
