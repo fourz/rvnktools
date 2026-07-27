@@ -162,4 +162,18 @@ public interface PlayerService {
      * @since 1.0.0
      */
     CompletableFuture<Boolean> playerExists(UUID playerId);
+
+    /**
+     * Copies per-server activity from {@code rvnk_players} into {@code rvnk_player_server_state}
+     * for this server (#1812).
+     *
+     * <p>Gap-filling only: rows already written by the #1811 dual-write are newer than the legacy
+     * columns and are left untouched. Idempotent and safe to run with players online.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return the number of rows inserted
+     * @since 1.5.55
+     */
+    int backfillServerState();
 }

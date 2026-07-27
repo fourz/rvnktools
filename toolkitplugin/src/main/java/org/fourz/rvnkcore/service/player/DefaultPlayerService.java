@@ -261,4 +261,14 @@ public class DefaultPlayerService implements PlayerService {
                 }
             });
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Delegates to the repository, which owns the mirror table and the server identity.</p>
+     */
+    @Override
+    public int backfillServerState() {
+        return playerRepository.backfillServerState();
+    }
 }

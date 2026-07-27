@@ -102,6 +102,9 @@ public class RVNKCoreCommand extends BaseCommand {
                     : new String[0];
                 handleMojang(sender, mojangArgs);
                 break;
+            case "migrate":
+                handleMigrate(sender, args.length > 1 ? args[1].toLowerCase() : "");
+                break;
             default:
                 sender.sendMessage(ChatFormat.colorize("&c✖ Unknown subcommand: " + sub));
                 sendHelp(sender);
@@ -251,6 +254,40 @@ public class RVNKCoreCommand extends BaseCommand {
 
         reportPlayerServerState(sender);
         reportClusterConnectivity(sender);
+    }
+
+    /**
+     * One-shot data migrations. Currently: {@code /rvnkcore migrate playerstate} (#1812).
+     *
+     * <p>Run as a command rather than automatically at startup so it is an explicit, logged,
+     * operator-timed action on live player data — and so it can be run per tier in a chosen order
+     * instead of firing on whichever server happens to restart first.</p>
+     */
+    private void handleMigrate(CommandSender sender, String what) {
+        if (!"playerstate".equals(what)) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ Usage: /rvnkcore migrate playerstate"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Copies per-server activity from rvnk_players into rvnk_player_server_state."));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Idempotent, gap-filling only, safe with players online."));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Backfilling per-server player state..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                int inserted = svc.backfillServerState();
+                sender.sendMessage(ChatFormat.colorize("&a✓ Backfill complete — &e" + inserted
+                        + " &frow(s) inserted"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Existing rows were left untouched (they are newer than the legacy columns)."));
+                sender.sendMessage(ChatFormat.colorize("&7   Run &f/rvnkcore db&7 to confirm the totals."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Backfill failed: " + e.getMessage()));
+            }
+        });
     }
 
     /**

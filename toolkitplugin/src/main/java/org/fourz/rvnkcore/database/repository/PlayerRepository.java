@@ -86,6 +86,125 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         });
     }
 
+    /** One player's per-server activity, as held in {@code rvnk_player_server_state}. */
+    private static final class ServerState {
+        final String currentWorld;
+        final int timesJoined;
+        final float playtimeHours;
+        final Timestamp lastSeen;
+
+        ServerState(String currentWorld, int timesJoined, float playtimeHours, Timestamp lastSeen) {
+            this.currentWorld = currentWorld;
+            this.timesJoined = timesJoined;
+            this.playtimeHours = playtimeHours;
+            this.lastSeen = lastSeen;
+        }
+    }
+
+    /** Cached mirror for this server, keyed by player. Guarded by {@link #cacheLock}. */
+    private volatile java.util.Map<UUID, ServerState> stateCache = java.util.Collections.emptyMap();
+    private volatile long stateCacheLoadedAt = 0L;
+    private final Object cacheLock = new Object();
+
+    /** How long the mirror snapshot is reused before being reloaded. */
+    private static final long STATE_CACHE_TTL_MS = 30_000L;
+
+    /**
+     * Returns this server's activity row for a player, or null when there is none.
+     *
+     * <p>Backed by a whole-table snapshot rather than a per-player query. {@code mapResultSet} is
+     * called once per row, so a query here would turn every {@code findAll} into N+1 round trips —
+     * on the WebUI roster that is one query per player, every page load.</p>
+     *
+     * <p>The mirror is per-server and therefore bounded by that server's own player count, so
+     * holding it in memory is cheap. A {@value #STATE_CACHE_TTL_MS}ms TTL keeps it fresh enough for
+     * activity data that is itself only updated on join/quit, and the cache is dropped immediately
+     * after any save so a player never reads back stale values for their own action.</p>
+     *
+     * <p>This design also survives #1813: once identity moves to the cluster database the mirror is
+     * still local, and a snapshot works across separate connections where a SQL join could not.</p>
+     */
+    private ServerState lookupServerState(UUID playerId) {
+        long now = System.currentTimeMillis();
+        if (now - stateCacheLoadedAt > STATE_CACHE_TTL_MS) {
+            synchronized (cacheLock) {
+                if (now - stateCacheLoadedAt > STATE_CACHE_TTL_MS) {
+                    loadStateCache();
+                    stateCacheLoadedAt = now;
+                }
+            }
+        }
+        return stateCache.get(playerId);
+    }
+
+    /** Loads this server's mirror rows into {@link #stateCache}. Never throws. */
+    private void loadStateCache() {
+        java.util.Map<UUID, ServerState> loaded = new java.util.HashMap<>();
+        try (var conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                 "SELECT player_id, current_world, times_joined, total_playtime_hours, last_seen "
+                 + "FROM rvnk_player_server_state WHERE server_id = ?")) {
+            stmt.setString(1, serverId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    try {
+                        loaded.put(UUID.fromString(rs.getString("player_id")), new ServerState(
+                            rs.getString("current_world"),
+                            rs.getInt("times_joined"),
+                            rs.getFloat("total_playtime_hours"),
+                            rs.getTimestamp("last_seen")));
+                    } catch (IllegalArgumentException ignored) {
+                        // Malformed UUID in the mirror: skip the row rather than fail every read.
+                    }
+                }
+            }
+            stateCache = loaded;
+        } catch (SQLException e) {
+            // Leave the previous snapshot in place. Reads then fall back to the legacy columns for
+            // anything missing, which is still correct — degraded, not wrong.
+            logger.warning("Could not load per-server player state (#1812); "
+                    + "falling back to legacy rvnk_players columns: " + e.getMessage());
+        }
+    }
+
+    /** Drops the cached snapshot so the next read reflects a just-written change. */
+    private void invalidateStateCache() {
+        stateCacheLoadedAt = 0L;
+    }
+
+    /**
+     * Copies per-server activity out of {@code rvnk_players} into the mirror for this server (#1812).
+     *
+     * <p>Existing mirror rows are <b>left untouched</b> — the dual-write from #1811 has been running
+     * since deploy, so any row already present is newer than the legacy columns it would be
+     * overwritten from. Backfill only fills gaps.</p>
+     *
+     * <p>Idempotent: safe to run repeatedly, and safe to run while players are online.</p>
+     *
+     * @return number of rows inserted
+     */
+    public int backfillServerState() {
+        boolean mysql = "mysql".equalsIgnoreCase(connectionProvider.getDatabaseType());
+        String sql = (mysql ? "INSERT IGNORE INTO " : "INSERT OR IGNORE INTO ")
+            + "rvnk_player_server_state "
+            + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
+            + "SELECT id, ?, current_world, times_joined, total_playtime_hours, last_seen "
+            + "FROM rvnk_players";
+
+        try (var conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, serverId);
+            int inserted = stmt.executeUpdate();
+            invalidateStateCache();
+            logger.info("Backfilled " + inserted + " per-server player state row(s) for server '"
+                    + serverId + "' (#1812)");
+            return inserted;
+        } catch (SQLException e) {
+            logger.error("Per-server state backfill failed", e);
+            throw new RuntimeException("Backfill failed: " + e.getMessage(), e);
+        }
+    }
+
     /**
      * Upserts this server's activity row for the player. Best-effort; see {@link #save}.
      */
@@ -120,6 +239,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             Timestamp lastSeen = player.getLastSeen();
             stmt.setTimestamp(6, lastSeen != null ? lastSeen : Timestamp.valueOf(LocalDateTime.now()));
             stmt.executeUpdate();
+            invalidateStateCache();
         } catch (SQLException e) {
             logger.warning("Failed to mirror per-server state for " + player.getId()
                     + " (#1811 dual-write; rvnk_players is unaffected): " + e.getMessage());
@@ -285,17 +405,28 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
 
     @Override
     protected PlayerDTO mapResultSet(ResultSet rs) throws SQLException {
+        UUID playerId = UUID.fromString(rs.getString("id"));
+
+        // Per-server activity comes from the mirror when this server has a row for the player,
+        // otherwise from the legacy rvnk_players columns (#1812).
+        //
+        // The fallback is what makes the cut-over safe: a player with no mirror row yet reads
+        // exactly as before, so the migration is per-player and self-healing rather than a
+        // flag-day. After the backfill every existing player has a row, and new players get one
+        // on their first save.
+        ServerState state = lookupServerState(playerId);
+
         PlayerDTO.Builder builder = new PlayerDTO.Builder()
-            .id(UUID.fromString(rs.getString("id")))
+            .id(playerId)
             .currentName(rs.getString("current_name"))
             .firstJoin(safeGetTimestamp(rs, "first_join"))
-            .lastSeen(safeGetTimestamp(rs, "last_seen"))
-            .currentWorld(rs.getString("current_world"))
-            .timesJoined(rs.getInt("times_joined"))
-            .totalPlaytimeHours(rs.getFloat("total_playtime_hours"))
+            .lastSeen(state != null ? state.lastSeen : safeGetTimestamp(rs, "last_seen"))
+            .currentWorld(state != null ? state.currentWorld : rs.getString("current_world"))
+            .timesJoined(state != null ? state.timesJoined : rs.getInt("times_joined"))
+            .totalPlaytimeHours(state != null ? state.playtimeHours : rs.getFloat("total_playtime_hours"))
             .primaryGroup(rs.getString("primary_group"))
             .banned(rs.getBoolean("banned"));
-        
+
         // Parse name history from comma-separated string
         String nameHistoryStr = rs.getString("name_history");
         if (nameHistoryStr != null && !nameHistoryStr.trim().isEmpty()) {
