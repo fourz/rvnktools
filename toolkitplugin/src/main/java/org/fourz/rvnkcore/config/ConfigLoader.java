@@ -440,8 +440,10 @@ public class ConfigLoader {
                 .maxConnections(coreConfig.getInt("database.mysql.pool.maxConnections", 20))
                 .minIdleConnections(coreConfig.getInt("database.mysql.pool.minIdleConnections", 5))
                 .connectionTimeoutMs(coreConfig.getLong("database.mysql.pool.connectionTimeoutMs", 30000L))
-                .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 600000L))
-                .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 1800000L))
+                // Cross-host-safe defaults (#1817/#1822 family). MySQLConnectionProvider also caps these
+                // at 120000/180000 regardless of config, so a stale config.yml cannot exceed them.
+                .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 120000L))
+                .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 180000L))
                 .leakDetectionMs(coreConfig.getLong("database.mysql.pool.leakDetectionMs", 60000L))
                 .build();
         } else {

@@ -26,7 +26,13 @@ import java.util.concurrent.locks.ReentrantLock;
  * @since 1.0.0
  */
 public class MySQLConnectionProvider implements ConnectionProvider {
-    
+
+    // Cross-host safe ceiling for pool timeouts (#1817/#1822 family). Applied to every RVNKCore MySQL
+    // pool regardless of config so an existing server's stale config.yml cannot hold idle connections
+    // past the network's silent drop window. Config may request lower, never higher.
+    private static final long MAX_SAFE_IDLE_TIMEOUT_MS = 120_000L;
+    private static final long MAX_SAFE_MAX_LIFETIME_MS = 180_000L;
+
     private HikariDataSource dataSource;
     private final DatabaseConfig config;
     private final LogManager logger;
@@ -151,8 +157,22 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.setMaximumPoolSize(config.getMaxConnections());
             hikariConfig.setMinimumIdle(config.getMinIdleConnections());
             hikariConfig.setConnectionTimeout(config.getConnectionTimeoutMs());
-            hikariConfig.setIdleTimeout(config.getIdleTimeoutMs());
-            hikariConfig.setMaxLifetime(config.getMaxLifetimeMs());
+
+            // Cross-host safe ceiling (following #1817/#1822): the RVNK MySQL host is on a different
+            // machine from the game servers, and network gear silently drops idle TCP with no FIN, so
+            // a pooled connection held past this window comes back dead ("Communications link failure /
+            // Socket is closed"). Cap idle/lifetime here regardless of config so a stale config.yml —
+            // the old 600000/1800000 defaults that saveResource() never overwrites on an existing
+            // server (#1563/#1592) — cannot reintroduce the churn. Config may request LOWER, never higher.
+            final long idleTimeout = Math.min(config.getIdleTimeoutMs(), MAX_SAFE_IDLE_TIMEOUT_MS);
+            final long maxLifetime = Math.min(config.getMaxLifetimeMs(), MAX_SAFE_MAX_LIFETIME_MS);
+            if (idleTimeout != config.getIdleTimeoutMs() || maxLifetime != config.getMaxLifetimeMs()) {
+                logger.info("Capping pool timeouts for cross-host safety: idleTimeout "
+                        + config.getIdleTimeoutMs() + "->" + idleTimeout + "ms, maxLifetime "
+                        + config.getMaxLifetimeMs() + "->" + maxLifetime + "ms (config exceeded the safe ceiling)");
+            }
+            hikariConfig.setIdleTimeout(idleTimeout);
+            hikariConfig.setMaxLifetime(maxLifetime);
             hikariConfig.setKeepaliveTime(config.getKeepaliveTimeMs());
 
             // Health and Monitoring
