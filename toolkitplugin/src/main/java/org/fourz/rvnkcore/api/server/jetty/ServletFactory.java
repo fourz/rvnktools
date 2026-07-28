@@ -10,6 +10,7 @@ import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.controller.AuthController;
 import org.fourz.rvnkcore.api.controller.BarterShopsController;
+import org.fourz.rvnkcore.api.controller.ChatRelayController;
 import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.NotificationController;
@@ -142,6 +143,12 @@ public class ServletFactory {
         // Register notification controller
         registerNotificationController(context);
 
+        // Register cross-server chat relay controller
+        registerChatRelayController(context);
+
+        // Register cross-server presence controller (#1728)
+        registerPresenceController(context);
+
         // Whitelist management
         registerWhitelistController(context);
 
@@ -191,6 +198,35 @@ public class ServletFactory {
         NotificationController controller = new NotificationController(null, gson, notifLogger);
         context.addServlet(new ServletHolder(controller), "/v1/notifications/*");
         logger.debug("Notification API controller registered at /v1/notifications/*");
+    }
+
+    /**
+     * Registers the chat relay controller for inbound cross-server chat at {@code /v1/chat/*}.
+     * The controller resolves ChatRelayService lazily from ServiceRegistry at request time.
+     * Guarded by the existing AuthFilter (X-API-Key) via the {@code /v1/*} blanket pattern.
+     *
+     * @param context The servlet context to configure
+     */
+    private void registerChatRelayController(ServletContextHandler context) {
+        LogManager chatLogger = LogManager.getInstance(plugin, ChatRelayController.class);
+        ChatRelayController controller = new ChatRelayController(gson, chatLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/chat/*");
+        logger.debug("Chat relay API controller registered at /v1/chat/*");
+    }
+
+    /**
+     * Registers the presence controller for inbound cross-server rosters at {@code /v1/presence/*}
+     * (#1728). Resolves PresenceService lazily from ServiceRegistry; AuthFilter-gated via {@code /v1/*}.
+     *
+     * @param context the servlet context
+     */
+    private void registerPresenceController(ServletContextHandler context) {
+        LogManager presenceLogger = LogManager.getInstance(plugin,
+                org.fourz.rvnkcore.api.controller.PresenceController.class);
+        org.fourz.rvnkcore.api.controller.PresenceController controller =
+                new org.fourz.rvnkcore.api.controller.PresenceController(gson, presenceLogger);
+        context.addServlet(new ServletHolder(controller), "/v1/presence/*");
+        logger.debug("Presence API controller registered at /v1/presence/*");
     }
 
     /**

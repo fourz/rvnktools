@@ -2,10 +2,13 @@ package org.fourz.rvnkcore.init;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
+import org.fourz.rvnkcore.api.chat.ChatRelayEgress;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.api.server.jetty.CoreServer;
 import org.fourz.rvnkcore.api.webhook.WebhookNotifier;
+import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -122,6 +125,30 @@ public class ApiServerInitializer {
             }
             registry.registerService(WebhookNotifier.class, new WebhookNotifier(webhookConfig, logger));
 
+            // Register cross-server chat relay service unconditionally — no-op when disabled.
+            // Registered here (phase 1) so RVNKToolsInitializer (phase 2) can resolve it when it
+            // registers ChatRelayListener.
+            ChatRelayConfig chatRelayConfig = configLoader.getChatRelayConfig();
+            if (chatRelayConfig.isEnabled()) {
+                chatRelayConfig.validate(logger);
+                logger.info("Chat relay enabled — server-id: " + chatRelayConfig.getServerId()
+                        + ", peers: " + chatRelayConfig.getPeers().size());
+            } else {
+                logger.debug("Chat relay service registered (disabled — no-op mode)");
+            }
+            ChatRelayEgress chatRelayEgress = new ChatRelayEgress(chatRelayConfig, logger);
+            registry.registerService(ChatRelayService.class,
+                    new ChatRelayService(plugin, chatRelayConfig, chatRelayEgress, logger));
+
+            // Register cross-server presence service (#1728) — reuses the chat relay peer set / auth /
+            // TLS. Registered here (phase 1) so RVNKToolsInitializer (phase 2) can wire its listener,
+            // scoreboard and heartbeat.
+            org.fourz.rvnkcore.api.presence.PresenceEgress presenceEgress =
+                    new org.fourz.rvnkcore.api.presence.PresenceEgress(chatRelayConfig, logger);
+            registry.registerService(org.fourz.rvnkcore.service.presence.PresenceService.class,
+                    new org.fourz.rvnkcore.service.presence.PresenceService(
+                            plugin, chatRelayConfig, presenceEgress, logger));
+
             long totalTime = System.currentTimeMillis() - startTime;
             logger.info("REST API server started on HTTPS port " + apiConfig.getHttpsPort() + " (" + totalTime + "ms) — /v1/events/* served by RVNKEvents plugin");
         } catch (Exception e) {
@@ -139,6 +166,13 @@ public class ApiServerInitializer {
                 WebhookNotifier notifier = registry.getService(WebhookNotifier.class);
                 if (notifier != null) notifier.shutdown();
                 registry.unregisterService(WebhookNotifier.class);
+                // Unregister chat relay service
+                registry.unregisterService(ChatRelayService.class);
+                // Stop + unregister presence service
+                org.fourz.rvnkcore.service.presence.PresenceService presence =
+                        registry.getService(org.fourz.rvnkcore.service.presence.PresenceService.class);
+                if (presence != null) presence.stopHeartbeat();
+                registry.unregisterService(org.fourz.rvnkcore.service.presence.PresenceService.class);
                 // Unregister servlet registration service
                 registry.unregisterService(IServletRegistrationService.class);
 

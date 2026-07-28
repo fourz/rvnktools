@@ -3,16 +3,25 @@ package org.fourz.rvnkcore.init;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.event.ClusterBanListener;
 import org.fourz.rvnkcore.api.event.PlayerBanListener;
 import org.fourz.rvnkcore.api.event.PlayerTrackingListener;
 import org.fourz.rvnkcore.api.event.WorldTrackingListener;
 import org.fourz.rvnkcore.command.PlayerPreferencesCommand;
+import org.fourz.rvnkcore.command.ServerTransferCommand;
+import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.api.config.TransferConfig;
+import org.fourz.rvnkcore.event.ChatRelayListener;
+import org.fourz.rvnkcore.event.PortalSignListener;
+import org.fourz.rvnkcore.event.PortalStepListener;
+import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
+import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
+import org.fourz.rvnkcore.service.transfer.TransferService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import org.fourz.rvnktools.command.manager.CommandManager;
 import org.fourz.rvnktools.linkMaker.LinkMaker;
-import org.fourz.rvnktools.listener.JoinListener;
 import org.fourz.rvnktools.listener.LuckPermsIntegrationListener;
 import org.fourz.rvnktools.listener.MickyHatPlaceListener;
 import org.fourz.rvnktools.logfilter.LogFilter;
@@ -96,6 +105,10 @@ public class RVNKToolsInitializer {
         // Initialize LogFilter BEFORE CommandManager to ensure service is available
         initializeLogFilter();
         logger.debug("  + LogFilter initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        // Register TransferService BEFORE commands so ServerTransferCommand can resolve it
+        initializeTransferService();
+        logger.debug("  + TransferService initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
@@ -194,7 +207,8 @@ public class RVNKToolsInitializer {
     }
 
     private void registerEventListeners() {
-        plugin.getServer().getPluginManager().registerEvents(new JoinListener(plugin), plugin);
+        // JoinListener moved to RVNKEvents (#1788) — player-facing welcome/join messaging is
+        // announcement content, which RVNKEvents owns. Do not re-register it here.
         plugin.getServer().getPluginManager().registerEvents(new MickyHatPlaceListener(), plugin);
 
         // Register core tracking listeners
@@ -210,6 +224,67 @@ public class RVNKToolsInitializer {
                 // Register ban detection listener
                 PlayerBanListener banListener = new PlayerBanListener(registry, logger);
                 plugin.getServer().getPluginManager().registerEvents(banListener, plugin);
+
+                // Enforce the network-wide ban flag at login (#1814). Minecraft's own ban list is
+                // per-server, so without this a player banned on one tier can simply hop to another.
+                ClusterBanListener clusterBanListener = new ClusterBanListener(registry, logger);
+                plugin.getServer().getPluginManager().registerEvents(clusterBanListener, plugin);
+                logger.info("Network ban enforcement listener registered");
+
+                // Register cross-server chat relay capture listener.
+                // The ChatRelayService is registered in phase 1 by ApiServerInitializer.
+                ChatRelayService chatRelayService = RVNKCore.getServiceSafe(ChatRelayService.class);
+                if (chatRelayService != null) {
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new ChatRelayListener(chatRelayService), plugin);
+                    logger.info("Chat relay capture listener registered");
+                } else {
+                    logger.warning("Chat relay capture listener not registered: ChatRelayService unavailable");
+                }
+
+                // Register cross-server presence (#1728): sidebar + join/quit republish + /list override.
+                // PresenceService is registered in phase 1 by ApiServerInitializer.
+                org.fourz.rvnkcore.service.presence.PresenceService presenceService =
+                        RVNKCore.getServiceSafe(org.fourz.rvnkcore.service.presence.PresenceService.class);
+                if (presenceService != null && presenceService.isActive()) {
+                    // Persistent per-player sidebar visibility preference (#1728).
+                    org.fourz.rvnkcore.api.service.PlayerPreferencesService presencePrefs =
+                            RVNKCore.getServiceSafe(org.fourz.rvnkcore.api.service.PlayerPreferencesService.class);
+                    if (presencePrefs != null) {
+                        presencePrefs.registerNotificationTypes(
+                                org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_PLUGIN_ID,
+                                java.util.List.of(new org.fourz.rvnkcore.api.model.NotificationTypeDefinition(
+                                        org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_PLUGIN_ID,
+                                        org.fourz.rvnkcore.service.presence.PresenceScoreboard.PREF_TYPE,
+                                        "Cross-server player list sidebar", true)));
+                    }
+                    org.fourz.rvnkcore.service.presence.PresenceScoreboard presenceScoreboard =
+                            new org.fourz.rvnkcore.service.presence.PresenceScoreboard(plugin, logger, presencePrefs);
+                    presenceService.setOnChange(() -> presenceScoreboard.render(
+                            presenceService.getMergedRoster(), presenceService.totalCount()));
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new org.fourz.rvnkcore.event.PresenceListener(plugin, presenceService, presenceScoreboard),
+                            plugin);
+                    presenceService.startHeartbeat();
+                    logger.info("Cross-server presence registered (sidebar + /list override)");
+                } else {
+                    logger.debug("Presence not registered (chat relay disabled or no peers)");
+                }
+
+                // Register cross-server portal listeners (sign registration + step detection).
+                // The PortalService is registered in phase 1 by CoreServiceFactory; gate on its
+                // presence so the listeners are only active when portals are configured.
+                PortalService portalService = RVNKCore.getServiceSafe(PortalService.class);
+                if (portalService != null) {
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new PortalSignListener(plugin), plugin);
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new PortalStepListener(plugin), plugin);
+                    logger.info("Cross-server portal listeners registered (enabled="
+                            + portalService.getConfig().isEnabled() + ")");
+                } else {
+                    logger.warning("Portal listeners not registered: PortalService unavailable");
+                }
 
                 // Register LuckPerms integration
                 try {
@@ -246,6 +321,26 @@ public class RVNKToolsInitializer {
         }
     }
 
+    /**
+     * Loads the transfer configuration and registers the {@link TransferService}.
+     *
+     * <p>Registered before the command framework so {@link ServerTransferCommand} can resolve the
+     * service at registration time. The shipped default is disabled — seed the {@code transfer}
+     * section on each live server's config.</p>
+     */
+    private void initializeTransferService() {
+        try {
+            ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+            TransferConfig transferConfig = configLoader.getTransferConfig();
+            transferConfig.validate(logger);
+            TransferService transferService = new TransferService(plugin, transferConfig, logger);
+            registry.registerService(TransferService.class, transferService);
+            logger.info("TransferService registered (enabled=" + transferConfig.isEnabled() + ")");
+        } catch (Exception e) {
+            logger.error("Failed to initialize TransferService", e);
+        }
+    }
+
     private void registerBundledComponentCommands() {
         try {
             // Register PlayerPreferencesCommand
@@ -254,6 +349,11 @@ public class RVNKToolsInitializer {
                 PlayerPreferencesCommand prefCommand = new PlayerPreferencesCommand(plugin);
                 commandManager.registerCommand(prefCommand);
                 logger.info("PlayerPreferencesCommand registered");
+
+                // Register cross-server transfer command (/server transfer <target>)
+                ServerTransferCommand transferCommand = new ServerTransferCommand(plugin);
+                commandManager.registerCommand(transferCommand);
+                logger.info("ServerTransferCommand registered");
             }
 
         } catch (Exception e) {

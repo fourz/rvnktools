@@ -8,13 +8,18 @@ import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.PushSubscriptionService;
 import org.fourz.rvnkcore.api.service.WorldService;
+import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.query.BasicSQLQueryBuilder;
 import org.fourz.rvnkcore.database.repository.PlayerPreferencesRepository;
 import org.fourz.rvnkcore.database.repository.PlayerRepository;
 import org.fourz.rvnkcore.database.repository.PlayerWorldDataRepository;
+import org.fourz.rvnkcore.database.repository.PortalRepository;
 import org.fourz.rvnkcore.database.repository.PushSubscriptionRepository;
 import org.fourz.rvnkcore.database.repository.DefaultWorldRepository;
+import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerService;
 import org.fourz.rvnkcore.service.player.DefaultPlayerWorldService;
 import org.fourz.rvnkcore.service.preferences.DefaultPlayerPreferencesService;
@@ -47,11 +52,16 @@ import org.fourz.rvnkcore.util.log.LogManager;
 public class CoreServiceFactory {
 
     private final ConnectionProvider connectionProvider;
+    /** Pool for network-shared tables; null when clustering is off (#1796 Phase 2). */
+    private final ClusterConnectionProvider clusterConnectionProvider;
     private final JavaPlugin plugin;
     private final LogManager logger;
 
     // Track MojangAPI for shutdown
     private MojangAPI mojangAPI;
+
+    // Track PortalService for shutdown (clears its in-memory index)
+    private PortalService portalService;
 
     /**
      * Creates a new CoreServiceFactory.
@@ -60,9 +70,96 @@ public class CoreServiceFactory {
      * @param plugin The plugin instance for logging and scheduling
      */
     public CoreServiceFactory(ConnectionProvider connectionProvider, JavaPlugin plugin) {
+        this(connectionProvider, null, plugin);
+    }
+
+    /**
+     * Creates a new CoreServiceFactory with an optional cluster provider.
+     *
+     * @param connectionProvider        The database connection provider
+     * @param clusterConnectionProvider Pool for network-shared tables, or null when clustering is
+     *                                  disabled or could not be established
+     * @param plugin                    The plugin instance for logging and scheduling
+     */
+    public CoreServiceFactory(ConnectionProvider connectionProvider,
+                              ClusterConnectionProvider clusterConnectionProvider,
+                              JavaPlugin plugin) {
         this.connectionProvider = connectionProvider;
+        this.clusterConnectionProvider = clusterConnectionProvider;
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin, getClass());
+    }
+
+    /**
+     * This server's network identity, used to scope per-server player activity rows (#1811).
+     *
+     * @return the server identifier, never blank
+     */
+    private String serverId() {
+        return ConfigLoader.getInstance(plugin).getServerId();
+    }
+
+    /**
+     * Provider that owns {@code rvnk_players} (#1812).
+     *
+     * <p>The cluster pool once {@code cluster.share-player-identity} is enabled and a cluster pool
+     * exists, otherwise the local one. Gated by its own flag rather than riding on
+     * {@code cluster.enabled}, because a member that starts reading identity from the cluster before
+     * its local rows have been unioned would treat those players as new and create fresh records,
+     * losing {@code first_join} and name history.</p>
+     */
+    private ConnectionProvider identityProvider() {
+        if (clusterConnectionProvider != null
+                && ConfigLoader.getInstance(plugin).isPlayerIdentityShared()) {
+            logger.info("Player identity is cluster-shared — " + clusterConnectionProvider.describeTarget());
+            return clusterConnectionProvider;
+        }
+        return connectionProvider;
+    }
+
+    /**
+     * Provider that owns the player preference tables (#1813).
+     *
+     * <p>Gated separately from identity so the local row counts can be inspected before anything
+     * moves. Falls back to the local pool otherwise.</p>
+     *
+     * <p>Note {@code isPlayerPreferencesShared()} already requires identity to be shared: the
+     * preference tables have a foreign key into {@code rvnk_players} and can only live where that
+     * table lives.</p>
+     */
+    private ConnectionProvider preferencesProvider(ServiceRegistry registry) {
+        if (clusterConnectionProvider == null
+                || !ConfigLoader.getInstance(plugin).isPlayerPreferencesShared()) {
+            return connectionProvider;
+        }
+
+        // Carry any local rows across BEFORE switching the read source (#1813).
+        //
+        // Identity deliberately used an operator-run command, because that union corrects
+        // first_join and therefore makes a judgement an operator should time and see. This one is
+        // insert-only and non-destructive — there is nothing to adjudicate — so requiring a
+        // separate command would only create an ordering footgun: enable the flag first and a
+        // member's preferences appear to vanish. Doing it here makes the order impossible to get
+        // wrong.
+        if (clusterConnectionProvider != connectionProvider) {
+            try {
+                int[] moved = registry.getService(PlayerService.class).unionPreferencesIntoCluster();
+                if (moved[0] + moved[1] + moved[2] > 0) {
+                    logger.info("Carried local preferences into the cluster before cut-over — "
+                            + moved[0] + " pref, " + moved[1] + " type, " + moved[2] + " channel row(s)");
+                }
+            } catch (Exception e) {
+                // Serve preferences locally rather than cut over to a cluster that may be missing
+                // this server's rows. A visibly unchanged setup beats silently resetting everyone.
+                logger.error("Preference union failed — keeping preferences LOCAL for this boot; "
+                        + "no settings were lost", e);
+                return connectionProvider;
+            }
+        }
+
+        logger.info("Player preferences are cluster-shared — "
+                + clusterConnectionProvider.describeTarget());
+        return clusterConnectionProvider;
     }
 
     /**
@@ -86,6 +183,17 @@ public class CoreServiceFactory {
         registry.registerService(ConnectionProvider.class, connectionProvider);
         logger.debug("  + ConnectionProvider registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        // Cluster pool for network-shared tables. Registered under its own class key because the
+        // registry is keyed by Class and therefore holds exactly one ConnectionProvider (#1796).
+        // Absent when clustering is off — consumers must fall back to the primary provider, which
+        // is the normal single-server case rather than an error.
+        if (clusterConnectionProvider != null) {
+            registry.registerService(ClusterConnectionProvider.class, clusterConnectionProvider);
+            logger.debug("  + ClusterConnectionProvider registered — "
+                    + clusterConnectionProvider.describeTarget()
+                    + " (" + (System.currentTimeMillis() - startTime) + "ms)");
+        }
+
         registerPlayerService(registry);
         logger.debug("  + PlayerService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -107,8 +215,11 @@ public class CoreServiceFactory {
         registerPushSubscriptionService(registry);
         logger.debug("  + PushSubscriptionService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        registerPortalService(registry);
+        logger.debug("  + PortalService registered (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         long totalTime = System.currentTimeMillis() - startTime;
-        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService (" + totalTime + "ms)");
+        logger.info("Core services registered: ConnectionProvider, PlayerService, PlayerWorldService, WorldService, PlayerPreferencesService, ITeleportService, MojangAPI, PushSubscriptionService, PortalService (" + totalTime + "ms)");
     }
 
     /**
@@ -121,6 +232,11 @@ public class CoreServiceFactory {
             mojangAPI = null;
             logger.info("MojangAPI shutdown complete");
         }
+        if (portalService != null) {
+            portalService.clear();
+            portalService = null;
+            logger.info("PortalService index cleared");
+        }
     }
 
     /**
@@ -130,7 +246,7 @@ public class CoreServiceFactory {
         try {
             logger.debug("Constructing PlayerService with dependencies...");
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
             DefaultPlayerService playerService = new DefaultPlayerService(playerRepository, plugin);
 
             registry.registerService(PlayerService.class, playerService);
@@ -146,7 +262,7 @@ public class CoreServiceFactory {
     private void registerPlayerWorldService(ServiceRegistry registry) {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(connectionProvider, queryBuilder, plugin);
+            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
             PlayerWorldDataRepository worldDataRepository = new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
             DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
 
@@ -179,7 +295,13 @@ public class CoreServiceFactory {
      */
     private void registerPlayerPreferencesService(ServiceRegistry registry) {
         try {
-            PlayerPreferencesRepository prefsRepository = new PlayerPreferencesRepository(connectionProvider, plugin);
+            // Preferences follow identity (#1813). Their FK chain roots in rvnk_players, so they
+            // must live in whichever database holds it — splitting them would leave the constraint
+            // pointing across databases, which InnoDB cannot enforce. Reusing identityProvider()
+            // rather than the cluster pool directly means that invariant holds automatically in
+            // both configurations, including when the cut-over flag is off.
+            PlayerPreferencesRepository prefsRepository =
+                    new PlayerPreferencesRepository(preferencesProvider(registry), plugin);
             LogManager prefsLogger = LogManager.getInstance(plugin, DefaultPlayerPreferencesService.class);
             DefaultPlayerPreferencesService prefsService = new DefaultPlayerPreferencesService(prefsRepository, prefsLogger);
 
@@ -241,6 +363,35 @@ public class CoreServiceFactory {
         } catch (Exception e) {
             logger.error("Failed to register PushSubscriptionService", e);
             throw new RuntimeException("PushSubscriptionService registration failed", e);
+        }
+    }
+
+    /**
+     * Registers the {@link PortalService} for cross-server portals.
+     *
+     * <p>Builds the {@link PortalRepository} on the shared {@link ConnectionProvider}, loads the
+     * {@link PortalConfig}, and populates the service's in-memory index from the database. The DB is
+     * already initialized at this point (setupDatabase runs before this factory), so
+     * {@code loadIndex()} can safely ensure the schema and read existing rows. The shipped default
+     * is disabled — seed the {@code portal} section on each live server's config.</p>
+     */
+    private void registerPortalService(ServiceRegistry registry) {
+        try {
+            ConfigLoader configLoader = ConfigLoader.getInstance(plugin);
+            PortalConfig portalConfig = configLoader.getPortalConfig();
+            portalConfig.validate(logger);
+
+            PortalRepository portalRepository = new PortalRepository(connectionProvider, plugin);
+            LogManager portalLogger = LogManager.getInstance(plugin, PortalService.class);
+            portalService = new PortalService(plugin, portalConfig, portalRepository, portalLogger);
+            portalService.loadIndex();
+
+            registry.registerService(PortalService.class, portalService);
+            logger.info("PortalService registered (enabled=" + portalConfig.isEnabled()
+                    + ", portals=" + portalService.getPortalCount() + ")");
+        } catch (Exception e) {
+            logger.error("Failed to register PortalService", e);
+            throw new RuntimeException("PortalService registration failed", e);
         }
     }
 

@@ -26,10 +26,17 @@ import java.util.concurrent.locks.ReentrantLock;
  * @since 1.0.0
  */
 public class MySQLConnectionProvider implements ConnectionProvider {
-    
+
+    // Cross-host safe ceiling for pool timeouts (#1817/#1822 family). Applied to every RVNKCore MySQL
+    // pool regardless of config so an existing server's stale config.yml cannot hold idle connections
+    // past the network's silent drop window. Config may request lower, never higher.
+    private static final long MAX_SAFE_IDLE_TIMEOUT_MS = 120_000L;
+    private static final long MAX_SAFE_MAX_LIFETIME_MS = 180_000L;
+
     private HikariDataSource dataSource;
     private final DatabaseConfig config;
     private final LogManager logger;
+    private final String poolOwner;
     private final ReentrantLock initializationLock = new ReentrantLock();
     private volatile boolean initialized = false;
     
@@ -43,6 +50,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
     public MySQLConnectionProvider(DatabaseConfig config, Plugin plugin) {
         this.config = validateConfig(config);
         this.logger = LogManager.getInstance(plugin);
+        this.poolOwner = (plugin != null) ? plugin.getName() : "unknown";
         initializeDataSource();
     }
     
@@ -53,6 +61,14 @@ public class MySQLConnectionProvider implements ConnectionProvider {
         try {
             Connection conn = dataSource.getConnection();
             if (!conn.isValid(5)) {
+                // #1766: return the dead connection to the pool (HikariCP evicts it) before failing —
+                // throwing while it is still checked out leaks it, and repeated validation failures on
+                // a cross-host drop exhaust the pool (the "Apparent connection leak" warnings).
+                try {
+                    conn.close();
+                } catch (SQLException closeEx) {
+                    logger.debug("Failed to close invalid connection: " + closeEx.getMessage());
+                }
                 throw new SQLException("Connection validation failed");
             }
             return conn;
@@ -141,8 +157,22 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.setMaximumPoolSize(config.getMaxConnections());
             hikariConfig.setMinimumIdle(config.getMinIdleConnections());
             hikariConfig.setConnectionTimeout(config.getConnectionTimeoutMs());
-            hikariConfig.setIdleTimeout(config.getIdleTimeoutMs());
-            hikariConfig.setMaxLifetime(config.getMaxLifetimeMs());
+
+            // Cross-host safe ceiling (following #1817/#1822): the RVNK MySQL host is on a different
+            // machine from the game servers, and network gear silently drops idle TCP with no FIN, so
+            // a pooled connection held past this window comes back dead ("Communications link failure /
+            // Socket is closed"). Cap idle/lifetime here regardless of config so a stale config.yml —
+            // the old 600000/1800000 defaults that saveResource() never overwrites on an existing
+            // server (#1563/#1592) — cannot reintroduce the churn. Config may request LOWER, never higher.
+            final long idleTimeout = Math.min(config.getIdleTimeoutMs(), MAX_SAFE_IDLE_TIMEOUT_MS);
+            final long maxLifetime = Math.min(config.getMaxLifetimeMs(), MAX_SAFE_MAX_LIFETIME_MS);
+            if (idleTimeout != config.getIdleTimeoutMs() || maxLifetime != config.getMaxLifetimeMs()) {
+                logger.info("Capping pool timeouts for cross-host safety: idleTimeout "
+                        + config.getIdleTimeoutMs() + "->" + idleTimeout + "ms, maxLifetime "
+                        + config.getMaxLifetimeMs() + "->" + maxLifetime + "ms (config exceeded the safe ceiling)");
+            }
+            hikariConfig.setIdleTimeout(idleTimeout);
+            hikariConfig.setMaxLifetime(maxLifetime);
             hikariConfig.setKeepaliveTime(config.getKeepaliveTimeMs());
 
             // Health and Monitoring
@@ -163,8 +193,12 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.addDataSourceProperty("elideSetAutoCommits", "true");
             hikariConfig.addDataSourceProperty("maintainTimeStats", "false");
             
-            // Pool naming for monitoring
-            hikariConfig.setPoolName("RVNKCore-MySQL-Pool");
+            // Pool naming for monitoring — include the owning plugin so logs are attributable
+            // (#1629). Every plugin builds its own pool through this provider but they all used to
+            // share the literal name "RVNKCore-MySQL-Pool", making it impossible to tell whose pool
+            // a shutdown/leak line referred to — which is how #1629 was first misdiagnosed as one
+            // shared pool being torn down under everyone.
+            hikariConfig.setPoolName("RVNKCore-MySQL-Pool-" + poolOwner);
             
             this.dataSource = new HikariDataSource(hikariConfig);
             this.initialized = true;
@@ -248,9 +282,17 @@ public class MySQLConnectionProvider implements ConnectionProvider {
         params.add("allowMultiQueries=true");
         params.add("allowPublicKeyRetrieval=true");
         
-        // Add custom connection parameters if provided
-        if (config.getConnectionParameters() != null && !config.getConnectionParameters().trim().isEmpty()) {
-            params.add(config.getConnectionParameters());
+        // Always apply the required MySQL safety params (socketTimeout / connectTimeout /
+        // tcpKeepAlive), merging with any operator-set connectionParameters (#1629 P4 / #1546).
+        // Applied HERE at the provider level — not only in RVNKCore's ConfigLoader — so every pool
+        // is protected, including plugins that build their own DatabaseConfig (RVNKWorlds, RVNKLore)
+        // and never called withRequiredMySqlParams. Without socketTimeout a dropped cross-host
+        // connection blocks the driver forever, HikariCP cannot reclaim it, and the pool degrades
+        // until exhaustion — the exact failure behind the #1629 leak. withRequiredMySqlParams is
+        // idempotent (skips any param already present), so double-application is harmless.
+        String requiredParams = DatabaseConfig.withRequiredMySqlParams(config.getConnectionParameters());
+        if (!requiredParams.isEmpty()) {
+            params.add(requiredParams);
         }
         
         url.append("?").append(String.join("&", params));

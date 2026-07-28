@@ -36,11 +36,88 @@ database:
     # know you need different values.
     connectionParameters: allowPublicKeyRetrieval=true&socketTimeout=30000&connectTimeout=10000&tcpKeepAlive=true
     pool:
+      # Tuned for a CROSS-HOST MySQL (#1817). Network gear between the game server and a remote
+      # database silently drops idle TCP connections with no FIN, so long-lived idle connections
+      # come back dead ("Connection validation failed" / "No operations allowed after connection
+      # closed"). NOT the MySQL wait_timeout — that is 28800s (8h) on our servers, so Hikari's
+      # "consider a shorter maxLifetime" hint points the wrong way. Retiring idle connections early
+      # is the effective lever, which makes idleTimeout the important value.
+      #
+      # These are the values proven stable on the live tiers. Raise only for a same-host database.
       maxConnections: 20
       minIdleConnections: 5
       connectionTimeoutMs: 30000
-      idleTimeoutMs: 600000
-      maxLifetimeMs: 1800000
+      idleTimeoutMs: 120000
+      maxLifetimeMs: 180000
+      leakDetectionMs: 60000
+
+# ---------------------------------------------------------------------------
+# Cluster-shared data (#1796 Phase 2)
+#
+# Lets a group of servers share ONE set of network-wide tables while every server keeps its own
+# per-server data. Disabled by default: RVNKCore then behaves exactly as it always has, with a
+# single pool and a single database.
+#
+# Roles:
+#   authoritative - this server HOSTS the cluster database. It reuses the primary pool above, so
+#                   being the cluster home costs no extra connections and needs no cluster.mysql
+#                   block at all.
+#   member        - this server CONNECTS OUT to the authoritative server's database. Fill in
+#                   cluster.mysql below with the authoritative server's credentials.
+#
+# Currently shared: rvnk_announcements, rvnk_announcement_types.
+#
+# NOT shared, and not a matter of preference: rvnk_players, rvnk_worlds, rvnk_player_world_data
+# and rvnk_cross_server_portal are per-server by nature. Note that rvnk_player_preferences is also
+# excluded despite being conceptually server-agnostic — it has a foreign key into rvnk_players, so
+# it cannot move unless the player table moves with it.
+#
+# If the cluster database is unreachable, this server still starts normally and only the
+# cluster-backed features degrade. The local database is never affected.
+# ---------------------------------------------------------------------------
+cluster:
+  enabled: false
+  role: member
+  # Whether player IDENTITY (rvnk_players) is read from the cluster database.
+  #
+  # Deliberately separate from `enabled` and default false, because turning it on changes where
+  # every player record lives. A member that flips this before its local players have been unioned
+  # into the cluster would see them as absent and start creating fresh records, losing first_join
+  # and name history.
+  #
+  # Sequence: deploy -> /rvnkcore migrate playeridentity -> verify -> set true -> restart.
+  # On the authoritative server it is a no-op (the cluster DB is already the local one).
+  #
+  # Per-server activity (world, joins, playtime, last_seen) is NOT affected either way — it always
+  # stays in the local rvnk_player_server_state table.
+  share-player-identity: false
+  # Whether player preferences (chat display, /list surface, announcement mutes) come from the
+  # cluster database. Requires share-player-identity — the preference tables have a foreign key
+  # into rvnk_players and can only live where that table lives.
+  #
+  # Own flag, default false, for the same reason as identity: flipping it moves where every
+  # preference row is read from, so a member's existing local rows would appear to vanish and
+  # players would find their settings reset. Deploy, check the counts in /rvnkcore db, decide
+  # whether anything needs carrying over, then enable.
+  share-player-preferences: false
+  mysql:
+    host: ""
+    port: 3306
+    database: ""
+    username: ""
+    password: ""
+    useSSL: false
+    # socketTimeout/connectTimeout/tcpKeepAlive are merged in automatically (#1546). The cluster
+    # link is cross-host by definition, so these matter more here than anywhere else.
+    connectionParameters: allowPublicKeyRetrieval=true
+    pool:
+      # Smaller than the primary pool on purpose — the cluster serves a narrow set of low-traffic
+      # content tables, not the hot per-player path.
+      maxConnections: 5
+      minIdleConnections: 1
+      connectionTimeoutMs: 10000
+      idleTimeoutMs: 120000
+      maxLifetimeMs: 180000
       leakDetectionMs: 60000
 
 # API Configuration
@@ -86,6 +163,76 @@ webhook:
     url: ""                # fourzorg-api purge endpoint, e.g. https://api.ravenkraft.org/diag/cache/purge
     env: ""                # dev | event | prod (must match this server's env name in fourzorg-api)
                            # uses webhook.secret for HMAC auth — no separate token needed
+
+# ──────────────────────────────────────────
+# Cross-Server Chat Relay
+# ──────────────────────────────────────────
+# Shares a "global" chat channel between RVNKCore servers (e.g. Event <-> prod) over the
+# existing Jetty HTTP API. Local chat stays on its own server. A line beginning with the
+# channel-trigger is relayed to peers; everything else is local-only.
+# Peers authenticate with the destination server's X-API-Key (same header AuthFilter checks
+# on /v1/*), sent as the egress X-API-Key header — no separate HMAC secret.
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+chat-relay:
+  enabled: false
+  server-id: ""            # This server's identity/tag source (e.g. "event", "prod")
+  channel-trigger: "!"     # Prefix that marks a chat line as global (stripped before relay)
+  dedup-cache-size: 512    # Bounded LRU of recent msgIds for loop/duplicate suppression
+  timeout-ms: 3000         # Per-peer HTTP timeout
+  # Render for bot/persona lines injected via POST /v1/chat/broadcast (#1769). Placeholders:
+  # {label} (bracket tag), {sender} (persona name), {message}. A single broadcast mirrors to this
+  # server AND every peer, rendered identically. NOTE: adding this key here does NOT reach a server
+  # that already has a config.yml (#1563) — the coded default below applies until an operator adds it.
+  # A broadcast may instead carry a tellraw JSON "components" payload (#1773); those render styled via
+  # `tellraw @a <components>` (full colour/hover/click) and BYPASS this bot-format entirely.
+  bot-format: "&8[&d{label}&8]&r &d{sender}&7: &f{message}"
+  peers: []                # List of peer servers. Example (uncomment and fill in):
+  #  - id: "prod"                                          # peer's chat-relay.server-id
+  #    tag: "P"                                            # short tag rendered on relayed lines
+  #    url: "https://<prod-host>:<port>/v1/chat/inbound"   # peer inbound endpoint
+  #    api-key: "<peer-x-api-key>"                         # peer's api.auth.key
+
+# ──────────────────────────────────────────
+# Native Cross-Server Transfer (movement only)
+# ──────────────────────────────────────────
+# Sends a player to another RVNK server via Minecraft's native Transfer packet
+# (Player#transfer(host, port)) — no proxy. MVP scope is MOVEMENT ONLY: inventory,
+# economy and quest state do NOT travel; the player arrives with the destination's data.
+# Requires accepts-transfers=true in server.properties on the DESTINATION (needs a restart).
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+transfer:
+  enabled: false
+  cooldown-seconds: 10               # Per-player minimum seconds between transfers
+  permission: "rvnkcore.transfer"    # Permission node required to transfer
+  confirm: true                      # Require "/server transfer <target> confirm" to proceed
+  # Themed notices for a network crossing (ASCII only — the MC font renders smart punctuation as
+  # ?-diamonds, #1753). {player} is substituted. The vanilla "left the game"/"joined the game"
+  # messages are suppressed either way; blank here only skips the themed announcement.
+  broadcast-message: "&d{player} &7was whisked away across the network..."   # on the server they LEAVE (#1763)
+  arrival-message: "&d{player} &7steps through from across the network..."   # on the server they ARRIVE at (#1782)
+  targets: {}                        # Named destinations. Example (uncomment and fill in):
+  #  prod:
+  #    host: "<prod-host>"
+  #    port: 25680
+  #  event:
+  #    host: "<event-host>"
+  #    port: 25724
+
+# ──────────────────────────────────────────
+# Cross-Server Portals (trigger block + sign)
+# ──────────────────────────────────────────
+# A trigger block (default DIAMOND_BLOCK) plus a sign whose first line is the sign-header and
+# which names a target server. Stepping on the block transfers the player via the existing
+# TransferService, so the named target must also exist under 'transfer.targets' above.
+# NOTE: shipped default is disabled; seed this section on each live server's config (#1563).
+portal:
+  enabled: false
+  trigger-block: "DIAMOND_BLOCK"     # Material name; must resolve to a placeable block
+  sign-header: "[server]"            # First sign line that marks a sign as a portal target
+  # permissions:
+  #   create: "rvnkcore.portal.create"   # Permission to create a portal
+  #   delete: "rvnkcore.portal.delete"   # Permission to delete a portal
+  #   use: "rvnkcore.portal.use"         # Permission to trigger a portal
 
 # ──────────────────────────────────────────
 # RVNKTools Settings
@@ -168,3 +315,11 @@ teleport:
   warmup-seconds: 3
   # Cooldown between TPA requests (seconds)
   cooldown-seconds: 10
+
+# Human-readable world display names for the /rvnkworlds/worlds REST endpoint.
+# Only consulted by RVNKCore's built-in fallback that serves that endpoint when the
+# RVNKWorlds plugin is NOT loaded on this server (e.g. nations). When RVNKWorlds IS
+# loaded, its own worlds.yml display_names take precedence and this section is unused.
+# Format: <bukkit-world-name>: <Display Name>   (case-insensitive; blank = raw name)
+world-display-names:
+  southmesa: Bankrekka

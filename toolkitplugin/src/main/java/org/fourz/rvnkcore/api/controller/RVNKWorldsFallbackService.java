@@ -2,6 +2,8 @@ package org.fourz.rvnkcore.api.controller;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
+import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
@@ -26,6 +28,39 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
     // ==================== Read Operations ====================
 
     /**
+     * Resolves a world's human-readable display name from RVNKCore config
+     * ({@code world-display-names.<world>}), falling back to the raw world name.
+     *
+     * <p>This is the RVNKWorlds-free equivalent of RVNKWorlds' {@code display_names} in
+     * worlds.yml: on servers where the RVNKWorlds plugin is not loaded (e.g. nations),
+     * this fallback serves {@code /rvnkworlds/worlds}, so friendly names must come from
+     * core config instead. Read live per request so a {@code /rvnkcore reload} takes effect
+     * without a restart. Key match is case-insensitive; blank values fall back to the raw name.</p>
+     */
+    private static String displayNameFor(String worldName) {
+        if (worldName == null) return "";
+        try {
+            RVNKCore core = RVNKCore.getInstance();
+            if (core != null) {
+                ConfigurationSection section = core.getConfig().getConfigurationSection("world-display-names");
+                if (section != null) {
+                    for (String key : section.getKeys(false)) {
+                        if (key.equalsIgnoreCase(worldName)) {
+                            String display = section.getString(key, "");
+                            if (display != null && !display.trim().isEmpty()) {
+                                return display.trim();
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // Config unavailable or malformed — fall through to the raw name.
+        }
+        return worldName;
+    }
+
+    /**
      * Returns all worlds currently loaded by Bukkit.
      * Shape mirrors WorldApiEndpointImpl.WorldSummaryDTO — see primary impl.
      */
@@ -39,7 +74,7 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
         for (LiveDataCache.WorldSnapshot w : snapshot) {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", w.name());
-            entry.put("displayName", w.name());
+            entry.put("displayName", displayNameFor(w.name()));
             entry.put("state", "ACTIVE");
             entry.put("environment", w.environment());
             entry.put("groupName", "");

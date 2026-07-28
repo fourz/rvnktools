@@ -162,4 +162,46 @@ public interface PlayerService {
      * @since 1.0.0
      */
     CompletableFuture<Boolean> playerExists(UUID playerId);
+
+    /**
+     * Copies per-server activity from {@code rvnk_players} into {@code rvnk_player_server_state}
+     * for this server (#1812).
+     *
+     * <p>Gap-filling only: rows already written by the #1811 dual-write are newer than the legacy
+     * columns and are left untouched. Idempotent and safe to run with players online.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return the number of rows inserted
+     * @since 1.5.55
+     */
+    int backfillServerState();
+
+    /**
+     * Unions this server's local identity rows into the cluster's {@code rvnk_players} (#1812).
+     *
+     * <p>Inserts players the cluster does not have, and corrects {@code first_join} backwards where
+     * this server saw the player earlier. Never deletes or overwrites a name. Only meaningful on a
+     * member server; throws if this server's identity database is already the cluster one.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return counts and per-player notes describing exactly what changed
+     * @since 1.5.56
+     */
+    org.fourz.rvnkcore.database.repository.PlayerRepository.IdentityUnionResult unionIdentityIntoCluster();
+
+    /**
+     * Unions this server's local player preferences into the cluster (#1813).
+     *
+     * <p>Insert-only — the cluster keeps any row it already has. Requires the identity union to
+     * have run first, since every player must exist in the cluster roster for the foreign key to
+     * accept the insert.</p>
+     *
+     * <p>Synchronous — callers must run it off the main thread.</p>
+     *
+     * @return rows inserted per table: {@code [preferences, types, channels]}
+     * @since 1.5.60
+     */
+    int[] unionPreferencesIntoCluster();
 }

@@ -5,6 +5,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.rvnkcore.api.config.ApiConfig;
+import org.fourz.rvnkcore.api.config.ChatRelayConfig;
+import org.fourz.rvnkcore.api.config.PortalConfig;
+import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.api.config.WebhookConfig;
 import org.fourz.rvnkcore.database.config.DatabaseConfig;
 
@@ -32,8 +35,12 @@ public class ConfigLoader {
     
     // Cached configurations to prevent duplicate loading
     private DatabaseConfig cachedDatabaseConfig;
+    private DatabaseConfig cachedClusterDatabaseConfig;
     private ApiConfig cachedApiConfig;
     private WebhookConfig cachedWebhookConfig;
+    private ChatRelayConfig cachedChatRelayConfig;
+    private TransferConfig cachedTransferConfig;
+    private PortalConfig cachedPortalConfig;
     private volatile boolean initialized = false;
     private final Object initLock = new Object();
     
@@ -337,8 +344,68 @@ public class ConfigLoader {
     }
 
     /**
+     * Gets the chat relay configuration instance with caching.
+     *
+     * @return ChatRelayConfig instance
+     */
+    public ChatRelayConfig getChatRelayConfig() {
+        if (cachedChatRelayConfig != null) {
+            return cachedChatRelayConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection chatRelaySection = coreConfig.getConfigurationSection("chat-relay");
+        cachedChatRelayConfig = ChatRelayConfig.fromConfigurationSection(chatRelaySection);
+        logger.debug("Chat relay configuration loaded and cached");
+        return cachedChatRelayConfig;
+    }
+
+    /**
+     * Gets the transfer configuration instance with caching.
+     *
+     * @return TransferConfig instance
+     */
+    public TransferConfig getTransferConfig() {
+        if (cachedTransferConfig != null) {
+            return cachedTransferConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection transferSection = coreConfig.getConfigurationSection("transfer");
+        cachedTransferConfig = TransferConfig.fromConfigurationSection(transferSection);
+        logger.debug("Transfer configuration loaded and cached");
+        return cachedTransferConfig;
+    }
+
+    /**
+     * Gets the portal configuration instance with caching.
+     *
+     * @return PortalConfig instance
+     */
+    public PortalConfig getPortalConfig() {
+        if (cachedPortalConfig != null) {
+            return cachedPortalConfig;
+        }
+
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+
+        ConfigurationSection portalSection = coreConfig.getConfigurationSection("portal");
+        cachedPortalConfig = PortalConfig.fromConfigurationSection(portalSection);
+        logger.debug("Portal configuration loaded and cached");
+        return cachedPortalConfig;
+    }
+
+    /**
      * Gets the database configuration instance with caching.
-     * 
+     *
      * @return DatabaseConfig instance
      */
     public DatabaseConfig getDatabaseConfig() {
@@ -373,8 +440,10 @@ public class ConfigLoader {
                 .maxConnections(coreConfig.getInt("database.mysql.pool.maxConnections", 20))
                 .minIdleConnections(coreConfig.getInt("database.mysql.pool.minIdleConnections", 5))
                 .connectionTimeoutMs(coreConfig.getLong("database.mysql.pool.connectionTimeoutMs", 30000L))
-                .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 600000L))
-                .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 1800000L))
+                // Cross-host-safe defaults (#1817/#1822 family). MySQLConnectionProvider also caps these
+                // at 120000/180000 regardless of config, so a stale config.yml cannot exceed them.
+                .idleTimeoutMs(coreConfig.getLong("database.mysql.pool.idleTimeoutMs", 120000L))
+                .maxLifetimeMs(coreConfig.getLong("database.mysql.pool.maxLifetimeMs", 180000L))
                 .leakDetectionMs(coreConfig.getLong("database.mysql.pool.leakDetectionMs", 60000L))
                 .build();
         } else {
@@ -396,7 +465,173 @@ public class ConfigLoader {
         logger.debug("Database configuration loaded and cached: " + dbType);
         return cachedDatabaseConfig;
     }
-    
+
+    /**
+     * This server's identity within the network, used to scope per-server rows (#1811).
+     *
+     * <p>There is no dedicated setting for this. Rather than introduce a fourth place to name the
+     * same server — and a fourth chance for the names to disagree — this reuses the identifiers
+     * already deployed and agreed across tiers:</p>
+     *
+     * <ol>
+     *   <li>{@code chat-relay.server-id} — set on every tier (dev / event / prod) and already the
+     *       de-facto network identity: peers address each other by it.</li>
+     *   <li>{@code webhook.server-id} — the same value, used by the WebUI cache tags.</li>
+     *   <li>{@code "local"} — standalone server with neither configured.</li>
+     * </ol>
+     *
+     * <p>Read directly from config rather than via {@code ChatRelayConfig} because that config is
+     * only populated when the relay is enabled, and a server's identity must not depend on whether
+     * an unrelated feature is switched on.</p>
+     *
+     * @return the server identifier, never null or blank
+     */
+    public String getServerId() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String id = coreConfig.getString("chat-relay.server-id", "");
+        if (id == null || id.isBlank()) {
+            id = coreConfig.getString("webhook.server-id", "");
+        }
+        return (id == null || id.isBlank()) ? "local" : id.trim();
+    }
+
+    // ============================================================
+    // CLUSTER (shared network data) — #1796 Phase 2
+    // ============================================================
+
+    /** Cluster role: this server owns the cluster database. */
+    public static final String CLUSTER_ROLE_AUTHORITATIVE = "authoritative";
+    /** Cluster role: this server connects to another server's cluster database. */
+    public static final String CLUSTER_ROLE_MEMBER = "member";
+
+    /**
+     * Whether cluster-shared data is enabled on this server.
+     *
+     * <p>When false (the default) RVNKCore behaves exactly as before: one pool, one database,
+     * everything local. Nothing about the cluster feature is reachable.</p>
+     */
+    public boolean isClusterEnabled() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.enabled", false);
+    }
+
+    /**
+     * This server's role in the cluster — {@value #CLUSTER_ROLE_AUTHORITATIVE} (it hosts the
+     * cluster database) or {@value #CLUSTER_ROLE_MEMBER} (it connects out to one).
+     *
+     * <p>Anything unrecognised is treated as {@code member}, because a member that cannot connect
+     * fails loudly, whereas mis-classifying a member as authoritative would silently point
+     * cluster reads at the local database and produce a second divergent data set — the exact
+     * failure this whole cluster effort exists to undo (#1795).</p>
+     */
+    public String getClusterRole() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String role = coreConfig.getString("cluster.role", CLUSTER_ROLE_MEMBER);
+        return CLUSTER_ROLE_AUTHORITATIVE.equalsIgnoreCase(role)
+                ? CLUSTER_ROLE_AUTHORITATIVE
+                : CLUSTER_ROLE_MEMBER;
+    }
+
+    /**
+     * Whether player <b>identity</b> is read from and written to the cluster database (#1812).
+     *
+     * <p>Separate from {@link #isClusterEnabled()} and default <b>false</b>, because turning it on
+     * changes where every player record lives. A member server that flips this before its local
+     * identity rows have been unioned into the cluster would see those players as absent and start
+     * creating fresh records for them, losing {@code first_join} and name history.</p>
+     *
+     * <p>Intended sequence: deploy with this off → run {@code /rvnkcore migrate playeridentity} →
+     * verify the union → enable → restart. On the authoritative server it is a no-op, since the
+     * cluster database is already the local one.</p>
+     *
+     * <p>Per-server activity is unaffected either way — it always stays in the local
+     * {@code rvnk_player_server_state}.</p>
+     */
+    public boolean isPlayerIdentityShared() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.share-player-identity", false);
+    }
+
+    /**
+     * Whether player <b>preferences</b> are read from the cluster database (#1813).
+     *
+     * <p>Its own flag, default <b>false</b>, for the same reason identity has one: flipping it moves
+     * where every preference row is read from, and a member's existing local rows would appear to
+     * vanish — players would find their chat display, list surface and announcement mutes reset.</p>
+     *
+     * <p>Requires {@link #isPlayerIdentityShared()}. The preference tables carry a foreign key into
+     * {@code rvnk_players}, so they can only live where that table lives; enabling preferences while
+     * identity is still local would point the constraint across databases, which InnoDB cannot
+     * enforce.</p>
+     *
+     * <p>Intended sequence: deploy with this off → check the counts in {@code /rvnkcore db} → decide
+     * whether the local rows need carrying over → enable → restart.</p>
+     */
+    public boolean isPlayerPreferencesShared() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("cluster.share-player-preferences", false)
+                && isPlayerIdentityShared();
+    }
+
+    /**
+     * Connection details for the cluster database, used only by {@code member} servers.
+     *
+     * <p>Authoritative servers never call this — they reuse the primary provider, so the cluster
+     * costs them no additional connections.</p>
+     *
+     * <p>The required MySQL safety parameters are merged in here for the same reason as the primary
+     * config (#1546): the cluster link is by definition cross-host, and without {@code socketTimeout}
+     * a stalled read blocks the calling thread forever and leaks the connection.</p>
+     *
+     * @return the cluster DatabaseConfig, or null when the cluster mysql block is absent
+     */
+    public DatabaseConfig getClusterDatabaseConfig() {
+        if (cachedClusterDatabaseConfig != null) {
+            return cachedClusterDatabaseConfig;
+        }
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        String host = coreConfig.getString("cluster.mysql.host");
+        String database = coreConfig.getString("cluster.mysql.database");
+        if (host == null || host.isBlank() || database == null || database.isBlank()) {
+            return null;
+        }
+
+        cachedClusterDatabaseConfig = DatabaseConfig.builder()
+                .type("mysql")
+                .host(host)
+                .port(coreConfig.getInt("cluster.mysql.port", 3306))
+                .database(database)
+                .username(coreConfig.getString("cluster.mysql.username", ""))
+                .password(coreConfig.getString("cluster.mysql.password", ""))
+                .useSSL(coreConfig.getBoolean("cluster.mysql.useSSL", false))
+                .connectionParameters(DatabaseConfig.withRequiredMySqlParams(
+                        coreConfig.getString("cluster.mysql.connectionParameters", "")))
+                // Deliberately smaller than the primary pool: the cluster serves a narrow set of
+                // low-traffic content tables, not the hot per-player path.
+                .maxConnections(coreConfig.getInt("cluster.mysql.pool.maxConnections", 5))
+                .minIdleConnections(coreConfig.getInt("cluster.mysql.pool.minIdleConnections", 1))
+                .connectionTimeoutMs(coreConfig.getLong("cluster.mysql.pool.connectionTimeoutMs", 10000L))
+                .idleTimeoutMs(coreConfig.getLong("cluster.mysql.pool.idleTimeoutMs", 120000L))
+                .maxLifetimeMs(coreConfig.getLong("cluster.mysql.pool.maxLifetimeMs", 180000L))
+                .leakDetectionMs(coreConfig.getLong("cluster.mysql.pool.leakDetectionMs", 60000L))
+                .build();
+
+        logger.debug("Cluster database configuration loaded and cached: " + host + "/" + database);
+        return cachedClusterDatabaseConfig;
+    }
+
     /**
      * Reloads the configuration from disk.
      * Invalidates all cached configurations to force fresh parsing.
@@ -411,7 +646,11 @@ public class ConfigLoader {
         // Invalidate caches so subsequent calls re-parse from the fresh config
         cachedApiConfig = null;
         cachedDatabaseConfig = null;
+        cachedClusterDatabaseConfig = null;
         cachedWebhookConfig = null;
+        cachedChatRelayConfig = null;
+        cachedTransferConfig = null;
+        cachedPortalConfig = null;
     }
     
     /**

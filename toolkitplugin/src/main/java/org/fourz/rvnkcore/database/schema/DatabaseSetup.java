@@ -29,6 +29,15 @@ public class DatabaseSetup {
     public static final String TABLE_WORLDS = "rvnk_worlds";
     public static final String TABLE_PLAYERS = "rvnk_players";
     public static final String TABLE_PLAYER_WORLD_DATA = "rvnk_player_world_data";
+    /**
+     * Per-server player activity (#1811). Always LOCAL — never cluster-shared.
+     *
+     * <p>Holds the columns of {@code rvnk_players} whose values are meaningful only on the server
+     * that produced them: {@code current_world}, {@code times_joined},
+     * {@code total_playtime_hours}, {@code last_seen}. Sharing those would be silent data loss —
+     * two tiers writing their own playtime would clobber each other's total.</p>
+     */
+    public static final String TABLE_PLAYER_SERVER_STATE = "rvnk_player_server_state";
     public static final String TABLE_ANNOUNCEMENTS = "rvnk_announcements";
     public static final String TABLE_PLAYER_PREFERENCES = "rvnk_player_preferences";
     public static final String TABLE_PLAYER_NOTIFICATION_TYPES = "rvnk_player_notification_types";
@@ -115,6 +124,309 @@ public class DatabaseSetup {
         }
     }
 
+    // ============================================================
+    // CLUSTER-SHARED SCHEMA (#1796 Phase 2)
+    // ============================================================
+
+    /**
+     * Tables that may be served by the {@code ClusterConnectionProvider} — one set network-wide
+     * rather than one set per server.
+     *
+     * <p><b>Membership is not a matter of taste.</b> A table qualifies only if it has no foreign
+     * key into per-server data. Both entries here are self-contained content tables with no FKs at
+     * all.</p>
+     *
+     * <p>{@code rvnk_player_preferences} is deliberately absent even though it is conceptually
+     * server-agnostic: it carries {@code FOREIGN KEY (player_id) REFERENCES rvnk_players(id)}, and
+     * {@code rvnk_players} is per-server. Creating it here would point that constraint at the
+     * authoritative server's roster, and writing preferences for a player who has never joined
+     * that server would fail.</p>
+     */
+    public static final String[] CLUSTER_SHARED_TABLES = {
+            TABLE_ANNOUNCEMENTS,
+            TABLE_ANNOUNCEMENT_TYPES,
+            // Player IDENTITY only (#1812). The per-server activity columns still physically exist
+            // on this table but are dead once identity is shared — live values live in the local
+            // rvnk_player_server_state. They are kept rather than dropped so the cut-over stays
+            // reversible; dropping them is a separate, later step.
+            TABLE_PLAYERS,
+            // Player preferences (#1813). Unblocked by #1812: these carry a foreign key into
+            // rvnk_players, so they could not move while the player table was per-server — the
+            // constraint would have pointed at the authoritative server's roster and rejected
+            // preferences for anyone who had never joined it. With identity now network-wide the
+            // FK resolves correctly and the chain moves as a unit.
+            TABLE_PLAYER_PREFERENCES,
+            TABLE_PLAYER_NOTIFICATION_TYPES,
+            TABLE_PLAYER_NOTIFICATION_CHANNELS,
+            TABLE_PREFERENCE_DEFAULTS,
+    };
+
+    /**
+     * Creates <b>only</b> the cluster-shared tables in the cluster database.
+     *
+     * <p>Deliberately not {@link #initializeDatabase()}. That method builds the entire schema —
+     * including {@code rvnk_players}, {@code rvnk_worlds} and the preference tables — and running
+     * it against the cluster connection would create a second, competing copy of the per-server
+     * schema in the authoritative database. On a member server those tables would then sit there
+     * empty and shadow nothing, and on the authoritative server the DDL is already applied.</p>
+     *
+     * <p>Idempotent: every statement is {@code CREATE TABLE IF NOT EXISTS}. Safe to run on an
+     * authoritative server where the tables already exist from the primary schema pass.</p>
+     *
+     * @param clusterProvider the cluster connection provider
+     * @throws SQLException if the cluster database cannot be reached or the DDL fails
+     */
+    public void initializeClusterTables(ConnectionProvider clusterProvider) throws SQLException {
+        try (Connection connection = clusterProvider.getConnection();
+             var stmt = connection.createStatement()) {
+
+            logger.info("Ensuring cluster-shared tables exist: "
+                    + String.join(", ", CLUSTER_SHARED_TABLES));
+
+            stmt.execute(announcementsDdl());
+            stmt.execute(announcementTypesDdl());
+            // rvnk_players must exist before the preference tables — their FK chain roots in it.
+            stmt.execute(playersDdl());
+            for (String ddl : preferenceDdl()) {
+                stmt.execute(ddl);
+            }
+
+            logger.info("Cluster-shared schema ready (" + CLUSTER_SHARED_TABLES.length + " tables)");
+        } catch (SQLException e) {
+            logger.error("Failed to initialize cluster-shared schema", e);
+            throw e;
+        }
+    }
+
+    /**
+     * DDL for {@code rvnk_announcements}. Shared by the primary schema pass and the cluster pass so
+     * the two cannot drift into different column definitions for the same logical table.
+     */
+    private String announcementsDdl() {
+        String announcementsTable = table(TABLE_ANNOUNCEMENTS);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "title VARCHAR(500), " +
+                "message TEXT NOT NULL, " +
+                "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "pinned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "scheduled_for TIMESTAMP NULL, " +
+                "expires_at TIMESTAMP NULL, " +
+                "interval_seconds INT DEFAULT 0, " +
+                "target_worlds TEXT, " +
+                "target_groups TEXT, " +
+                "metadata TEXT" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "title TEXT, " +
+            "message TEXT NOT NULL, " +
+            "type TEXT NOT NULL DEFAULT 'general', " +
+            "active BOOLEAN DEFAULT TRUE, " +
+            "pinned BOOLEAN DEFAULT FALSE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "scheduled_for TIMESTAMP NULL, " +
+            "expires_at TIMESTAMP NULL, " +
+            "interval_seconds INTEGER DEFAULT 0, " +
+            "target_worlds TEXT, " +
+            "target_groups TEXT, " +
+            "metadata TEXT" +
+            ")";
+    }
+
+    /**
+     * DDL for the four preference tables, in dependency order (#1813).
+     *
+     * <p>Returned as an ordered array because the foreign keys chain:
+     * {@code notification_channels} → {@code notification_types} → {@code player_preferences} →
+     * {@code rvnk_players}. Creating them out of order fails on MySQL.</p>
+     *
+     * <p>{@code preference_defaults} has no foreign key and is plugin-scoped rather than
+     * player-scoped, but travels with the set because it is meaningless apart from it.</p>
+     *
+     * <p>Shared by the primary schema pass and the cluster pass so the two cannot drift.</p>
+     */
+    private String[] preferenceDdl() {
+        String playersTable = table(TABLE_PLAYERS);
+        String prefs = table(TABLE_PLAYER_PREFERENCES);
+        String types = table(TABLE_PLAYER_NOTIFICATION_TYPES);
+        String channels = table(TABLE_PLAYER_NOTIFICATION_CHANNELS);
+        String defaults = table(TABLE_PREFERENCE_DEFAULTS);
+
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return new String[]{
+                "CREATE TABLE IF NOT EXISTS " + prefs + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "master_enabled BOOLEAN DEFAULT FALSE, " +
+                    "quiet_hours_start INT DEFAULT -1, " +
+                    "quiet_hours_end INT DEFAULT -1, " +
+                    "metadata TEXT, " +
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                    "PRIMARY KEY (player_id, plugin_id), " +
+                    "INDEX idx_player_prefs_player (player_id), " +
+                    "INDEX idx_player_prefs_plugin (plugin_id), " +
+                    "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + types + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "notification_type VARCHAR(64) NOT NULL, " +
+                    "enabled BOOLEAN DEFAULT TRUE, " +
+                    "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                    "INDEX idx_notif_types_player (player_id), " +
+                    "INDEX idx_notif_types_plugin_type (plugin_id, notification_type), " +
+                    "FOREIGN KEY (player_id, plugin_id) REFERENCES " + prefs + "(player_id, plugin_id) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + channels + " (" +
+                    "player_id VARCHAR(36) NOT NULL, " +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "notification_type VARCHAR(64) NOT NULL, " +
+                    "channel_name VARCHAR(32) NOT NULL, " +
+                    "enabled BOOLEAN DEFAULT TRUE, " +
+                    "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                    "INDEX idx_channels_player (player_id), " +
+                    "INDEX idx_channels_plugin_type (plugin_id, notification_type), " +
+                    "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + types + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                "CREATE TABLE IF NOT EXISTS " + defaults + " (" +
+                    "plugin_id VARCHAR(64) NOT NULL, " +
+                    "preference_key VARCHAR(64) NOT NULL, " +
+                    "preference_value TEXT NOT NULL, " +
+                    "description TEXT, " +
+                    "PRIMARY KEY (plugin_id, preference_key), " +
+                    "INDEX idx_defaults_plugin (plugin_id)" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            };
+        }
+        return new String[]{
+            "CREATE TABLE IF NOT EXISTS " + prefs + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "master_enabled BOOLEAN DEFAULT FALSE, " +
+                "quiet_hours_start INTEGER DEFAULT -1, " +
+                "quiet_hours_end INTEGER DEFAULT -1, " +
+                "metadata TEXT, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, plugin_id), " +
+                "FOREIGN KEY (player_id) REFERENCES " + playersTable + "(id) ON DELETE CASCADE ON UPDATE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + types + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type), " +
+                "FOREIGN KEY (player_id, plugin_id) REFERENCES " + prefs + "(player_id, plugin_id) ON DELETE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + channels + " (" +
+                "player_id TEXT NOT NULL, " +
+                "plugin_id TEXT NOT NULL, " +
+                "notification_type TEXT NOT NULL, " +
+                "channel_name TEXT NOT NULL, " +
+                "enabled BOOLEAN DEFAULT TRUE, " +
+                "PRIMARY KEY (player_id, plugin_id, notification_type, channel_name), " +
+                "FOREIGN KEY (player_id, plugin_id, notification_type) REFERENCES " + types + "(player_id, plugin_id, notification_type) ON DELETE CASCADE" +
+                ")",
+            "CREATE TABLE IF NOT EXISTS " + defaults + " (" +
+                "plugin_id TEXT NOT NULL, " +
+                "preference_key TEXT NOT NULL, " +
+                "preference_value TEXT NOT NULL, " +
+                "description TEXT, " +
+                "PRIMARY KEY (plugin_id, preference_key)" +
+                ")",
+        };
+    }
+
+    /**
+     * DDL for {@code rvnk_players}, shared by the primary schema pass and the cluster pass (#1812).
+     *
+     * <p>Retains the per-server activity columns even though they are dead once identity is shared.
+     * Keeping them means the cut-over is reversible by flipping
+     * {@code cluster.share-player-identity} back off; dropping them is a deliberate later step, not
+     * a side effect of this migration.</p>
+     */
+    private String playersDdl() {
+        String playersTable = table(TABLE_PLAYERS);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+                "id VARCHAR(36) PRIMARY KEY, " +
+                "current_name VARCHAR(255) NOT NULL, " +
+                "name_history TEXT, " +
+                "first_join TIMESTAMP NOT NULL, " +
+                "last_seen TIMESTAMP NOT NULL, " +
+                "current_world VARCHAR(255), " +
+                "times_joined INT DEFAULT 1, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
+                "primary_group VARCHAR(255) DEFAULT 'default', " +
+                "groups TEXT, " +
+                "banned BOOLEAN DEFAULT FALSE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + playersTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "current_name TEXT NOT NULL, " +
+            "name_history TEXT DEFAULT '', " +
+            "first_join TIMESTAMP NOT NULL, " +
+            "last_seen TIMESTAMP NOT NULL, " +
+            "current_world TEXT, " +
+            "times_joined INTEGER DEFAULT 1, " +
+            "total_playtime_hours REAL DEFAULT 0.0, " +
+            "primary_group TEXT DEFAULT 'default', " +
+            "groups TEXT, " +
+            "banned BOOLEAN DEFAULT FALSE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+            ")";
+    }
+
+    /**
+     * DDL for {@code rvnk_announcement_types}. See {@link #announcementsDdl()}.
+     */
+    private String announcementTypesDdl() {
+        String announcementTypesTable = table(TABLE_ANNOUNCEMENT_TYPES);
+        if ("MySQL".equalsIgnoreCase(databaseType)) {
+            return "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+                "id VARCHAR(50) PRIMARY KEY, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "prefix VARCHAR(200), " +
+                "suffix VARCHAR(200), " +
+                "permission VARCHAR(200), " +
+                "list_fee INT DEFAULT 0, " +
+                "weekly_fee INT DEFAULT 0, " +
+                "active BOOLEAN DEFAULT TRUE, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "metadata TEXT, " +
+                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        }
+        return "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
+            "id TEXT PRIMARY KEY, " +
+            "name TEXT NOT NULL, " +
+            "prefix TEXT, " +
+            "suffix TEXT, " +
+            "permission TEXT, " +
+            "list_fee INTEGER DEFAULT 0, " +
+            "weekly_fee INTEGER DEFAULT 0, " +
+            "active BOOLEAN DEFAULT TRUE, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+            "metadata TEXT, " +
+            "display_context TEXT NOT NULL DEFAULT 'both'" +
+            ")";
+    }
+
     /**
      * Quick check to see if schema already exists without detailed logging.
      */
@@ -191,7 +503,9 @@ public class DatabaseSetup {
         String preferenceDefaultsTable = table(TABLE_PREFERENCE_DEFAULTS);
         String pushSubscriptionsTable = table(TABLE_PUSH_SUBSCRIPTIONS);
         String webuiAccessLogTable = table(TABLE_WEBUI_ACCESS_LOG);
+        String playerServerStateTable = table(TABLE_PLAYER_SERVER_STATE);
 
+        String createPlayerServerStateTable;
         String createPlayersTable;
         String createPlayerWorldDataTable;
         String createWorldsTable;
@@ -277,37 +591,8 @@ public class DatabaseSetup {
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
-                "id VARCHAR(36) PRIMARY KEY, " +
-                "title VARCHAR(500), " +
-                "message TEXT NOT NULL, " +
-                "type VARCHAR(100) NOT NULL DEFAULT 'general', " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "pinned BOOLEAN DEFAULT FALSE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                "scheduled_for TIMESTAMP NULL, " +
-                "expires_at TIMESTAMP NULL, " +
-                "interval_seconds INT DEFAULT 0, " +
-                "target_worlds TEXT, " +
-                "target_groups TEXT, " +
-                "metadata TEXT" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-
-            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
-                "id VARCHAR(50) PRIMARY KEY, " +
-                "name VARCHAR(100) NOT NULL, " +
-                "prefix VARCHAR(200), " +
-                "suffix VARCHAR(200), " +
-                "permission VARCHAR(200), " +
-                "list_fee INT DEFAULT 0, " +
-                "weekly_fee INT DEFAULT 0, " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                "metadata TEXT, " +
-                "display_context VARCHAR(10) NOT NULL DEFAULT 'both'" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            createAnnouncementsTable = announcementsDdl();
+            createAnnouncementTypesTable = announcementTypesDdl();
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
                 "player_id VARCHAR(36) NOT NULL, " +
@@ -379,6 +664,23 @@ public class DatabaseSetup {
                 "INDEX idx_webui_access_ign (ign), " +
                 "INDEX idx_webui_access_created_at (created_at), " +
                 "INDEX idx_webui_access_country (country_code)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            // Per-server player activity (#1811). Deliberately NO foreign key to rvnk_players:
+            // once identity is cluster-shared (#1812) that table lives in a different database,
+            // and InnoDB cannot constrain across databases on separate hosts. Integrity is
+            // application-level here by necessity, not oversight.
+            createPlayerServerStateTable = "CREATE TABLE IF NOT EXISTS " + playerServerStateTable + " (" +
+                "player_id VARCHAR(36) NOT NULL, " +
+                "server_id VARCHAR(32) NOT NULL, " +
+                "current_world VARCHAR(255), " +
+                "times_joined INT DEFAULT 1, " +
+                "total_playtime_hours FLOAT DEFAULT 0.0, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, server_id), " +
+                "INDEX idx_player_server_state_player (player_id), " +
+                "INDEX idx_player_server_state_last_seen (last_seen)" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         } else {
             // SQLite table definitions
@@ -453,37 +755,8 @@ public class DatabaseSetup {
                 "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                 ")";
 
-            createAnnouncementsTable = "CREATE TABLE IF NOT EXISTS " + announcementsTable + " (" +
-                "id TEXT PRIMARY KEY, " +
-                "title TEXT, " +
-                "message TEXT NOT NULL, " +
-                "type TEXT NOT NULL DEFAULT 'general', " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "pinned BOOLEAN DEFAULT FALSE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "scheduled_for TIMESTAMP NULL, " +
-                "expires_at TIMESTAMP NULL, " +
-                "interval_seconds INTEGER DEFAULT 0, " +
-                "target_worlds TEXT, " +
-                "target_groups TEXT, " +
-                "metadata TEXT" +
-                ")";
-
-            createAnnouncementTypesTable = "CREATE TABLE IF NOT EXISTS " + announcementTypesTable + " (" +
-                "id TEXT PRIMARY KEY, " +
-                "name TEXT NOT NULL, " +
-                "prefix TEXT, " +
-                "suffix TEXT, " +
-                "permission TEXT, " +
-                "list_fee INTEGER DEFAULT 0, " +
-                "weekly_fee INTEGER DEFAULT 0, " +
-                "active BOOLEAN DEFAULT TRUE, " +
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "metadata TEXT, " +
-                "display_context TEXT NOT NULL DEFAULT 'both'" +
-                ")";
+            createAnnouncementsTable = announcementsDdl();
+            createAnnouncementTypesTable = announcementTypesDdl();
 
             createPlayerPreferencesTable = "CREATE TABLE IF NOT EXISTS " + playerPreferencesTable + " (" +
                 "player_id TEXT NOT NULL, " +
@@ -544,6 +817,18 @@ public class DatabaseSetup {
                 "action_type TEXT NOT NULL DEFAULT 'PAGE_VISIT', " +
                 "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" +
                 ")";
+
+            // See the MySQL branch for why there is no foreign key to rvnk_players (#1811).
+            createPlayerServerStateTable = "CREATE TABLE IF NOT EXISTS " + playerServerStateTable + " (" +
+                "player_id TEXT NOT NULL, " +
+                "server_id TEXT NOT NULL, " +
+                "current_world TEXT, " +
+                "times_joined INTEGER DEFAULT 1, " +
+                "total_playtime_hours REAL DEFAULT 0.0, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (player_id, server_id)" +
+                ")";
         }
 
         try (var stmt = connection.createStatement()) {
@@ -569,6 +854,8 @@ public class DatabaseSetup {
             stmt.execute(createPushSubscriptionsTable);
             logger.debug("Creating " + webuiAccessLogTable + " table...");
             stmt.execute(createWebuiAccessLogTable);
+            logger.debug("Creating " + playerServerStateTable + " table...");
+            stmt.execute(createPlayerServerStateTable);
             logger.debug("All tables created successfully");
         }
     }

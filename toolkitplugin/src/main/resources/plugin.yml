@@ -112,6 +112,10 @@ commands:
     description: Link your account to external services
     usage: /link <login|matrix|discord>
     permission: rvnktools.link
+  server:
+    description: Cross-server transfer commands (movement only)
+    usage: /server transfer <target> [confirm]
+    permission: rvnkcore.transfer
   pref:
     description: Manage your notification preferences
     usage: |
@@ -294,10 +298,8 @@ permissions:
     default: op
 
   # ── Welcome ──────────────────────────────────────────────────────────────
-  rvnktools.welcome:
-    description: Allows player to receive welcome messages
-  rvnktools.welcome.newplayer:
-    description: Sends welcome message to new players
+  # MOVED to RVNKEvents as rvnkevents.welcome{,.newplayer} (#1788). Nodes retained here only as a
+  # breadcrumb; JoinListener no longer lives in this plugin. Remove after the tiers are re-granted.
 
   # ── Preferences (rvnkcore.*) ─────────────────────────────────────────────
   rvnkcore.prefs:
@@ -312,3 +314,26 @@ permissions:
     children:
       rvnkcore.prefs: true
       rvnkcore.prefs.admin: true
+
+  # ── Cross-Server Transfer (rvnkcore.*) ───────────────────────────────────
+  rvnkcore.transfer:
+    description: Allows use of /server transfer to move between RVNK servers
+    default: op
+
+  # ── Cross-Server Portals (rvnkcore.*) ────────────────────────────────────
+  rvnkcore.portal.create:
+    description: Allows creating a cross-server portal
+    default: op
+  rvnkcore.portal.delete:
+    description: Allows deleting a cross-server portal
+    default: op
+  rvnkcore.portal.use:
+    description: Allows triggering a cross-server portal
+    default: true
+  rvnkcore.portal.*:
+    description: All cross-server portal permissions
+    default: op
+    children:
+      rvnkcore.portal.create: true
+      rvnkcore.portal.delete: true
+      rvnkcore.portal.use: true

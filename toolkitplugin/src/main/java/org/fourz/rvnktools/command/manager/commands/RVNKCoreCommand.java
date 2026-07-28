@@ -5,6 +5,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.mojang.MojangAPI;
+import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.CommandManager;
@@ -100,6 +101,14 @@ public class RVNKCoreCommand extends BaseCommand {
                     ? Arrays.copyOfRange(args, 1, args.length)
                     : new String[0];
                 handleMojang(sender, mojangArgs);
+                break;
+            case "migrate":
+                handleMigrate(sender, args.length > 1 ? args[1].toLowerCase() : "");
+                break;
+            case "netban":
+                handleNetBan(sender,
+                        args.length > 1 ? args[1].toLowerCase() : "",
+                        args.length > 2 ? args[2] : "");
                 break;
             default:
                 sender.sendMessage(ChatFormat.colorize("&c✖ Unknown subcommand: " + sub));
@@ -247,6 +256,280 @@ public class RVNKCoreCommand extends BaseCommand {
         } catch (Exception e) {
             sender.sendMessage(ChatFormat.colorize("&c✖ Failed to access PlayerService: " + e.getMessage()));
         }
+
+        reportPlayerServerState(sender);
+        reportPreferenceRows(sender);
+        reportClusterConnectivity(sender);
+    }
+
+    /**
+     * Views and edits the network-wide ban flag (#1814).
+     *
+     * <p><b>Why this exists:</b> {@code PlayerBanListener} only ever sets {@code banned = true}, on
+     * detecting a kick-due-to-ban. Nothing ever cleared it. Minecraft's {@code /pardon} lifts the
+     * local vanilla ban but does not touch the cluster roster, so before this command a network ban
+     * was <b>irreversible without a direct database edit</b> — and because
+     * {@link org.fourz.rvnkcore.api.event.ClusterBanListener} checks the flag on every server, that
+     * included the tier the ban was issued from.</p>
+     *
+     * <p>Works on offline players: the lookup is by stored name, not by online player.</p>
+     *
+     * <p>Usage: {@code /rvnkcore netban <add|remove|check> <player>}</p>
+     */
+    private void handleNetBan(CommandSender sender, String action, String playerName) {
+        if (playerName.isEmpty()
+                || !(action.equals("add") || action.equals("remove") || action.equals("check"))) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&c✖ Usage: /rvnkcore netban <add|remove|check> <player>"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Network-wide ban flag. Separate from Minecraft's per-server /ban —"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   /pardon does NOT clear this, use 'netban remove'."));
+            return;
+        }
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                var found = svc.getPlayerByName(playerName).get();
+                if (found.isEmpty()) {
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&c✖ No player named '" + playerName + "' in the network roster"));
+                    return;
+                }
+                org.fourz.rvnkcore.api.model.PlayerDTO dto = found.get();
+
+                if (action.equals("check")) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + dto.getCurrentName()
+                            + " network ban: " + (dto.isBanned() ? "&cBANNED" : "&anot banned")));
+                    return;
+                }
+
+                boolean target = action.equals("add");
+                if (dto.isBanned() == target) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + dto.getCurrentName()
+                            + " is already " + (target ? "banned" : "not banned") + " — no change"));
+                    return;
+                }
+
+                dto.setBanned(target);
+                svc.savePlayer(dto).get();
+                sender.sendMessage(ChatFormat.colorize("&a✓ " + dto.getCurrentName()
+                        + " network ban " + (target ? "&cSET" : "&aCLEARED")));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Applies on every server in the cluster. Minecraft's own per-server"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   ban list is unaffected — use /ban and /pardon for that separately."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ netban failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Carries this server's local player preferences into the cluster (#1813).
+     *
+     * <p>Insert-only — see {@code unionPreferencesIntoCluster}. Run after
+     * {@code migrate playeridentity} and before enabling
+     * {@code cluster.share-player-preferences}.</p>
+     */
+    private void handleMigratePrefs(CommandSender sender) {
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Unioning player preferences into the cluster..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                int[] r = svc.unionPreferencesIntoCluster();
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — &e" + r[0]
+                        + " &fpref, &e" + r[1] + " &ftype, &e" + r[2] + " &fchannel row(s) inserted"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Rows the cluster already had were left as-is — a preference set on two"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   servers has no objectively correct winner, so none was picked."));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Enable &fcluster.share-player-preferences&7 and restart to cut over."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Union failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Reports preference row counts in the LOCAL database (#1813).
+     *
+     * <p>Deliberately always queries the local pool, not whichever provider preferences are
+     * currently served from. Before the cut-over that is the live data; after it, it is what was
+     * left behind — and knowing whether anything was stranded is the whole question. A count taken
+     * from the active provider would report the cluster's rows either way and answer nothing.</p>
+     */
+    private void reportPreferenceRows(CommandSender sender) {
+        try (java.sql.Connection conn = rvnkCore.getService(
+                org.fourz.rvnkcore.database.connection.ConnectionProvider.class).getConnection();
+             java.sql.Statement stmt = conn.createStatement();
+             java.sql.ResultSet rs = stmt.executeQuery(
+                 "SELECT (SELECT COUNT(*) FROM rvnk_player_preferences) AS prefs, "
+                 + "(SELECT COUNT(*) FROM rvnk_player_notification_types) AS types, "
+                 + "(SELECT COUNT(*) FROM rvnk_player_notification_channels) AS channels")) {
+            if (rs.next()) {
+                sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &flocal preferences: &e"
+                        + rs.getLong("prefs") + " &fpref, &e" + rs.getLong("types")
+                        + " &ftype, &e" + rs.getLong("channels") + " &fchannel row(s)"));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   • &8- &7local preferences: unavailable (" + e.getMessage() + ")"));
+        }
+    }
+
+    /**
+     * One-shot data migrations. Currently: {@code /rvnkcore migrate playerstate} (#1812).
+     *
+     * <p>Run as a command rather than automatically at startup so it is an explicit, logged,
+     * operator-timed action on live player data — and so it can be run per tier in a chosen order
+     * instead of firing on whichever server happens to restart first.</p>
+     */
+    private void handleMigrate(CommandSender sender, String what) {
+        if ("playeridentity".equals(what)) {
+            handleMigrateIdentity(sender);
+            return;
+        }
+        if ("playerprefs".equals(what)) {
+            handleMigratePrefs(sender);
+            return;
+        }
+        if (!"playerstate".equals(what)) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&c✖ Usage: /rvnkcore migrate <playerstate|playeridentity|playerprefs>"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   playerstate    — copy per-server activity into rvnk_player_server_state"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   playeridentity — union this server's players into the cluster roster"));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   Both are idempotent and safe with players online."));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Backfilling per-server player state..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                int inserted = svc.backfillServerState();
+                sender.sendMessage(ChatFormat.colorize("&a✓ Backfill complete — &e" + inserted
+                        + " &frow(s) inserted"));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Existing rows were left untouched (they are newer than the legacy columns)."));
+                sender.sendMessage(ChatFormat.colorize("&7   Run &f/rvnkcore db&7 to confirm the totals."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Backfill failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Unions this server's player identity into the cluster roster (#1812).
+     *
+     * <p>Prints every change rather than just totals: this rewrites live player records, and an
+     * operator should be able to see exactly which players were inserted and whose
+     * {@code first_join} moved, without going to the database to find out.</p>
+     */
+    private void handleMigrateIdentity(CommandSender sender) {
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Unioning player identity into the cluster..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                org.fourz.rvnkcore.api.service.PlayerService svc =
+                        rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+                var r = svc.unionIdentityIntoCluster();
+                for (String note : r.notes) {
+                    sender.sendMessage(ChatFormat.colorize("&7   " + note));
+                }
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — examined &e" + r.examined
+                        + "&f, inserted &e" + r.inserted
+                        + "&f, first_join corrected &e" + r.firstJoinCorrected));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Nothing was deleted and no name was overwritten."));
+                sender.sendMessage(ChatFormat.colorize(
+                        "&7   Enable &fcluster.share-player-identity&7 and restart to cut over."));
+            } catch (Exception e) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ Union failed: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Reports the per-server player activity mirror (#1811).
+     *
+     * <p>During the additive phase nothing reads {@code rvnk_player_server_state}, so without this
+     * there is no way to tell a working dual-write from a silently failing one until #1812 cuts
+     * reads over and finds the table empty. Prints the row count and the newest {@code last_seen}
+     * so the mirror can be confirmed to be filling before anything depends on it.</p>
+     */
+    private void reportPlayerServerState(CommandSender sender) {
+        try (java.sql.Connection conn = rvnkCore.getService(
+                org.fourz.rvnkcore.database.connection.ConnectionProvider.class).getConnection();
+             java.sql.Statement stmt = conn.createStatement();
+             java.sql.ResultSet rs = stmt.executeQuery(
+                 "SELECT COUNT(*) AS n, COUNT(DISTINCT server_id) AS servers, MAX(last_seen) AS newest "
+                 + "FROM rvnk_player_server_state")) {
+            if (rs.next()) {
+                sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &fper-server state: &e"
+                        + rs.getLong("n") + " &frow(s) across &e" + rs.getInt("servers")
+                        + " &fserver(s), newest &7" + rs.getString("newest")));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7   • &c✖ &fper-server state unavailable: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Reports cluster-shared database state, if clustering is enabled (#1796 Phase 2).
+     *
+     * <p>Deliberately runs a <b>real query against the cluster tables</b> and prints the row counts
+     * rather than reporting "connected". A provider can hold a valid connection and still be aimed
+     * at the wrong database or a schema that was never created — a status line would look identical
+     * in every one of those cases. Phase 1 produced two bugs that reported success while the data
+     * was not where it claimed to be (#1797, #1804); the counts here are what actually distinguish
+     * a working cluster from a plausible-looking one.</p>
+     */
+    private void reportClusterConnectivity(CommandSender sender) {
+        ClusterConnectionProvider cluster;
+        try {
+            cluster = rvnkCore.getService(ClusterConnectionProvider.class);
+        } catch (Exception e) {
+            cluster = null;
+        }
+
+        if (cluster == null) {
+            sender.sendMessage(ChatFormat.colorize("&7   • &8- &7Cluster: disabled (all data local)"));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Cluster-Shared Database"));
+        sender.sendMessage(ChatFormat.colorize("&7   • &f Role: &b"
+                + (cluster.isAuthoritative() ? "authoritative" : "member")
+                + " &7— " + cluster.describeTarget()));
+
+        long startMs = System.currentTimeMillis();
+        try (java.sql.Connection conn = cluster.getConnection()) {
+            for (String table : org.fourz.rvnkcore.database.schema.DatabaseSetup.CLUSTER_SHARED_TABLES) {
+                try (java.sql.Statement stmt = conn.createStatement();
+                     java.sql.ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + table)) {
+                    long rows = rs.next() ? rs.getLong(1) : -1;
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&7   • &a✓ &f" + table + ": &e" + rows + " &frow(s)"));
+                } catch (java.sql.SQLException e) {
+                    sender.sendMessage(ChatFormat.colorize(
+                            "&7   • &c✖ &f" + table + ": " + e.getMessage()));
+                }
+            }
+            sender.sendMessage(ChatFormat.colorize("&a✓ Result: Cluster reachable ("
+                    + (System.currentTimeMillis() - startMs) + "ms)"));
+        } catch (Exception e) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ Result: Cluster unreachable — " + e.getMessage()));
+            sender.sendMessage(ChatFormat.colorize("&7   Local database is unaffected."));
+        }
     }
 
     // ========================================================
@@ -279,6 +562,39 @@ public class RVNKCoreCommand extends BaseCommand {
         try {
             rvnkCore.reloadConfig();
             sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &fConfig reloaded"));
+
+            // Push refreshed config into the cross-server services so transfer/portal/chat-relay
+            // changes take effect without a full restart (#1743). Previously reload only re-read
+            // config.yml while these services kept the config captured at construction.
+            org.bukkit.configuration.file.FileConfiguration cfg = rvnkCore.getConfig();
+            ServiceRegistry reg = rvnkCore.getServiceRegistry();
+            int refreshed = 0;
+            if (reg.hasService(org.fourz.rvnkcore.service.transfer.TransferService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.transfer.TransferService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.TransferConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("transfer")));
+                refreshed++;
+            }
+            if (reg.hasService(org.fourz.rvnkcore.service.portal.PortalService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.portal.PortalService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.PortalConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("portal")));
+                refreshed++;
+            }
+            if (reg.hasService(org.fourz.rvnkcore.service.chatrelay.ChatRelayService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.chatrelay.ChatRelayService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.ChatRelayConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("chat-relay")));
+                refreshed++;
+            }
+            if (reg.hasService(org.fourz.rvnkcore.service.presence.PresenceService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.presence.PresenceService.class).refreshConfig(
+                    org.fourz.rvnkcore.api.config.ChatRelayConfig.fromConfigurationSection(
+                        cfg.getConfigurationSection("chat-relay")));
+                refreshed++;
+            }
+            sender.sendMessage(ChatFormat.colorize(
+                "&7   • &a✓ &fCross-server services refreshed: " + refreshed));
 
             // Verify services survived
             String[] services = rvnkCore.getServiceRegistry().getRegisteredServices();
