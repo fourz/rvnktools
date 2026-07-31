@@ -128,6 +128,31 @@ public final class PortalSignWriter {
     }
 
     /**
+     * Strips a sign back to a plain, reusable sign: removes the portal-id stamp and blanks the
+     * four lines.
+     *
+     * <p>Called when a portal is removed. Without it the sign keeps a stamp pointing at a portal
+     * that no longer exists, which makes the sign inert — it cannot be re-registered and its text
+     * cannot be changed, because the stamp short-circuits the sign-change handler.</p>
+     *
+     * @param block the sign block
+     * @param key   the portal-id key
+     * @return true when the sign was cleared; false when the block is not (or is no longer) a sign
+     */
+    public static boolean clearStamp(Block block, NamespacedKey key) {
+        BlockState state = block.getState();
+        if (!(state instanceof Sign sign)) {
+            return false;
+        }
+        sign.getPersistentDataContainer().remove(key);
+        for (int i = 0; i < 4; i++) {
+            sign.setLine(i, "");
+        }
+        sign.update();
+        return true;
+    }
+
+    /**
      * Resolves the block a sign is mounted on: the block behind a wall sign, or the block below a
      * standing sign.
      *

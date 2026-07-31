@@ -88,12 +88,21 @@ public class PortalSignListener implements Listener {
             String existingId = existingSign.getPersistentDataContainer()
                     .get(portalIdKey, PersistentDataType.STRING);
             if (existingId != null) {
-                portalService.getPortalById(existingId).ifPresent(p -> {
+                Optional<PortalDTO> existing = portalService.getPortalById(existingId);
+                if (existing.isPresent()) {
                     String[] lines = buildDisplayLines(
-                            RVNKCore.getServiceSafe(TransferService.class), p.getTargetServer(), existingId);
+                            RVNKCore.getServiceSafe(TransferService.class),
+                            existing.get().getTargetServer(), existingId);
                     for (int i = 0; i < 4; i++) event.setLine(i, lines[i]);
-                });
-                return;
+                    return;
+                }
+                // Stamp survives but the portal is gone (deleted, rolled back, DB resync). Returning
+                // here would leave the sign inert forever: never re-registerable, never editable.
+                // Drop the stale stamp and fall through so this edit is treated as a fresh sign.
+                existingSign.getPersistentDataContainer().remove(portalIdKey);
+                existingSign.update();
+                logger.debug("Cleared stale portal stamp " + existingId + " from sign at "
+                        + event.getBlock().getLocation() + " — portal no longer registered");
             }
         }
 
@@ -207,6 +216,15 @@ public class PortalSignListener implements Listener {
         PortalConfig config = portalService.getConfig();
 
         Player player = event.getPlayer();
+
+        // A stamp pointing at a portal that no longer exists protects nothing. Blocking the break
+        // would strand an un-removable sign in the world for anyone without delete permission.
+        if (portalService.getPortalById(portalId).isEmpty()) {
+            logger.debug("Sign at " + block.getLocation() + " carried stale portal stamp " + portalId
+                    + " — allowing break, portal is not registered");
+            return;
+        }
+
         if (config != null && !player.hasPermission(config.getPermissionDelete())) {
             event.setCancelled(true);
             player.sendMessage("§cYou don't have permission to remove cross-server portals.");
@@ -214,8 +232,8 @@ public class PortalSignListener implements Listener {
         }
 
         // Remove by the id stamped on the sign: clears all index entries and returns the interior
-        // NETHER_PORTAL blocks to AIR.
-        boolean removed = portalService.deletePortalById(portalId);
+        // NETHER_PORTAL blocks to AIR. The sign is already being destroyed, so skip clearing it.
+        boolean removed = portalService.deletePortalById(portalId, false);
 
         if (removed) {
             player.sendMessage("§aCross-server portal removed.");

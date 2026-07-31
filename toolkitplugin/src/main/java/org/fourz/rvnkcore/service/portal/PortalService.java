@@ -284,9 +284,26 @@ public class PortalService {
      * @return true if a portal with that id was present and removed
      */
     public boolean deletePortalById(String portalId) {
+        return deletePortalById(portalId, true);
+    }
+
+    /**
+     * Deletes a portal by id, optionally stripping its registration sign back to a plain sign.
+     *
+     * @param portalId  The portal id (as stamped on the registration sign)
+     * @param clearSign true to blank the sign and remove its portal-id stamp. Pass false when the
+     *                  sign is already being destroyed (the block-break path), where clearing it
+     *                  would be pointless work on a block about to become air.
+     * @return true if a portal with that id was present and removed
+     */
+    public boolean deletePortalById(String portalId, boolean clearSign) {
         PortalDTO portal = byId.remove(portalId);
         if (portal == null) {
             return false;
+        }
+
+        if (clearSign) {
+            clearRegistrationSign(portal, portalId);
         }
 
         World world = Bukkit.getWorld(portal.getWorld());
@@ -314,6 +331,30 @@ public class PortalService {
             logger.info("Portal deleted (id " + portalId + ")");
         }
         return true;
+    }
+
+    /**
+     * Strips a deleted portal's registration sign back to a plain sign.
+     *
+     * <p>A sign left carrying the stamp of a portal that no longer exists is <b>inert</b>: the
+     * sign-change handler short-circuits on the stamp, so the sign can be neither re-registered nor
+     * edited into anything else, and the block-break handler demands delete permission to remove
+     * it. Clearing the stamp on delete is what keeps the sign reusable.</p>
+     *
+     * <p>Best-effort: an unloaded world or chunk is skipped rather than force-loaded. Any sign left
+     * behind that way is recovered by the sign-change handler, which clears a stale stamp on the
+     * next edit.</p>
+     */
+    private void clearRegistrationSign(PortalDTO portal, String portalId) {
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null || !world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
+            logger.debug("Portal " + portalId + " sign not cleared — world or chunk not loaded");
+            return;
+        }
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        PortalSignWriter.findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), portalId)
+                .ifPresent(signBlock -> PortalSignWriter.clearStamp(
+                        signBlock, PortalSignWriter.portalIdKey(plugin)));
     }
 
     /**
