@@ -354,6 +354,13 @@ public class RVNKToolsInitializer {
                 ServerTransferCommand transferCommand = new ServerTransferCommand(plugin);
                 commandManager.registerCommand(transferCommand);
                 logger.info("ServerTransferCommand registered");
+
+                // Cross-server portal administration (/portal). Registered unconditionally: RVNKCore
+                // owns the command and other plugins extend it via IPortalCommandExtension (#1859).
+                org.fourz.rvnkcore.command.PortalCommand portalCommand =
+                        new org.fourz.rvnkcore.command.PortalCommand(plugin);
+                commandManager.registerCommand(portalCommand);
+                logger.info("PortalCommand registered");
             }
 
         } catch (Exception e) {

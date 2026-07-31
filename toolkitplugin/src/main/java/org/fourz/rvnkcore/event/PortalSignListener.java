@@ -4,11 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Sign;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -22,6 +19,7 @@ import org.fourz.rvnkcore.api.config.TransferConfig;
 import org.fourz.rvnkcore.api.model.PortalDTO;
 import org.fourz.rvnkcore.service.portal.PortalFrameBuilder;
 import org.fourz.rvnkcore.service.portal.PortalService;
+import org.fourz.rvnkcore.service.portal.PortalSignWriter;
 import org.fourz.rvnkcore.service.transfer.TransferService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -49,7 +47,7 @@ import java.util.Optional;
 public class PortalSignListener implements Listener {
 
     /** PersistentDataContainer key storing the portal id on the sign block. */
-    private static final String PORTAL_ID_KEY = "portal_id";
+    private static final String PORTAL_ID_KEY = PortalSignWriter.PORTAL_ID_KEY;
 
     private final RVNKCore plugin;
     private final LogManager logger;
@@ -233,16 +231,7 @@ public class PortalSignListener implements Listener {
      * @return the mounting block, or null when the block is not a sign
      */
     private Block resolveMountBlock(Block signBlock) {
-        BlockData data = signBlock.getBlockData();
-        if (data instanceof WallSign wallSign) {
-            // A wall sign faces outward; the block it is attached to sits behind it.
-            return signBlock.getRelative(wallSign.getFacing().getOppositeFace());
-        }
-        if (data instanceof org.bukkit.block.data.type.Sign) {
-            // A standing sign is mounted on the block directly below it.
-            return signBlock.getRelative(BlockFace.DOWN);
-        }
-        return null;
+        return PortalSignWriter.resolveMountBlock(signBlock);
     }
 
     /**
@@ -255,20 +244,7 @@ public class PortalSignListener implements Listener {
      * @return four legacy-coded sign lines
      */
     private String[] buildDisplayLines(TransferService transferService, String targetServer, String portalId) {
-        TransferConfig.Target tgt = transferService != null
-                ? transferService.getConfig().resolveTarget(targetServer) : null;
-        String display = (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
-                ? tgt.display() : targetServer;
-        String world = (tgt != null && tgt.world() != null && !tgt.world().isEmpty())
-                ? tgt.world() : "";
-        String shortId = (portalId != null && portalId.length() >= 8)
-                ? portalId.substring(0, 8) : (portalId != null ? portalId : "");
-        return new String[]{
-                "§9[server]",
-                "§a" + display,
-                world.isEmpty() ? "" : "§7" + world,
-                "§8" + shortId
-        };
+        return PortalSignWriter.buildDisplayLines(transferService, targetServer, portalId);
     }
 
     /**
@@ -278,13 +254,9 @@ public class PortalSignListener implements Listener {
      * @param portalId  The portal id to store
      */
     private void stampSign(Block signBlock, String portalId) {
-        BlockState state = signBlock.getState();
-        if (!(state instanceof Sign sign)) {
+        if (!PortalSignWriter.stamp(signBlock, portalIdKey, portalId)) {
             logger.warning("Portal sign PDC stamp skipped: block at " + signBlock.getLocation()
                     + " is no longer a sign");
-            return;
         }
-        sign.getPersistentDataContainer().set(portalIdKey, PersistentDataType.STRING, portalId);
-        sign.update();
     }
 }

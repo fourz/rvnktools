@@ -116,6 +116,11 @@ commands:
     description: Cross-server transfer commands (movement only)
     usage: /server transfer <target> [confirm]
     permission: rvnkcore.transfer
+  portal:
+    description: Cross-server portal administration, and the cross-system portal view
+    usage: /portal <list|info|delete|tp|repair|reload|types> [args]
+    aliases: [portals]
+    permission: rvnkcore.portal.admin
   pref:
     description: Manage your notification preferences
     usage: |
@@ -330,6 +335,9 @@ permissions:
   rvnkcore.portal.use:
     description: Allows triggering a cross-server portal
     default: true
+  rvnkcore.portal.admin:
+    description: Allows use of /portal (list, info, tp, repair, reload, types)
+    default: op
   rvnkcore.portal.*:
     description: All cross-server portal permissions
     default: op
@@ -337,3 +345,4 @@ permissions:
       rvnkcore.portal.create: true
       rvnkcore.portal.delete: true
       rvnkcore.portal.use: true
+      rvnkcore.portal.admin: true

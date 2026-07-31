@@ -42,7 +42,13 @@ public class PortalService {
         DISABLED,
         ALREADY_EXISTS,
         NOT_FOUND,
-        PERSIST_FAILED
+        PERSIST_FAILED,
+        /**
+         * The portal exists but cannot be acted on right now — typically its world or chunk is not
+         * loaded. Distinct from {@link #NOT_FOUND}: the portal is fine, we simply cannot reach it,
+         * so a caller must not treat this as grounds for deleting anything (#1859).
+         */
+        UNAVAILABLE
     }
 
     /**
@@ -335,6 +341,181 @@ public class PortalService {
             logger.info("Portal deleted at " + key);
         }
         return true;
+    }
+
+    /**
+     * Result of checking a registered portal against the actual world (#1859, #1860).
+     *
+     * <p>{@link #UNVERIFIED} is deliberately distinct from {@link #ORPHANED}: a portal in an
+     * unloaded world or chunk cannot be inspected without force-loading it, and reporting
+     * "not currently readable" as "gone" would condemn healthy portals. Callers must treat the two
+     * differently — in particular nothing should ever be auto-deleted on UNVERIFIED.</p>
+     */
+    public enum Verification {
+        /** Trigger block and a correctly-stamped sign are both present. */
+        VERIFIED,
+        /** The world or chunk is not loaded, so the portal could not be checked. */
+        UNVERIFIED,
+        /** The trigger block or the stamped sign is missing — the row no longer matches the world. */
+        ORPHANED,
+        /** No portal is registered under that id. */
+        UNKNOWN
+    }
+
+    /**
+     * Returns every registered portal, ordered by world then coordinates.
+     *
+     * <p>Served from the in-memory index, which is authoritative for runtime lookups, so this is
+     * safe to call on the main thread and keeps working during a database outage.</p>
+     *
+     * @return all registered portals; never null
+     */
+    public List<PortalDTO> listPortals() {
+        List<PortalDTO> portals = new java.util.ArrayList<>(byId.values());
+        portals.sort(java.util.Comparator
+                .comparing(PortalDTO::getWorld, java.util.Comparator.nullsLast(String::compareTo))
+                .thenComparingInt(PortalDTO::getX)
+                .thenComparingInt(PortalDTO::getY)
+                .thenComparingInt(PortalDTO::getZ));
+        return portals;
+    }
+
+    /**
+     * Returns registered portals in one world.
+     *
+     * @param world the world name; null or blank returns every portal
+     * @return matching portals; never null
+     */
+    public List<PortalDTO> listPortalsInWorld(String world) {
+        if (world == null || world.isBlank()) {
+            return listPortals();
+        }
+        List<PortalDTO> portals = new java.util.ArrayList<>();
+        for (PortalDTO portal : listPortals()) {
+            if (world.equalsIgnoreCase(portal.getWorld())) {
+                portals.add(portal);
+            }
+        }
+        return portals;
+    }
+
+    /**
+     * Resolves a portal by a full id or an unambiguous id prefix.
+     *
+     * <p>Portal signs display only the first eight characters of the id, so an operator reading a
+     * sign has a prefix rather than the full UUID. An ambiguous prefix resolves to empty rather
+     * than picking one — guessing which portal an admin meant is how the wrong one gets deleted.</p>
+     *
+     * @param idOrPrefix the full portal id, or a prefix of it
+     * @return the single matching portal, or empty when nothing or more than one matches
+     */
+    public Optional<PortalDTO> resolvePortal(String idOrPrefix) {
+        if (idOrPrefix == null || idOrPrefix.isBlank()) {
+            return Optional.empty();
+        }
+        PortalDTO exact = byId.get(idOrPrefix);
+        if (exact != null) {
+            return Optional.of(exact);
+        }
+        String prefix = idOrPrefix.toLowerCase();
+        PortalDTO match = null;
+        for (Map.Entry<String, PortalDTO> entry : byId.entrySet()) {
+            if (entry.getKey().toLowerCase().startsWith(prefix)) {
+                if (match != null) {
+                    return Optional.empty(); // ambiguous
+                }
+                match = entry.getValue();
+            }
+        }
+        return Optional.ofNullable(match);
+    }
+
+    /**
+     * Checks a registered portal against the world: is its trigger block still the configured
+     * material, and is a sign carrying its id still mounted on it.
+     *
+     * <p>Never force-loads a world or chunk — an unloaded portal reports {@link Verification#UNVERIFIED}.
+     * Must be called on the main thread (it reads block state).</p>
+     *
+     * @param portalId the portal id
+     * @return the verification outcome
+     */
+    public Verification verify(String portalId) {
+        PortalDTO portal = byId.get(portalId);
+        if (portal == null) {
+            return Verification.UNKNOWN;
+        }
+
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null) {
+            return Verification.UNVERIFIED;
+        }
+        if (!world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
+            return Verification.UNVERIFIED;
+        }
+
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        Material triggerMaterial = config.getTriggerMaterial();
+        if (triggerMaterial != null && anchor.getType() != triggerMaterial) {
+            return Verification.ORPHANED;
+        }
+
+        return PortalSignWriter
+                .findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), portalId)
+                .isPresent()
+                ? Verification.VERIFIED
+                : Verification.ORPHANED;
+    }
+
+    /**
+     * Rewrites and re-stamps the registration sign for an existing portal.
+     *
+     * <p>Recovers a portal whose sign text was overwritten or whose PDC stamp was lost — for
+     * example after a rollback or a schematic paste, which restores the sign block without its
+     * persistent data (#1614). Requires a sign still mounted on the anchor; it will not place one,
+     * because choosing a face and material on an admin's behalf is a build decision, not a repair.</p>
+     *
+     * <p>Must be called on the main thread.</p>
+     *
+     * @param portalId        the portal id
+     * @param transferService the transfer service used to render the destination line; may be null
+     * @return a result describing the outcome
+     */
+    public PortalResult repairSign(String portalId, org.fourz.rvnkcore.service.transfer.TransferService transferService) {
+        PortalDTO portal = byId.get(portalId);
+        if (portal == null) {
+            return new PortalResult(Status.NOT_FOUND, "No portal registered with id " + portalId, null);
+        }
+
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null) {
+            return new PortalResult(Status.UNAVAILABLE, "World '" + portal.getWorld() + "' is not loaded", portal);
+        }
+        if (!world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
+            return new PortalResult(Status.UNAVAILABLE,
+                    "Chunk at " + portal.getX() + "," + portal.getZ() + " is not loaded", portal);
+        }
+
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        // Accept any sign mounted on the anchor — the whole point of a repair is that the stamp may
+        // be missing, so matching on the id here would reject exactly the case we came to fix.
+        Optional<Block> signBlock = PortalSignWriter
+                .findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), null);
+        if (signBlock.isEmpty()) {
+            return new PortalResult(Status.NOT_FOUND,
+                    "No sign is mounted on this portal's anchor block — place one, then repair again", portal);
+        }
+
+        String[] lines = PortalSignWriter.buildDisplayLines(transferService, portal.getTargetServer(), portalId);
+        boolean written = PortalSignWriter.write(
+                signBlock.get(), PortalSignWriter.portalIdKey(plugin), portalId, lines);
+        if (!written) {
+            return new PortalResult(Status.UNAVAILABLE, "Block is no longer a sign", portal);
+        }
+
+        logger.info("Portal sign repaired (id " + portalId + ") at " + portal.getWorld() + " "
+                + portal.getX() + "," + portal.getY() + "," + portal.getZ());
+        return new PortalResult(Status.SUCCESS, "Portal sign repaired", portal);
     }
 
     /**
