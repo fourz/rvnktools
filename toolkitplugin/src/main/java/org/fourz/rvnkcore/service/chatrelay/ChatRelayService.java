@@ -47,6 +47,10 @@ public class ChatRelayService {
     // per-viewer rendering + world-relay. Null => injectRoom falls back to the flat bot-format render.
     private volatile Consumer<ChatMessageDTO> roomInjector;
 
+    // Bounded chat tail backing GET /v1/chat/recent (#1869). Survives config reload; the bootId is
+    // minted once here so a client can tell a restart from "nothing was said".
+    private final ChatMessageBuffer buffer;
+
     /**
      * Creates a new ChatRelayService.
      *
@@ -61,6 +65,32 @@ public class ChatRelayService {
         this.egress = egress;
         this.logger = logger;
         this.dedupCacheSize = config.getDedupCacheSize();
+        this.buffer = new ChatMessageBuffer(config.getBufferSize());
+    }
+
+    /**
+     * Records a message into the chat tail read by {@code GET /v1/chat/recent} (#1869).
+     *
+     * <p>Safe to call from any thread and idempotent per {@code msgId}, so a line that is both
+     * recorded locally by the chatroom and relayed through {@link #relay} lands once (#1871).</p>
+     *
+     * <p>Recording never affects delivery: a buffer failure must not cost anyone their message.</p>
+     *
+     * @param dto The message to retain
+     */
+    public void record(ChatMessageDTO dto) {
+        try {
+            buffer.record(dto);
+        } catch (RuntimeException e) {
+            logger.warning("Chat buffer record failed (message still delivered): " + e.getMessage());
+        }
+    }
+
+    /**
+     * @return The chat tail buffer, for the {@code /v1/chat/recent} read path
+     */
+    public ChatMessageBuffer getBuffer() {
+        return buffer;
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -142,6 +172,7 @@ public class ChatRelayService {
         dto.setRoom(roomName);
         dto.setWorld(world);
         dto.setServerLabel(config.getServerLabel());
+        record(dto);
 
         Consumer<ChatMessageDTO> injector = this.roomInjector;
         if (injector != null) {
@@ -169,8 +200,12 @@ public class ChatRelayService {
         if (newConfig == null) return;
         this.config = newConfig;
         this.egress = new ChatRelayEgress(newConfig, logger);
+        // Apply chat-relay.buffer.size on reload, not only at boot — a config key that is parsed and
+        // never consumed is a recurring defect in this codebase (#1590, #1598, #1558, #1605).
+        buffer.resize(newConfig.getBufferSize());
         logger.info("ChatRelayService config refreshed — server-id=" + config.getServerId()
-            + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls());
+            + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()
+            + ", buffer=" + buffer.capacity());
     }
 
     /**
@@ -182,6 +217,7 @@ public class ChatRelayService {
     public void relay(ChatMessageDTO dto) {
         if (!config.isEnabled() || dto == null || dto.getMsgId() == null) return;
         markSeen(dto.getMsgId());
+        record(dto);
         egress.send(dto);
     }
 
@@ -228,6 +264,8 @@ public class ChatRelayService {
         if (hasComponents) {
             dto.setComponents(components);
         }
+
+        record(dto);
 
         // Origin local echo (main thread — the inbound REST POST is handled off-thread by Jetty).
         renderBot(dto);
@@ -361,6 +399,10 @@ public class ChatRelayService {
         if (dto.getServerLabel() == null || dto.getServerLabel().isEmpty()) {
             dto.setServerLabel(config.resolvePeerTag(dto.getOriginServerId()));
         }
+
+        // Record after the loop/duplicate guards so the tail holds one copy per distinct message,
+        // and before the BOT branch so persona lines from peers are readable too (#1869).
+        record(dto);
 
         // BOT-room lines (#1769, #1773) render via renderBot (styled tellraw when components are present,
         // else bot-format) and BYPASS the external chatroom consumer — a persona broadcast is not a
