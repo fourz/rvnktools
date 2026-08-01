@@ -280,6 +280,11 @@ public class RVNKToolsInitializer {
                             new PortalSignListener(plugin), plugin);
                     plugin.getServer().getPluginManager().registerEvents(
                             new PortalStepListener(plugin), plugin);
+                    // #1858: sign-break is only one destruction vector. Guard the anchor block and
+                    // every non-player path (explosion, fire, piston, entity) so a portal cannot be
+                    // orphaned into a row with no world state behind it.
+                    plugin.getServer().getPluginManager().registerEvents(
+                            new org.fourz.rvnkcore.event.PortalProtectionListener(plugin), plugin);
                     logger.info("Cross-server portal listeners registered (enabled="
                             + portalService.getConfig().isEnabled() + ")");
                 } else {
