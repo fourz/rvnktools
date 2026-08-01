@@ -53,9 +53,12 @@ public final class PortalSignWriter {
      * @param transferService the transfer service, for the target's friendly name and world; may be null
      * @param targetServer    the target server name
      * @param portalId        the portal id, which drives the short-id line
+     * @param signHeader      the configured sign header (e.g. {@code [server]}); falls back to
+     *                        {@code [server]} when null or blank
      * @return four legacy-coded sign lines
      */
-    public static String[] buildDisplayLines(TransferService transferService, String targetServer, String portalId) {
+    public static String[] buildDisplayLines(TransferService transferService, String targetServer,
+                                            String portalId, String signHeader) {
         TransferConfig.Target tgt = transferService != null
                 ? transferService.getConfig().resolveTarget(targetServer) : null;
         String display = (tgt != null && tgt.display() != null && !tgt.display().isEmpty())
@@ -64,8 +67,12 @@ public final class PortalSignWriter {
                 ? tgt.world() : "";
         String shortId = (portalId != null && portalId.length() >= 8)
                 ? portalId.substring(0, 8) : (portalId != null ? portalId : "");
+        // Render the CONFIGURED header, not a literal. A server that sets portal.sign-header would
+        // otherwise get repaired signs whose header no longer matches the marker its own listener
+        // accepts, and /portal types would report a header signs do not show (Copilot, rvnktools#41).
+        String header = (signHeader != null && !signHeader.isBlank()) ? signHeader.trim() : "[server]";
         return new String[]{
-                "§9[server]",
+                "§9" + header,
                 "§a" + display,
                 world.isEmpty() ? "" : "§7" + world,
                 "§8" + shortId

@@ -61,8 +61,10 @@ public interface IPortalCommandExtension {
     /**
      * Subcommand names this extension claims, lowercase, without a leading slash.
      *
-     * <p>RVNKCore's own subcommands always win a collision — a clash is logged as a startup
-     * warning and the claimed name is ignored rather than shadowing core behaviour.</p>
+     * <p>RVNKCore's own subcommands always win a collision: the claimed name is ignored rather
+     * than shadowing core behaviour. A clash is logged as a warning once per provider, the first
+     * time {@code /portal} considers dispatching to it — not at startup, since extensions register
+     * independently of command setup and are resolved per invocation.</p>
      *
      * @return claimed subcommand names; may be empty, never null
      */
@@ -99,9 +101,14 @@ public interface IPortalCommandExtension {
      * Writes this extension's portals into the output of {@code /portal list}.
      *
      * <p>RVNKCore prints the section header (so the {@code WORLD} vs {@code SERVER} labelling stays
-     * consistent regardless of implementor) and then calls this to fill in the rows. The returned
-     * future lets RVNKCore sequence sections rather than interleaving them — complete it only once
-     * the rows have actually been sent, and never block the calling thread waiting for a database.</p>
+     * consistent regardless of implementor) and then calls this to fill in the rows.</p>
+     *
+     * @implSpec Complete the returned future once the rows have been sent, and never block the
+     * calling thread waiting for a database. RVNKCore consumes it to surface failures — an
+     * exceptionally-completed future is logged and reported to the sender, so a provider that dies
+     * mid-listing does not just print a header and stop. It is <b>not</b> currently used to order
+     * one section against another; with a single provider there is nothing to interleave. Do not
+     * rely on cross-section sequencing.
      *
      * @param sender      who to write to
      * @param worldFilter world name to restrict the listing to, or null for every world

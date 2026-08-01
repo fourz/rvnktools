@@ -74,11 +74,20 @@ public class PortalService {
     /**
      * In-memory index: {@code world:x:y:z} -> portal. Authoritative for runtime lookups. Every
      * interior portal block of a framed portal is registered here so walk-through detection is O(1).
+     *
+     * <p><b>volatile, and replaced wholesale by {@link #loadIndex()} rather than cleared in place.</b>
+     * A reader on the main thread holds whichever map reference it read, so it always sees a complete
+     * index — never a half-built one. Clearing in place would open a window where
+     * {@code PortalStepListener} finds no portal, skips its {@code event.setCancelled(true)}, and
+     * vanilla sends a player standing in a cross-server portal to the Nether instead.</p>
      */
-    private final Map<String, PortalDTO> index = new ConcurrentHashMap<>();
+    private volatile Map<String, PortalDTO> index = new ConcurrentHashMap<>();
 
-    /** Portal-id -> portal, so a framed portal can be removed by its (sign-stamped) id in one call. */
-    private final Map<String, PortalDTO> byId = new ConcurrentHashMap<>();
+    /**
+     * Portal-id -> portal, so a framed portal can be removed by its (sign-stamped) id in one call.
+     * Swapped atomically alongside {@link #index}; see that field for why.
+     */
+    private volatile Map<String, PortalDTO> byId = new ConcurrentHashMap<>();
 
     /** Shared frame filler/clearer, used to return interior blocks to AIR on delete. */
     private final PortalFrameBuilder frameBuilder = new PortalFrameBuilder();
@@ -111,22 +120,33 @@ public class PortalService {
             logger.error("Portal schema could not be ensured; starting with an empty index", e);
         }
 
-        index.clear();
-        byId.clear();
+        // Build into fresh maps, then publish both by reference. Never clear the live maps: a reader
+        // on the main thread must see either the whole old index or the whole new one. Clearing in
+        // place let PortalStepListener miss a portal mid-reload and fall through to vanilla nether
+        // travel (Copilot review, rvnktools#41).
+        Map<String, PortalDTO> newIndex = new ConcurrentHashMap<>();
+        Map<String, PortalDTO> newById = new ConcurrentHashMap<>();
+
         List<PortalDTO> portals = repository.listAll();
         for (PortalDTO portal : portals) {
-            byId.put(portal.getPortalId(), portal);
+            newById.put(portal.getPortalId(), portal);
             List<int[]> blocks = portal.getPortalBlocks();
             if (blocks == null || blocks.isEmpty()) {
                 // Legacy single-block portal: the trigger is the anchor block itself.
-                index.put(locationKey(portal.getWorld(), portal.getX(), portal.getY(), portal.getZ()), portal);
+                newIndex.put(locationKey(portal.getWorld(), portal.getX(), portal.getY(), portal.getZ()), portal);
             } else {
                 for (int[] b : blocks) {
-                    index.put(locationKey(portal.getWorld(), b[0], b[1], b[2]), portal);
+                    newIndex.put(locationKey(portal.getWorld(), b[0], b[1], b[2]), portal);
                 }
             }
         }
-        logger.info("Portal index loaded: " + byId.size() + " portal(s), " + index.size()
+
+        // Publish. byId first, then index: index is what gates the vanilla-cancel, so it is the last
+        // thing to change and is never live before its portals are resolvable by id.
+        this.byId = newById;
+        this.index = newIndex;
+
+        logger.info("Portal index loaded: " + newById.size() + " portal(s), " + newIndex.size()
                 + " portal block(s) (enabled=" + config.isEnabled() + ")");
     }
 
@@ -458,10 +478,10 @@ public class PortalService {
         if (exact != null) {
             return Optional.of(exact);
         }
-        String prefix = idOrPrefix.toLowerCase();
+        String prefix = idOrPrefix.toLowerCase(java.util.Locale.ROOT);
         PortalDTO match = null;
         for (Map.Entry<String, PortalDTO> entry : byId.entrySet()) {
-            if (entry.getKey().toLowerCase().startsWith(prefix)) {
+            if (entry.getKey().toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
                 if (match != null) {
                     return Optional.empty(); // ambiguous
                 }
@@ -547,7 +567,8 @@ public class PortalService {
                     "No sign is mounted on this portal's anchor block — place one, then repair again", portal);
         }
 
-        String[] lines = PortalSignWriter.buildDisplayLines(transferService, portal.getTargetServer(), portalId);
+        String[] lines = PortalSignWriter.buildDisplayLines(
+                transferService, portal.getTargetServer(), portalId, config.getSignHeader());
         boolean written = PortalSignWriter.write(
                 signBlock.get(), PortalSignWriter.portalIdKey(plugin), portalId, lines);
         if (!written) {

@@ -43,6 +43,9 @@ public class PortalCommand extends BaseCommand {
     private static final List<String> CORE_SUBCOMMANDS =
             List.of("list", "info", "delete", "tp", "repair", "reload", "types");
 
+    /** Providers already checked for subcommand collisions, so the warning is logged once each. */
+    private final java.util.Set<String> warnedProviders = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public PortalCommand(RVNKCore plugin) {
         super(plugin, "portal",
                 "Cross-server portal administration",
@@ -145,7 +148,20 @@ public class PortalCommand extends BaseCommand {
             } else {
                 sender.sendMessage(ChatColor.GOLD + "World portals" + ChatColor.GRAY
                         + " (via " + extension.providerName() + ")");
-                extension.appendListing(sender, worldFilter);
+                // Consume the future rather than dropping it: a provider that fails mid-listing
+                // would otherwise print a header and then nothing, with no trace anywhere.
+                java.util.concurrent.CompletableFuture<Void> listing =
+                        extension.appendListing(sender, worldFilter);
+                if (listing != null) {
+                    listing.whenComplete((v, ex) -> {
+                        if (ex != null) {
+                            logger.warning("Portal extension '" + extension.providerName()
+                                    + "' failed while listing world portals: " + ex);
+                            sender.sendMessage(ChatColor.RED
+                                    + "  (world portal listing failed — see console)");
+                        }
+                    });
+                }
             }
         }
         return true;
@@ -401,8 +417,14 @@ public class PortalCommand extends BaseCommand {
         return RVNKCore.getServiceSafe(PortalService.class);
     }
 
-    /** Core subcommands always win a name clash; an extension cannot shadow built-in behaviour. */
+    /**
+     * Core subcommands always win a name clash; an extension cannot shadow built-in behaviour.
+     *
+     * <p>A clash is warned about once per provider rather than silently ignored, so an author who
+     * claims a reserved name finds out instead of wondering why their subcommand never fires.</p>
+     */
     private boolean claims(IPortalCommandExtension extension, String sub) {
+        warnOnCollisionsOnce(extension);
         if (CORE_SUBCOMMANDS.contains(sub)) {
             return false;
         }
@@ -412,6 +434,29 @@ public class PortalCommand extends BaseCommand {
             if (candidate != null && candidate.equalsIgnoreCase(sub)) return true;
         }
         return false;
+    }
+
+    /**
+     * Logs, once per provider, any subcommand names an extension claims that collide with a core
+     * subcommand. The SPI contract promises this warning; without it a shadowed name fails silently.
+     */
+    private void warnOnCollisionsOnce(IPortalCommandExtension extension) {
+        String provider = extension.providerName();
+        if (provider == null || !warnedProviders.add(provider)) {
+            return;
+        }
+        List<String> claimed = extension.subcommands();
+        if (claimed == null) return;
+        List<String> clashes = new ArrayList<>();
+        for (String candidate : claimed) {
+            if (candidate != null && CORE_SUBCOMMANDS.contains(candidate.toLowerCase(Locale.ROOT))) {
+                clashes.add(candidate);
+            }
+        }
+        if (!clashes.isEmpty()) {
+            logger.warning("Portal extension '" + provider + "' claims subcommand(s) reserved by core: "
+                    + String.join(", ", clashes) + " — core wins, these will not be dispatched.");
+        }
     }
 
     private ChatColor colourFor(PortalService.Verification state) {

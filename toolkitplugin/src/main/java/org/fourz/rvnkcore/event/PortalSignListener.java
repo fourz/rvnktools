@@ -92,7 +92,7 @@ public class PortalSignListener implements Listener {
                 if (existing.isPresent()) {
                     String[] lines = buildDisplayLines(
                             RVNKCore.getServiceSafe(TransferService.class),
-                            existing.get().getTargetServer(), existingId);
+                            existing.get().getTargetServer(), existingId, config);
                     for (int i = 0; i < 4; i++) event.setLine(i, lines[i]);
                     return;
                 }
@@ -177,7 +177,7 @@ public class PortalSignListener implements Listener {
         final String portalId = result.portal().getPortalId();
 
         // Reformat the sign to a friendly display: [server] | destination server | world | id.
-        String[] lines = buildDisplayLines(transferService, targetServer, portalId);
+        String[] lines = buildDisplayLines(transferService, targetServer, portalId, config);
         for (int i = 0; i < 4; i++) {
             event.setLine(i, lines[i]);
         }
@@ -261,8 +261,10 @@ public class PortalSignListener implements Listener {
      * @param portalId        The portal id (drives the short-id line)
      * @return four legacy-coded sign lines
      */
-    private String[] buildDisplayLines(TransferService transferService, String targetServer, String portalId) {
-        return PortalSignWriter.buildDisplayLines(transferService, targetServer, portalId);
+    private String[] buildDisplayLines(TransferService transferService, String targetServer,
+                                       String portalId, PortalConfig config) {
+        return PortalSignWriter.buildDisplayLines(transferService, targetServer, portalId,
+                config != null ? config.getSignHeader() : null);
     }
 
     /**
