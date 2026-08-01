@@ -35,4 +35,54 @@ public interface IRVNKWorldsApiService {
     // Metrics & Health
     CompletableFuture<ApiResponse<?>> getMetrics();
     CompletableFuture<ApiResponse<?>> getHealthStatus();
+
+    // ---------------------------------------------------------------------------------------------
+    // Runtime holds (#1883)
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Claims a world as in-use so RVNKWorlds' inactivity cleanup will not reclaim it.
+     *
+     * <p>Loading a world is not the same as keeping it. {@code WorldCleanupScheduler} unloads any
+     * unprotected world that has sat empty past the inactivity threshold and writes it back to
+     * {@code IMPORTED}. A world loaded to satisfy a quest requirement has, by definition, nobody
+     * standing in it yet — so without a hold it is reclaimed minutes later and the quest silently
+     * becomes unplayable again (#1883).</p>
+     *
+     * <p>A hold is <b>runtime state, not config</b>. It is deliberately distinct from
+     * {@code cleanup.protectedWorlds}: that list is an operator's permanent policy, while a hold is
+     * a plugin saying "I am using this right now". Holds do not survive a restart, which is correct —
+     * whatever placed the hold will re-place it when it loads again.</p>
+     *
+     * <p>Holds are tracked <b>per holder</b>, so two plugins claiming the same world do not clobber
+     * one another; the world stays held until every holder has released it. Re-holding an
+     * already-held world is a no-op success.</p>
+     *
+     * @param worldName World to hold (case-insensitive)
+     * @param holder    Stable identifier for the claimant, e.g. the plugin name. Used so releases
+     *                  only drop that claimant's hold
+     * @return future completing success once the hold is registered
+     * @since 1.5.70
+     */
+    default CompletableFuture<ApiResponse<?>> holdWorld(String worldName, String holder) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support runtime world holds"));
+    }
+
+    /**
+     * Releases a hold previously placed by {@link #holdWorld}.
+     *
+     * <p>Only drops the named holder's claim. The world becomes cleanup-eligible again once no
+     * holders remain and it is otherwise unprotected. Releasing a hold that was never placed is a
+     * no-op success — callers should not have to track whether they hold something.</p>
+     *
+     * @param worldName World to release (case-insensitive)
+     * @param holder    The same identifier passed to {@link #holdWorld}
+     * @return future completing success once the hold is gone
+     * @since 1.5.70
+     */
+    default CompletableFuture<ApiResponse<?>> releaseWorld(String worldName, String holder) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support runtime world holds"));
+    }
 }
