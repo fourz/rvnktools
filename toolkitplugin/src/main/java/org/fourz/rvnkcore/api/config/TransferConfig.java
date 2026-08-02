@@ -50,15 +50,42 @@ public class TransferConfig {
      * reach none of them ({@code saveResource(..., false)} only writes when the file is absent).
      * A code default applies immediately everywhere and is still overridable per target with a
      * {@code realm:} key.</p>
+     *
+     * <p>Keyed by every identifier a tier is known by, because the ecosystem genuinely uses more
+     * than one for the same server: production is {@code prod} as a transfer target and
+     * {@code nations} as a chat-relay tag, and Dev is {@code dev} to {@code getServerId()} but
+     * {@code test} as its chat label. Mapping only one of each pair would leave the other rendering
+     * a raw infrastructure word in a player-facing sentence.</p>
      */
     private static final Map<String, String> DEFAULT_REALMS = Map.of(
             "prod", "the home realm",
+            "nations", "the home realm",
             "event", "the Arcology",
+            "arcology", "the Arcology",
             "dev", "the fragile worlds",
             "test", "the fragile worlds");
 
     /** Neutral stand-in when a crossing's destination cannot be resolved. */
     public static final String UNKNOWN_REALM = "another realm";
+
+    /**
+     * The in-fiction realm name for a server identifier.
+     *
+     * <p>For callers that hold a server identity rather than a transfer target — the arrival
+     * broadcast naming the realm it is running in, or a chat notice naming the tier an event
+     * happened on.</p>
+     *
+     * @param serverName A server id or chat label ({@code prod}, {@code nations}, {@code event},
+     *                   {@code dev}, {@code test}); null or unknown yields {@link #UNKNOWN_REALM}
+     * @return A non-blank realm name
+     */
+    public static String realmForServer(String serverName) {
+        if (serverName == null || serverName.isBlank()) {
+            return UNKNOWN_REALM;
+        }
+        return DEFAULT_REALMS.getOrDefault(
+                serverName.trim().toLowerCase(java.util.Locale.ROOT), UNKNOWN_REALM);
+    }
 
     /**
      * Resolves the in-fiction realm name for a target.
@@ -108,8 +135,15 @@ public class TransferConfig {
      * the fiction treats as travel between realms.</p>
      */
     public static final String DEFAULT_BROADCAST = "&d{player} &7has crossed to &f{realm}";
-    /** Default themed arrival broadcast — ASCII-safe (#1753). */
-    public static final String DEFAULT_ARRIVAL = "&d{player} &7steps through from across the network...";
+    /**
+     * Default themed arrival broadcast — ASCII-safe (#1753).
+     *
+     * <p>{@code {realm}} is the realm the player has arrived <b>in</b>, not the one they left.
+     * The destination knows its own identity for free; the origin is only recoverable via a
+     * transfer cookie and a client round-trip, which would leave the message silent whenever the
+     * client did not answer.</p>
+     */
+    public static final String DEFAULT_ARRIVAL = "&d{player} &7has crossed into &f{realm}";
 
     private TransferConfig(boolean enabled, int cooldownSeconds, String permission,
                            boolean confirm, Map<String, Target> targets, String broadcastMessage,

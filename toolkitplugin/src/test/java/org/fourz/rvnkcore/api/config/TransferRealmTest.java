@@ -77,6 +77,50 @@ class TransferRealmTest {
     }
 
     @Nested
+    @DisplayName("Realm by server identity")
+    class ByServer {
+
+        @Test
+        @DisplayName("Both names for production resolve to the same realm")
+        void productionAliases() {
+            // 'prod' is the transfer target key; 'nations' is the chat-relay tag. Mapping only one
+            // would print a raw infrastructure word in whichever message used the other.
+            assertEquals("the home realm", TransferConfig.realmForServer("prod"));
+            assertEquals("the home realm", TransferConfig.realmForServer("nations"));
+        }
+
+        @Test
+        @DisplayName("Both names for Dev resolve to the same realm")
+        void devAliases() {
+            // getServerId() yields 'dev'; the chat label is 'test'.
+            assertEquals("the fragile worlds", TransferConfig.realmForServer("dev"));
+            assertEquals("the fragile worlds", TransferConfig.realmForServer("test"));
+        }
+
+        @Test
+        @DisplayName("Event resolves to the Arcology")
+        void event() {
+            assertEquals("the Arcology", TransferConfig.realmForServer("event"));
+        }
+
+        @Test
+        @DisplayName("Unknown, blank and null identities yield a neutral phrase")
+        void unknownIsNeutral() {
+            // getServerId() returns "local" on a standalone server; that must still read as a
+            // sentence rather than as an empty string or the word "local".
+            assertEquals(TransferConfig.UNKNOWN_REALM, TransferConfig.realmForServer("local"));
+            assertEquals(TransferConfig.UNKNOWN_REALM, TransferConfig.realmForServer(""));
+            assertEquals(TransferConfig.UNKNOWN_REALM, TransferConfig.realmForServer(null));
+        }
+
+        @Test
+        @DisplayName("Identity matching tolerates case and padding")
+        void tolerant() {
+            assertEquals("the Arcology", TransferConfig.realmForServer("  EVENT  "));
+        }
+    }
+
+    @Nested
     @DisplayName("Departure message")
     class Message {
 
@@ -106,6 +150,25 @@ class TransferRealmTest {
                 assertTrue(c < 128, "non-ASCII char in default broadcast: " + c
                     + " - the Minecraft font renders these as diamonds");
             }
+            for (char c : TransferConfig.DEFAULT_ARRIVAL.toCharArray()) {
+                assertTrue(c < 128, "non-ASCII char in default arrival: " + c);
+            }
+        }
+
+        @Test
+        @DisplayName("Arrival names the realm too, and reads as the other half of the pair")
+        void arrivalMatchesDeparture() {
+            assertTrue(TransferConfig.DEFAULT_ARRIVAL.contains("{player}"));
+            assertTrue(TransferConfig.DEFAULT_ARRIVAL.contains("{realm}"),
+                "arrival must name a realm - the old copy named neither end");
+
+            String departure = TransferConfig.DEFAULT_BROADCAST
+                .replace("{player}", "Twinkies97").replace("{realm}", "the Arcology");
+            String arrival = TransferConfig.DEFAULT_ARRIVAL
+                .replace("{player}", "Twinkies97").replace("{realm}", "the Arcology");
+
+            assertEquals("&dTwinkies97 &7has crossed to &fthe Arcology", departure);
+            assertEquals("&dTwinkies97 &7has crossed into &fthe Arcology", arrival);
         }
     }
 
