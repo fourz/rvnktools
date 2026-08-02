@@ -530,8 +530,11 @@ public class PortalStepListener implements Listener {
             TransferConfig tc = ts.getConfig();
             String template = (tc != null) ? tc.getBroadcastMessage() : null;
             if (template != null && !template.isBlank()) {
+                // Read the realm BEFORE clearTransferring below drops the record.
+                String realm = ts.getTransferRealm(uuid);
                 Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&',
-                        template.replace("{player}", event.getPlayer().getName())));
+                        template.replace("{player}", event.getPlayer().getName())
+                                .replace("{realm}", realm)));
             }
             ts.clearTransferring(uuid);
         }

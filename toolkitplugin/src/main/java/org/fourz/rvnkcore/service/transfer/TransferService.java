@@ -57,11 +57,27 @@ public class TransferService {
      * Players whose imminent disconnect is a cross-server transfer, not a real quit (#1763). A quit
      * handler suppresses the vanilla leave message and broadcasts the themed notice for these.
      */
-    private final java.util.Set<UUID> transferring = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<UUID, String> transferring = new ConcurrentHashMap<>();
 
     /** True when the player's pending disconnect is a transfer (checked by the quit handler). */
     public boolean isTransferring(UUID playerId) {
-        return transferring.contains(playerId);
+        return transferring.containsKey(playerId);
+    }
+
+    /**
+     * The in-fiction realm a departing player is bound for.
+     *
+     * <p>The quit handler fires after {@link #transfer} has already dispatched the packet, and a
+     * {@link org.bukkit.event.player.PlayerQuitEvent} carries no destination — so the departure
+     * broadcast can only name where someone went if it was recorded here first.</p>
+     *
+     * @param playerId The departing player
+     * @return The destination realm name, or {@link TransferConfig#UNKNOWN_REALM} when the
+     *         transfer was not recorded (flag expired, or a disconnect that was not a transfer)
+     */
+    public String getTransferRealm(UUID playerId) {
+        String realm = transferring.get(playerId);
+        return (realm == null || realm.isBlank()) ? TransferConfig.UNKNOWN_REALM : realm;
     }
 
     /** Clears a player's transfer flag (called once the quit is handled, or if it never happens). */
@@ -130,8 +146,10 @@ public class TransferService {
         // #1763: flag the imminent disconnect as a transfer so the quit handler suppresses the vanilla
         // leave message and broadcasts the themed notice. Auto-expire in case the transfer fails and no
         // quit follows.
+        // Records the destination realm, not just a flag: the quit handler needs it to say where the
+        // player went, and PlayerQuitEvent carries no destination of its own.
         final UUID transferId = player.getUniqueId();
-        transferring.add(transferId);
+        transferring.put(transferId, target.realm());
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> transferring.remove(transferId), 200L);
 
         // Audit at the call site (no PlayerTransferEvent exists on spigot-api).
