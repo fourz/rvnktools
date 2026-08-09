@@ -41,6 +41,8 @@ public class RVNKWorldsController extends HttpServlet {
     private static final Pattern GROUP_NAME_PATTERN = Pattern.compile("^/groups/([^/]+)/?$");
     private static final Pattern METRICS_PATTERN = Pattern.compile("^/metrics/?$");
     private static final Pattern HEALTH_PATTERN = Pattern.compile("^/health/?$");
+    /** #1923 — dense site survey for agentic tooling. */
+    private static final Pattern SURVEY_PATTERN = Pattern.compile("^/survey/?$");
 
     public RVNKWorldsController(IRVNKWorldsApiService ignored, Gson gson, LogManager logger) {
         this.gson = gson;
@@ -94,6 +96,10 @@ public class RVNKWorldsController extends HttpServlet {
                 future = apiService.getMetrics();
             } else if (HEALTH_PATTERN.matcher(pathInfo).matches()) {
                 future = apiService.getHealthStatus();
+            } else if (SURVEY_PATTERN.matcher(pathInfo).matches()) {
+                // The whole query string is handed through: the survey takes several optional
+                // params and parsing them here would split the contract across two files.
+                future = apiService.surveySite(req.getQueryString());
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;

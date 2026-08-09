@@ -85,4 +85,25 @@ public interface IRVNKWorldsApiService {
         return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
             "This RVNKWorlds build does not support runtime world holds"));
     }
+
+    /**
+     * Site survey — one dense read describing a location well enough for an agent to act on (#1923).
+     *
+     * <p>Answers, in a single call: where this is, whether it is built or wild, what it is made of,
+     * what it might be, and who else is nearby. The alternative is several calls plus console
+     * scraping, and console output is truncated and lossy.</p>
+     *
+     * <p>Optional capabilities report {@code available: false} rather than being omitted. An agent
+     * must be able to distinguish "no claim here" from "claims cannot be evaluated" — those lead to
+     * different decisions, and a missing key looks like the former while meaning the latter.</p>
+     *
+     * @param query Raw query string: {@code player=<name>} or {@code world=<w>&x=&y=&z=},
+     *              plus optional {@code radius} and {@code include}
+     * @return future completing with the survey payload
+     * @since 1.5.72
+     */
+    default CompletableFuture<ApiResponse<?>> surveySite(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support the survey endpoint"));
+    }
 }
