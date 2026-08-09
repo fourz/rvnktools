@@ -40,15 +40,19 @@ public class ChatRelayConfig {
     private final String serverId;
     private final String serverLabel;
     private final String channelTrigger;
+    /** Default retained chat-tail size; ChatMessageBuffer clamps the final value. */
+    private static final int DEFAULT_BUFFER_SIZE = 500;
+
     private final int dedupCacheSize;
+    private final int bufferSize;
     private final int timeoutMs;
     private final boolean insecureTls;
     private final String botFormat;
     private final List<Peer> peers;
 
     private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
-                            int dedupCacheSize, int timeoutMs, boolean insecureTls, String botFormat,
-                            List<Peer> peers) {
+                            int dedupCacheSize, int bufferSize, int timeoutMs, boolean insecureTls,
+                            String botFormat, List<Peer> peers) {
         this.enabled = enabled;
         this.serverId = serverId != null ? serverId.trim() : "";
         // Friendly label for THIS server (e.g. "nations", "event"); stamped on outgoing chatroom
@@ -57,6 +61,8 @@ public class ChatRelayConfig {
                 ? serverLabel.trim() : this.serverId;
         this.channelTrigger = (channelTrigger != null && !channelTrigger.isEmpty()) ? channelTrigger : "!";
         this.dedupCacheSize = dedupCacheSize > 0 ? dedupCacheSize : 512;
+        // Retained chat tail for GET /v1/chat/recent (#1869). Clamped again by ChatMessageBuffer.
+        this.bufferSize = bufferSize > 0 ? bufferSize : DEFAULT_BUFFER_SIZE;
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 3000;
         this.insecureTls = insecureTls;
         this.botFormat = (botFormat != null && !botFormat.isEmpty()) ? botFormat : DEFAULT_BOT_FORMAT;
@@ -71,8 +77,8 @@ public class ChatRelayConfig {
      */
     public static ChatRelayConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new ChatRelayConfig(false, "", "", "!", 512, 3000, false, DEFAULT_BOT_FORMAT,
-                    Collections.emptyList());
+            return new ChatRelayConfig(false, "", "", "!", 512, DEFAULT_BUFFER_SIZE, 3000,
+                    false, DEFAULT_BOT_FORMAT, Collections.emptyList());
         }
 
         List<Peer> peers = new ArrayList<>();
@@ -112,6 +118,7 @@ public class ChatRelayConfig {
             section.getString("server-label", ""),
             section.getString("channel-trigger", "!"),
             section.getInt("dedup-cache-size", 512),
+            section.getInt("buffer.size", DEFAULT_BUFFER_SIZE),
             section.getInt("timeout-ms", 3000),
             section.getBoolean("insecure-tls", false),
             section.getString("bot-format", DEFAULT_BOT_FORMAT),
@@ -189,6 +196,7 @@ public class ChatRelayConfig {
     public String getServerLabel() { return serverLabel; }
     public String getChannelTrigger() { return channelTrigger; }
     public int getDedupCacheSize() { return dedupCacheSize; }
+    public int getBufferSize() { return bufferSize; }
     public int getTimeoutMs() { return timeoutMs; }
     public boolean isInsecureTls() { return insecureTls; }
     public String getBotFormat() { return botFormat; }

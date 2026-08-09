@@ -33,8 +33,80 @@ public class TransferConfig {
      * @param port    The destination server port
      * @param display Friendly server name for signs/messages (e.g. {@code "Nations"}); defaults to the target name
      * @param world   Friendly destination world/realm name for signs (informational; may be empty)
+     * @param realm   In-fiction name of the destination for crossing messages (e.g. {@code "the Arcology"})
      */
-    public record Target(String host, int port, String display, String world) {
+    public record Target(String host, int port, String display, String world, String realm) {
+    }
+
+    /**
+     * In-fiction realm names, keyed by target name.
+     *
+     * <p>Players do not cross to "prod" or "event" — they cross to the home realm and the Arcology.
+     * {@code display} cannot carry this: it is the operator-facing server name and is also stamped
+     * onto portal signs, so overloading it would change those too.</p>
+     *
+     * <p>Defaulted in code rather than shipped in {@code config.yml} on purpose. Dev, Event and
+     * production all already have that file, so a new key added to the packaged resource would
+     * reach none of them ({@code saveResource(..., false)} only writes when the file is absent).
+     * A code default applies immediately everywhere and is still overridable per target with a
+     * {@code realm:} key.</p>
+     *
+     * <p>Keyed by every identifier a tier is known by, because the ecosystem genuinely uses more
+     * than one for the same server: production is {@code prod} as a transfer target and
+     * {@code nations} as a chat-relay tag, and Dev is {@code dev} to {@code getServerId()} but
+     * {@code test} as its chat label. Mapping only one of each pair would leave the other rendering
+     * a raw infrastructure word in a player-facing sentence.</p>
+     */
+    private static final Map<String, String> DEFAULT_REALMS = Map.of(
+            "prod", "the home realm",
+            "nations", "the home realm",
+            "event", "the Arcology",
+            "arcology", "the Arcology",
+            "dev", "the fragile worlds",
+            "test", "the fragile worlds");
+
+    /** Neutral stand-in when a crossing's destination cannot be resolved. */
+    public static final String UNKNOWN_REALM = "another realm";
+
+    /**
+     * The in-fiction realm name for a server identifier.
+     *
+     * <p>For callers that hold a server identity rather than a transfer target — the arrival
+     * broadcast naming the realm it is running in, or a chat notice naming the tier an event
+     * happened on.</p>
+     *
+     * @param serverName A server id or chat label ({@code prod}, {@code nations}, {@code event},
+     *                   {@code dev}, {@code test}); null or unknown yields {@link #UNKNOWN_REALM}
+     * @return A non-blank realm name
+     */
+    public static String realmForServer(String serverName) {
+        if (serverName == null || serverName.isBlank()) {
+            return UNKNOWN_REALM;
+        }
+        return DEFAULT_REALMS.getOrDefault(
+                serverName.trim().toLowerCase(java.util.Locale.ROOT), UNKNOWN_REALM);
+    }
+
+    /**
+     * Resolves the in-fiction realm name for a target.
+     *
+     * @param targetName The configured target key (case-insensitive)
+     * @param configured The explicit {@code realm:} value, or null/blank when unset
+     * @param display    The target's display name, used as the last resort
+     * @return A non-blank realm name
+     */
+    // Package-private rather than private so the realm table can be tested directly. Building a
+    // Bukkit ConfigurationSection off-server is not practical, so the alternative was a test that
+    // re-implemented this switch and therefore verified nothing.
+    static String resolveRealm(String targetName, String configured, String display) {
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        String byName = DEFAULT_REALMS.get(targetName.toLowerCase(java.util.Locale.ROOT));
+        if (byName != null) {
+            return byName;
+        }
+        return (display != null && !display.isBlank()) ? display : UNKNOWN_REALM;
     }
 
     private final boolean enabled;
@@ -55,10 +127,23 @@ public class TransferConfig {
      */
     private final String arrivalMessage;
 
-    /** Default themed transfer broadcast — ASCII-safe (no smart punctuation, #1753). */
-    public static final String DEFAULT_BROADCAST = "&d{player} &7was whisked away across the network...";
-    /** Default themed arrival broadcast — ASCII-safe (#1753). */
-    public static final String DEFAULT_ARRIVAL = "&d{player} &7steps through from across the network...";
+    /**
+     * Default themed transfer broadcast — ASCII-safe (no smart punctuation, #1753).
+     *
+     * <p>Names the destination. The previous copy ("was whisked away across the network...") told
+     * nobody where the player went, and "the network" is infrastructure vocabulary for something
+     * the fiction treats as travel between realms.</p>
+     */
+    public static final String DEFAULT_BROADCAST = "&d{player} &7has crossed to &f{realm}";
+    /**
+     * Default themed arrival broadcast — ASCII-safe (#1753).
+     *
+     * <p>{@code {realm}} is the realm the player has arrived <b>in</b>, not the one they left.
+     * The destination knows its own identity for free; the origin is only recoverable via a
+     * transfer cookie and a client round-trip, which would leave the message silent whenever the
+     * client did not answer.</p>
+     */
+    public static final String DEFAULT_ARRIVAL = "&d{player} &7has crossed into &f{realm}";
 
     private TransferConfig(boolean enabled, int cooldownSeconds, String permission,
                            boolean confirm, Map<String, Target> targets, String broadcastMessage,
@@ -94,11 +179,13 @@ public class TransferConfig {
                 if (target == null) {
                     continue;
                 }
+                String display = target.getString("display", name);
                 targets.put(name, new Target(
                         target.getString("host", ""),
                         target.getInt("port", 25565),
-                        target.getString("display", name),
-                        target.getString("world", "")
+                        display,
+                        target.getString("world", ""),
+                        resolveRealm(name, target.getString("realm", null), display)
                 ));
             }
         }

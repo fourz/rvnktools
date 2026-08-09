@@ -368,8 +368,14 @@ public class PortalStepListener implements Listener {
             TransferConfig atc = (ats != null) ? ats.getConfig() : null;
             String arrival = (atc != null) ? atc.getArrivalMessage() : null;
             if (arrival != null && !arrival.isBlank()) {
+                // {realm} is the realm they arrived IN. getServerId() is the network identity every
+                // tier already agrees on (chat-relay.server-id, falling back to webhook.server-id) —
+                // deliberately not a new setting, per its own javadoc.
+                String realm = TransferConfig.realmForServer(
+                        org.fourz.rvnkcore.config.ConfigLoader.getInstance(plugin).getServerId());
                 Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&',
-                        arrival.replace("{player}", player.getName())));
+                        arrival.replace("{player}", player.getName())
+                                .replace("{realm}", realm)));
             }
         }
 
@@ -530,8 +536,11 @@ public class PortalStepListener implements Listener {
             TransferConfig tc = ts.getConfig();
             String template = (tc != null) ? tc.getBroadcastMessage() : null;
             if (template != null && !template.isBlank()) {
+                // Read the realm BEFORE clearTransferring below drops the record.
+                String realm = ts.getTransferRealm(uuid);
                 Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&',
-                        template.replace("{player}", event.getPlayer().getName())));
+                        template.replace("{player}", event.getPlayer().getName())
+                                .replace("{realm}", realm)));
             }
             ts.clearTransferring(uuid);
         }

@@ -158,9 +158,14 @@ class InitializerClassesTest {
         // Verify accessor methods like getAnnounceManager() delegate to getService()
         Class<?> rvnkCore = Class.forName("org.fourz.rvnkcore.RVNKCore");
 
+        // getAnnounceManager() is deliberately absent: the announcement domain was removed from
+        // RVNKCore in #869 (7372199) and now lives in RVNKEvents. Asserting it here failed the
+        // build for a method that was intentionally deleted — the test was encoding the old shape.
+        assertThrows(NoSuchMethodException.class, () -> rvnkCore.getMethod("getAnnounceManager"),
+            "getAnnounceManager() was removed with the announcement domain (#869) — "
+            + "if this now exists, the domain has moved back into core and this test needs revisiting");
+
         // These methods should exist and return the expected types
-        assertDoesNotThrow(() -> rvnkCore.getMethod("getAnnounceManager"),
-            "RVNKCore should have getAnnounceManager() method");
         assertDoesNotThrow(() -> rvnkCore.getMethod("getLinkMaker"),
             "RVNKCore should have getLinkMaker() method");
         assertDoesNotThrow(() -> rvnkCore.getMethod("getPermissionService"),

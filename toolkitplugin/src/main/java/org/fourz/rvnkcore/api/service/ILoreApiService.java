@@ -72,4 +72,30 @@ public interface ILoreApiService {
 
     /** Roll an item back to a prior version (POST /lore/items/{id}/rollback, body {"version":N}). */
     CompletableFuture<ApiResponse<?>> rollbackItem(String id, String requestBody);
+
+    /**
+     * Lore locations within {@code radius} of a point, for cross-plugin spatial lookups (#1924).
+     *
+     * <p>Added so RVNKWorlds' site survey can answer "what lore is here?" without reaching into
+     * RVNKLore's schema. Reading {@code rvnklore_lore_location} directly would couple a consumer to
+     * another plugin's table name and prefix; this keeps the seam at the service boundary, matching
+     * how RVNKQuests consumes {@code IRVNKWorldsApiService}.</p>
+     *
+     * <p><b>Deliberately a default method.</b> Plugins here deploy independently and do go out of
+     * step — Event ran RVNKCore 1.5.71 against newer plugins for weeks. An abstract method would
+     * make an older RVNKLore throw {@code AbstractMethodError} against a newer core at the first
+     * call; this degrades to an honest "unavailable" instead, so a version-skewed tier loses the
+     * feature rather than the plugin.</p>
+     *
+     * @param world  world name; locations are per-server and carry a world name
+     * @param x      centre X
+     * @param z      centre Z — Y is ignored, matching the repository's 2D distance filter
+     * @param radius search radius in blocks
+     */
+    default CompletableFuture<ApiResponse<?>> findNearbyLocations(String world, double x, double z,
+                                                                  double radius) {
+        return CompletableFuture.completedFuture(
+            ApiResponse.error("NOT_SUPPORTED",
+                "Lore location lookup requires RVNKLore 1.0.108 or newer on this server."));
+    }
 }

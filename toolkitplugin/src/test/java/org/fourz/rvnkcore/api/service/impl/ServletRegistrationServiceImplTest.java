@@ -373,14 +373,22 @@ class ServletRegistrationServiceImplTest {
     class InputValidation {
 
         @Test
-        @DisplayName("Duplicate registration is rejected")
+        @DisplayName("Re-registration replaces the delegate and reports success (#1604)")
         void testDuplicateRegistration() {
             HttpServlet servlet1 = mock(HttpServlet.class);
             HttpServlet servlet2 = mock(HttpServlet.class);
 
+            // Re-registration used to return false. That WAS the bug (#1604): Jetty cannot remove a
+            // servlet from a started ServletContextHandler, so refusing the second registration left
+            // the first servlet mapped and serving the OLD plugin's classes after a hot reload —
+            // while the plugin logged Enabled and the endpoint returned 200. A deployed REST fix
+            // silently had no effect, which reads as "the fix doesn't work" rather than "the fix was
+            // never loaded". Re-registration now swaps the delegate and reports that it did.
             assertTrue(service.registerServlet("/api/duplicate/*", servlet1));
-            assertFalse(service.registerServlet("/api/duplicate/*", servlet2));
+            assertTrue(service.registerServlet("/api/duplicate/*", servlet2),
+                "re-registration must succeed so a hot-reloaded plugin actually takes over the path");
 
+            // Still one path — a swap, not a second mapping.
             assertEquals(1, service.getRegisteredCount());
         }
 
