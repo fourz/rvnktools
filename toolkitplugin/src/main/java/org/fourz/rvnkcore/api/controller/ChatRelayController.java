@@ -148,6 +148,9 @@ public class ChatRelayController extends HttpServlet {
         m.put("senderName", dto.getSenderName());
         m.put("senderUuid", dto.getSenderUuid());
         m.put("message", dto.getMessage());
+        // Line kind (global/world emote, death relay, join/leave notice, ...). Without it a
+        // relayed system notice is indistinguishable from player speech downstream (#1873).
+        m.put("channel", dto.getChannel());
         m.put("room", dto.getRoom());
         m.put("world", dto.getWorld());
         m.put("originServerId", dto.getOriginServerId());
