@@ -25,13 +25,8 @@ public class PingCommand extends BaseCommand {
 
     @Override
     protected boolean executeCommand(CommandSender sender, String[] args) {
-        // Get TPS information
-        double[] tps = new double[3];
-        try {
-            Object server = Bukkit.getServer().getClass().getMethod("getServer").invoke(Bukkit.getServer());
-            tps = (double[]) server.getClass().getField("recentTps").get(server);
-        } catch (Exception e) {
-            logger.error("Failed to get TPS information", e);
+        double[] tps = readRecentTps();
+        if (tps == null) {
             sender.sendMessage("§cError retrieving TPS information.");
             return true;
         }
@@ -48,7 +43,11 @@ public class PingCommand extends BaseCommand {
                 .append(Bukkit.getMaxPlayers()).append("\n");
         message.append("§eMemory Usage: §f").append(formatMemory(runtime.totalMemory() - runtime.freeMemory()))
                 .append("/").append(formatMemory(runtime.maxMemory())).append("\n");
-        message.append("§eCPU Usage: §f").append(df.format(osBean.getSystemLoadAverage())).append("%\n");
+        // getSystemLoadAverage() is a run-queue load average, not a CPU percentage, and returns a
+        // negative value when the platform cannot supply it.
+        double loadAverage = osBean.getSystemLoadAverage();
+        message.append("§eLoad Average (1m): §f")
+                .append(loadAverage < 0 ? "unavailable" : df.format(loadAverage)).append("\n");
         message.append("§eServer Version: §f").append(Bukkit.getVersion()).append("\n");
         message.append("§eJava Version: §f").append(System.getProperty("java.version")).append("\n");
         message.append("§eOperating System: §f").append(System.getProperty("os.name")).append(" ")
@@ -70,6 +69,45 @@ public class PingCommand extends BaseCommand {
     public List<String> tabComplete(CommandSender sender, String[] args) {
         // Ping command doesn't need tab completion, it takes no arguments
         return Collections.emptyList();
+    }
+
+    /**
+     * Read the server's recent TPS averages.
+     *
+     * <p>RVNKCore compiles against spigot-api, which has no {@code Server#getTPS()}, so the call is
+     * made reflectively. Paper declares {@code public double[] getTPS()} on {@code Server} and every
+     * Ravenkraft tier runs Paper, so this is the primary path.</p>
+     *
+     * <p>The previous implementation reached through {@code CraftServer.getServer()} for the NMS
+     * {@code recentTps} field. That threw {@code NoSuchFieldException} on Paper 26.2 — the field is
+     * not public on the Mojang-mapped server — so the command reported an error every time it was
+     * reached. Falling back to it keeps plain Spigot working (#1600).</p>
+     *
+     * @return the 1m/5m/15m averages, or {@code null} if neither source is available
+     */
+    private double[] readRecentTps() {
+        try {
+            Object result = Bukkit.getServer().getClass().getMethod("getTPS").invoke(Bukkit.getServer());
+            if (result instanceof double[] tps && tps.length >= 3) {
+                return tps;
+            }
+            logger.warning("Server.getTPS() returned an unusable value: " + result);
+        } catch (NoSuchMethodException e) {
+            logger.debug("Server.getTPS() not available — falling back to the NMS recentTps field");
+        } catch (Exception e) {
+            logger.warning("Server.getTPS() failed: " + e.getMessage());
+        }
+
+        try {
+            Object server = Bukkit.getServer().getClass().getMethod("getServer").invoke(Bukkit.getServer());
+            Object tps = server.getClass().getField("recentTps").get(server);
+            if (tps instanceof double[] values && values.length >= 3) {
+                return values;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to get TPS information from both Server.getTPS() and recentTps", e);
+        }
+        return null;
     }
 
     /**

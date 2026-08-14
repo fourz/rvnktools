@@ -147,28 +147,41 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
     
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        // If no arguments or help is requested, show help
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+        // An explicit help request always wins, for leaf and parent commands alike.
+        if (args.length > 0 && args[0].equalsIgnoreCase("help")) {
             sendHelp(sender);
             return true;
         }
-        
+
+        // A bare invocation only means "show help" for a command that dispatches to subcommands.
+        // A leaf command must reach executeCommand(), which is the only reason to override it.
+        // This previously returned help unconditionally on zero args, which made every no-argument
+        // command in the plugin unreachable — /ping and /discord both answered with their own usage
+        // text instead of running (#1600).
+        if (args.length == 0) {
+            if (!subCommands.isEmpty()) {
+                sendHelp(sender);
+                return true;
+            }
+            return executeCommand(sender, args);
+        }
+
         // Check for subcommands
         String subCommandName = args[0].toLowerCase();
         SubCommand subCommand = getSubCommand(subCommandName);
-        
+
         if (subCommand != null) {
             // Check if subcommand is player-only
             if (subCommand.isPlayerOnly() && !(sender instanceof Player)) {
                 sender.sendMessage(ChatColor.RED + "This command can only be used by players.");
                 return true;
             }
-            
+
             // Execute subcommand with remaining arguments
             String[] subArgs = Arrays.copyOfRange(args, 1, args.length);
             return subCommand.execute(sender, subArgs);
         }
-        
+
         // If no subcommand found, try to execute the base command
         return executeCommand(sender, args);
     }
@@ -182,6 +195,12 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
      * @return true if the command was handled successfully
      */
     protected boolean executeCommand(CommandSender sender, String[] args) {
+        // Reachable with zero args now that a bare leaf invocation dispatches here (#1600).
+        // A subclass that does not override this has no bare-invocation behaviour to offer.
+        if (args.length == 0) {
+            sendHelp(sender);
+            return true;
+        }
         sendUnknownSubCommandMessage(sender, args[0]);
         return true;
     }
