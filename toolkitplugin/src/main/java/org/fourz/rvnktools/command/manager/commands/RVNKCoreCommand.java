@@ -40,9 +40,19 @@ import java.util.UUID;
  */
 public class RVNKCoreCommand extends BaseCommand {
 
+    /**
+     * Bukkit plugins only.
+     *
+     * <p>{@code MickyHats} was listed here and is <b>not a plugin</b> — it is the server resource
+     * pack, set through {@code resource-pack} in {@code server.properties}. Looking it up with
+     * {@code PluginManager#getPlugin} could only ever return null, so every tier reported a
+     * permanent "not loaded" failure for something that was working correctly, and the
+     * not-available count was inflated by one everywhere. The pack is now reported from the server
+     * API in its own section by {@link #handleResourcePack(CommandSender)}.</p>
+     */
     private static final String[] RVNK_PLUGIN_NAMES = {
         "RVNKCore", "RVNKWorlds", "RVNKLore", "RVNKQuests",
-        "BarterShops", "TokenEconomy", "MickyHats"
+        "BarterShops", "TokenEconomy"
     };
 
     private final RVNKCore rvnkCore;
@@ -627,15 +637,83 @@ public class RVNKCoreCommand extends BaseCommand {
                 sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &f" + name + " v" + version + "&7 (enabled" + extra + ")"));
                 loaded++;
             } else if (p != null) {
+                // Present but disabled IS a fault — it means the jar loaded and then failed, so this
+                // one keeps a warning colour.
                 sender.sendMessage(ChatFormat.colorize("&7   • &e⚠ &f" + name + "&7 (loaded but disabled)"));
                 notLoaded++;
             } else {
-                sender.sendMessage(ChatFormat.colorize("&7   • &c✖ &f" + name + "&7 (not loaded)"));
+                // Neutral, not a red failure. Several absences are deliberate — RVNKWorlds is never
+                // installed on production by design, and not every tier runs every plugin — so a red
+                // cross here reported healthy servers as broken.
+                sender.sendMessage(ChatFormat.colorize("&7   • &8– &7" + name + " &8(not installed)"));
                 notLoaded++;
             }
         }
 
-        sender.sendMessage(ChatFormat.colorize("&a✓ Result: " + loaded + " loaded, " + notLoaded + " not available"));
+        sender.sendMessage(ChatFormat.colorize("&a✓ Result: " + loaded + " loaded, " + notLoaded + " not installed"));
+
+        handleResourcePack(sender);
+    }
+
+    /**
+     * Report the server resource pack, read from the running server rather than any hardcoded name.
+     *
+     * <p>Nothing here names a specific pack. The previous code hardcoded {@code MickyHats} as if it
+     * were a plugin, which meant renaming or replacing the pack would have needed a code change and
+     * meanwhile produced a permanent false failure. Reading {@code getResourcePack()} reflects
+     * whatever {@code server.properties} actually sets, including nothing at all.</p>
+     */
+    private void handleResourcePack(CommandSender sender) {
+        String url;
+        boolean required;
+        String hash;
+        try {
+            url = Bukkit.getResourcePack();
+            required = Bukkit.isResourcePackRequired();
+            hash = Bukkit.getResourcePackHash();
+        } catch (Throwable t) {
+            // Never let a diagnostics command die on an optional API.
+            sender.sendMessage(ChatFormat.colorize("&c▶ &6Resource Pack"));
+            sender.sendMessage(ChatFormat.colorize("&7   • &e⚠ unavailable: " + t.getClass().getSimpleName()));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Resource Pack"));
+
+        if (url == null || url.isBlank()) {
+            sender.sendMessage(ChatFormat.colorize("&7   • &8– none configured"));
+            return;
+        }
+
+        String file = url;
+        String host = "";
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            int slash = path.lastIndexOf('/');
+            if (slash >= 0 && slash + 1 < path.length()) {
+                file = path.substring(slash + 1);
+            }
+            if (uri.getHost() != null) {
+                host = uri.getHost();
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Not a parseable URI — fall back to showing the raw value.
+        }
+
+        // required=false means players are prompted and may decline, so the pack is NOT guaranteed
+        // to be applied. Saying "enforced" when it is optional would misreport what players see.
+        String enforcement = required ? "&crequired" : "&7optional";
+        sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &f" + file + " &8(" + enforcement + "&8)"));
+        if (!host.isEmpty()) {
+            sender.sendMessage(ChatFormat.colorize("&8     " + host));
+        }
+        if (hash != null && !hash.isBlank()) {
+            String shortHash = hash.length() > 8 ? hash.substring(0, 8) : hash;
+            sender.sendMessage(ChatFormat.colorize("&8     sha1 " + shortHash));
+        } else {
+            sender.sendMessage(ChatFormat.colorize("&8     &eno sha1 — clients re-download every join"));
+        }
     }
 
     // ========================================================
