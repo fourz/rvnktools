@@ -34,19 +34,23 @@ public class RVNKToolsCommand extends BaseCommand {
         return true;
     }
 
+    /**
+     * The subcommand list is generated (#1981); only the standalone shortcuts are hand-written,
+     * because no registry knows about them.
+     *
+     * <p>The previous hand-kept list advertised
+     * {@code /rvnktools createtestdata [all|types|announcements]}. That command has no handler
+     * anywhere in the plugin and never ran &mdash; the line was the only trace of it. That is the
+     * cost of restating a registry by hand, so the list below comes from the registry.</p>
+     */
     @Override
     public void sendHelp(CommandSender sender) {
         sender.sendMessage("§c▶ §6RVNKTools Administrative Commands");
-        sender.sendMessage("§7   Use /rvnktools <subcommand> for detailed help");
+        sender.sendMessage("§7   Use §f/rvnktools help <subcommand>§7 for usage and examples");
         sender.sendMessage("");
-        sender.sendMessage("§f/rvnktools links reload §7- Reload links configuration");
-        sender.sendMessage("§f/rvnktools cycle reload §7- Reload cycle commands configuration");
-        sender.sendMessage("§f/rvnktools teleport worldswap [world] §7- Teleport between worlds");
-        sender.sendMessage("§f/rvnktools reload §7- Reload plugin configuration");
-        sender.sendMessage("§f/rvnktools debug §7- Show debug information");
-        sender.sendMessage("§f/rvnktools createtestdata [all|types|announcements] §7- Create test data for API");
+        sendSubCommandList(sender);
         sender.sendMessage("");
-        sender.sendMessage("§e⚠ §7Quick access commands:");
+        sender.sendMessage("§e⚠ §7Standalone shortcuts (not subcommands):");
         sender.sendMessage("§f/worldswap [world] §7- Direct world swap command");
         sender.sendMessage("§f/event [world] §7- Event world shortcut command");
     }

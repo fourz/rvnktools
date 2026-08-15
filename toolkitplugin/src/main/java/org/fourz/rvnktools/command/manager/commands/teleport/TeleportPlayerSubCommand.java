@@ -104,4 +104,14 @@ public class TeleportPlayerSubCommand extends BaseSubCommand {
 
         return completions;
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/teleport player Shad0melt",
+                "  teleport yourself to that player",
+                "/teleport player Shad0melt wizardofire",
+                "  teleport the first player to the second");
+    }
 }

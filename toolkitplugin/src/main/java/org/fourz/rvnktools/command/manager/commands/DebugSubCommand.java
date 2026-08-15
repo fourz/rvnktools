@@ -125,4 +125,14 @@ public class DebugSubCommand extends BaseSubCommand {
         }
         return Collections.emptyList();
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/rvnktools debug",
+                "  current debug state and system info",
+                "/rvnktools debug setup",
+                "  bootstrap the LuckPerms permission defaults");
+    }
 }

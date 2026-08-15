@@ -60,4 +60,14 @@ public class TeleportSubCommand extends BaseSubCommand {
         }
         return Collections.emptyList();
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/rvnktools teleport worldswap",
+                "  swap to your configured default world",
+                "/rvnktools teleport worldswap event",
+                "The standalone /worldswap [world] does the same thing with less typing.");
+    }
 }
