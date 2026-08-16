@@ -81,8 +81,53 @@ public class ClusterBanListener implements Listener {
         } catch (Exception e) {
             // Fail open — see the class javadoc. Logged at WARNING because a persistent failure
             // means bans silently stop being enforced, which should not pass unnoticed.
+            //
+            // "by policy" is deliberate wording (#1995): the previous line read
+            // "allowing login (fail-open)", which scans as an apology for a bug rather than the
+            // documented trade-off it actually is. A reader tailing the console should not have to
+            // open this class to learn whether the fallback was intended.
             logger.warning("Network ban check failed for " + event.getName()
-                    + " - allowing login (fail-open): " + e.getMessage());
+                    + " - allowing login (fail-open by policy; local ban list still applies): "
+                    + describe(e));
         }
+    }
+
+    /**
+     * Describe a throwable in a way that survives a null message (#1995).
+     *
+     * <p>{@code getMessage()} is null for {@link java.util.concurrent.TimeoutException} and for many
+     * NPEs, so the original line rendered as {@code ...(fail-open): null} — it recorded that a
+     * failure happened while recording nothing whatsoever about it. That is worse than useless on a
+     * path that fails open, because the log is the only signal that enforcement stopped.</p>
+     *
+     * <p>The class name alone separates the failure modes that matter here: a
+     * {@code TimeoutException} means the roster lookup exceeded {@value #LOOKUP_TIMEOUT_MS}ms and
+     * points at database latency, while an {@code SQLException} or NPE points at the query or the
+     * connection. The first stack frame says where. Wrappers are unwrapped because
+     * {@code ExecutionException: null} names the wrapper and hides the cause.</p>
+     */
+    private static String describe(Throwable t) {
+        if (t == null) {
+            return "unknown (null throwable)";
+        }
+        Throwable root = t;
+        while ((root instanceof java.util.concurrent.ExecutionException
+                || root instanceof java.util.concurrent.CompletionException)
+                && root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+
+        StringBuilder sb = new StringBuilder(root.getClass().getName());
+        if (root.getMessage() != null) {
+            sb.append(": ").append(root.getMessage());
+        }
+        StackTraceElement[] frames = root.getStackTrace();
+        if (frames.length > 0) {
+            sb.append(" at ").append(frames[0]);
+        }
+        if (root != t) {
+            sb.append(" [wrapped in ").append(t.getClass().getSimpleName()).append(']');
+        }
+        return sb.toString();
     }
 }
