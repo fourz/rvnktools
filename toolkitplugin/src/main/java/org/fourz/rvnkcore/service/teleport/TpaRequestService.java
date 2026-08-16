@@ -255,7 +255,7 @@ public class TpaRequestService {
             current.getBlockZ() != start.getBlockZ()) {
 
             cancelWarmup(uuid);
-            player.sendMessage("§c✖ Teleport cancelled — you moved!");
+            player.sendMessage("§c✖ Teleport cancelled - you moved!");
             return true;
         }
         return false;

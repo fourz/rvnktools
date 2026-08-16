@@ -101,7 +101,7 @@ public class ChatRelayEgress {
             return ctx;
         } catch (Exception e) {
             logger.warning("ChatRelay insecure-tls requested but trust-all SSLContext failed: "
-                + e.getMessage() + " — self-signed peers will not be reachable");
+                + e.getMessage() + " - self-signed peers will not be reachable");
             return null;
         }
     }

@@ -146,10 +146,10 @@ public class ChatRelayConfig {
             valid = false;
         }
         if (peers.isEmpty()) {
-            logger.warning("Chat relay enabled but no peers configured — nothing will be relayed");
+            logger.warning("Chat relay enabled but no peers configured - nothing will be relayed");
         }
         if (insecureTls) {
-            logger.warning("Chat relay insecure-tls is ON — peer TLS certificates are NOT verified "
+            logger.warning("Chat relay insecure-tls is ON - peer TLS certificates are NOT verified "
                 + "(self-signed peers accepted). Only use on a trusted server-to-server network; the "
                 + "egress X-API-Key would be exposed to a man-in-the-middle.");
         }
@@ -168,7 +168,7 @@ public class ChatRelayConfig {
                 valid = false;
             }
             if (serverId.equals(peer.id())) {
-                logger.error("Chat relay peer '" + peer.id() + "' has the same id as this server — would loop");
+                logger.error("Chat relay peer '" + peer.id() + "' has the same id as this server - would loop");
                 valid = false;
             }
         }

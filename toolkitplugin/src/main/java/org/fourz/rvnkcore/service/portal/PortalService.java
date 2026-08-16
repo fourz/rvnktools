@@ -225,9 +225,9 @@ public class PortalService {
         boolean persisted = repository.create(portal);
         if (!persisted) {
             logger.warning("Portal " + portal.getPortalId()
-                    + " added to in-memory index but failed to persist — will resync on reload");
+                    + " added to in-memory index but failed to persist - will resync on reload");
             return new PortalResult(Status.PERSIST_FAILED,
-                    "Portal created in memory but could not be saved — check the database.", portal);
+                    "Portal created in memory but could not be saved - check the database.", portal);
         }
 
         logger.info("Portal created at " + key + " -> '" + targetServer + "' by " + ownerUuid);
@@ -285,9 +285,9 @@ public class PortalService {
         boolean persisted = repository.create(portal);
         if (!persisted) {
             logger.warning("Framed portal " + portal.getPortalId()
-                    + " added to in-memory index but failed to persist — will resync on reload");
+                    + " added to in-memory index but failed to persist - will resync on reload");
             return new PortalResult(Status.PERSIST_FAILED,
-                    "Portal lit in memory but could not be saved — check the database.", portal);
+                    "Portal lit in memory but could not be saved - check the database.", portal);
         }
 
         logger.info("Framed portal created (" + interior.size() + " blocks) in " + world
@@ -346,7 +346,7 @@ public class PortalService {
         boolean persisted = repository.deleteById(portalId);
         if (!persisted) {
             logger.warning("Portal " + portalId
-                    + " removed from in-memory index but DB delete did not confirm — will resync on reload");
+                    + " removed from in-memory index but DB delete did not confirm - will resync on reload");
         } else {
             logger.info("Portal deleted (id " + portalId + ")");
         }
@@ -368,7 +368,7 @@ public class PortalService {
     private void clearRegistrationSign(PortalDTO portal, String portalId) {
         World world = Bukkit.getWorld(portal.getWorld());
         if (world == null || !world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
-            logger.debug("Portal " + portalId + " sign not cleared — world or chunk not loaded");
+            logger.debug("Portal " + portalId + " sign not cleared - world or chunk not loaded");
             return;
         }
         Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
@@ -397,7 +397,7 @@ public class PortalService {
         boolean persisted = repository.deleteByLocation(world, x, y, z);
         if (!persisted) {
             logger.warning("Portal at " + key
-                    + " removed from in-memory index but DB delete did not confirm — will resync on reload");
+                    + " removed from in-memory index but DB delete did not confirm - will resync on reload");
         } else {
             logger.info("Portal deleted at " + key);
         }
@@ -564,7 +564,7 @@ public class PortalService {
                 .findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), null);
         if (signBlock.isEmpty()) {
             return new PortalResult(Status.NOT_FOUND,
-                    "No sign is mounted on this portal's anchor block — place one, then repair again", portal);
+                    "No sign is mounted on this portal's anchor block - place one, then repair again", portal);
         }
 
         String[] lines = PortalSignWriter.buildDisplayLines(
@@ -604,7 +604,7 @@ public class PortalService {
     public void refreshConfig(PortalConfig newConfig) {
         if (newConfig == null) return;
         this.config = newConfig;
-        logger.info("PortalService config refreshed — trigger=" + config.getTriggerBlock()
+        logger.info("PortalService config refreshed - trigger=" + config.getTriggerBlock()
             + ", header=" + config.getSignHeader());
     }
 

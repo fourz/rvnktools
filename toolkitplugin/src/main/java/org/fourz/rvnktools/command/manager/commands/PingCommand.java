@@ -93,7 +93,7 @@ public class PingCommand extends BaseCommand {
             }
             logger.warning("Server.getTPS() returned an unusable value: " + result);
         } catch (NoSuchMethodException e) {
-            logger.debug("Server.getTPS() not available — falling back to the NMS recentTps field");
+            logger.debug("Server.getTPS() not available - falling back to the NMS recentTps field");
         } catch (Exception e) {
             logger.warning("Server.getTPS() failed: " + e.getMessage());
         }

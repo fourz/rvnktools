@@ -76,7 +76,7 @@ public class DebugSubCommand extends BaseSubCommand {
 
     private boolean executeSetup(CommandSender sender) {
         if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-            sender.sendMessage("§c✖ LuckPerms is not installed — cannot apply permission defaults.");
+            sender.sendMessage("§c✖ LuckPerms is not installed - cannot apply permission defaults.");
             sender.sendMessage("§7Install LuckPerms and run this command again.");
             return true;
         }

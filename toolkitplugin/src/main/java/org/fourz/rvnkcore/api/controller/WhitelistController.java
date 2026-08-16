@@ -105,7 +105,7 @@ public class WhitelistController extends HttpServlet {
         String ign = body.get("ign").toString().trim();
         if (!ign.matches("[a-zA-Z0-9_]{3,16}")) {
             ApiUtils.sendError(resp, gson, 400, "INVALID_IGN",
-                    "IGN must be 3–16 characters (letters, numbers, underscores)");
+                    "IGN must be 3-16 characters (letters, numbers, underscores)");
             return;
         }
 

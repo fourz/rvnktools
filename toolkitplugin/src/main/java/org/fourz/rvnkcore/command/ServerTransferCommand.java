@@ -72,7 +72,7 @@ public class ServerTransferCommand extends BaseCommand {
                 && service.getConfig().resolveTarget(targetName) != null) {
             player.sendMessage(ChatColor.YELLOW + "You are about to transfer to '"
                     + ChatColor.WHITE + targetName.toLowerCase() + ChatColor.YELLOW + "'.");
-            player.sendMessage(ChatColor.GRAY + "This is a server change — movement only. "
+            player.sendMessage(ChatColor.GRAY + "This is a server change - movement only. "
                     + "Your items, economy and quest progress do NOT travel with you.");
             player.sendMessage(ChatColor.YELLOW + "Run " + ChatColor.WHITE + "/server transfer "
                     + targetName.toLowerCase() + " confirm" + ChatColor.YELLOW + " to proceed.");

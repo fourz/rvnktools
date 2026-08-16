@@ -302,7 +302,7 @@ public class ChatRelayController extends HttpServlet {
 
         if (obj != null && obj.has("components") && !obj.get("components").isJsonNull()) {
             ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
-                    "Room posts are plain text — use 'message'. Styled 'components' is supported on "
+                    "Room posts are plain text - use 'message'. Styled 'components' is supported on "
                     + "POST /v1/chat/broadcast only.");
             return;
         }

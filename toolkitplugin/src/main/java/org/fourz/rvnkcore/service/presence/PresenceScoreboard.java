@@ -345,7 +345,7 @@ public class PresenceScoreboard {
                 numberStyleLogged = true;
                 logger.warning("Presence sidebar: could not hide score numbers ("
                         + t.getClass().getSimpleName() + ": " + t.getMessage()
-                        + ") — they will render in red");
+                        + ") - they will render in red");
             }
         }
     }

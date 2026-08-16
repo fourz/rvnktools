@@ -74,7 +74,7 @@ public class ClusterBanListener implements Listener {
             }
 
             logger.info("Refused login for " + event.getName()
-                    + " — banned on the network roster (#1814)");
+                    + " - banned on the network roster (#1814)");
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
                     "You are banned from the Ravenkraft network.");
 
@@ -82,7 +82,7 @@ public class ClusterBanListener implements Listener {
             // Fail open — see the class javadoc. Logged at WARNING because a persistent failure
             // means bans silently stop being enforced, which should not pass unnoticed.
             logger.warning("Network ban check failed for " + event.getName()
-                    + " — allowing login (fail-open): " + e.getMessage());
+                    + " - allowing login (fail-open): " + e.getMessage());
         }
     }
 }

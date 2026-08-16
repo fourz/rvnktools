@@ -189,7 +189,7 @@ public class RVNKCore extends JavaPlugin implements Listener {
                 DatabaseConfig clusterConfig = coreConfigLoader.getClusterDatabaseConfig();
                 if (clusterConfig == null) {
                     logger.warning("cluster.enabled=true with role=member but cluster.mysql.host/database "
-                            + "are not set — cluster features disabled, local database unaffected");
+                            + "are not set - cluster features disabled, local database unaffected");
                     return;
                 }
                 ConnectionProvider clusterPool = factory.createConnectionProvider(clusterConfig);
@@ -198,10 +198,10 @@ public class RVNKCore extends JavaPlugin implements Listener {
             }
 
             databaseSetup.initializeClusterTables(clusterConnectionProvider);
-            logger.info("Cluster-shared data enabled — " + clusterConnectionProvider.describeTarget());
+            logger.info("Cluster-shared data enabled - " + clusterConnectionProvider.describeTarget());
 
         } catch (Exception e) {
-            logger.error("Cluster database setup failed (role=" + role + ") — cluster features "
+            logger.error("Cluster database setup failed (role=" + role + ") - cluster features "
                     + "disabled; this server's local database is unaffected", e);
             closeClusterProviderQuietly();
         }

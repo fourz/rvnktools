@@ -404,7 +404,7 @@ public class PortalStepListener implements Listener {
             // No safe exit computed — keep grace so they don't instantly re-transfer while standing in
             // the portal; onPlayerMove clears it when they step out.
             logger.debug("Portal arrival: no safe exit for " + player.getName()
-                    + " at portal " + portal.getPortalId() + " — holding arrival grace");
+                    + " at portal " + portal.getPortalId() + " - holding arrival grace");
         });
     }
 

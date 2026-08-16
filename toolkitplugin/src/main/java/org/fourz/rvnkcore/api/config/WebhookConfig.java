@@ -88,7 +88,7 @@ public class WebhookConfig {
             try {
                 String host = URI.create(url).getHost();
                 if (isInternalHost(host)) {
-                    logger.error("Webhook URL resolves to a private/loopback address — SSRF risk blocked: " + host);
+                    logger.error("Webhook URL resolves to a private/loopback address - SSRF risk blocked: " + host);
                     valid = false;
                 }
             } catch (Exception e) {

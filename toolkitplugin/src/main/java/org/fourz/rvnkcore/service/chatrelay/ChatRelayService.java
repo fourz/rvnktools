@@ -107,7 +107,7 @@ public class ChatRelayService {
     public void registerChatConsumer(Consumer<ChatMessageDTO> consumer) {
         this.externalConsumer = consumer;
         logger.info("Chat relay consumer " + (consumer != null ? "registered" : "cleared")
-            + " — " + (consumer != null ? "external chatroom owns routing/rendering"
+            + " - " + (consumer != null ? "external chatroom owns routing/rendering"
                                         : "built-in !-trigger relay active"));
     }
 
@@ -128,7 +128,7 @@ public class ChatRelayService {
     public void registerRoomInjector(Consumer<ChatMessageDTO> injector) {
         this.roomInjector = injector;
         logger.info("Chat room injector " + (injector != null ? "registered" : "cleared")
-            + " — " + (injector != null ? "bot room posts render via the chatroom"
+            + " - " + (injector != null ? "bot room posts render via the chatroom"
                                         : "bot room posts fall back to bot-format"));
     }
 
@@ -203,7 +203,7 @@ public class ChatRelayService {
         // Apply chat-relay.buffer.size on reload, not only at boot — a config key that is parsed and
         // never consumed is a recurring defect in this codebase (#1590, #1598, #1558, #1605).
         buffer.resize(newConfig.getBufferSize());
-        logger.info("ChatRelayService config refreshed — server-id=" + config.getServerId()
+        logger.info("ChatRelayService config refreshed - server-id=" + config.getServerId()
             + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()
             + ", buffer=" + buffer.capacity());
     }

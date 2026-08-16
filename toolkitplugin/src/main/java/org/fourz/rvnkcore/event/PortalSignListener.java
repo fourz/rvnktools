@@ -102,7 +102,7 @@ public class PortalSignListener implements Listener {
                 existingSign.getPersistentDataContainer().remove(portalIdKey);
                 existingSign.update();
                 logger.debug("Cleared stale portal stamp " + existingId + " from sign at "
-                        + event.getBlock().getLocation() + " — portal no longer registered");
+                        + event.getBlock().getLocation() + " - portal no longer registered");
             }
         }
 
@@ -221,7 +221,7 @@ public class PortalSignListener implements Listener {
         // would strand an un-removable sign in the world for anyone without delete permission.
         if (portalService.getPortalById(portalId).isEmpty()) {
             logger.debug("Sign at " + block.getLocation() + " carried stale portal stamp " + portalId
-                    + " — allowing break, portal is not registered");
+                    + " - allowing break, portal is not registered");
             return;
         }
 

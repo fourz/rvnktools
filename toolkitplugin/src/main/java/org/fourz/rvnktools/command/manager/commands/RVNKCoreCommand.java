@@ -84,7 +84,7 @@ public class RVNKCoreCommand extends BaseCommand {
         java.util.Map<String, java.util.List<String>> m = new java.util.LinkedHashMap<>();
         m.put("debug", java.util.List.of(
                 "/rvnkcore debug",
-                "  full system diagnostics — also what a bare /rvnkcore runs"));
+                "  full system diagnostics - also what a bare /rvnkcore runs"));
         m.put("services", java.util.List.of(
                 "/rvnkcore services",
                 "  every interface registered in the ServiceRegistry, and by which plugin",
@@ -92,7 +92,7 @@ public class RVNKCoreCommand extends BaseCommand {
         m.put("db", java.util.List.of(
                 "/rvnkcore db",
                 "  connectivity plus row totals; alias: database",
-                "RVNKCore's MySQL is cross-host — a hang here usually means a missing",
+                "RVNKCore's MySQL is cross-host - a hang here usually means a missing",
                 "socketTimeout in connectionParameters, not a dead server."));
         m.put("version", java.util.List.of(
                 "/rvnkcore version",
@@ -101,7 +101,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 "/rvnkcore reload",
                 "  re-reads config only",
                 "Adding a key to a shipped config.yml does NOT reach a server that already",
-                "has the file — saveResource writes only when the file is absent."));
+                "has the file - saveResource writes only when the file is absent."));
         m.put("plugins", java.util.List.of(
                 "/rvnkcore plugins",
                 "  which ecosystem plugins are present and what they registered"));
@@ -124,7 +124,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 "/rvnkcore mojang verify Shad0melt",
                 "  accepts a username or a UUID",
                 "/rvnkcore mojang stats",
-                "  cache and rate-limit counters — the lookup is rate limited"));
+                "  cache and rate-limit counters - the lookup is rate limited"));
         m.put("migrate", java.util.List.of(
                 "/rvnkcore migrate playerstate",
                 "/rvnkcore migrate playeridentity",
@@ -390,7 +390,7 @@ public class RVNKCoreCommand extends BaseCommand {
             sender.sendMessage(ChatFormat.colorize(
                     "&c✖ Usage: /rvnkcore netban <add|remove|check> <player>"));
             sender.sendMessage(ChatFormat.colorize(
-                    "&7   Network-wide ban flag. Separate from Minecraft's per-server /ban —"));
+                    "&7   Network-wide ban flag. Separate from Minecraft's per-server /ban -"));
             sender.sendMessage(ChatFormat.colorize(
                     "&7   /pardon does NOT clear this, use 'netban remove'."));
             return;
@@ -417,7 +417,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 boolean target = action.equals("add");
                 if (dto.isBanned() == target) {
                     sender.sendMessage(ChatFormat.colorize("&7   " + dto.getCurrentName()
-                            + " is already " + (target ? "banned" : "not banned") + " — no change"));
+                            + " is already " + (target ? "banned" : "not banned") + " - no change"));
                     return;
                 }
 
@@ -428,7 +428,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 sender.sendMessage(ChatFormat.colorize(
                         "&7   Applies on every server in the cluster. Minecraft's own per-server"));
                 sender.sendMessage(ChatFormat.colorize(
-                        "&7   ban list is unaffected — use /ban and /pardon for that separately."));
+                        "&7   ban list is unaffected - use /ban and /pardon for that separately."));
             } catch (Exception e) {
                 sender.sendMessage(ChatFormat.colorize("&c✖ netban failed: " + e.getMessage()));
             }
@@ -449,10 +449,10 @@ public class RVNKCoreCommand extends BaseCommand {
                 org.fourz.rvnkcore.api.service.PlayerService svc =
                         rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
                 int[] r = svc.unionPreferencesIntoCluster();
-                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — &e" + r[0]
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete - &e" + r[0]
                         + " &fpref, &e" + r[1] + " &ftype, &e" + r[2] + " &fchannel row(s) inserted"));
                 sender.sendMessage(ChatFormat.colorize(
-                        "&7   Rows the cluster already had were left as-is — a preference set on two"));
+                        "&7   Rows the cluster already had were left as-is - a preference set on two"));
                 sender.sendMessage(ChatFormat.colorize(
                         "&7   servers has no objectively correct winner, so none was picked."));
                 sender.sendMessage(ChatFormat.colorize(
@@ -510,9 +510,9 @@ public class RVNKCoreCommand extends BaseCommand {
             sender.sendMessage(ChatFormat.colorize(
                     "&c✖ Usage: /rvnkcore migrate <playerstate|playeridentity|playerprefs>"));
             sender.sendMessage(ChatFormat.colorize(
-                    "&7   playerstate    — copy per-server activity into rvnk_player_server_state"));
+                    "&7   playerstate    - copy per-server activity into rvnk_player_server_state"));
             sender.sendMessage(ChatFormat.colorize(
-                    "&7   playeridentity — union this server's players into the cluster roster"));
+                    "&7   playeridentity - union this server's players into the cluster roster"));
             sender.sendMessage(ChatFormat.colorize(
                     "&7   Both are idempotent and safe with players online."));
             return;
@@ -524,7 +524,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 org.fourz.rvnkcore.api.service.PlayerService svc =
                         rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
                 int inserted = svc.backfillServerState();
-                sender.sendMessage(ChatFormat.colorize("&a✓ Backfill complete — &e" + inserted
+                sender.sendMessage(ChatFormat.colorize("&a✓ Backfill complete - &e" + inserted
                         + " &frow(s) inserted"));
                 sender.sendMessage(ChatFormat.colorize(
                         "&7   Existing rows were left untouched (they are newer than the legacy columns)."));
@@ -552,7 +552,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 for (String note : r.notes) {
                     sender.sendMessage(ChatFormat.colorize("&7   " + note));
                 }
-                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete — examined &e" + r.examined
+                sender.sendMessage(ChatFormat.colorize("&a✓ Union complete - examined &e" + r.examined
                         + "&f, inserted &e" + r.inserted
                         + "&f, first_join corrected &e" + r.firstJoinCorrected));
                 sender.sendMessage(ChatFormat.colorize(
@@ -617,7 +617,7 @@ public class RVNKCoreCommand extends BaseCommand {
         sender.sendMessage(ChatFormat.colorize("&c▶ &6Cluster-Shared Database"));
         sender.sendMessage(ChatFormat.colorize("&7   • &f Role: &b"
                 + (cluster.isAuthoritative() ? "authoritative" : "member")
-                + " &7— " + cluster.describeTarget()));
+                + " &7- " + cluster.describeTarget()));
 
         long startMs = System.currentTimeMillis();
         try (java.sql.Connection conn = cluster.getConnection()) {
@@ -635,7 +635,7 @@ public class RVNKCoreCommand extends BaseCommand {
             sender.sendMessage(ChatFormat.colorize("&a✓ Result: Cluster reachable ("
                     + (System.currentTimeMillis() - startMs) + "ms)"));
         } catch (Exception e) {
-            sender.sendMessage(ChatFormat.colorize("&c✖ Result: Cluster unreachable — " + e.getMessage()));
+            sender.sendMessage(ChatFormat.colorize("&c✖ Result: Cluster unreachable - " + e.getMessage()));
             sender.sendMessage(ChatFormat.colorize("&7   Local database is unaffected."));
         }
     }
@@ -743,7 +743,7 @@ public class RVNKCoreCommand extends BaseCommand {
                 // Neutral, not a red failure. Several absences are deliberate — RVNKWorlds is never
                 // installed on production by design, and not every tier runs every plugin — so a red
                 // cross here reported healthy servers as broken.
-                sender.sendMessage(ChatFormat.colorize("&7   • &8– &7" + name + " &8(not installed)"));
+                sender.sendMessage(ChatFormat.colorize("&7   • &8- &7" + name + " &8(not installed)"));
                 notLoaded++;
             }
         }
@@ -779,7 +779,7 @@ public class RVNKCoreCommand extends BaseCommand {
         sender.sendMessage(ChatFormat.colorize("&c▶ &6Resource Pack"));
 
         if (url == null || url.isBlank()) {
-            sender.sendMessage(ChatFormat.colorize("&7   • &8– none configured"));
+            sender.sendMessage(ChatFormat.colorize("&7   • &8- none configured"));
             return;
         }
 
@@ -810,7 +810,7 @@ public class RVNKCoreCommand extends BaseCommand {
             String shortHash = hash.length() > 8 ? hash.substring(0, 8) : hash;
             sender.sendMessage(ChatFormat.colorize("&8     sha1 " + shortHash));
         } else {
-            sender.sendMessage(ChatFormat.colorize("&8     &eno sha1 — clients re-download every join"));
+            sender.sendMessage(ChatFormat.colorize("&8     &eno sha1 - clients re-download every join"));
         }
     }
 

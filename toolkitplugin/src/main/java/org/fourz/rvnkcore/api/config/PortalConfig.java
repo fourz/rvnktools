@@ -87,7 +87,7 @@ public class PortalConfig {
         boolean valid = true;
         if (triggerMaterial == null) {
             logger.error("Portal trigger-block '" + triggerBlock
-                    + "' did not resolve to a Material — portals cannot be triggered");
+                    + "' did not resolve to a Material - portals cannot be triggered");
             valid = false;
         } else if (!triggerMaterial.isBlock()) {
             logger.error("Portal trigger-block '" + triggerBlock
@@ -95,7 +95,7 @@ public class PortalConfig {
             valid = false;
         }
         if (signHeader.isEmpty()) {
-            logger.warning("Portal sign-header is empty — signs cannot be recognised as portals");
+            logger.warning("Portal sign-header is empty - signs cannot be recognised as portals");
         }
         return valid;
     }

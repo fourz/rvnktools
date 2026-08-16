@@ -129,7 +129,7 @@ public class CommandManager {
                 AuthTokenStore authTokenStore = registry.getService(AuthTokenStore.class);
                 registerCommand(new LinkCommand(plugin, authTokenStore));
             } else {
-                logger.info("AuthTokenStore not available — /link command not registered (API server may be disabled)");
+                logger.info("AuthTokenStore not available - /link command not registered (API server may be disabled)");
             }
         } catch (Exception e) {
             logger.warning("Failed to register /link command: " + e.getMessage());

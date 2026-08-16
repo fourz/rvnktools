@@ -111,7 +111,7 @@ public class CoreServiceFactory {
     private ConnectionProvider identityProvider() {
         if (clusterConnectionProvider != null
                 && ConfigLoader.getInstance(plugin).isPlayerIdentityShared()) {
-            logger.info("Player identity is cluster-shared — " + clusterConnectionProvider.describeTarget());
+            logger.info("Player identity is cluster-shared - " + clusterConnectionProvider.describeTarget());
             return clusterConnectionProvider;
         }
         return connectionProvider;
@@ -145,19 +145,19 @@ public class CoreServiceFactory {
             try {
                 int[] moved = registry.getService(PlayerService.class).unionPreferencesIntoCluster();
                 if (moved[0] + moved[1] + moved[2] > 0) {
-                    logger.info("Carried local preferences into the cluster before cut-over — "
+                    logger.info("Carried local preferences into the cluster before cut-over - "
                             + moved[0] + " pref, " + moved[1] + " type, " + moved[2] + " channel row(s)");
                 }
             } catch (Exception e) {
                 // Serve preferences locally rather than cut over to a cluster that may be missing
                 // this server's rows. A visibly unchanged setup beats silently resetting everyone.
-                logger.error("Preference union failed — keeping preferences LOCAL for this boot; "
+                logger.error("Preference union failed - keeping preferences LOCAL for this boot; "
                         + "no settings were lost", e);
                 return connectionProvider;
             }
         }
 
-        logger.info("Player preferences are cluster-shared — "
+        logger.info("Player preferences are cluster-shared - "
                 + clusterConnectionProvider.describeTarget());
         return clusterConnectionProvider;
     }
@@ -189,7 +189,7 @@ public class CoreServiceFactory {
         // is the normal single-server case rather than an error.
         if (clusterConnectionProvider != null) {
             registry.registerService(ClusterConnectionProvider.class, clusterConnectionProvider);
-            logger.debug("  + ClusterConnectionProvider registered — "
+            logger.debug("  + ClusterConnectionProvider registered - "
                     + clusterConnectionProvider.describeTarget()
                     + " (" + (System.currentTimeMillis() - startTime) + "ms)");
         }

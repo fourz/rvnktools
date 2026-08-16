@@ -100,7 +100,7 @@ public class PortalProtectionListener implements Listener {
 
         if (config != null && !player.hasPermission(config.getPermissionDelete())) {
             event.setCancelled(true);
-            player.sendMessage("§cThat block anchors a cross-server portal — you don't have "
+            player.sendMessage("§cThat block anchors a cross-server portal - you don't have "
                     + "permission to remove it.");
             return;
         }

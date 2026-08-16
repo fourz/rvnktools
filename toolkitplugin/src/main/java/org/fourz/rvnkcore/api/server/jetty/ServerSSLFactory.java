@@ -112,7 +112,7 @@ public class ServerSSLFactory {
                 return keystoreFile;
             }
             // SANs changed — delete and regenerate
-            logger.info("Configured hostnames changed — regenerating TLS certificate");
+            logger.info("Configured hostnames changed - regenerating TLS certificate");
             keystoreFile.delete();
         }
 
