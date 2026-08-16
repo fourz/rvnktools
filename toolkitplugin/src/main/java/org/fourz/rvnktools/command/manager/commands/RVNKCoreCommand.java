@@ -40,9 +40,19 @@ import java.util.UUID;
  */
 public class RVNKCoreCommand extends BaseCommand {
 
+    /**
+     * Bukkit plugins only.
+     *
+     * <p>{@code MickyHats} was listed here and is <b>not a plugin</b> — it is the server resource
+     * pack, set through {@code resource-pack} in {@code server.properties}. Looking it up with
+     * {@code PluginManager#getPlugin} could only ever return null, so every tier reported a
+     * permanent "not loaded" failure for something that was working correctly, and the
+     * not-available count was inflated by one everywhere. The pack is now reported from the server
+     * API in its own section by {@link #handleResourcePack(CommandSender)}.</p>
+     */
     private static final String[] RVNK_PLUGIN_NAMES = {
         "RVNKCore", "RVNKWorlds", "RVNKLore", "RVNKQuests",
-        "BarterShops", "TokenEconomy", "MickyHats"
+        "BarterShops", "TokenEconomy"
     };
 
     private final RVNKCore rvnkCore;
@@ -51,9 +61,105 @@ public class RVNKCoreCommand extends BaseCommand {
     public RVNKCoreCommand(RVNKCore plugin) {
         super(plugin, "rvnkcore",
               "RVNKCore diagnostics, testing, and system information",
-              "/rvnkcore <debug|services|db|version|reload|plugins|commands|health|test|mojang> [args]",
+              "/rvnkcore <debug|services|db|version|reload|plugins|commands|health|test|mojang"
+                      + "|migrate|netban|help> [args]",
               "rvnktools.admin.test");
         this.rvnkCore = plugin;
+    }
+
+    /**
+     * Worked examples per verb (#1981).
+     *
+     * <p>{@code /rvnkcore} dispatches from a switch rather than the subcommand registry, so it
+     * cannot inherit {@code BaseCommand.sendVerbHelp}. The examples live here instead of in
+     * {@code docs/plugins/commands/rvnkcore.md} for the same reason they do elsewhere: shipped in
+     * the jar they are fetched per verb and cannot drift from the build.</p>
+     *
+     * <p>A line starting with two spaces renders as a note under the example above it.</p>
+     */
+    private static final java.util.Map<String, java.util.List<String>> VERB_EXAMPLES =
+            buildVerbExamples();
+
+    private static java.util.Map<String, java.util.List<String>> buildVerbExamples() {
+        java.util.Map<String, java.util.List<String>> m = new java.util.LinkedHashMap<>();
+        m.put("debug", java.util.List.of(
+                "/rvnkcore debug",
+                "  full system diagnostics — also what a bare /rvnkcore runs"));
+        m.put("services", java.util.List.of(
+                "/rvnkcore services",
+                "  every interface registered in the ServiceRegistry, and by which plugin",
+                "A plugin whose service is missing here did not finish onEnable."));
+        m.put("db", java.util.List.of(
+                "/rvnkcore db",
+                "  connectivity plus row totals; alias: database",
+                "RVNKCore's MySQL is cross-host — a hang here usually means a missing",
+                "socketTimeout in connectionParameters, not a dead server."));
+        m.put("version", java.util.List.of(
+                "/rvnkcore version",
+                "  read the running version here, never from a commit message or issue comment"));
+        m.put("reload", java.util.List.of(
+                "/rvnkcore reload",
+                "  re-reads config only",
+                "Adding a key to a shipped config.yml does NOT reach a server that already",
+                "has the file — saveResource writes only when the file is absent."));
+        m.put("plugins", java.util.List.of(
+                "/rvnkcore plugins",
+                "  which ecosystem plugins are present and what they registered"));
+        m.put("commands", java.util.List.of(
+                "/rvnkcore commands",
+                "  every command RVNKCore registered, with its permission"));
+        m.put("health", java.util.List.of(
+                "/rvnkcore health",
+                "  the same signal the REST /v1/health endpoint serves"));
+        m.put("test", java.util.List.of(
+                "/rvnkcore test",
+                "  runs the all suite",
+                "/rvnkcore test all",
+                "/rvnkcore test services",
+                "/rvnkcore test db"));
+        m.put("mojang", java.util.List.of(
+                "/rvnkcore mojang name Shad0melt",
+                "  resolve a username to a UUID",
+                "/rvnkcore mojang uuid 28fc0be8-1afb-4b2f-8557-bc28655a8b06",
+                "/rvnkcore mojang verify Shad0melt",
+                "  accepts a username or a UUID",
+                "/rvnkcore mojang stats",
+                "  cache and rate-limit counters — the lookup is rate limited"));
+        m.put("migrate", java.util.List.of(
+                "/rvnkcore migrate playerstate",
+                "/rvnkcore migrate playeridentity",
+                "/rvnkcore migrate playerprefs",
+                "Migrations are one-way. Take a database backup before running one."));
+        m.put("netban", java.util.List.of(
+                "/rvnkcore netban check Shad0melt",
+                "/rvnkcore netban add Shad0melt",
+                "/rvnkcore netban remove Shad0melt",
+                "A network ban applies across every server in the cluster, not just this one."));
+        return m;
+    }
+
+    /**
+     * {@code /rvnkcore help <verb>} &mdash; one verb's examples.
+     */
+    @Override
+    protected void sendVerbHelp(CommandSender sender, String verb) {
+        java.util.List<String> lines = VERB_EXAMPLES.get(verb);
+        if (lines == null) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ No examples for '" + verb + "'."));
+            sender.sendMessage(ChatFormat.colorize(
+                    "&7Verbs: &f" + String.join(" ", VERB_EXAMPLES.keySet())));
+            return;
+        }
+        sender.sendMessage(ChatFormat.colorize("&6/rvnkcore " + verb));
+        for (String line : lines) {
+            if (line.startsWith("  ")) {
+                sender.sendMessage(ChatFormat.colorize("&8     " + line.trim()));
+            } else if (line.startsWith("/")) {
+                sender.sendMessage(ChatFormat.colorize("&f  " + line));
+            } else {
+                sender.sendMessage(ChatFormat.colorize("&7  " + line));
+            }
+        }
     }
 
     @Override
@@ -110,6 +216,8 @@ public class RVNKCoreCommand extends BaseCommand {
                         args.length > 1 ? args[1].toLowerCase() : "",
                         args.length > 2 ? args[2] : "");
                 break;
+            // "help" never reaches here — BaseCommand.execute intercepts it and routes to the
+            // sendHelp / sendVerbHelp overrides below.
             default:
                 sender.sendMessage(ChatFormat.colorize("&c✖ Unknown subcommand: " + sub));
                 sendHelp(sender);
@@ -627,15 +735,83 @@ public class RVNKCoreCommand extends BaseCommand {
                 sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &f" + name + " v" + version + "&7 (enabled" + extra + ")"));
                 loaded++;
             } else if (p != null) {
+                // Present but disabled IS a fault — it means the jar loaded and then failed, so this
+                // one keeps a warning colour.
                 sender.sendMessage(ChatFormat.colorize("&7   • &e⚠ &f" + name + "&7 (loaded but disabled)"));
                 notLoaded++;
             } else {
-                sender.sendMessage(ChatFormat.colorize("&7   • &c✖ &f" + name + "&7 (not loaded)"));
+                // Neutral, not a red failure. Several absences are deliberate — RVNKWorlds is never
+                // installed on production by design, and not every tier runs every plugin — so a red
+                // cross here reported healthy servers as broken.
+                sender.sendMessage(ChatFormat.colorize("&7   • &8– &7" + name + " &8(not installed)"));
                 notLoaded++;
             }
         }
 
-        sender.sendMessage(ChatFormat.colorize("&a✓ Result: " + loaded + " loaded, " + notLoaded + " not available"));
+        sender.sendMessage(ChatFormat.colorize("&a✓ Result: " + loaded + " loaded, " + notLoaded + " not installed"));
+
+        handleResourcePack(sender);
+    }
+
+    /**
+     * Report the server resource pack, read from the running server rather than any hardcoded name.
+     *
+     * <p>Nothing here names a specific pack. The previous code hardcoded {@code MickyHats} as if it
+     * were a plugin, which meant renaming or replacing the pack would have needed a code change and
+     * meanwhile produced a permanent false failure. Reading {@code getResourcePack()} reflects
+     * whatever {@code server.properties} actually sets, including nothing at all.</p>
+     */
+    private void handleResourcePack(CommandSender sender) {
+        String url;
+        boolean required;
+        String hash;
+        try {
+            url = Bukkit.getResourcePack();
+            required = Bukkit.isResourcePackRequired();
+            hash = Bukkit.getResourcePackHash();
+        } catch (Throwable t) {
+            // Never let a diagnostics command die on an optional API.
+            sender.sendMessage(ChatFormat.colorize("&c▶ &6Resource Pack"));
+            sender.sendMessage(ChatFormat.colorize("&7   • &e⚠ unavailable: " + t.getClass().getSimpleName()));
+            return;
+        }
+
+        sender.sendMessage(ChatFormat.colorize("&c▶ &6Resource Pack"));
+
+        if (url == null || url.isBlank()) {
+            sender.sendMessage(ChatFormat.colorize("&7   • &8– none configured"));
+            return;
+        }
+
+        String file = url;
+        String host = "";
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            int slash = path.lastIndexOf('/');
+            if (slash >= 0 && slash + 1 < path.length()) {
+                file = path.substring(slash + 1);
+            }
+            if (uri.getHost() != null) {
+                host = uri.getHost();
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Not a parseable URI — fall back to showing the raw value.
+        }
+
+        // required=false means players are prompted and may decline, so the pack is NOT guaranteed
+        // to be applied. Saying "enforced" when it is optional would misreport what players see.
+        String enforcement = required ? "&crequired" : "&7optional";
+        sender.sendMessage(ChatFormat.colorize("&7   • &a✓ &f" + file + " &8(" + enforcement + "&8)"));
+        if (!host.isEmpty()) {
+            sender.sendMessage(ChatFormat.colorize("&8     " + host));
+        }
+        if (hash != null && !hash.isBlank()) {
+            String shortHash = hash.length() > 8 ? hash.substring(0, 8) : hash;
+            sender.sendMessage(ChatFormat.colorize("&8     sha1 " + shortHash));
+        } else {
+            sender.sendMessage(ChatFormat.colorize("&8     &eno sha1 — clients re-download every join"));
+        }
     }
 
     // ========================================================
@@ -1017,19 +1193,30 @@ public class RVNKCoreCommand extends BaseCommand {
     // Help
     // ========================================================
 
+    /**
+     * The verb index, generated from {@link #VERB_EXAMPLES} so it cannot drift.
+     *
+     * <p>The previous hand-written list omitted {@code migrate}, {@code netban} and {@code help} —
+     * three of the twelve verbs — for the same reason every hand-kept list in this repo has
+     * drifted: nothing makes you update it when the switch gains a case. Adding a verb to
+     * {@code VERB_EXAMPLES} now adds it here, and {@code /rvnkcore help <verb>} serves it. (#1981)</p>
+     */
     @Override
     public void sendHelp(CommandSender sender) {
         sender.sendMessage(ChatFormat.colorize("&6=== RVNKCore Commands ==="));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore debug &7- Comprehensive system diagnostics"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore services &7- List registered services"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore db &7- Test database connectivity"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore version &7- Show version information"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore reload &7- Reload configuration"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore plugins &7- List RVNK plugin status"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore commands &7- Show CommandManager state"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore health &7- Full system health check"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore test [all|services|db] &7- Run test suite"));
-        sender.sendMessage(ChatFormat.colorize("&e/rvnkcore mojang <op> [args] &7- Mojang API operations"));
+        for (java.util.Map.Entry<String, java.util.List<String>> e : VERB_EXAMPLES.entrySet()) {
+            java.util.List<String> body = e.getValue();
+            String note = "";
+            for (String line : body) {
+                if (line.startsWith("  ")) {
+                    note = " &7- " + line.trim();
+                    break;
+                }
+            }
+            sender.sendMessage(ChatFormat.colorize("&e/rvnkcore " + e.getKey() + note));
+        }
+        sender.sendMessage(ChatFormat.colorize(
+                "&7Examples for one verb: &f/rvnkcore help <verb>"));
     }
 
     private void sendMojangHelp(CommandSender sender) {

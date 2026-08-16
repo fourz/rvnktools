@@ -52,4 +52,12 @@ public class LinksSubCommand extends BaseSubCommand {
         }
         return Collections.emptyList();
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/rvnktools links reload",
+                "  re-read the links config after editing it");
+    }
 }

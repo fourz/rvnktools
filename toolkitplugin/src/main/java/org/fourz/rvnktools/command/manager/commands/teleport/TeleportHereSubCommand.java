@@ -66,4 +66,12 @@ public class TeleportHereSubCommand extends BaseSubCommand {
 
         return completions;
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/teleport here Shad0melt",
+                "  bring that player to you; requires a player sender");
+    }
 }

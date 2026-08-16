@@ -242,21 +242,20 @@ portal:
 logging:
   level: INFO
 
-# Storage configuration for RVNKCore database tables
+# Table-naming configuration for RVNKCore database tables.
+#
+# Only `type` and `<type>.tablePrefix` are read (DatabaseSetup). Connection settings live under
+# `database:` above — this section previously also carried host/port/database/username/password/useSSL,
+# a full second MySQL credential block that nothing ever read. Editing those did nothing while
+# appearing to be the place to configure the database, so they have been removed (#1605).
 storage:
-  # Storage type: sqlite (default) or mysql
+  # Selects which tablePrefix below applies: sqlite (default) or mysql
   type: sqlite
   sqlite:
     # Table prefix for shared database hosting (e.g., "core_" creates "core_rvnk_players")
     # Leave empty for no prefix (default)
     tablePrefix: ""
   mysql:
-    host: localhost
-    port: 3306
-    database: minecraft
-    username: root
-    password: ""
-    useSSL: false
     # Table prefix for shared database hosting
     tablePrefix: ""
 

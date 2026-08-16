@@ -139,4 +139,16 @@ public class TeleportCoordsSubCommand extends BaseSubCommand {
 
         return completions;
     }
+
+    /** Worked examples served by {@code help <verb>} (#1981). */
+    @Override
+    public java.util.List<String> getExamples() {
+        return java.util.List.of(
+                "/teleport coords 100 64 -200",
+                "  teleport yourself to the coordinates",
+                "/teleport coords Shad0melt 100 64 -200",
+                "  teleport that player there",
+                "Coordinates land in the player's CURRENT world. To cross worlds use",
+                "/world tp <world> <player> - a plain teleport does not activate a world.");
+    }
 }

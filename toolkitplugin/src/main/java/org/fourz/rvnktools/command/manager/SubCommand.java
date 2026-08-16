@@ -72,8 +72,31 @@ public interface SubCommand {
     
     /**
      * Get the parent command of this subcommand.
-     * 
+     *
      * @return The parent command
      */
     RVNKCommand getParent();
+
+    /**
+     * Worked examples for this subcommand, served by {@code /&lt;command&gt; help &lt;verb&gt;}.
+     *
+     * <p>Return concrete, runnable lines with real-looking arguments &mdash; not a restatement of
+     * {@link #getUsage()}, which the help prints above them. A line beginning with two spaces is
+     * rendered as an indented note under the example above it.</p>
+     *
+     * <p><b>Why the examples live in the jar.</b> Restating them in {@code docs/plugins/commands/}
+     * means an assistant must read a whole page to answer a question about one verb, and the copy
+     * drifts from the build with nothing to catch it &mdash; RVNKWorlds' page had lost six verbs
+     * and RVNKQuests' index advertised three commands with the wrong grammar. Shipping them here
+     * makes them per-verb and unable to drift. The doc pages keep what no command can print:
+     * sequence diagrams, backend class references and changelogs. (#1981)</p>
+     *
+     * <p>Default is empty, so existing subcommands need no change. A verb whose whole grammar fits
+     * in one usage line does not need examples, and the help marks which verbs have them.</p>
+     *
+     * @return example lines, or an empty list when the usage string says everything
+     */
+    default List<String> getExamples() {
+        return List.of();
+    }
 }

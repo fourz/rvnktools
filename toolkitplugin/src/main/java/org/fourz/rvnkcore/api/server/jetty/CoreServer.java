@@ -7,6 +7,7 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.fourz.rvnkcore.api.auth.AuthTokenStore;
 import org.fourz.rvnkcore.api.config.ApiConfig;
 import org.fourz.rvnkcore.api.service.IServletRegistrationService;
@@ -162,9 +163,15 @@ public class CoreServer {
         }
 
         try {
-            // Create server instance
-            server = new Server();
-            
+            // Create server instance.
+            // api.server.max-threads was read into ApiConfig and validated, but never reached Jetty —
+            // `new Server()` builds its own QueuedThreadPool with Jetty's default of 200, so the
+            // configured value (and its validation warning above 200) described nothing (#1558).
+            QueuedThreadPool threadPool = new QueuedThreadPool(config.getMaxThreads());
+            threadPool.setName("rvnkcore-api");
+            server = new Server(threadPool);
+            logger.info("API thread pool max threads: " + config.getMaxThreads());
+
             // Setup connectors (HTTP/HTTPS)
             connectorFactory.setupConnectors(server);
             
