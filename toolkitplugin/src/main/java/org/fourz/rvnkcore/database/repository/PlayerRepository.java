@@ -252,7 +252,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         // and by this point it has already run.
         if (identityIsRemote()) {
             throw new IllegalStateException(
-                "Per-server backfill is not available once player identity is cluster-shared — "
+                "Per-server backfill is not available once player identity is cluster-shared - "
                 + "rvnk_players now holds the authoritative server's activity values, not this "
                 + "server's. Run this before enabling cluster.share-player-identity.");
         }
@@ -324,11 +324,11 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     public IdentityUnionResult unionIdentityIntoCluster() {
         if (clusterProvider == null) {
             throw new IllegalStateException(
-                "No cluster pool on this server — enable cluster.enabled first.");
+                "No cluster pool on this server - enable cluster.enabled first.");
         }
         if (clusterProvider == localProvider) {
             throw new IllegalStateException(
-                "This server IS the cluster database (authoritative) — its players are already the "
+                "This server IS the cluster database (authoritative) - its players are already the "
                 + "cluster roster. Run this on a member server.");
         }
 
@@ -435,11 +435,11 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     public int[] unionPreferencesIntoCluster() {
         if (clusterProvider == null) {
             throw new IllegalStateException(
-                "No cluster pool on this server — enable cluster.enabled first.");
+                "No cluster pool on this server - enable cluster.enabled first.");
         }
         if (clusterProvider == localProvider) {
             throw new IllegalStateException(
-                "This server IS the cluster database (authoritative) — its preferences are already "
+                "This server IS the cluster database (authoritative) - its preferences are already "
                 + "the cluster's. Run this on a member server.");
         }
 
@@ -477,7 +477,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                         inserted[t] += write.executeUpdate();
                     }
                 }
-                logger.info("Preference union: " + table + " — " + inserted[t] + " row(s) inserted");
+                logger.info("Preference union: " + table + " - " + inserted[t] + " row(s) inserted");
             }
         } catch (SQLException e) {
             logger.error("Preference union failed", e);
@@ -690,7 +690,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             return rs.getTimestamp(column);
         } catch (SQLException e) {
             if (e.getMessage() != null && e.getMessage().contains("Zero date value prohibited")) {
-                logger.warning("Zero date in column '" + column + "' — treating as null (row will self-heal on next update)");
+                logger.warning("Zero date in column '" + column + "' - treating as null (row will self-heal on next update)");
                 return null;
             }
             throw e;

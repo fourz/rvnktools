@@ -162,12 +162,12 @@ public class TransferService {
             transferring.remove(transferId);
             logger.error("Transfer failed for " + player.getName() + " -> " + targetName, e);
             lastTransfer.remove(player.getUniqueId());
-            return new TransferResult(Status.DISABLED, "Transfer failed — see server log.");
+            return new TransferResult(Status.DISABLED, "Transfer failed - see server log.");
         }
 
         return new TransferResult(Status.SUCCESS,
                 "Transferring you to '" + targetName.toLowerCase()
-                        + "' (movement only — your items do not travel).");
+                        + "' (movement only - your items do not travel).");
     }
 
     /** @return the backing transfer configuration. */
@@ -184,6 +184,6 @@ public class TransferService {
     public void refreshConfig(TransferConfig newConfig) {
         if (newConfig == null) return;
         this.config = newConfig;
-        logger.info("TransferService config refreshed — targets: " + config.getTargetNames());
+        logger.info("TransferService config refreshed - targets: " + config.getTargetNames());
     }
 }

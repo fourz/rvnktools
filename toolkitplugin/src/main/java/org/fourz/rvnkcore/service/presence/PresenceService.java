@@ -74,7 +74,7 @@ public class PresenceService {
     public void refreshConfig(ChatRelayConfig newConfig) {
         this.config = newConfig;
         this.egress = new PresenceEgress(newConfig, logger);
-        logger.info("PresenceService config refreshed — peers=" + newConfig.getPeers().size()
+        logger.info("PresenceService config refreshed - peers=" + newConfig.getPeers().size()
                 + ", enabled=" + newConfig.isEnabled());
     }
 

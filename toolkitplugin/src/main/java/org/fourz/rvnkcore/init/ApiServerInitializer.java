@@ -119,9 +119,9 @@ public class ApiServerInitializer {
             WebhookConfig webhookConfig = configLoader.getWebhookConfig();
             if (webhookConfig.isEnabled()) {
                 webhookConfig.validate(logger);
-                logger.info("Webhook notifier enabled — server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
+                logger.info("Webhook notifier enabled - server-id: " + webhookConfig.getServerId() + ", URL: " + webhookConfig.getUrl());
             } else {
-                logger.debug("Webhook notifier registered (disabled — no-op mode)");
+                logger.debug("Webhook notifier registered (disabled - no-op mode)");
             }
             registry.registerService(WebhookNotifier.class, new WebhookNotifier(webhookConfig, logger));
 
@@ -131,10 +131,10 @@ public class ApiServerInitializer {
             ChatRelayConfig chatRelayConfig = configLoader.getChatRelayConfig();
             if (chatRelayConfig.isEnabled()) {
                 chatRelayConfig.validate(logger);
-                logger.info("Chat relay enabled — server-id: " + chatRelayConfig.getServerId()
+                logger.info("Chat relay enabled - server-id: " + chatRelayConfig.getServerId()
                         + ", peers: " + chatRelayConfig.getPeers().size());
             } else {
-                logger.debug("Chat relay service registered (disabled — no-op mode)");
+                logger.debug("Chat relay service registered (disabled - no-op mode)");
             }
             ChatRelayEgress chatRelayEgress = new ChatRelayEgress(chatRelayConfig, logger);
             registry.registerService(ChatRelayService.class,

@@ -372,7 +372,7 @@ public abstract class BaseRepository<T, ID> {
                     return results;
                 }
             } catch (SQLException e) {
-                logger.error("queryList failed — SQL: " + sql, e);
+                logger.error("queryList failed - SQL: " + sql, e);
                 throw new DatabaseException("Query execution failed", e);
             }
         });

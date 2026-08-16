@@ -35,7 +35,7 @@ public class CycleSubCommand extends BaseSubCommand {
             }
             
             sender.sendMessage("§c✖ Cycle commands reload not available. Use /rvnktools reload instead.");
-            logger.info("Cycle reload attempted by " + sender.getName() + " — redirected to /rvnktools reload");
+            logger.info("Cycle reload attempted by " + sender.getName() + " - redirected to /rvnktools reload");
             return true;
         }
         

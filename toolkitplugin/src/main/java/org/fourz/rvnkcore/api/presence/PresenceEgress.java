@@ -107,7 +107,7 @@ public class PresenceEgress {
             return ctx;
         } catch (Exception e) {
             logger.warning("Presence insecure-tls requested but trust-all SSLContext failed: "
-                + e.getMessage() + " — self-signed peers will not be reachable");
+                + e.getMessage() + " - self-signed peers will not be reachable");
             return null;
         }
     }
@@ -190,7 +190,7 @@ public class PresenceEgress {
                 if (!h.circuitLogged) {
                     h.circuitLogged = true;
                     logger.warning(logTag + " appears offline after " + h.failures
-                            + " consecutive failures (" + reason + ") — pausing presence polling for "
+                            + " consecutive failures (" + reason + ") - pausing presence polling for "
                             + (CIRCUIT_MS / 60_000L) + " minutes");
                 } else {
                     logger.debug(logTag + " still offline (" + reason + ")");
@@ -200,7 +200,7 @@ public class PresenceEgress {
                 if (!h.backoffLogged) {
                     h.backoffLogged = true;
                     logger.warning(logTag + " failed " + h.failures + "x (" + reason
-                            + ") — backing off to every " + (BACKOFF_MS / 1000L)
+                            + ") - backing off to every " + (BACKOFF_MS / 1000L)
                             + "s; further failures at DEBUG until it recovers");
                 } else {
                     logger.debug(logTag + " failed (" + reason + ")");

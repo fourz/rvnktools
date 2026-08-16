@@ -239,7 +239,7 @@ public class ApiConfig {
             }
             
             if (apiKey == null || apiKey.trim().isEmpty() || "changeme".equals(apiKey.trim()) || apiKey.trim().length() < 16) {
-                logger.error("API key is insecure (default 'changeme' or shorter than 16 characters) — API server will not start. Set api.auth.key in config.yml.");
+                logger.error("API key is insecure (default 'changeme' or shorter than 16 characters) - API server will not start. Set api.auth.key in config.yml.");
                 isValid = false;
             }
             

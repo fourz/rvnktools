@@ -156,7 +156,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
             registeredServlets.put(normalizedPath,
                     new ServletRegistration(servlet, displayName, requireAuth, true));
             logger.info("Servlet at " + normalizedPath + " rebound to " + displayName
-                    + " (hot swap) — previous delegate replaced");
+                    + " (hot swap) - previous delegate replaced");
             return true;
         }
 
@@ -190,7 +190,7 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
             DelegatingServlet wrapper = boundWrappers.get(normalizedPath);
             if (wrapper != null) {
                 wrapper.clearDelegate();
-                logger.debug("Cleared delegate for " + normalizedPath + " — path now returns 503");
+                logger.debug("Cleared delegate for " + normalizedPath + " - path now returns 503");
             }
             return true;
         }

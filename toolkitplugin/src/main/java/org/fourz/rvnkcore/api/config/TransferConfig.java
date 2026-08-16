@@ -213,7 +213,7 @@ public class TransferConfig {
         }
         boolean valid = true;
         if (targets.isEmpty()) {
-            logger.warning("Transfer enabled but no targets configured — nothing can be transferred to");
+            logger.warning("Transfer enabled but no targets configured - nothing can be transferred to");
         }
         for (Map.Entry<String, Target> entry : targets.entrySet()) {
             String name = entry.getKey();

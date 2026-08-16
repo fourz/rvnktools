@@ -92,7 +92,7 @@ public class PresenceListener implements Listener {
                     switch (target) {
                         case SIDEBAR -> player.sendMessage(ChatColor.GREEN + "Network roster: sidebar.");
                         case TAB -> player.sendMessage(ChatColor.GREEN
-                                + "Network roster moved to the tab list — hold Tab to see it.");
+                                + "Network roster moved to the tab list - hold Tab to see it.");
                         case OFF -> player.sendMessage(ChatColor.GRAY
                                 + "Network roster hidden. Use /list sidebar or /list tab.");
                     }
@@ -177,7 +177,7 @@ public class PresenceListener implements Listener {
         List<PresenceService.ServerGroup> groups = service.getMergedRoster();
         int total = service.totalCount();
         sender.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "Network"
-                + ChatColor.GRAY + " — " + ChatColor.WHITE + total + ChatColor.GRAY + " online across servers");
+                + ChatColor.GRAY + " - " + ChatColor.WHITE + total + ChatColor.GRAY + " online across servers");
         for (PresenceService.ServerGroup g : groups) {
             ChatColor tag = g.isLocal() ? ChatColor.GREEN : ChatColor.AQUA;
             String names = g.getPlayers().stream()

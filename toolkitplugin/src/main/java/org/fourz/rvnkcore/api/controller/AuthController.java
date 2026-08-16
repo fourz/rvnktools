@@ -223,7 +223,7 @@ public class AuthController extends HttpServlet {
         } catch (TimeoutException e) {
             // DB-pool contention (not a real failure) — degrade gracefully so the caller can retry (#1466).
             logger.warning("Session-token lookup for UUID " + uuid + " timed out after "
-                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) — returning 503");
+                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) - returning 503");
             ApiUtils.sendError(resp, gson, 503, "LOOKUP_TIMEOUT",
                     "Player lookup timed out, please retry");
         } catch (Exception e) {
@@ -293,7 +293,7 @@ public class AuthController extends HttpServlet {
             // DB-pool contention (not a real failure) — degrade gracefully so the WebUI/widget can
             // retry instead of treating the user as logged-out. Logged at WARN, not ERROR (#1466).
             logger.warning("Session validation for UUID " + uuid + " timed out after "
-                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) — returning 503");
+                    + PLAYER_LOOKUP_TIMEOUT_SECONDS + "s (DB-pool contention) - returning 503");
             ApiUtils.sendError(resp, gson, 503, "LOOKUP_TIMEOUT",
                     "Player lookup timed out, please retry");
         } catch (Exception e) {

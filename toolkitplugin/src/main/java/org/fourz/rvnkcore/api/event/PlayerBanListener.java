@@ -40,7 +40,7 @@ public class PlayerBanListener implements Listener {
             return;
         }
 
-        logger.info("Ban detected for " + playerName + " — updating record and firing webhook");
+        logger.info("Ban detected for " + playerName + " - updating record and firing webhook");
 
         // Update player record with banned status
         try {

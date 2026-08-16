@@ -53,7 +53,7 @@ public class LinkCommand extends BaseCommand {
         } else {
             this.callbackUrl = configured;
         }
-        logger.info("Link command initialized — callback URL: " + this.callbackUrl);
+        logger.info("Link command initialized - callback URL: " + this.callbackUrl);
     }
 
     @Override
@@ -252,7 +252,7 @@ public class LinkCommand extends BaseCommand {
         String url = callbackUrl + "?token=" + token;
 
         String issuerName = (sender instanceof Player p) ? p.getName() : "console";
-        logger.info("Invite issued — invitee=" + resolvedName + " targetUuid=" + uuid
+        logger.info("Invite issued - invitee=" + resolvedName + " targetUuid=" + uuid
                 + " ttlMinutes=" + ttlMinutes + " issuer=" + issuerName);
 
         sender.sendMessage(ChatFormat.colorize(

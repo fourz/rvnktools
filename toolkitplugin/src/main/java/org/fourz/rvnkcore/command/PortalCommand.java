@@ -144,7 +144,7 @@ public class PortalCommand extends BaseCommand {
             // loaded — the #1752 confusion, one level up.
             if (extension == null) {
                 sender.sendMessage(ChatColor.GOLD + "World portals" + ChatColor.GRAY
-                        + " — unavailable: no portal provider is loaded (RVNKWorlds absent).");
+                        + " - unavailable: no portal provider is loaded (RVNKWorlds absent).");
             } else {
                 sender.sendMessage(ChatColor.GOLD + "World portals" + ChatColor.GRAY
                         + " (via " + extension.providerName() + ")");
@@ -158,7 +158,7 @@ public class PortalCommand extends BaseCommand {
                             logger.warning("Portal extension '" + extension.providerName()
                                     + "' failed while listing world portals: " + ex);
                             sender.sendMessage(ChatColor.RED
-                                    + "  (world portal listing failed — see console)");
+                                    + "  (world portal listing failed - see console)");
                         }
                     });
                 }
@@ -181,7 +181,7 @@ public class PortalCommand extends BaseCommand {
             sender.sendMessage(ChatColor.RED + "No cross-server portal matches '" + args[0]
                     + "' (unknown id, or an ambiguous prefix).");
             if (extension != null) {
-                sender.sendMessage(ChatColor.GRAY + "  It may be a world portal — try "
+                sender.sendMessage(ChatColor.GRAY + "  It may be a world portal - try "
                         + ChatColor.WHITE + "/world portal info " + args[0]);
             }
             return true;
@@ -200,7 +200,7 @@ public class PortalCommand extends BaseCommand {
                 + (portal.getOwnerUuid() != null ? portal.getOwnerUuid() : "unknown"));
         sender.sendMessage(ChatColor.GRAY + "  state      " + colourFor(state) + state.name().toLowerCase(Locale.ROOT));
         if (state == PortalService.Verification.UNVERIFIED) {
-            sender.sendMessage(ChatColor.GRAY + "             world or chunk not loaded — not checked, not broken");
+            sender.sendMessage(ChatColor.GRAY + "             world or chunk not loaded - not checked, not broken");
         } else if (state == PortalService.Verification.ORPHANED) {
             sender.sendMessage(ChatColor.GRAY + "             trigger block or stamped sign missing; "
                     + "repair with /portal repair, or remove with /portal delete");
@@ -319,7 +319,7 @@ public class PortalCommand extends BaseCommand {
         PortalService service = portalService();
         sender.sendMessage(ChatColor.GOLD + "Portal systems on this server");
         if (service != null) {
-            sender.sendMessage(ChatColor.WHITE + "  SERVER " + ChatColor.GRAY + "(RVNKCore) — "
+            sender.sendMessage(ChatColor.WHITE + "  SERVER " + ChatColor.GRAY + "(RVNKCore) - "
                     + service.getConfig().getSignHeader() + " sign on a "
                     + service.getConfig().getTriggerBlock() + " frame; sends you to another server. "
                     + "Manage with /portal.");
@@ -327,11 +327,11 @@ public class PortalCommand extends BaseCommand {
         IPortalCommandExtension extension = extension();
         if (extension == null) {
             sender.sendMessage(ChatColor.WHITE + "  WORLD  " + ChatColor.GRAY
-                    + "— no provider loaded (RVNKWorlds absent).");
+                    + "- no provider loaded (RVNKWorlds absent).");
         } else {
             String described = extension.describe();
             sender.sendMessage(ChatColor.WHITE + "  WORLD  " + ChatColor.GRAY + "(" + extension.providerName()
-                    + ") — " + (described != null ? described : "no description provided"));
+                    + ") - " + (described != null ? described : "no description provided"));
         }
         return true;
     }
@@ -455,7 +455,7 @@ public class PortalCommand extends BaseCommand {
         }
         if (!clashes.isEmpty()) {
             logger.warning("Portal extension '" + provider + "' claims subcommand(s) reserved by core: "
-                    + String.join(", ", clashes) + " — core wins, these will not be dispatched.");
+                    + String.join(", ", clashes) + " - core wins, these will not be dispatched.");
         }
     }
 
