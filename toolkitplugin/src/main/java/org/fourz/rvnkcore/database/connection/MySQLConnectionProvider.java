@@ -33,6 +33,18 @@ public class MySQLConnectionProvider implements ConnectionProvider {
     private static final long MAX_SAFE_IDLE_TIMEOUT_MS = 120_000L;
     private static final long MAX_SAFE_MAX_LIFETIME_MS = 180_000L;
 
+    // Outage logging (#2017). A database outage is an EXPECTED condition on a cross-host MySQL —
+    // the provider already signals it to callers by throwing, so logging a full stack trace on
+    // every retry adds no diagnostic value and is an availability risk in its own right: a caller
+    // that retries on a timer (RVNKWorlds' world sync runs every 60s) turns a multi-hour outage
+    // into tens of thousands of log lines. That is the same shape as the DEBUG-plus-load incident
+    // that queued ~150k lines and blocked shutdown for ~11 minutes (#1548).
+    // Policy: full trace ONCE when an outage begins, a single-line summary at most every
+    // SUMMARY_INTERVAL_MS while it continues, and one line when it recovers.
+    private static final long OUTAGE_SUMMARY_INTERVAL_MS = 300_000L;
+
+    private final ConnectionOutageLog outageLog = new ConnectionOutageLog(OUTAGE_SUMMARY_INTERVAL_MS);
+
     private HikariDataSource dataSource;
     private final DatabaseConfig config;
     private final LogManager logger;
@@ -71,10 +83,55 @@ public class MySQLConnectionProvider implements ConnectionProvider {
                 }
                 throw new SQLException("Connection validation failed");
             }
+            recordConnectionSuccess();
             return conn;
         } catch (SQLException e) {
-            logger.error("Failed to obtain MySQL connection", e);
+            recordConnectionFailure(e);
             throw new DatabaseException("MySQL connection failed", e);
+        }
+    }
+
+    /**
+     * Notes a successful borrow, and reports recovery if an outage was in progress.
+     */
+    private void recordConnectionSuccess() {
+        // Duration must be read before recordSuccess(), which resets the outage clock.
+        long durationMs = outageLog.outageDurationMs(System.currentTimeMillis());
+        int failures = outageLog.recordSuccess();
+        if (failures > 0) {
+            logger.warning("MySQL connection recovered after " + failures
+                    + " failed attempt(s) over " + ConnectionOutageLog.describeDuration(durationMs));
+        }
+    }
+
+    /**
+     * Logs a connection failure without flooding the console on a sustained outage.
+     *
+     * <p>The first failure of an outage carries the full stack trace, because that is the one
+     * that explains the cause. Everything after it is the same cause repeating, so it is
+     * collapsed into a periodic one-line summary. Callers still receive the exception either
+     * way — this governs logging only, never control flow.</p>
+     */
+    private void recordConnectionFailure(SQLException e) {
+        long now = System.currentTimeMillis();
+        ConnectionOutageLog.Action action = outageLog.recordFailure(now);
+
+        switch (action) {
+            case FULL_TRACE:
+                logger.error("Failed to obtain MySQL connection", e);
+                break;
+            case SUMMARY:
+                logger.warning("MySQL still unavailable - " + outageLog.failureCount()
+                        + " failed attempt(s) over "
+                        + ConnectionOutageLog.describeDuration(outageLog.outageDurationMs(now))
+                        + "; last error: " + e.getMessage()
+                        + " (repeat stack traces suppressed)");
+                break;
+            case SUPPRESS:
+            default:
+                logger.debug("MySQL connection failure " + outageLog.failureCount()
+                        + ": " + e.getMessage());
+                break;
         }
     }
     
@@ -87,7 +144,10 @@ public class MySQLConnectionProvider implements ConnectionProvider {
         try (Connection testConn = dataSource.getConnection()) {
             return testConn.isValid(5);
         } catch (SQLException e) {
-            logger.warning("MySQL connection validation failed: " + e.getMessage());
+            // Debug, not warning: isValid() is polled by health checks and adapters, so during an
+            // outage this fires on every poll. recordConnectionFailure() owns the operator-facing
+            // narrative for an outage; this line would only duplicate it once per poll (#2017).
+            logger.debug("MySQL connection validation failed: " + e.getMessage());
             return false;
         }
     }
