@@ -106,4 +106,32 @@ public interface IRVNKWorldsApiService {
         return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
             "This RVNKWorlds build does not support the survey endpoint"));
     }
+
+    // ── coordinate probes (#2051) — point/column/grid siblings of the survey ──────
+    // Defaults, like surveySite: an older RVNKWorlds against a newer core loses the
+    // endpoint, not the plugin. All GET, so they stay under rvnk_api_read.
+
+    /** One block or a grouped list ({@code points=x,y,z;x,y,z;...}); {@code load=true} opt-in. */
+    default CompletableFuture<ApiResponse<?>> probePoints(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support the point probe (needs 1.6.143+)"));
+    }
+
+    /** Ground truth for one (x,z): surface heights, top block, RLE layer stack, liquid depth. */
+    default CompletableFuture<ApiResponse<?>> columnProfile(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support the column profile (needs 1.6.143+)"));
+    }
+
+    /** Surface heights + top materials on a step grid — terrain shape in one call. */
+    default CompletableFuture<ApiResponse<?>> heightmapGrid(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support the heightmap grid (needs 1.6.143+)"));
+    }
+
+    /** Strided lattice sweep across a box ({@code from}/{@code to}/{@code step}) with histogram. */
+    default CompletableFuture<ApiResponse<?>> scatterProbe(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "This RVNKWorlds build does not support the scatter probe (needs 1.6.143+)"));
+    }
 }

@@ -29,6 +29,7 @@ public final class AuthPathPatterns {
             "/bartershops/*",
             "/lore/*",
             "/rvnkworlds/*",
+            "/quests/*",
             "/docs/*"
     );
 

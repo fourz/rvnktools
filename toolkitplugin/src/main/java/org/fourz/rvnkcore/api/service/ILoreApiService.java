@@ -98,4 +98,26 @@ public interface ILoreApiService {
             ApiResponse.error("NOT_SUPPORTED",
                 "Lore location lookup requires RVNKLore 1.0.108 or newer on this server."));
     }
+
+    // ── location surface (#2053) — the validated twin of the raw two-table INSERT ──
+
+    /**
+     * Lore locations over HTTP (GET /lore/locations). With {@code world}, {@code x}, {@code z}
+     * and {@code radius} in the query it answers nearby; otherwise a recent list, optionally
+     * filtered by {@code world} and capped by {@code limit}.
+     */
+    default CompletableFuture<ApiResponse<?>> getLocations(String query) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "Lore location listing requires RVNKLore 1.0.127 or newer on this server."));
+    }
+
+    /**
+     * Create a lore location (POST /lore/locations). Body: {@code {name, description?, type,
+     * world, x, y, z, createdBy?}}. Creates the entry AND mirrors the coordinate row through
+     * the plugin's own validation - the governed replacement for direct SQL inserts.
+     */
+    default CompletableFuture<ApiResponse<?>> createLocation(String requestBody) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
+            "Lore location creation requires RVNKLore 1.0.127 or newer on this server."));
+    }
 }

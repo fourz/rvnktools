@@ -43,6 +43,11 @@ public class RVNKWorldsController extends HttpServlet {
     private static final Pattern HEALTH_PATTERN = Pattern.compile("^/health/?$");
     /** #1923 — dense site survey for agentic tooling. */
     private static final Pattern SURVEY_PATTERN = Pattern.compile("^/survey/?$");
+    /** #2051 — coordinate probes: point/batch, column, heightmap grid, scatter sweep. */
+    private static final Pattern PROBE_PATTERN = Pattern.compile("^/probe/?$");
+    private static final Pattern COLUMN_PATTERN = Pattern.compile("^/column/?$");
+    private static final Pattern HEIGHTMAP_PATTERN = Pattern.compile("^/heightmap/?$");
+    private static final Pattern SCATTER_PATTERN = Pattern.compile("^/scatter/?$");
 
     public RVNKWorldsController(IRVNKWorldsApiService ignored, Gson gson, LogManager logger) {
         this.gson = gson;
@@ -100,6 +105,14 @@ public class RVNKWorldsController extends HttpServlet {
                 // The whole query string is handed through: the survey takes several optional
                 // params and parsing them here would split the contract across two files.
                 future = apiService.surveySite(req.getQueryString());
+            } else if (PROBE_PATTERN.matcher(pathInfo).matches()) {
+                future = apiService.probePoints(req.getQueryString());
+            } else if (COLUMN_PATTERN.matcher(pathInfo).matches()) {
+                future = apiService.columnProfile(req.getQueryString());
+            } else if (HEIGHTMAP_PATTERN.matcher(pathInfo).matches()) {
+                future = apiService.heightmapGrid(req.getQueryString());
+            } else if (SCATTER_PATTERN.matcher(pathInfo).matches()) {
+                future = apiService.scatterProbe(req.getQueryString());
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;
