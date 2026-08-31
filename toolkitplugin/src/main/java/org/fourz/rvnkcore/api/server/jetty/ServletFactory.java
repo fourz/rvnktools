@@ -15,6 +15,7 @@ import org.fourz.rvnkcore.api.controller.HealthController;
 import org.fourz.rvnkcore.api.controller.LoreController;
 import org.fourz.rvnkcore.api.controller.NotificationController;
 import org.fourz.rvnkcore.api.controller.RVNKWorldsController;
+import org.fourz.rvnkcore.api.controller.QuestsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.WebUIAccessController;
 import org.fourz.rvnkcore.api.controller.WhitelistController;
@@ -159,6 +160,7 @@ public class ServletFactory {
         registerBarterShopsController(context);
         registerLoreController(context);
         registerRVNKWorldsController(context);
+        registerQuestsController(context);
     }
 
     /**
@@ -306,6 +308,22 @@ public class ServletFactory {
             logger.debug("RVNKLore API controller registered at /lore/* (service resolved lazily)");
         } catch (Throwable e) {
             logger.warning("RVNKLore API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the Quests controller (#2042). The IQuestsApiService is registered by the
+     * RVNKQuests plugin at startup and resolved lazily; on a tier without RVNKQuests the
+     * controller answers 503, which is the intended state, not a fault.
+     */
+    private void registerQuestsController(ServletContextHandler context) {
+        try {
+            LogManager controllerLogger = LogManager.getInstance(plugin, QuestsController.class);
+            QuestsController controller = new QuestsController(null, gson, controllerLogger);
+            context.addServlet(new ServletHolder(controller), "/quests/*");
+            logger.debug("Quests API controller registered at /quests/* (service resolved lazily)");
+        } catch (Throwable e) {
+            logger.warning("Quests API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());
         }
     }
 
