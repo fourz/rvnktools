@@ -154,11 +154,27 @@ public final class ChatMessageBuffer {
         long effectiveSince = stale ? 0L : sinceSeq;
 
         List<Entry> out = new ArrayList<>();
-        for (Entry e : entries) {
-            if (e.getSeq() <= effectiveSince) continue;
-            if (!matches(e.getDto(), room, world)) continue;
-            out.add(e);
-            if (out.size() >= cap) break;
+        if (effectiveSince == 0L) {
+            // No usable cursor (first read, or a stale resync): "recent" means the NEWEST
+            // cap matches (#2048). The old head-first scan handed a small limit the OLDEST
+            // slice, so a cursorless poller read a frozen window while every response
+            // looked healthy. Cursored reads below are untouched - forward pagination
+            // after since is correct for them.
+            Iterator<Entry> it = entries.descendingIterator();
+            while (it.hasNext()) {
+                Entry e = it.next();
+                if (!matches(e.getDto(), room, world)) continue;
+                out.add(e);
+                if (out.size() >= cap) break;
+            }
+            Collections.reverse(out); // chronological order on the wire, as before
+        } else {
+            for (Entry e : entries) {
+                if (e.getSeq() <= effectiveSince) continue;
+                if (!matches(e.getDto(), room, world)) continue;
+                out.add(e);
+                if (out.size() >= cap) break;
+            }
         }
 
         // Cursor advances to the last message actually returned. When a filter matched nothing, hold
