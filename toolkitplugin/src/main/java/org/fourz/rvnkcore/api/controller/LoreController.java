@@ -93,6 +93,9 @@ public class LoreController extends HttpServlet {
                 future = apiService.getStats();
             } else if (pathInfo.equals("/health")) {
                 future = apiService.getHealthStatus();
+            } else if (pathInfo.equals("/locations")) {
+                // GET /lore/locations (#2053) - nearby with world/x/z/radius, else recent list
+                future = apiService.getLocations(req.getQueryString());
             } else if (pathInfo.equals("/items")) {
                 // GET /lore/items?name=<display name>
                 String name = req.getParameter("name");
@@ -144,6 +147,13 @@ public class LoreController extends HttpServlet {
                 ApiResponse<?> response = apiService.submitEntry(body)
                     .get(30, TimeUnit.SECONDS);
                 sendApiResponse(resp, response);
+            } else if (pathInfo.equals("/locations")) {
+                // POST /lore/locations (#2053) - validated create, replaces raw SQL seeding
+                String body = ApiUtils.readRequestBody(req);
+                ApiResponse<?> response = apiService.createLocation(body)
+                    .get(30, TimeUnit.SECONDS);
+                sendApiResponse(resp, response);
+                return;
             } else if (pathInfo.equals("/items")) {
                 // POST /lore/items — mint a single lore item (#1517)
                 String body = ApiUtils.readRequestBody(req);
