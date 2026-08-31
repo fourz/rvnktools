@@ -56,6 +56,10 @@ public class HealthController extends HttpServlet {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "healthy");
         data.put("apiVersion", ApiVersion.API_VERSION);
+        // RVNKCore's own version (#2054): "version" below is the SERVER build, and the
+        // fleet drift table needs the plugin number the tiers actually run.
+        org.bukkit.plugin.Plugin core = Bukkit.getPluginManager().getPlugin("RVNKCore");
+        data.put("pluginVersion", core != null ? core.getDescription().getVersion() : null);
         data.put("mcVersion", parseMcVersion(Bukkit.getVersion()));
         data.put("version", Bukkit.getVersion());
         data.put("bukkitVersion", Bukkit.getBukkitVersion());
