@@ -62,4 +62,31 @@ class DatabaseAvailabilityServiceImplTest {
         assertTrue(s.isCoreInFallback());
         assertTrue(s.describe().contains("SQLITE FALLBACK"));
     }
+
+    @Test
+    void aDifferentHostIsNotAnsweredFromThePrimaryCache() throws Exception {
+        // Event 2026-09-20: core pointed at a dead host, RVNKLore at a live one. Lore must not be
+        // told "unreachable" for a database that is answering, or it can never recover (#2103).
+        AtomicLong now = new AtomicLong(1_000L);
+        DatabaseAvailabilityServiceImpl s =
+                new DatabaseAvailabilityServiceImpl(mysql(), 2000, 60_000L, now::get);
+        s.recordProbe(false);                                   // core's host is down
+
+        assertFalse(s.isPrimaryReachable());
+        assertFalse(s.isReachable("192.0.2.1", 3306), "same host as core: reuse the cached no");
+
+        try (java.net.ServerSocket live = new java.net.ServerSocket()) {
+            live.bind(new java.net.InetSocketAddress("127.0.0.1", 0));
+            assertTrue(s.isReachable("127.0.0.1", live.getLocalPort()),
+                    "a different, live host must be probed on its own merits");
+        }
+    }
+
+    @Test
+    void callerWithoutAHostIsLeftToItsOwnConnection() {
+        DatabaseAvailabilityServiceImpl s = new DatabaseAvailabilityServiceImpl(mysql(), 50, 60_000L);
+        s.recordProbe(false);
+        assertTrue(s.isReachable(null, 3306));
+        assertTrue(s.isReachable("  ", 3306));
+    }
 }

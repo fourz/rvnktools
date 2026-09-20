@@ -65,6 +65,18 @@ public class DatabaseAvailabilityServiceImpl implements DatabaseAvailabilityServ
     }
 
     @Override
+    public boolean isReachable(String callerHost, int callerPort) {
+        if (callerHost == null || callerHost.isBlank()) {
+            return true;
+        }
+        if (primaryIsMySql && callerHost.equalsIgnoreCase(host) && callerPort == port) {
+            return isPrimaryReachable();        // same target: reuse the shared cached answer
+        }
+        // A different database than RVNKCore's: the cached answer says nothing about it.
+        return DatabaseReachability.probe(callerHost, callerPort, probeTimeoutMs).reachable();
+    }
+
+    @Override
     public boolean probeNow() {
         if (!primaryIsMySql) {
             return true;
