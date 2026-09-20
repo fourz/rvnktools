@@ -11,6 +11,20 @@ general:
 database:
   type: sqlite
 
+  # Behaviour when a MySQL primary cannot be reached (#2103).
+  # These defaults apply even on servers whose config.yml predates this block.
+  fallback:
+    # Serve from local SQLite instead of failing to enable. With this off, an unreachable
+    # database disables RVNKCore and every plugin that depends on it - that is how a database
+    # outage took a whole server down to vanilla on 2026-09-19.
+    # Data written while in fallback stays local; it does not reach MySQL afterwards.
+    enabled: true
+    # TCP pre-flight probe. Decides reachability in milliseconds instead of HikariCP's 30s
+    # retry window, and the answer is shared with dependent plugins so they skip their own wait.
+    probeTimeoutMs: 3000
+    # Minimum gap between probes; callers inside the window reuse the cached answer.
+    recheckSeconds: 60
+
   # SQLite Configuration (default)
   sqlite:
     file: rvnkcore.db
