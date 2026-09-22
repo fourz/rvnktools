@@ -2,6 +2,7 @@ package org.fourz.rvnkcore;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.rvnkcore.api.service.DatabaseAvailabilityService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.service.WorldService;
@@ -10,6 +11,8 @@ import org.fourz.rvnkcore.database.config.DatabaseConfig;
 import org.fourz.rvnkcore.database.connection.ClusterConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
+import org.fourz.rvnkcore.api.service.impl.DatabaseAvailabilityServiceImpl;
+import org.fourz.rvnkcore.database.connection.DatabaseReachability;
 import org.fourz.rvnkcore.database.connection.DelegatingClusterConnectionProvider;
 import org.fourz.rvnkcore.database.schema.DatabaseSetup;
 import org.fourz.rvnkcore.init.ApiServerInitializer;
@@ -67,6 +70,9 @@ public class RVNKCore extends JavaPlugin implements Listener {
     private ConnectionProvider connectionProvider;
     /** Second pool for network-shared tables; null when clustering is disabled or unavailable (#1796). */
     private ClusterConnectionProvider clusterConnectionProvider;
+
+    /** Shared reachability answer; also records whether core itself fell back to SQLite (#2103). */
+    private DatabaseAvailabilityServiceImpl databaseAvailability;
     private boolean coreInitialized = false;
 
     // Initializers (SOLID: delegated responsibilities)
@@ -130,6 +136,10 @@ public class RVNKCore extends JavaPlugin implements Listener {
             // Setup database
             setupDatabase();
 
+            // Publish the reachability answer before anything else registers, so dependent plugins
+            // enabling after RVNKCore can skip their own 30s pool timeout (#2103).
+            serviceRegistry.registerService(DatabaseAvailabilityService.class, databaseAvailability);
+
             // Register core services via factory
             coreServiceFactory = new CoreServiceFactory(connectionProvider, clusterConnectionProvider, this);
             coreServiceFactory.registerAllServices(serviceRegistry);
@@ -147,19 +157,80 @@ public class RVNKCore extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * Builds the primary connection provider, degrading to local SQLite rather than failing the
+     * plugin when a MySQL primary cannot be reached (#2103).
+     *
+     * <p>Before this, an unreachable database threw out of {@code onEnable}, so Bukkit disabled
+     * RVNKCore — and with it every plugin that hard-depends on it. On 2026-09-19 that turned a
+     * database outage into a production server running vanilla: no lore, no events, no economy, no
+     * shops, and no block logging. A degraded stack on local SQLite is worth far more than a
+     * correct refusal to start.</p>
+     *
+     * <p>Two cheap guards keep the slow path off the main thread's clock: a TCP probe decides
+     * reachability in {@code database.fallback.probeTimeoutMs} instead of HikariCP's 30-second
+     * retry window, and the answer is published on {@link DatabaseAvailabilityService} so every
+     * dependent plugin can skip its own wait.</p>
+     */
     private void setupDatabase() {
-        try {
-            ConnectionProviderFactory factory = new ConnectionProviderFactory(this);
-            connectionProvider = factory.createConnectionProvider();
+        ConnectionProviderFactory factory = new ConnectionProviderFactory(this);
+        DatabaseConfig primary = coreConfigLoader.getDatabaseConfig();
 
+        databaseAvailability = new DatabaseAvailabilityServiceImpl(primary,
+                coreConfigLoader.getDatabaseProbeTimeoutMs(), coreConfigLoader.getDatabaseRecheckMs());
+
+        boolean fallbackAllowed = coreConfigLoader.isDatabaseFallbackEnabled();
+        boolean mysqlPrimary = "mysql".equalsIgnoreCase(primary.getType());
+        String failure = null;
+
+        if (mysqlPrimary) {
+            DatabaseReachability.Result probe = DatabaseReachability.probe(
+                    primary.getHost(), primary.getPort(), coreConfigLoader.getDatabaseProbeTimeoutMs());
+            databaseAvailability.recordProbe(probe.reachable());
+            if (!probe.reachable()) {
+                failure = "host did not answer - " + probe.describe(primary.getHost(), primary.getPort());
+            }
+        }
+
+        if (failure == null) {
+            try {
+                connectionProvider = factory.createConnectionProvider(primary);
+            } catch (Exception e) {
+                failure = e.getMessage();
+                if (mysqlPrimary) {
+                    databaseAvailability.recordProbe(false);
+                }
+            }
+        }
+
+        if (connectionProvider == null) {
+            if (!fallbackAllowed || !mysqlPrimary) {
+                logger.error("Failed to setup database: " + failure);
+                throw new RuntimeException("Database setup failed: " + failure);
+            }
+            logger.warning("Primary MySQL database unavailable (" + failure + ")");
+            logger.warning("Falling back to local SQLite so dependent plugins still start. "
+                    + "Data written now stays local and does NOT reach MySQL - restore the primary "
+                    + "and restart to resume shared storage.");
+            try {
+                connectionProvider = factory.createConnectionProvider(coreConfigLoader.getSqliteConfig());
+                databaseAvailability.setCoreInFallback(true);
+            } catch (Exception e) {
+                logger.error("SQLite fallback also failed - no database available", e);
+                throw new RuntimeException("Database setup failed (primary and fallback)", e);
+            }
+        }
+
+        try {
             DatabaseSetup databaseSetup = new DatabaseSetup(connectionProvider, this);
             databaseSetup.initializeDatabase();
 
-            logger.info("Database setup completed using " + connectionProvider.getClass().getSimpleName());
+            logger.info("Database setup completed using " + connectionProvider.getClass().getSimpleName()
+                    + (databaseAvailability.isCoreInFallback() ? " (SQLITE FALLBACK - primary unreachable)" : ""));
 
             setupClusterDatabase(factory, databaseSetup);
         } catch (Exception e) {
-            logger.error("Failed to setup database", e);
+            logger.error("Failed to setup database schema", e);
             throw new RuntimeException("Database setup failed", e);
         }
     }
@@ -190,6 +261,14 @@ public class RVNKCore extends JavaPlugin implements Listener {
                 if (clusterConfig == null) {
                     logger.warning("cluster.enabled=true with role=member but cluster.mysql.host/database "
                             + "are not set - cluster features disabled, local database unaffected");
+                    return;
+                }
+                DatabaseReachability.Result probe = DatabaseReachability.probe(clusterConfig.getHost(),
+                        clusterConfig.getPort(), coreConfigLoader.getDatabaseProbeTimeoutMs());
+                if (!probe.reachable()) {
+                    // Skip Hikari's 30s retry window: the cluster host is not answering at all.
+                    logger.warning("Cluster database " + probe.describe(clusterConfig.getHost(), clusterConfig.getPort())
+                            + " - cluster features disabled, local database unaffected");
                     return;
                 }
                 ConnectionProvider clusterPool = factory.createConnectionProvider(clusterConfig);

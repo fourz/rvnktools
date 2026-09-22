@@ -448,22 +448,63 @@ public class ConfigLoader {
                 .build();
         } else {
             // Default to SQLite
-            String databaseFile = coreConfig.getString("database.sqlite.file", "rvnkcore.db");
-            cachedDatabaseConfig = DatabaseConfig.builder()
-                .type("sqlite")
-                .database(databaseFile)
-                // Connection Pool Configuration (SQLite defaults: small pool, leak detection disabled)
-                .maxConnections(coreConfig.getInt("database.sqlite.pool.maxConnections", 5))
-                .minIdleConnections(coreConfig.getInt("database.sqlite.pool.minIdleConnections", 1))
-                .connectionTimeoutMs(coreConfig.getLong("database.sqlite.pool.connectionTimeoutMs", 30000L))
-                .idleTimeoutMs(coreConfig.getLong("database.sqlite.pool.idleTimeoutMs", 600000L))
-                .maxLifetimeMs(coreConfig.getLong("database.sqlite.pool.maxLifetimeMs", 1800000L))
-                .leakDetectionMs(coreConfig.getLong("database.sqlite.pool.leakDetectionMs", 0L))
-                .build();
+            cachedDatabaseConfig = getSqliteConfig();
         }
         
         logger.debug("Database configuration loaded and cached: " + dbType);
         return cachedDatabaseConfig;
+    }
+
+    /**
+     * The SQLite configuration, built from {@code database.sqlite.*} whatever {@code database.type}
+     * says. Used both as the configured primary and as the automatic fallback when a MySQL primary
+     * is unreachable (#2103), so both paths cannot drift apart.
+     */
+    public DatabaseConfig getSqliteConfig() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return DatabaseConfig.builder()
+            .type("sqlite")
+            .database(coreConfig.getString("database.sqlite.file", "rvnkcore.db"))
+            // Connection Pool Configuration (SQLite defaults: small pool, leak detection disabled)
+            .maxConnections(coreConfig.getInt("database.sqlite.pool.maxConnections", 5))
+            .minIdleConnections(coreConfig.getInt("database.sqlite.pool.minIdleConnections", 1))
+            .connectionTimeoutMs(coreConfig.getLong("database.sqlite.pool.connectionTimeoutMs", 30000L))
+            .idleTimeoutMs(coreConfig.getLong("database.sqlite.pool.idleTimeoutMs", 600000L))
+            .maxLifetimeMs(coreConfig.getLong("database.sqlite.pool.maxLifetimeMs", 1800000L))
+            .leakDetectionMs(coreConfig.getLong("database.sqlite.pool.leakDetectionMs", 0L))
+            .build();
+    }
+
+    /**
+     * Whether RVNKCore may serve from local SQLite when the MySQL primary is unreachable (#2103).
+     *
+     * <p>Default true. With it off, an unreachable database disables RVNKCore — and with it every
+     * plugin that hard-depends on RVNKCore, which is how the 2026-09-19 outage took an entire
+     * server down to vanilla rather than to a degraded stack.</p>
+     */
+    public boolean isDatabaseFallbackEnabled() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getBoolean("database.fallback.enabled", true);
+    }
+
+    /** How long the pre-flight TCP probe waits before calling the primary unreachable (#2103). */
+    public int getDatabaseProbeTimeoutMs() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getInt("database.fallback.probeTimeoutMs", 3000);
+    }
+
+    /** Minimum gap between reachability probes; callers inside the window share the cached answer. */
+    public long getDatabaseRecheckMs() {
+        if (coreConfig == null) {
+            ensureConfigExists();
+        }
+        return coreConfig.getLong("database.fallback.recheckSeconds", 60L) * 1000L;
     }
 
     /**

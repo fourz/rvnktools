@@ -54,9 +54,53 @@ public class PushSubscriptionRepository extends BaseRepository<PushSubscriptionD
 
     @Override
     protected String buildInsertQuery() {
-        return "INSERT INTO " + tableName
-                + " (player_id, endpoint, p256dh, auth_key) VALUES (?, ?, ?, ?)"
-                + " ON DUPLICATE KEY UPDATE player_id = VALUES(player_id), p256dh = VALUES(p256dh), auth_key = VALUES(auth_key)";
+        return upsertSql(isMySql(), tableName);
+    }
+
+    private boolean isMySql() {
+        return "mysql".equalsIgnoreCase(connectionProvider.getDatabaseType());
+    }
+
+    /**
+     * Insert-or-refresh keyed on the endpoint. SQLite has no {@code ON DUPLICATE KEY}; it takes the
+     * {@code ON CONFLICT ... DO UPDATE} form against the endpoint's UNIQUE constraint (#2103).
+     */
+    static String upsertSql(boolean mysql, String table) {
+        String insert = "INSERT INTO " + table + " (player_id, endpoint, p256dh, auth_key) VALUES (?, ?, ?, ?)";
+        if (mysql) {
+            return insert + " ON DUPLICATE KEY UPDATE player_id = VALUES(player_id), p256dh = VALUES(p256dh),"
+                    + " auth_key = VALUES(auth_key)";
+        }
+        return insert + " ON CONFLICT(endpoint) DO UPDATE SET player_id = excluded.player_id,"
+                + " p256dh = excluded.p256dh, auth_key = excluded.auth_key";
+    }
+
+    /**
+     * Table DDL per dialect. MySQL declares its indexes inline; SQLite rejects inline {@code INDEX}
+     * clauses and prefix lengths, so it gets a column UNIQUE plus a separate index statement (#2103).
+     */
+    static List<String> createTableSql(boolean mysql, String table) {
+        if (mysql) {
+            return List.of("CREATE TABLE IF NOT EXISTS " + table + " ("
+                    + "id INT AUTO_INCREMENT PRIMARY KEY, "
+                    + "player_id VARCHAR(36) NOT NULL, "
+                    + "endpoint TEXT NOT NULL, "
+                    + "p256dh TEXT NOT NULL, "
+                    + "auth_key VARCHAR(128) NOT NULL, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "INDEX idx_push_player (player_id), "
+                    + "UNIQUE INDEX idx_push_endpoint (endpoint(255))"
+                    + ")");
+        }
+        return List.of("CREATE TABLE IF NOT EXISTS " + table + " ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + "player_id TEXT NOT NULL, "
+                        + "endpoint TEXT NOT NULL UNIQUE, "
+                        + "p256dh TEXT NOT NULL, "
+                        + "auth_key TEXT NOT NULL, "
+                        + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                        + ")",
+                "CREATE INDEX IF NOT EXISTS idx_push_player ON " + table + " (player_id)");
     }
 
     @Override
@@ -117,19 +161,11 @@ public class PushSubscriptionRepository extends BaseRepository<PushSubscriptionD
      */
     public CompletableFuture<Void> createTable() {
         return CompletableFuture.runAsync(() -> {
-            String sql = "CREATE TABLE IF NOT EXISTS " + tableName + " ("
-                    + "id INT AUTO_INCREMENT PRIMARY KEY, "
-                    + "player_id VARCHAR(36) NOT NULL, "
-                    + "endpoint TEXT NOT NULL, "
-                    + "p256dh TEXT NOT NULL, "
-                    + "auth_key VARCHAR(128) NOT NULL, "
-                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                    + "INDEX idx_push_player (player_id), "
-                    + "UNIQUE INDEX idx_push_endpoint (endpoint(255))"
-                    + ")";
             try (var conn = connectionProvider.getConnection();
-                 var stmt = conn.prepareStatement(sql)) {
-                stmt.executeUpdate();
+                 var stmt = conn.createStatement()) {
+                for (String sql : createTableSql(isMySql(), tableName)) {
+                    stmt.execute(sql);
+                }
                 logger.info("Push subscriptions table ensured");
             } catch (SQLException e) {
                 logger.error("Failed to create push subscriptions table", e);
