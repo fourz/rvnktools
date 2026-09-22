@@ -27,6 +27,7 @@ class PushSubscriptionSqlTest {
             }
             try (ResultSet rs = stmt.executeQuery(
                     "SELECT count(*) FROM sqlite_master WHERE name IN ('" + TABLE + "', 'idx_push_player')")) {
+                assertTrue(rs.next(), "query returned no rows");
                 assertEquals(2, rs.getInt(1));
             }
         }
@@ -43,6 +44,7 @@ class PushSubscriptionSqlTest {
             upsert(conn, "p2", "https://push/e1", "k2", "a2");
 
             try (ResultSet rs = stmt.executeQuery("SELECT count(*), player_id, auth_key FROM " + TABLE)) {
+                assertTrue(rs.next(), "query returned no rows");
                 assertEquals(1, rs.getInt(1));
                 assertEquals("p2", rs.getString(2));
                 assertEquals("a2", rs.getString(3));
