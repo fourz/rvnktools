@@ -252,7 +252,8 @@ public class PortalStepListener implements Listener {
         PortalConfig portalConfig = permPortalService != null ? permPortalService.getConfig() : null;
         if (portalConfig != null && !player.hasPermission(portalConfig.getPermissionUse())) {
             lastTrigger.put(uuid, now);
-            player.sendMessage("§cYou don't have permission to use cross-server portals.");
+            player.sendMessage("§cYou don't have permission to use cross-server portals ("
+                    + portalConfig.getPermissionUse() + ").");
             return;
         }
 
@@ -304,7 +305,13 @@ public class PortalStepListener implements Listener {
             player.sendMessage("§cCross-server transfer is unavailable.");
             return;
         }
-        TransferService.TransferResult result = transferService.transfer(player, targetServer);
+        // Gate on the portal node, not the /server transfer command node (#2032)
+        PortalService portalService = RVNKCore.getServiceSafe(PortalService.class);
+        String portalNode = portalService != null && portalService.getConfig() != null
+                ? portalService.getConfig().getPermissionUse() : null;
+        TransferService.TransferResult result = portalNode != null
+                ? transferService.transfer(player, targetServer, portalNode)
+                : transferService.transfer(player, targetServer);
         player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
         if (result.isSuccess()) {
             logger.info("Portal walk-through transfer: " + player.getName() + " -> '" + targetServer + "'");

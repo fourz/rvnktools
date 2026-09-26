@@ -536,6 +536,26 @@ public class PlayerController extends HttpServlet {
 
     // ====== End PlayerWorld API Endpoints ======
 
+    /**
+     * Online state for a player row. Reads the main-thread live snapshot first (the same source as
+     * /players/online) and falls back to Bukkit. This runs on a Jetty thread, and the list endpoint
+     * reported online=false for a connected player (#2096).
+     */
+    private boolean isOnline(java.util.UUID playerId) {
+        if (playerId == null) return false;
+        try {
+            List<PlayerResponse> online = liveDataCache.getSnapshot().onlinePlayers;
+            if (online != null) {
+                for (PlayerResponse p : online) {
+                    if (playerId.equals(p.getUuid())) return true;
+                }
+            }
+        } catch (Exception ignored) {
+            // No snapshot yet: fall through to the direct lookup
+        }
+        return Bukkit.getPlayer(playerId) != null;
+    }
+
     private PlayerResponse convertToResponse(PlayerDTO player) {
         // Convert Timestamp to LocalDateTime
         LocalDateTime firstSeen = player.getFirstJoin() != null ? 
@@ -546,7 +566,8 @@ public class PlayerController extends HttpServlet {
         return PlayerResponse.builder()
                 .uuid(player.getId())
                 .name(player.getCurrentName())
-                .online(Bukkit.getPlayer(player.getId()) != null)
+                .online(isOnline(player.getId()))
+                .banned(player.isBanned())
                 .firstSeen(firstSeen)
                 .lastSeen(lastSeen)
                 .timesJoined(player.getTimesJoined())

@@ -110,6 +110,19 @@ public class TransferService {
      * @return A {@link TransferResult} describing the outcome
      */
     public TransferResult transfer(Player player, String targetName) {
+        return transfer(player, targetName, config.getPermission());
+    }
+
+    /**
+     * Attempts a transfer gated by {@code permission} instead of the command node.
+     *
+     * <p>Portals pass {@code rvnkcore.portal.use}: walking into a portal is a different act from
+     * running {@code /server transfer}, and gating it on the command node (default op) blocked every
+     * non-op at the portal while the portal node, which says "cross-server portal", never did (#2032).</p>
+     *
+     * @param permission Node the player must hold; null or blank skips the check
+     */
+    public TransferResult transfer(Player player, String targetName, String permission) {
         if (player == null) {
             return new TransferResult(Status.DISABLED, "No player to transfer.");
         }
@@ -126,9 +139,10 @@ public class TransferService {
                     "Unknown target '" + targetName + "'. Available: " + hint);
         }
 
-        if (!player.hasPermission(config.getPermission())) {
+        if (permission != null && !permission.isBlank() && !player.hasPermission(permission)) {
+            // Name the node: the old message named neither, so the #2032 denial looked unexplained
             return new TransferResult(Status.NO_PERMISSION,
-                    "You don't have permission to transfer between servers.");
+                    "You don't have permission to transfer between servers (" + permission + ").");
         }
 
         long now = System.currentTimeMillis();
