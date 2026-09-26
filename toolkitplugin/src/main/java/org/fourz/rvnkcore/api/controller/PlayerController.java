@@ -542,18 +542,32 @@ public class PlayerController extends HttpServlet {
      * reported online=false for a connected player (#2096).
      */
     private boolean isOnline(java.util.UUID playerId) {
-        if (playerId == null) return false;
+        List<PlayerResponse> snapshot = null;
         try {
-            List<PlayerResponse> online = liveDataCache.getSnapshot().onlinePlayers;
-            if (online != null) {
-                for (PlayerResponse p : online) {
-                    if (playerId.equals(p.getUuid())) return true;
-                }
-            }
+            snapshot = liveDataCache.getSnapshot().onlinePlayers;
         } catch (Exception ignored) {
-            // No snapshot yet: fall through to the direct lookup
+            // No snapshot yet: the direct lookup decides
         }
-        return Bukkit.getPlayer(playerId) != null;
+        return isOnline(playerId, snapshot, id -> Bukkit.getPlayer(id) != null);
+    }
+
+    /**
+     * Online if the live snapshot lists the player, else if the direct lookup finds them.
+     * Package-private and static so the rule is testable without a server (#2096).
+     */
+    static boolean isOnline(java.util.UUID playerId, List<PlayerResponse> snapshot,
+                            java.util.function.Predicate<java.util.UUID> directLookup) {
+        if (playerId == null) return false;
+        if (snapshot != null) {
+            for (PlayerResponse p : snapshot) {
+                if (p != null && playerId.equals(p.getUuid())) return true;
+            }
+        }
+        try {
+            return directLookup.test(playerId);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private PlayerResponse convertToResponse(PlayerDTO player) {
