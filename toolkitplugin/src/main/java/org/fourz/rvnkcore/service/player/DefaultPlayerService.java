@@ -54,6 +54,11 @@ public class DefaultPlayerService implements PlayerService {
     }
     
     @Override
+    public CompletableFuture<Boolean> setNetworkBan(UUID playerId, boolean banned) {
+        return playerRepository.setBanned(playerId, banned);
+    }
+
+    @Override
     public CompletableFuture<Integer> correctFirstJoin(UUID playerId, java.sql.Timestamp firstJoin) {
         if (playerId == null || firstJoin == null || firstJoin.getTime() <= 0) {
             return CompletableFuture.completedFuture(0);

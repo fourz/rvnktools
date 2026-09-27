@@ -48,6 +48,17 @@ public interface PlayerService {
     default CompletableFuture<Integer> correctFirstJoin(UUID playerId, java.sql.Timestamp firstJoin) {
         return CompletableFuture.completedFuture(0);
     }
+
+    /**
+     * Sets or clears the network ban flag and nothing else. Use this rather than
+     * {@code savePlayer}, which does not write the flag (#2128).
+     *
+     * @return true when the player's record was updated
+     * @since 1.5.93-alpha
+     */
+    default CompletableFuture<Boolean> setNetworkBan(UUID playerId, boolean banned) {
+        return CompletableFuture.completedFuture(false);
+    }
     
     /**
      * Saves or updates player information.

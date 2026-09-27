@@ -46,16 +46,10 @@ public class PlayerBanListener implements Listener {
         try {
             PlayerService playerService = registry.getService(PlayerService.class);
             if (playerService != null) {
-                playerService.getPlayer(player.getUniqueId())
-                    .thenAccept(optDto -> {
-                        optDto.ifPresent(dto -> {
-                            dto.setBanned(true);
-                            playerService.savePlayer(dto)
-                                .exceptionally(ex -> {
-                                    logger.error("Failed to save ban status for " + playerName, (Throwable) ex);
-                                    return null;
-                                });
-                        });
+                // Dedicated write: the general save no longer carries the ban flag (#2128)
+                playerService.setNetworkBan(player.getUniqueId(), true)
+                    .thenAccept(updated -> {
+                        if (!updated) logger.warning("Ban for " + playerName + " matched no player record");
                     })
                     .exceptionally(ex -> {
                         logger.error("Failed to fetch player for ban update: " + playerName, (Throwable) ex);

@@ -467,8 +467,11 @@ public class RVNKCoreCommand extends BaseCommand {
                     return;
                 }
 
-                dto.setBanned(target);
-                svc.savePlayer(dto).get();
+                // Dedicated write: the general save no longer carries the ban flag (#2128)
+                if (!svc.setNetworkBan(dto.getId(), target).get()) {
+                    sender.sendMessage(ChatFormat.colorize("&c✖ netban: no player record was updated"));
+                    return;
+                }
                 sender.sendMessage(ChatFormat.colorize("&a✓ " + dto.getCurrentName()
                         + " network ban " + (target ? "&cSET" : "&aCLEARED")));
                 sender.sendMessage(ChatFormat.colorize(
