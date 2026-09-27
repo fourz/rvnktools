@@ -35,10 +35,22 @@ public class TpAcceptCommand extends BaseCommand {
         if (!validatePlayer(sender)) return true;
 
         Player player = (Player) sender;
-        Optional<TpaRequest> optRequest = tpaService.acceptRequest(player.getUniqueId());
+        // "/tpaccept <name>" accepts only that player's request; bare "/tpaccept" accepts the pending one
+        java.util.UUID expectedSender = null;
+        if (args.length > 0) {
+            Player named = Bukkit.getPlayerExact(args[0]);
+            if (named == null) {
+                sender.sendMessage(ChatFormat.colorize("&c✖ " + args[0] + " is not online."));
+                return true;
+            }
+            expectedSender = named.getUniqueId();
+        }
+        Optional<TpaRequest> optRequest = tpaService.acceptRequest(player.getUniqueId(), expectedSender);
 
         if (optRequest.isEmpty()) {
-            sender.sendMessage(ChatFormat.colorize("&c✖ You have no pending teleport requests."));
+            sender.sendMessage(ChatFormat.colorize(expectedSender != null
+                    ? "&c✖ You have no pending teleport request from " + args[0] + "."
+                    : "&c✖ You have no pending teleport requests."));
             return true;
         }
 
@@ -65,8 +77,9 @@ public class TpAcceptCommand extends BaseCommand {
             destination = senderPlayer;
         }
 
-        // Store back location before teleporting
-        backService.setBackLocation(teleporting.getUniqueId(), teleporting.getLocation());
+        // The back location is recorded only when the teleport lands; setting it here lost the
+        // original location whenever the warmup was cancelled (#2127)
+        final org.bukkit.Location from = teleporting.getLocation().clone();
 
         // Execute teleport with warmup
         tpaService.startWarmup(teleporting, () -> {
@@ -76,6 +89,7 @@ public class TpAcceptCommand extends BaseCommand {
                 ITeleportService teleportService = registry.getService(ITeleportService.class);
                 teleportService.teleportToPlayer(teleporting, destination).thenAccept(success -> {
                     if (success) {
+                        backService.setBackLocation(teleporting.getUniqueId(), from);
                         teleporting.sendMessage(ChatFormat.colorize("&a✓ Teleported to &f" + destination.getName()));
                         destination.sendMessage(ChatFormat.colorize("&a✓ &f" + teleporting.getName() + " &ateleported to you."));
                     } else {
@@ -85,7 +99,11 @@ public class TpAcceptCommand extends BaseCommand {
             } else {
                 // Fallback: direct Bukkit teleport
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    teleporting.teleport(destination.getLocation());
+                    if (!teleporting.teleport(destination.getLocation())) {
+                        teleporting.sendMessage(ChatFormat.colorize("&c✖ Teleport failed."));
+                        return;
+                    }
+                    backService.setBackLocation(teleporting.getUniqueId(), from);
                     teleporting.sendMessage(ChatFormat.colorize("&a✓ Teleported to &f" + destination.getName()));
                     destination.sendMessage(ChatFormat.colorize("&a✓ &f" + teleporting.getName() + " &ateleported to you."));
                 });

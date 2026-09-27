@@ -66,7 +66,8 @@ public class TpaCommand extends BaseCommand {
         target.sendMessage(ChatFormat.colorize("&e⚠ " + label));
 
         TextComponent accept = new TextComponent(ChatFormat.colorize("&a&l[Accept]"));
-        accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tpaccept"));
+        // Name the sender, so this button can only accept this request (#2127)
+        accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tpaccept " + player.getName()));
 
         TextComponent space = new TextComponent("  ");
 

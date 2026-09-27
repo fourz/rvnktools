@@ -66,26 +66,30 @@ public class BackCommand extends BaseCommand {
             return true;
         }
 
-        // Store current location as new back location (enables back-and-forth)
-        backService.setBackLocation(player.getUniqueId(), player.getLocation());
+        // A world RVNKWorlds has since unloaded cannot be entered by a raw teleport
+        if (!backLoc.isWorldLoaded()) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ Your previous location's world is not loaded right now."));
+            return true;
+        }
 
-        // Execute with warmup
-        tpaService.startWarmup(player, () -> {
-            ServiceRegistry registry = plugin.getServiceRegistry();
-            if (registry.hasService(ITeleportService.class)) {
-                ITeleportService teleportService = registry.getService(ITeleportService.class);
-                // Use teleportToPlayer approach for cross-world support
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.teleport(backLoc);
-                    player.sendMessage(ChatFormat.colorize("&a✓ Teleported to your previous location."));
-                });
-            } else {
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.teleport(backLoc);
-                    player.sendMessage(ChatFormat.colorize("&a✓ Teleported to your previous location."));
-                });
+        // Where the player stands now becomes the new back location only once the teleport lands:
+        // setting it before the warmup lost the original location when the warmup was cancelled
+        final Location from = player.getLocation().clone();
+
+        tpaService.startWarmup(player, () -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!backLoc.isWorldLoaded()) {
+                player.sendMessage(ChatFormat.colorize("&c✖ Your previous location's world is no longer loaded."));
+                return;
             }
-        });
+            if (player.teleport(backLoc)) {
+                backService.setBackLocation(player.getUniqueId(), from);
+                // /back checked the teleport cooldown but never started it: an unlimited two-point warp
+                tpaService.startCooldown(player.getUniqueId());
+                player.sendMessage(ChatFormat.colorize("&a✓ Teleported to your previous location."));
+            } else {
+                player.sendMessage(ChatFormat.colorize("&c✖ Teleport failed."));
+            }
+        }));
 
         if (sender != player) {
             sender.sendMessage("Teleporting " + player.getName() + " to their previous location.");

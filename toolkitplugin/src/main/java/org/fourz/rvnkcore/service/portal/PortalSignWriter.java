@@ -191,6 +191,25 @@ public final class PortalSignWriter {
      * @param portalId the id the sign must carry, or null to accept any sign mounted on the anchor
      * @return the matching sign block, or empty
      */
+    /**
+     * Every sign mounted on the anchor, in face order. Protection must consider all of them: a
+     * plain sign on an earlier face used to hide the portal's stamped sign (#2127).
+     */
+    public static java.util.List<Block> findSignsOnAnchor(Block anchor) {
+        java.util.List<Block> signs = new java.util.ArrayList<>();
+        BlockFace[] faces = {
+                BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST,
+                BlockFace.WEST, BlockFace.UP, BlockFace.DOWN
+        };
+        for (BlockFace face : faces) {
+            Block candidate = anchor.getRelative(face);
+            if (!(candidate.getState() instanceof Sign)) continue;
+            Block mount = resolveMountBlock(candidate);
+            if (mount != null && mount.equals(anchor)) signs.add(candidate);
+        }
+        return signs;
+    }
+
     public static Optional<Block> findSignOnAnchor(Block anchor, NamespacedKey key, String portalId) {
         BlockFace[] faces = {
                 BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST,
