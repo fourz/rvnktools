@@ -62,6 +62,8 @@ public class PlayerTrackingListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        // Read on the main thread; the saves below complete on database threads
+        final long firstPlayed = player.getFirstPlayed();
         
         // Record session start time for playtime tracking
         sessionStartTimes.put(player.getUniqueId(), System.currentTimeMillis());
@@ -79,7 +81,8 @@ public class PlayerTrackingListener implements Listener {
                         PlayerDTO newPlayer = new PlayerDTO.Builder()
                             .id(player.getUniqueId())
                             .currentName(player.getName())
-                            .firstJoin(new Timestamp(System.currentTimeMillis()))
+                            // Bukkit's first-played predates RVNKCore tracking for older accounts
+                            .firstJoin(new Timestamp(firstPlayed > 0 ? firstPlayed : System.currentTimeMillis()))
                             .lastSeen(new Timestamp(System.currentTimeMillis()))
                             .currentWorld(player.getWorld() != null ? player.getWorld().getName() : "unknown")
                             .timesJoined(1)
@@ -99,7 +102,12 @@ public class PlayerTrackingListener implements Listener {
                         
                         return playerService.savePlayer(playerDTO).thenApply((saved) -> (Void) null);
                     }
-                });
+                })
+                // Restore the real first join where the stored one is later (#2125)
+                .thenCompose(v -> firstPlayed > 0
+                    ? playerService.correctFirstJoin(player.getUniqueId(), new Timestamp(firstPlayed))
+                        .thenApply(changed -> (Void) null)
+                    : CompletableFuture.completedFuture((Void) null));
                 
             // Track per-world data separately
             org.bukkit.World joinWorld = player.getWorld();

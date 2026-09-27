@@ -38,6 +38,16 @@ public interface PlayerService {
      * @since 1.0.0
      */
     CompletableFuture<Optional<PlayerDTO>> getPlayerByName(String playerName);
+
+    /**
+     * Moves a player's first-join time earlier, never later - e.g. to Bukkit's first-played record.
+     *
+     * @return 1 when the stored value was corrected, 0 otherwise
+     * @since 1.5.93-alpha
+     */
+    default CompletableFuture<Integer> correctFirstJoin(UUID playerId, java.sql.Timestamp firstJoin) {
+        return CompletableFuture.completedFuture(0);
+    }
     
     /**
      * Saves or updates player information.

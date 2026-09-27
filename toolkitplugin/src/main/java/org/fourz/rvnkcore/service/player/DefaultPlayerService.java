@@ -54,6 +54,14 @@ public class DefaultPlayerService implements PlayerService {
     }
     
     @Override
+    public CompletableFuture<Integer> correctFirstJoin(UUID playerId, java.sql.Timestamp firstJoin) {
+        if (playerId == null || firstJoin == null || firstJoin.getTime() <= 0) {
+            return CompletableFuture.completedFuture(0);
+        }
+        return playerRepository.correctFirstJoinIfEarlier(playerId, firstJoin);
+    }
+
+    @Override
     public CompletableFuture<Optional<PlayerDTO>> getPlayerByName(String playerName) {
         logger.debug("Retrieving player data for name: " + playerName);
         return playerRepository.findByCurrentName(playerName)

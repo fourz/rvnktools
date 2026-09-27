@@ -546,6 +546,28 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * @param playerName The current name of the player
      * @return CompletableFuture containing the player if found
      */
+    /**
+     * Moves a player's {@code first_join} earlier, never later (#2125). Used to restore the real
+     * date from Bukkit's first-played record after MariaDB's implicit ON UPDATE overwrote it.
+     *
+     * @return rows changed: 1 when corrected, 0 when the stored value was already as early
+     */
+    public CompletableFuture<Integer> correctFirstJoinIfEarlier(UUID playerId, java.sql.Timestamp firstJoin) {
+        return CompletableFuture.supplyAsync(() -> {
+            String query = "UPDATE " + tableName + " SET first_join = ? WHERE id = ? AND first_join > ?";
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement(query)) {
+                stmt.setTimestamp(1, firstJoin);
+                stmt.setString(2, playerId.toString());
+                stmt.setTimestamp(3, firstJoin);
+                return stmt.executeUpdate();
+            } catch (SQLException e) {
+                logger.warning("Failed to correct first_join for " + playerId + ": " + e.getMessage());
+                return 0;
+            }
+        });
+    }
+
     public CompletableFuture<Optional<PlayerDTO>> findByCurrentName(String playerName) {
         return CompletableFuture.supplyAsync(() -> {
             // Create a new QueryBuilder instance for thread safety
