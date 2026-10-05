@@ -125,9 +125,19 @@ Registered in ServiceRegistry by `CoreServiceFactory`:
 
 ### Service Framework
 
+`ServiceRegistry` is an **instance** owned by RVNKCore, not a static API — there is no
+`ServiceRegistry.register(...)` / `ServiceRegistry.get(...)`.
+
 ```java
-ServiceRegistry.register(MyService.class, new MyServiceImpl());
-MyService service = ServiceRegistry.get(MyService.class);
+// Register (inside RVNKCore, or a plugin holding the core instance)
+RVNKCore.getInstance().getServiceRegistry()
+        .registerService(MyService.class, new MyServiceImpl());
+
+// Hard dependency: throws if RVNKCore is not initialised
+MyService service = RVNKCore.getInstance().getService(MyService.class);
+
+// Soft dependency: returns null when RVNKCore or the service is absent
+MyService maybe = RVNKCore.getServiceSafe(MyService.class);
 ```
 
 ### Async Operations
