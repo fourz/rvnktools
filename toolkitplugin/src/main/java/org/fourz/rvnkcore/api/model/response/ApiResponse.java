@@ -83,6 +83,27 @@ public record ApiResponse<T>(
     }
 
     /**
+     * Creates a 400 validation-failure response carrying structured field errors (since 1.5.96).
+     *
+     * <p>JSON: {@code error.code = "VALIDATION_FAILED"}, {@code error.fieldErrors = [{field, message}]},
+     * and {@code error.details} repeats each one as {@code "field: message"} so a client that only
+     * reads {@code details} still sees the reasons.</p>
+     *
+     * @param fieldErrors One entry per failing field; must not be empty
+     */
+    public static <T> ApiResponse<T> validationError(List<FieldError> fieldErrors) {
+        List<String> details = fieldErrors.stream().map(FieldError::asDetail).toList();
+        String message = fieldErrors.size() == 1
+            ? "Validation failed: " + details.get(0)
+            : "Validation failed for " + fieldErrors.size() + " fields";
+        return new ApiResponse<>(false, null,
+            new ApiError(VALIDATION_FAILED, message, details, fieldErrors), ApiMeta.create());
+    }
+
+    /** Error code used by {@link #validationError(List)}. Maps to HTTP 400. */
+    public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
+
+    /**
      * Creates a generic error response. Uses {@code "ERROR"} as the error code.
      * Prefer {@link #error(String, String)} when a specific code is available.
      *

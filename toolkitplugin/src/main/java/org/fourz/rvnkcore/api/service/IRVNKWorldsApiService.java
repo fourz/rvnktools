@@ -1,7 +1,15 @@
 package org.fourz.rvnkcore.api.service;
 
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.worlds.CreateWorldV2Request;
+import org.fourz.rvnkcore.api.model.worlds.GeneratorInfoDTO;
+import org.fourz.rvnkcore.api.model.worlds.JobDTO;
+import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
+import org.fourz.rvnkcore.api.model.worlds.PreviewDTO;
+import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.WorldGenSettingsDTO;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -133,5 +141,121 @@ public interface IRVNKWorldsApiService {
     default CompletableFuture<ApiResponse<?>> scatterProbe(String query) {
         return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED",
             "This RVNKWorlds build does not support the scatter probe (needs 1.6.143+)"));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // World Forge (#2196 / #2200) — generators, presets, create v2, jobs, preview, gen-settings
+    // ---------------------------------------------------------------------------------------------
+    //
+    // Every method is a default returning NOT_SUPPORTED, which RVNKWorldsController maps to 501.
+    // An RVNKWorlds built against an older core (<= 1.6.207) therefore keeps loading and serving its
+    // existing routes; it only lacks these. Implemented by RVNKWorlds 1.6.208+.
+    //
+    // Error codes the controller maps: NOT_FOUND -> 404, CONFLICT -> 409, VALIDATION_FAILED -> 400
+    // (build it with ApiResponse.validationError(List<FieldError>)), NOT_SUPPORTED -> 501.
+    // Futures are awaited for up to 30 s; return quickly and push slow work into a job.
+
+    /** Message used by every World Forge default. */
+    String WORLD_FORGE_NOT_SUPPORTED = "This RVNKWorlds build does not support World Forge (needs 1.6.208+)";
+
+    /**
+     * {@code GET /rvnkworlds/generators} — every generator a v2 create accepts, with its schema.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<List<GeneratorInfoDTO>>> listGenerators() {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/generators/{id}} — one generator; {@code NOT_FOUND} if unknown.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<GeneratorInfoDTO>> getGenerator(String generatorId) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/presets[?generator=]} — built-in and custom presets.
+     *
+     * @param generatorFilter generator id to filter by, or {@code null} for all
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<List<PresetDTO>>> listPresets(String generatorFilter) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/presets/{name}} — one preset; {@code NOT_FOUND} if unknown.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<PresetDTO>> getPreset(String name) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code POST /rvnkworlds/presets} — create or replace a custom preset; returns the stored preset.
+     *
+     * <p>Core has already checked {@code name} and {@code generator} are non-blank and
+     * {@code settings} is an object, and has forced {@code builtIn=false}, {@code createdAt=null}.
+     * The implementation validates the settings against the generator schema
+     * ({@code VALIDATION_FAILED} with field paths like {@code settings.seaLevel}) and returns
+     * {@code CONFLICT} when {@code name} collides with a built-in.</p>
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<PresetDTO>> savePreset(PresetDTO preset) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code DELETE /rvnkworlds/presets/{name}} — removes a custom preset and returns it.
+     * {@code NOT_FOUND} if unknown; {@code CONFLICT} for a built-in.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<PresetDTO>> deletePreset(String name) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * v2 {@code POST /rvnkworlds/worlds} — validate, then queue a world creation and return its job.
+     * The controller answers HTTP 202 with a {@code Location: .../jobs/{id}} header on success.
+     *
+     * <p>The implementation must not block the calling thread on world generation: validate,
+     * enqueue, and return the {@link JobDTO} in {@code QUEUED} state. {@code CONFLICT} if the world
+     * exists; {@code VALIDATION_FAILED} for a bad name, unknown generator/preset or bad settings.</p>
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<JobDTO>> createWorldV2(CreateWorldV2Request request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/jobs/{id}} — job status; {@code NOT_FOUND} if unknown or expired.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<JobDTO>> getJob(String jobId) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code POST /rvnkworlds/preview} — sample terrain heights/biomes without generating chunks.
+     *
+     * <p><b>Threading:</b> the controller calls this on its own bounded preview worker pool, never
+     * on the Bukkit main thread and never on a Jetty request thread. The implementation must do
+     * the sampling on the calling thread (or its own executor) and must <b>not</b> hop to the main
+     * thread — a 256x256 sample run there would stall the server tick. Geometry, caps and defaults
+     * are already applied; see {@link PreviewRequest}.</p>
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<PreviewDTO>> previewTerrain(PreviewRequest request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/worlds/{name}/gen-settings} — the world's frozen generation snapshot.
+     * {@code NOT_FOUND} if the world is unknown or has no snapshot.
+     * @since 1.5.96
+     */
+    default CompletableFuture<ApiResponse<WorldGenSettingsDTO>> getWorldGenSettings(String worldName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
     }
 }
