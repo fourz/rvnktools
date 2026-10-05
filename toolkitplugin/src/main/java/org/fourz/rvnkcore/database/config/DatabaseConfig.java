@@ -20,7 +20,10 @@ public class DatabaseConfig {
     private boolean useSSL = true;
     private String connectionParameters;
     
-    // Connection Pool Settings
+    // Connection Pool Settings (MySQL/HikariCP only - SQLite is unpooled, #1590).
+    // These differ from ConfigLoader's database.mysql.pool.* defaults; they only reach
+    // ConnectionProviderFactory, since every plugin builder sets pool values explicitly.
+    // Not raised to match: minIdle > 0 goes stale on cross-host MySQL (#1822).
     private int maxConnections = 10;
     private int minIdleConnections = 2;
     private long connectionTimeoutMs = 30000;

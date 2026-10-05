@@ -93,7 +93,9 @@ public class ApiServerInitializer {
             logger.debug("  + WorldService retrieved");
 
             // Create AuthTokenStore and register as a service (used by LinkCommand + AuthController)
-            AuthTokenStore authTokenStore = new AuthTokenStore(plugin);
+            // link.login-ttl-minutes is read here once; LinkCommand reads it back from the store (#1598)
+            AuthTokenStore authTokenStore = new AuthTokenStore(plugin, plugin.getConfig().getLong(
+                    "link.login-ttl-minutes", AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES));
             registry.registerService(AuthTokenStore.class, authTokenStore);
             logger.debug("  + AuthTokenStore created and registered");
 

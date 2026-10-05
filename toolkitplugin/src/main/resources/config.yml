@@ -26,15 +26,10 @@ database:
     recheckSeconds: 60
 
   # SQLite Configuration (default)
+  # SQLite is deliberately unpooled: one connection per call, WAL journal mode. There are no
+  # pool settings for it - an old "pool:" block under sqlite in an existing config.yml is ignored (#1590).
   sqlite:
     file: rvnkcore.db
-    pool:
-      maxConnections: 5
-      minIdleConnections: 1
-      connectionTimeoutMs: 30000
-      idleTimeoutMs: 600000
-      maxLifetimeMs: 1800000
-      leakDetectionMs: 0
 
   # MySQL Configuration
   mysql:

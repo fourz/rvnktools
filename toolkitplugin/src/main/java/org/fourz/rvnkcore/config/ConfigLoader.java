@@ -467,13 +467,8 @@ public class ConfigLoader {
         return DatabaseConfig.builder()
             .type("sqlite")
             .database(coreConfig.getString("database.sqlite.file", "rvnkcore.db"))
-            // Connection Pool Configuration (SQLite defaults: small pool, leak detection disabled)
-            .maxConnections(coreConfig.getInt("database.sqlite.pool.maxConnections", 5))
-            .minIdleConnections(coreConfig.getInt("database.sqlite.pool.minIdleConnections", 1))
-            .connectionTimeoutMs(coreConfig.getLong("database.sqlite.pool.connectionTimeoutMs", 30000L))
-            .idleTimeoutMs(coreConfig.getLong("database.sqlite.pool.idleTimeoutMs", 600000L))
-            .maxLifetimeMs(coreConfig.getLong("database.sqlite.pool.maxLifetimeMs", 1800000L))
-            .leakDetectionMs(coreConfig.getLong("database.sqlite.pool.leakDetectionMs", 0L))
+            // No pool settings: SQLite is deliberately unpooled (SQLiteConnectionProvider opens a
+            // connection per call, WAL mode). The old SQLite pool keys were never read (#1590).
             .build();
     }
 
