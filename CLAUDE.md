@@ -74,6 +74,9 @@ org.fourz.rvnkcore
 ├── init/                # CoreServiceFactory, BundledComponentInitializer
 ├── service/
 │   ├── announcement/    # DefaultAnnouncementService
+│   ├── npc/             # NPC bridge: NpcBridge, NpcKeys, UnavailableNpcService (#2213)
+│   │   ├── citizens/    # Citizens adapter - loaded ONLY when Citizens is enabled
+│   │   └── papi/        # %rvnknpc_*% - loaded ONLY when PlaceholderAPI is enabled
 │   └── registry/        # ServiceRegistry, DefaultServiceRegistry
 ├── validation/          # Validator, ValidationResult
 └── util/log/            # LogManager
@@ -139,6 +142,41 @@ MyService service = RVNKCore.getInstance().getService(MyService.class);
 // Soft dependency: returns null when RVNKCore or the service is absent
 MyService maybe = RVNKCore.getServiceSafe(MyService.class);
 ```
+
+### NPC bridge (#2213, since 1.5.99-alpha)
+
+RVNKCore owns the NPC contract; Citizens sits behind it. Consumers (RVNKQuests, RVNKEvents) depend
+only on `INpcService` and `RvnkNpcInteractEvent` and reference an NPC by its **RVNK key**, never by a
+Citizens id. Keys are lower-case `[a-z0-9_-]{1,48}`, unique per server, and staff set them with
+`/rvnk npc tag <key> [npcId]` (perms `rvnkcore.npc.*`).
+
+```java
+// Listen: fired on the main thread, only for NPCs that carry a key. Cancellable - a cancel also
+// cancels the Citizens click (right-click interaction and the NPC's /npc command actions).
+@EventHandler(ignoreCancelled = true)
+public void onNpc(RvnkNpcInteractEvent event) {
+    if (event.getClickType() == RvnkNpcInteractEvent.ClickType.RIGHT
+            && event.getNpcKey().equals("harbour_master")) {
+        Player player = event.getPlayer();
+        // advance a TALK_TO objective ...
+    }
+}
+
+// Query: always registered. Without Citizens it is an "unavailable" stand-in that returns empty
+// and never throws, so check isAvailable() instead of null.
+INpcService npcs = RVNKCore.getServiceSafe(INpcService.class);
+if (npcs != null && npcs.isAvailable()) {
+    npcs.findByKey("harbour_master").ifPresent(ref -> ref.getLocation());
+}
+```
+
+- **Classloading guard**: every Citizens class is in `service/npc/citizens/`, every PlaceholderAPI
+  class in `service/npc/papi/`. `NpcBridge` reaches them only after `isPluginEnabled(...)` is true.
+  Never import either package from anywhere else — `NpcBridgeClassLoadingTest` fails if you do.
+- **Persistence**: the key is Citizens persistent metadata `rvnk-key` in each server's `saves.yml`.
+- **Placeholders** (registered only when PlaceholderAPI is enabled): `%rvnknpc_last_key%`,
+  `%rvnknpc_last_name%`, `%rvnknpc_last_ago_seconds%` (`""` / `""` / `-1` when none). In memory,
+  bounded to 1024 players, empty after a restart.
 
 ### Async Operations
 

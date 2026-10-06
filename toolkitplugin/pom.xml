@@ -5,7 +5,7 @@
 
     <groupId>org.fourz</groupId>
     <artifactId>rvnkcore</artifactId>
-    <version>1.5.98-alpha</version>
+    <version>1.5.99-alpha</version>
 
     <name>RVNKCore</name>
     <description>Core unified library for Ravenkraft Minecraft plugins - provides ServiceRegistry, database abstraction, REST API, and shared services</description>
@@ -43,6 +43,11 @@
         <repository>
             <id>onarandombox-repo</id>
             <url>https://repo.onarandombox.com/content/groups/public/</url>
+        </repository>
+        <!-- Citizens2 (NPC bridge adapter, #2213) -->
+        <repository>
+            <id>citizens-repo</id>
+            <url>https://maven.citizensnpcs.co/repo</url>
         </repository>
     </repositories>
 
@@ -143,6 +148,25 @@
             <artifactId>Multiverse-Core</artifactId>
             <version>4.3.1</version>
             <scope>provided</scope>
+        </dependency>
+        <!--
+          Citizens2 for the NPC bridge adapter (#2213). provided: the server supplies it, and it is a
+          softdepend, so every Citizens class lives in org.fourz.rvnkcore.service.npc.citizens and
+          loads only when Citizens is enabled. All transitive dependencies are excluded, as RVNKLore
+          does for 2.0.34: citizens-main drags in paper-api, packetevents, adventure and others that
+          would clash with spigot-api on the compile classpath and must never reach the shade.
+        -->
+        <dependency>
+            <groupId>net.citizensnpcs</groupId>
+            <artifactId>citizens-main</artifactId>
+            <version>2.0.44-SNAPSHOT</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- jsoup for HTML sanitization (TipTap body_html cleaning) -->
         <dependency>

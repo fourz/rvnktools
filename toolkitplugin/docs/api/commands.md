@@ -39,6 +39,7 @@ RVNKTools is the RVNKCore toolkit plugin providing teleportation, messaging, ann
 | `/rvnktools <subcommand>` | Plugin admin command | `rvnktools.command` |
 | `/rvnkcore <subcommand>` | RVNKCore diagnostics | `rvnktools.admin.test` |
 | `/pstest <subcommand>` | PlayerService test utilities | `rvnktools.admin.pstest` |
+| `/rvnk npc <tag\|untag\|list\|info>` | Tag Citizens NPCs with an RVNK key | `rvnkcore.npc.*` |
 
 ---
 
@@ -513,6 +514,30 @@ Test harness for `PlayerService`. Used for verifying database operations and Luc
 
 ---
 
+### /rvnk npc
+
+NPC bridge staff tooling (#2213, since 1.5.99-alpha). Attaches an **RVNK key** to a Citizens NPC so
+quests and events can reference the NPC by key. Keys are lower-case `a-z 0-9 _ -`, 1-48 characters,
+unique per server. Input is lower-cased. The key is stored in the NPC's Citizens data (`saves.yml`),
+so it survives restarts.
+
+**Usage**: `/rvnk npc <tag|untag|list|info> [args]`
+
+**Console**: Yes, every verb. `tag` from the console needs the NPC id.
+
+**Without Citizens**: every verb answers "NPC bridge unavailable" and changes nothing.
+
+| Subcommand | Permission | Description |
+|------------|------------|-------------|
+| `tag <key> [npcId]` | `rvnkcore.npc.tag` | Tag the NPC. Without `npcId`, uses the sender's `/npc sel` selection. Replaces a different key on the same NPC. Refuses a key another NPC carries. |
+| `untag <key>` | `rvnkcore.npc.untag` | Remove the key from its NPC |
+| `list` | `rvnkcore.npc.list` | All keys, with NPC id, name and world |
+| `info <key>` | `rvnkcore.npc.info` | One keyed NPC: name, Citizens id, spawned, location |
+
+Examples: `/rvnk npc tag harbour_master 12`, `/rvnk npc info harbour_master`, `/rvnk help npc`.
+
+---
+
 ## Permission Nodes
 
 ### Teleportation
@@ -576,6 +601,16 @@ Test harness for `PlayerService`. Used for verifying database operations and Luc
 | `rvnktools.admin.pstest` | `/pstest` utilities |
 | `rvnktools.links.reload` | Reload links config |
 | `rvnktools.cycle.reload` | Reload cycle commands |
+
+### NPC Bridge
+
+| Permission | Purpose |
+|-----------|---------|
+| `rvnkcore.npc.*` | All NPC bridge permissions (wildcard, default op) |
+| `rvnkcore.npc.tag` | `/rvnk npc tag` |
+| `rvnkcore.npc.untag` | `/rvnk npc untag` |
+| `rvnkcore.npc.list` | `/rvnk npc list` |
+| `rvnkcore.npc.info` | `/rvnk npc info` |
 
 ---
 

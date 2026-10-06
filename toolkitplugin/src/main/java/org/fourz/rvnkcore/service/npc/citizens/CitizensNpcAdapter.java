@@ -1,0 +1,45 @@
+package org.fourz.rvnkcore.service.npc.citizens;
+
+import net.citizensnpcs.api.CitizensAPI;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.api.service.INpcService;
+import org.fourz.rvnkcore.service.npc.NpcInteractionTracker;
+import org.fourz.rvnkcore.util.log.LogManager;
+
+/**
+ * Entry point into the Citizens adapter (#2213).
+ *
+ * <p>Only {@link org.fourz.rvnkcore.service.npc.NpcBridge} calls this, and only after
+ * {@code isPluginEnabled("Citizens")} returned true. The signature names no Citizens type, so the
+ * caller can be verified and loaded without Citizens on the classpath.</p>
+ *
+ * @since 1.5.99-alpha
+ */
+public final class CitizensNpcAdapter {
+
+    private CitizensNpcAdapter() {
+    }
+
+    /**
+     * Builds the Citizens-backed service and registers the click listener.
+     *
+     * @param plugin  RVNKCore, which owns the listener
+     * @param tracker the shared last-interaction tracker
+     * @param logger  RVNKCore's logger
+     * @return the service
+     */
+    public static INpcService start(Plugin plugin, NpcInteractionTracker tracker, LogManager logger) {
+        CitizensNpcService service = new CitizensNpcService(
+                CitizensAPI::getNPCRegistry,
+                CitizensAPI::getDefaultNPCSelector,
+                CitizensAPI::hasImplementation,
+                tracker,
+                logger::warning);
+
+        CitizensNpcListener listener = new CitizensNpcListener(
+                tracker, event -> Bukkit.getPluginManager().callEvent(event), logger::debug);
+        Bukkit.getPluginManager().registerEvents(listener, plugin);
+        return service;
+    }
+}

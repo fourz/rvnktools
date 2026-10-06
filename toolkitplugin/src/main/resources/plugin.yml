@@ -5,7 +5,7 @@ main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
 api-version: '26.1'
 website: http://www.fourz.org
-softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault]
+softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault, Citizens]
 
 commands:
   rvnktools:
@@ -135,6 +135,9 @@ commands:
       /<command> <plugin> reset - Reset to defaults
     aliases: [prefs, preferences]
     permission: rvnkcore.prefs
+  rvnk:
+    description: RVNK network tools - NPC bridge (tag Citizens NPCs with an RVNK key)
+    usage: /rvnk npc <tag|untag|list|info> [args]
 
 permissions:
   rvnktools.command:
@@ -346,3 +349,25 @@ permissions:
       rvnkcore.portal.delete: true
       rvnkcore.portal.use: true
       rvnkcore.portal.admin: true
+
+  # ── NPC bridge (rvnkcore.npc.*) — /rvnk npc (#2213) ─────────────────────
+  rvnkcore.npc.tag:
+    description: Allows tagging a Citizens NPC with an RVNK key (/rvnk npc tag)
+    default: op
+  rvnkcore.npc.untag:
+    description: Allows removing an RVNK key from an NPC (/rvnk npc untag)
+    default: op
+  rvnkcore.npc.list:
+    description: Allows listing RVNK-keyed NPCs (/rvnk npc list)
+    default: op
+  rvnkcore.npc.info:
+    description: Allows showing one RVNK-keyed NPC (/rvnk npc info)
+    default: op
+  rvnkcore.npc.*:
+    description: All NPC bridge permissions
+    default: op
+    children:
+      rvnkcore.npc.tag: true
+      rvnkcore.npc.untag: true
+      rvnkcore.npc.list: true
+      rvnkcore.npc.info: true
