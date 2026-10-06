@@ -235,6 +235,10 @@ These endpoints support WorldSwap plugin integration:
 
 #### WorldDTO
 
+> **`seed` is hidden by default (1.5.98).** `/api/v1/worlds` responses carry no `seed` field
+> unless `api.worlds.exposeSeed: true` is set in RVNKCore's `config.yml`. A missing key means
+> false. A seed lets a player find structures and ores off-map.
+
 ```json
 {
   "worldName": "world",
