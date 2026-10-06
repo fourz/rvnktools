@@ -1,6 +1,9 @@
 package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.model.PlayerWorldDataDTO;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
@@ -20,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 /**
@@ -29,17 +33,43 @@ import java.util.stream.Collectors;
  * @since 1.0.0
  */
 public class WorldController extends HttpServlet {
-    
+
+    /**
+     * Config key that lets {@code /api/v1/worlds} responses carry the world seed.
+     * Missing key means {@code false}: a seed lets a player find structures and ores off-map.
+     *
+     * @since 1.5.98
+     */
+    public static final String EXPOSE_SEED_KEY = "api.worlds.exposeSeed";
+
+    /** JSON field name of {@link org.fourz.rvnkcore.api.dto.WorldDTO#getSeed()}. */
+    static final String SEED_FIELD = "seed";
+
     private final WorldService worldService;
     private final PlayerWorldService playerWorldService;
     private final Gson gson;
     private final LogManager logger;
+    private final BooleanSupplier exposeSeed;
 
+    /**
+     * Creates a controller that never exposes world seeds.
+     */
     public WorldController(WorldService worldService, PlayerWorldService playerWorldService, Gson gson, LogManager logger) {
+        this(worldService, playerWorldService, gson, logger, () -> false);
+    }
+
+    /**
+     * @param exposeSeed read on every response, so a config reload applies without a restart;
+     *                   {@code false} strips the {@code seed} field from every world payload
+     * @since 1.5.98
+     */
+    public WorldController(WorldService worldService, PlayerWorldService playerWorldService, Gson gson,
+                           LogManager logger, BooleanSupplier exposeSeed) {
         this.worldService = worldService;
         this.playerWorldService = playerWorldService;
         this.gson = gson;
         this.logger = logger;
+        this.exposeSeed = exposeSeed != null ? exposeSeed : () -> false;
     }
 
     @Override
@@ -268,7 +298,47 @@ public class WorldController extends HttpServlet {
     }
 
     private void sendResponse(HttpServletResponse response, Object data) {
-        ApiUtils.sendSuccess(response, gson, data);
+        ApiUtils.sendSuccess(response, gson, applySeedPolicy(data));
+    }
+
+    /**
+     * Strips the world seed at the API boundary unless {@link #EXPOSE_SEED_KEY} is true.
+     * The service and its DTOs keep the seed for internal callers; only the JSON loses it.
+     */
+    Object applySeedPolicy(Object data) {
+        if (data == null || seedExposed()) {
+            return data;
+        }
+        JsonElement tree = gson.toJsonTree(data);
+        stripSeed(tree);
+        return tree;
+    }
+
+    private boolean seedExposed() {
+        try {
+            return exposeSeed.getAsBoolean();
+        } catch (RuntimeException e) {
+            logger.warning("Could not read " + EXPOSE_SEED_KEY + "; hiding world seeds: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void stripSeed(JsonElement element) {
+        if (element == null) {
+            return;
+        }
+        if (element.isJsonObject()) {
+            JsonObject obj = element.getAsJsonObject();
+            obj.remove(SEED_FIELD);
+            for (var entry : obj.entrySet()) {
+                stripSeed(entry.getValue());
+            }
+        } else if (element.isJsonArray()) {
+            JsonArray arr = element.getAsJsonArray();
+            for (JsonElement child : arr) {
+                stripSeed(child);
+            }
+        }
     }
 
     private void sendErrorResponse(HttpServletResponse response, int statusCode, String message) {
