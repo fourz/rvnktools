@@ -321,6 +321,33 @@ class RVNKWorldsControllerTest {
         }
 
         @Test
+        @DisplayName("gen-settings with no seed omits the key and keeps the 1.5.96 JSON (#2209)")
+        void genSettingsNoSeedIsUnchanged() throws Exception {
+            Result r = get(controller(new ForgeService()), "/worlds/isles/gen-settings");
+            assertFalse(r.body().getAsJsonObject("data").has("seed"));
+            assertFalse(r.raw().contains("\"seed\""));
+            // The 1.5.96 DTO had exactly these four keys; a null seed must not add a fifth.
+            assertEquals(List.of("world", "generator", "schemaVersion", "settings"),
+                new ArrayList<>(r.body().getAsJsonObject("data").keySet()));
+        }
+
+        @Test
+        @DisplayName("gen-settings with a seed serializes it as an exact int64 (#2209)")
+        void genSettingsWithSeed() throws Exception {
+            long seed = -4962768465676381896L;
+            ForgeService seeded = new ForgeService() {
+                @Override public CompletableFuture<ApiResponse<WorldGenSettingsDTO>> getWorldGenSettings(String w) {
+                    return done(ApiResponse.success(
+                        new WorldGenSettingsDTO(w, "archipelago", 1, Map.of("seaLevel", 63L), seed)));
+                }
+            };
+            Result r = get(controller(seeded), "/worlds/isles/gen-settings");
+            assertEquals(200, r.status());
+            assertTrue(r.raw().contains("\"seed\": -4962768465676381896"), r.raw());
+            assertEquals(seed, r.body().getAsJsonObject("data").get("seed").getAsLong());
+        }
+
+        @Test
         @DisplayName("existing GET /worlds/{name} still routes to getWorld")
         void legacyGetWorld() throws Exception {
             Result r = get(controller(new ForgeService()), "/worlds/isles");
