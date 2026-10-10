@@ -293,7 +293,11 @@ public class ServletFactory {
         try {
             LogManager controllerLogger = LogManager.getInstance(plugin, RVNKWorldsController.class);
             RVNKWorldsController controller = new RVNKWorldsController(null, gson, controllerLogger);
-            context.addServlet(new ServletHolder(controller), "/rvnkworlds/*");
+            ServletHolder holder = new ServletHolder(controller);
+            // The control-plane routes answer from an async response (#2218). An embedded holder is
+            // async-capable by default; set it so a later change of holder source cannot turn it off.
+            holder.setAsyncSupported(true);
+            context.addServlet(holder, "/rvnkworlds/*");
             logger.debug("RVNKWorlds API controller registered at /rvnkworlds/* (service resolved lazily)");
         } catch (Throwable e) {
             logger.warning("RVNKWorlds API controller not registered: " + e.getClass().getName() + ": " + e.getMessage());

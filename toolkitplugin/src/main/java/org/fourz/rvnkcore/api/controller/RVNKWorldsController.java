@@ -3,14 +3,21 @@ package org.fourz.rvnkcore.api.controller;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.worlds.CreateGroupRequest;
+import org.fourz.rvnkcore.api.model.worlds.CreateSkyStackRequest;
 import org.fourz.rvnkcore.api.model.worlds.CreateWorldV2Request;
+import org.fourz.rvnkcore.api.model.worlds.GroupWorldRequest;
 import org.fourz.rvnkcore.api.model.worlds.JobDTO;
 import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackSettingsRequest;
 import org.fourz.rvnkcore.api.ratelimit.RateLimiter;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
@@ -31,7 +38,10 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -55,6 +65,24 @@ import java.util.regex.Pattern;
  * GET    /jobs/{id}                  getJob(id)
  * POST   /preview                    previewTerrain(PreviewRequest)   429 rate limit, 503 busy
  * GET    /worlds/{name}/gen-settings getWorldGenSettings(name)
+ * </pre>
+ *
+ * <p><b>Control plane routes (#2218, since 1.5.103)</b> - every one is answered asynchronously
+ * ({@link #dispatchAsync}): the Jetty thread returns at once and the response is written when the
+ * service future completes, so no request thread waits on the server thread (#1552).</p>
+ * <pre>
+ * POST   /groups                     createGroup(CreateGroupRequest)    201
+ * POST   /groups/{name}/worlds       addWorldToGroup(name, GroupWorldRequest)
+ * DELETE /groups/{name}/worlds/{w}   removeWorldFromGroup(name, w)
+ * PUT    /groups/{name}/default      setDefaultGroup(name)
+ * PUT    /groups/{name}/permission   setGroupPermission(name, bool)
+ * DELETE /groups/{name}              deleteGroup(name)                 409 default group / players inside
+ * GET    /skystacks                  listSkyStacks()
+ * GET    /skystacks/{group}          getSkyStack(group)
+ * GET    /skystack-templates         listSkyStackTemplates()
+ * POST   /skystacks                  createSkyStack(...)               202 + Location: jobs/{id}
+ * PUT    /skystacks/{group}          updateSkyStack(group, ...)
+ * DELETE /skystacks/{group}          deleteSkyStack(group)             config only, never world folders
  * </pre>
  *
  * <p>Status mapping: success 200 (202 for v2 create); otherwise {@code NOT_SUPPORTED} and
@@ -112,6 +140,14 @@ public class RVNKWorldsController extends HttpServlet {
     private static final Pattern JOB_PATTERN = Pattern.compile("^/jobs/([^/]+)/?$");
     private static final Pattern PREVIEW_PATTERN = Pattern.compile("^/preview/?$");
     private static final Pattern WORLD_GEN_SETTINGS_PATTERN = Pattern.compile("^/worlds/([^/]+)/gen-settings/?$");
+    // ── Control plane (#2218) ──
+    private static final Pattern GROUP_WORLDS_PATTERN = Pattern.compile("^/groups/([^/]+)/worlds/?$");
+    private static final Pattern GROUP_WORLD_PATTERN = Pattern.compile("^/groups/([^/]+)/worlds/([^/]+)/?$");
+    private static final Pattern GROUP_DEFAULT_PATTERN = Pattern.compile("^/groups/([^/]+)/default/?$");
+    private static final Pattern GROUP_PERMISSION_PATTERN = Pattern.compile("^/groups/([^/]+)/permission/?$");
+    private static final Pattern SKYSTACKS_PATTERN = Pattern.compile("^/skystacks/?$");
+    private static final Pattern SKYSTACK_NAME_PATTERN = Pattern.compile("^/skystacks/([^/]+)/?$");
+    private static final Pattern SKYSTACK_TEMPLATES_PATTERN = Pattern.compile("^/skystack-templates/?$");
 
     public RVNKWorldsController(IRVNKWorldsApiService ignored, Gson gson, LogManager logger) {
         this(RVNKWorldsController::resolveFromRegistry, gson, logger,
@@ -224,6 +260,15 @@ public class RVNKWorldsController extends HttpServlet {
                 future = apiService.getJob(matcher.group(1));
             } else if ((matcher = WORLD_GEN_SETTINGS_PATTERN.matcher(pathInfo)).matches()) {
                 future = apiService.getWorldGenSettings(matcher.group(1));
+            } else if (SKYSTACKS_PATTERN.matcher(pathInfo).matches()) {
+                dispatchAsync(req, resp, apiService.listSkyStacks(), 200, null);
+                return;
+            } else if ((matcher = SKYSTACK_NAME_PATTERN.matcher(pathInfo)).matches()) {
+                dispatchAsync(req, resp, apiService.getSkyStack(matcher.group(1)), 200, null);
+                return;
+            } else if (SKYSTACK_TEMPLATES_PATTERN.matcher(pathInfo).matches()) {
+                dispatchAsync(req, resp, apiService.listSkyStackTemplates(), 200, null);
+                return;
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;
@@ -286,6 +331,40 @@ public class RVNKWorldsController extends HttpServlet {
             } else if (TEMPLATES_PATTERN.matcher(pathInfo).matches()) {
                 String body = ApiUtils.readRequestBody(req);
                 future = apiService.createTemplate(body);
+            } else if (GROUPS_PATTERN.matcher(pathInfo).matches()) {
+                JsonObject obj = requireObject(req, resp);
+                if (obj == null) return;
+                WorldForgeRequests.Parsed<CreateGroupRequest> parsed = WorldForgeRequests.parseCreateGroup(obj);
+                if (!parsed.ok()) {
+                    sendApiResponse(resp, ApiResponse.validationError(parsed.errors()));
+                    return;
+                }
+                dispatchAsync(req, resp, apiService.createGroup(parsed.value()), 201, null);
+                return;
+            } else if ((matcher = GROUP_WORLDS_PATTERN.matcher(pathInfo)).matches()) {
+                JsonObject obj = requireObject(req, resp);
+                if (obj == null) return;
+                WorldForgeRequests.Parsed<GroupWorldRequest> parsed = WorldForgeRequests.parseGroupWorld(obj);
+                if (!parsed.ok()) {
+                    sendApiResponse(resp, ApiResponse.validationError(parsed.errors()));
+                    return;
+                }
+                dispatchAsync(req, resp, apiService.addWorldToGroup(matcher.group(1), parsed.value()), 200, null);
+                return;
+            } else if (SKYSTACKS_PATTERN.matcher(pathInfo).matches()) {
+                JsonObject obj = requireObject(req, resp);
+                if (obj == null) return;
+                WorldForgeRequests.Parsed<CreateSkyStackRequest> parsed = WorldForgeRequests.parseCreateSkyStack(obj);
+                if (!parsed.ok()) {
+                    sendApiResponse(resp, ApiResponse.validationError(parsed.errors()));
+                    return;
+                }
+                dispatchAsync(req, resp, apiService.createSkyStack(parsed.value()), 202, response -> {
+                    if (response.success() && response.data() instanceof JobDTO job && job.getId() != null) {
+                        resp.setHeader("Location", jobLocation(req, job.getId()));
+                    }
+                });
+                return;
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
                 return;
@@ -321,6 +400,12 @@ public class RVNKWorldsController extends HttpServlet {
                 sendApiResponse(resp, await(apiService.deleteWorld(worldName, deleteFiles)));
             } else if ((matcher = PRESET_NAME_PATTERN.matcher(pathInfo)).matches()) {
                 sendApiResponse(resp, await(apiService.deletePreset(matcher.group(1))));
+            } else if ((matcher = GROUP_WORLD_PATTERN.matcher(pathInfo)).matches()) {
+                dispatchAsync(req, resp, apiService.removeWorldFromGroup(matcher.group(1), matcher.group(2)), 200, null);
+            } else if ((matcher = GROUP_NAME_PATTERN.matcher(pathInfo)).matches()) {
+                dispatchAsync(req, resp, apiService.deleteGroup(matcher.group(1)), 200, null);
+            } else if ((matcher = SKYSTACK_NAME_PATTERN.matcher(pathInfo)).matches()) {
+                dispatchAsync(req, resp, apiService.deleteSkyStack(matcher.group(1)), 200, null);
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
             }
@@ -352,6 +437,26 @@ public class RVNKWorldsController extends HttpServlet {
                 ApiResponse<?> response = await(apiService.restoreWorldSnapshot(worldName, body));
                 // 202 Accepted for a successfully queued restore; other statuses use normal mapping
                 ApiUtils.sendJson(resp, gson, statusFor(response, 202), response);
+            } else if ((matcher = GROUP_DEFAULT_PATTERN.matcher(pathInfo)).matches()) {
+                dispatchAsync(req, resp, apiService.setDefaultGroup(matcher.group(1)), 200, null);
+            } else if ((matcher = GROUP_PERMISSION_PATTERN.matcher(pathInfo)).matches()) {
+                JsonObject obj = requireObject(req, resp);
+                if (obj == null) return;
+                WorldForgeRequests.Parsed<Boolean> parsed = WorldForgeRequests.parsePermission(obj);
+                if (!parsed.ok()) {
+                    sendApiResponse(resp, ApiResponse.validationError(parsed.errors()));
+                    return;
+                }
+                dispatchAsync(req, resp, apiService.setGroupPermission(matcher.group(1), parsed.value()), 200, null);
+            } else if ((matcher = SKYSTACK_NAME_PATTERN.matcher(pathInfo)).matches()) {
+                JsonObject obj = requireObject(req, resp);
+                if (obj == null) return;
+                WorldForgeRequests.Parsed<SkyStackSettingsRequest> parsed = WorldForgeRequests.parseSkyStackSettings(obj);
+                if (!parsed.ok()) {
+                    sendApiResponse(resp, ApiResponse.validationError(parsed.errors()));
+                    return;
+                }
+                dispatchAsync(req, resp, apiService.updateSkyStack(matcher.group(1), parsed.value()), 200, null);
             } else {
                 sendError(resp, 404, "NOT_FOUND", "Endpoint not found: " + pathInfo);
             }
@@ -445,6 +550,79 @@ public class RVNKWorldsController extends HttpServlet {
             }
         }
         return "ip:" + ApiUtils.getClientIP(req);
+    }
+
+    // ── control plane helpers (#2218) ────────────────────────────────────────────────────────
+
+    /** Reads the body as a JSON object; on failure sends 400 INVALID_REQUEST and returns null. */
+    private JsonObject requireObject(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        JsonObject obj = WorldForgeRequests.parseObject(ApiUtils.readRequestBody(req));
+        if (obj == null) {
+            sendError(resp, 400, "INVALID_REQUEST", "Request body must be a JSON object");
+        }
+        return obj;
+    }
+
+    /**
+     * Answers a request from a service future without holding the Jetty thread (#1552, #2218): starts an
+     * async response, returns, and writes the JSON when the future completes. A future that has not
+     * completed after {@value #AWAIT_SECONDS}s gets 504 TIMEOUT, as {@link #await} gives.
+     *
+     * <p>Exactly one writer wins ({@code written}): the completion, or the timeout listener. When the
+     * container does not support async for this request (a filter in the chain without async support)
+     * it falls back to {@link #await}, so the route still answers.</p>
+     *
+     * @param beforeSend called with the response before it is written (headers such as Location); may be null
+     */
+    void dispatchAsync(HttpServletRequest req, HttpServletResponse resp,
+                       CompletableFuture<? extends ApiResponse<?>> future, int successStatus,
+                       Consumer<ApiResponse<?>> beforeSend) throws Exception {
+        if (!req.isAsyncSupported()) {
+            ApiResponse<?> response = await(future);
+            if (beforeSend != null) beforeSend.accept(response);
+            ApiUtils.sendJson(resp, gson, statusFor(response, successStatus), response);
+            return;
+        }
+        AsyncContext ctx = req.startAsync();
+        ctx.setTimeout(AWAIT_SECONDS * 1000L);
+        AtomicBoolean written = new AtomicBoolean();
+        ctx.addListener(new AsyncListener() {
+            @Override public void onTimeout(AsyncEvent event) {
+                if (!written.compareAndSet(false, true)) return;
+                future.cancel(true);
+                try {
+                    HttpServletResponse out = (HttpServletResponse) ctx.getResponse();
+                    ApiResponse<?> timeout = ApiResponse.error("TIMEOUT",
+                        "RVNKWorlds did not answer within " + AWAIT_SECONDS + "s");
+                    ApiUtils.sendJson(out, gson, statusFor(timeout, successStatus), timeout);
+                } finally {
+                    ctx.complete();
+                }
+            }
+            @Override public void onComplete(AsyncEvent event) { }
+            @Override public void onError(AsyncEvent event) { written.set(true); }
+            @Override public void onStartAsync(AsyncEvent event) { }
+        });
+        future.whenComplete((response, ex) -> {
+            if (!written.compareAndSet(false, true)) return;
+            try {
+                HttpServletResponse out = (HttpServletResponse) ctx.getResponse();
+                if (ex != null) {
+                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+                    logger.error("Error handling RVNKWorlds API " + req.getMethod() + ": " + req.getPathInfo(), cause);
+                    ApiUtils.sendError(out, gson, 500, "INTERNAL_ERROR", "An unexpected error occurred.");
+                    return;
+                }
+                ApiResponse<?> r = response != null ? response
+                    : ApiResponse.error("INTERNAL_ERROR", "RVNKWorlds returned no response");
+                if (beforeSend != null) beforeSend.accept(r);
+                ApiUtils.sendJson(out, gson, statusFor(r, successStatus), r);
+            } catch (RuntimeException e) {
+                logger.error("Error writing RVNKWorlds API response: " + req.getPathInfo(), e);
+            } finally {
+                ctx.complete();
+            }
+        });
     }
 
     // ── response helpers ─────────────────────────────────────────────────────────────────────

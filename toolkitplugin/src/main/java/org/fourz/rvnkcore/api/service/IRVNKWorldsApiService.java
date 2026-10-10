@@ -1,12 +1,19 @@
 package org.fourz.rvnkcore.api.service;
 
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.worlds.CreateGroupRequest;
+import org.fourz.rvnkcore.api.model.worlds.CreateSkyStackRequest;
 import org.fourz.rvnkcore.api.model.worlds.CreateWorldV2Request;
 import org.fourz.rvnkcore.api.model.worlds.GeneratorInfoDTO;
+import org.fourz.rvnkcore.api.model.worlds.GroupWorldRequest;
 import org.fourz.rvnkcore.api.model.worlds.JobDTO;
 import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackDTO;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackSettingsRequest;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackTemplateDTO;
+import org.fourz.rvnkcore.api.model.worlds.WorldGroupDTO;
 import org.fourz.rvnkcore.api.model.worlds.WorldGenSettingsDTO;
 
 import java.util.List;
@@ -257,5 +264,133 @@ public interface IRVNKWorldsApiService {
      */
     default CompletableFuture<ApiResponse<WorldGenSettingsDTO>> getWorldGenSettings(String worldName) {
         return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", WORLD_FORGE_NOT_SUPPORTED));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // World Forge control plane (#2218) - world group writes and sky stacks
+    // ---------------------------------------------------------------------------------------------
+    //
+    // Same rules as the World Forge block above: every method is a default returning NOT_SUPPORTED,
+    // which the controller maps to 501, so RVNKWorlds 1.6.232 and older keep loading against this core
+    // and only lack these routes. Implemented by RVNKWorlds 1.6.233+.
+    //
+    // The implementation runs the same service methods as the /world group and /world skystack console
+    // commands, on the server thread. RVNKCore completes the HTTP response from the returned future
+    // (an async servlet response), so a slow server thread never holds a Jetty thread.
+    //
+    // Error codes: NOT_FOUND -> 404, CONFLICT -> 409, VALIDATION_FAILED -> 400, NOT_SUPPORTED -> 501.
+
+    /** Message used by every control-plane default. */
+    String CONTROL_PLANE_NOT_SUPPORTED =
+        "This RVNKWorlds build does not support the World Forge control plane (needs 1.6.233+)";
+
+    /**
+     * {@code POST /rvnkworlds/groups} - {@code /world group create <name> [--link] [--portal]}.
+     * {@code VALIDATION_FAILED} for a bad name, {@code CONFLICT} when the name is taken (any case).
+     * The controller answers 201 on success.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> createGroup(CreateGroupRequest request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code POST /rvnkworlds/groups/{name}/worlds} - {@code /world group add-world <group> <world> [--force]}.
+     * {@code NOT_FOUND} for an unknown group; {@code CONFLICT} when the world is already in this group, or
+     * in another group without {@code force}.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> addWorldToGroup(String groupName, GroupWorldRequest request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code DELETE /rvnkworlds/groups/{name}/worlds/{world}} - {@code /world group remove-world <group> <world>}.
+     * Only drops the membership; the world itself is untouched. {@code NOT_FOUND} for an unknown group or a
+     * world that is not in it.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> removeWorldFromGroup(String groupName, String worldName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code PUT /rvnkworlds/groups/{name}/default} - {@code /world group default <group>}.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> setDefaultGroup(String groupName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code PUT /rvnkworlds/groups/{name}/permission} - {@code /world group permission <group> set|clear}.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> setGroupPermission(String groupName, boolean requiresPermission) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code DELETE /rvnkworlds/groups/{name}} - {@code /world group delete <group>}, plus one REST-only
+     * guard: {@code CONFLICT} while a loaded world of the group has players in it. {@code CONFLICT} for the
+     * default group. Removes the group from {@code worlds.yml} only; no world is unloaded or deleted.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<WorldGroupDTO>> deleteGroup(String groupName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/skystacks} - {@code /world skystack list}: every group with a sky or deep stack.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<List<SkyStackDTO>>> listSkyStacks() {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/skystacks/{group}} - {@code /world skystack info <group>}. {@code NOT_FOUND} for
+     * an unknown group or a group with no {@code skyStack} block.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<SkyStackDTO>> getSkyStack(String groupName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code GET /rvnkworlds/skystack-templates} - the templates a create accepts.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<List<SkyStackTemplateDTO>>> listSkyStackTemplates() {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code POST /rvnkworlds/skystacks} - validate, then queue the layers and return the QUEUED job
+     * (type {@code CREATE_SKYSTACK}, polled at {@code GET /rvnkworlds/jobs/{id}}). The controller answers
+     * 202 with a {@code Location} header. Must not block: validate, enqueue, return.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<JobDTO>> createSkyStack(CreateSkyStackRequest request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code PUT /rvnkworlds/skystacks/{group}} - change keys of the group's {@code skyStack} block and
+     * save {@code worlds.yml}. No console command does this today; {@code /world skystack info} shows it.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<SkyStackDTO>> updateSkyStack(String groupName, SkyStackSettingsRequest request) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
+    }
+
+    /**
+     * {@code DELETE /rvnkworlds/skystacks/{group}} - {@code /world skystack delete <group>}: strips the
+     * {@code skyStack} block only. The group and every world stay; no world folder is ever deleted.
+     * Returns the stack as it was before the strip.
+     * @since 1.5.103
+     */
+    default CompletableFuture<ApiResponse<SkyStackDTO>> deleteSkyStack(String groupName) {
+        return CompletableFuture.completedFuture(ApiResponse.error("NOT_SUPPORTED", CONTROL_PLANE_NOT_SUPPORTED));
     }
 }
