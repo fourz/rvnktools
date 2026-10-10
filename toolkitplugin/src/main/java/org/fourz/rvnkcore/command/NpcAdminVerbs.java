@@ -12,6 +12,7 @@ import org.fourz.rvnkcore.service.npc.NpcKeys;
 import org.fourz.rvnkcore.service.npc.harness.NpcApplyPlanner;
 import org.fourz.rvnkcore.service.npc.harness.NpcChange;
 import org.fourz.rvnkcore.service.npc.harness.NpcDrift;
+import org.fourz.rvnkcore.service.npc.harness.NpcGround;
 import org.fourz.rvnkcore.service.npc.harness.NpcHarness;
 import org.fourz.rvnkcore.service.npc.harness.NpcHarness.Result;
 import org.fourz.rvnkcore.service.npc.harness.NpcNameplate;
@@ -124,7 +125,10 @@ final class NpcAdminVerbs {
         if (at == null) {
             return;
         }
-        report(sender, key, harness.create(key, args[1], at));
+        NpcGround.Snap snap = snapToGround(harness, at);
+        Result result = harness.create(key, args[1], at);
+        report(sender, key, result);
+        reportSnap(sender, key, result, snap);
     }
 
     private void move(CommandSender sender, String[] args) {
@@ -150,7 +154,10 @@ final class NpcAdminVerbs {
         if (to == null) {
             return;
         }
-        report(sender, key, harness.move(key, to));
+        NpcGround.Snap snap = snapToGround(harness, to);
+        Result result = harness.move(key, to);
+        report(sender, key, result);
+        reportSnap(sender, key, result, snap);
     }
 
     private void rename(CommandSender sender, String[] args) {
@@ -336,7 +343,7 @@ final class NpcAdminVerbs {
         }
         IRegionService regions = regions();
         List<NpcState> states = harness.snapshot();
-        List<NpcPlanStep> plan = NpcApplyPlanner.plan(specs, states, NpcAdminVerbs::worldLoaded, regions);
+        List<NpcPlanStep> plan = NpcApplyPlanner.plan(specs, states, NpcAdminVerbs::worldLoaded, regions, harness.terrain());
 
         Map<String, Integer> counts = new HashMap<>();
         plan.forEach(step -> counts.merge(step.action().name(), 1, Integer::sum));
@@ -395,7 +402,7 @@ final class NpcAdminVerbs {
             }
         }
         List<NpcState> states = harness.snapshot();
-        List<NpcDrift> drifts = NpcVerifier.verify(specs, states, NpcAdminVerbs::worldLoaded, regions());
+        List<NpcDrift> drifts = NpcVerifier.verify(specs, states, NpcAdminVerbs::worldLoaded, regions(), harness.terrain());
         long problems = NpcVerifier.problemCount(drifts);
         int keys = specs != null ? specs.size() : (int) states.stream().map(NpcState::key).distinct().count();
         String label = specs != null ? "'" + args[0] + "'" : "(all tagged keys)";
@@ -631,6 +638,23 @@ final class NpcAdminVerbs {
         return at;
     }
 
+    /**
+     * Snaps a target location's Y to the standable Y at its X/Z ({@link NpcGround#snap}, 1.5.101).
+     * Changes {@code at} in place; keeps the Y when no standable spot is in the search window.
+     */
+    private static NpcGround.Snap snapToGround(NpcHarness harness, Location at) {
+        String world = at.getWorld() == null ? null : at.getWorld().getName();
+        NpcGround.Snap snap = NpcGround.snap(harness.terrain(), world, at.getX(), at.getY(), at.getZ());
+        at.setY(snap.y());
+        return snap;
+    }
+
+    private static void reportSnap(CommandSender sender, String key, Result result, NpcGround.Snap snap) {
+        if (result.ok() && snap.note() != null) {
+            sender.sendMessage((snap.found() ? ChatColor.GRAY : ChatColor.YELLOW) + "[" + key + "] position: " + snap.note());
+        }
+    }
+
     static Location locate(String world, double x, double y, double z, float yaw, float pitch) {
         World bukkitWorld = world == null ? null : Bukkit.getWorld(world);
         return bukkitWorld == null ? null : new Location(bukkitWorld, x, y, z, yaw, pitch);
@@ -688,7 +712,8 @@ final class NpcAdminVerbs {
             } else {
                 plugin.getLogger().info("[npc] " + line);
             }
-            ChatColor color = line.contains("FAILED") ? ChatColor.RED : ChatColor.GREEN;
+            ChatColor color = line.contains("FAILED") ? ChatColor.RED
+                    : line.contains(NpcSkins.NOT_YET) ? ChatColor.YELLOW : ChatColor.GREEN;
             if (playerId != null) {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player != null) {

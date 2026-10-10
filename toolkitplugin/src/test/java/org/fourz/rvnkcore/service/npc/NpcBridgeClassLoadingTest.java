@@ -65,6 +65,7 @@ class NpcBridgeClassLoadingTest {
             "org.fourz.rvnkcore.service.npc.harness.NpcVerifier",
             "org.fourz.rvnkcore.service.npc.harness.NpcSpecExecutor",
             "org.fourz.rvnkcore.service.npc.harness.NpcSpecExporter",
+            "org.fourz.rvnkcore.service.npc.harness.NpcGround",
             "org.fourz.rvnkcore.service.region.IRegionService",
             "org.fourz.rvnkcore.service.region.UnavailableRegionService",
             "org.fourz.rvnkcore.service.region.RegionBridge",

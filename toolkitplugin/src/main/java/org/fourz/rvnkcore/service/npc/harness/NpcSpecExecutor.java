@@ -19,6 +19,12 @@ import java.util.function.Consumer;
  * lookclose, protected, pose, hold, nameplate, zone. Skins finish asynchronously; their final line
  * goes to the {@code later} sink.</p>
  *
+ * <p><b>Standable Y (1.5.101).</b> Create and move snap the target Y to the standable Y at that X/Z
+ * ({@link NpcGround#snap}, block reads from {@link NpcHarness#terrain()}), and the step result says
+ * so: {@code position: snapped 68 -> 67}. The zone is built around the same standable position.
+ * When no standable spot is in the window the requested Y is kept and a WARNING line is added; the
+ * step still succeeds.</p>
+ *
  * @since 1.5.100-alpha
  */
 public final class NpcSpecExecutor {
@@ -76,8 +82,9 @@ public final class NpcSpecExecutor {
         }
 
         boolean ok = true;
+        NpcGround.Snap snap = NpcGround.snap(harness.terrain(), spec.world(), spec.x(), spec.y(), spec.z());
         if (step.action() == NpcPlanStep.Action.CREATE) {
-            Location at = locator.at(spec.world(), spec.x(), spec.y(), spec.z(),
+            Location at = locator.at(spec.world(), spec.x(), snap.y(), spec.z(),
                     spec.yaw() == null ? 0f : spec.yaw(), spec.pitch() == null ? 0f : spec.pitch());
             if (at == null) {
                 lines.add("create: world '" + spec.world() + "' is not loaded");
@@ -88,6 +95,7 @@ public final class NpcSpecExecutor {
             if (!created.ok()) {
                 return new StepResult(step.key(), step.action(), false, lines);
             }
+            addSnapNote(lines, snap);
         }
 
         boolean moved = false;
@@ -107,9 +115,12 @@ public final class NpcSpecExecutor {
                     moved = true;
                     float yaw = spec.yaw() != null ? spec.yaw() : current != null ? current.yaw() : 0f;
                     float pitch = spec.pitch() != null ? spec.pitch() : current != null ? current.pitch() : 0f;
-                    Location to = locator.at(spec.world(), spec.x(), spec.y(), spec.z(), yaw, pitch);
+                    Location to = locator.at(spec.world(), spec.x(), snap.y(), spec.z(), yaw, pitch);
                     result = to == null ? NpcHarness.Result.fail("world '" + spec.world() + "' is not loaded")
                             : harness.move(spec.key(), to);
+                    if (result.ok() && snap.note() != null) {
+                        result = NpcHarness.Result.ok(result.message() + " (" + snap.note() + ")");
+                    }
                 }
                 case SKIN -> result = harness.skin(spec.key(), spec.skin(), later);
                 case LOOKCLOSE -> result = harness.lookClose(spec.key(), spec.lookClose());
@@ -118,7 +129,7 @@ public final class NpcSpecExecutor {
                 case HOLD -> result = harness.hold(spec.key(), spec.hold());
                 case NAMEPLATE -> result = harness.nameplate(spec.key(), spec.nameplate());
                 case ZONE -> {
-                    RegionResult zone = defineZone(regions, spec.key(), spec.world(), spec.x(), spec.y(), spec.z(),
+                    RegionResult zone = defineZone(regions, spec.key(), spec.world(), spec.x(), snap.y(), spec.z(),
                             spec.zone(), sender);
                     result = new NpcHarness.Result(zone.ok(), zone.message());
                 }
@@ -128,6 +139,12 @@ public final class NpcSpecExecutor {
             ok &= result.ok();
         }
         return new StepResult(step.key(), step.action(), ok, lines);
+    }
+
+    private static void addSnapNote(List<String> lines, NpcGround.Snap snap) {
+        if (snap.note() != null) {
+            lines.add("position: " + snap.note());
+        }
     }
 
     /**

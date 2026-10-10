@@ -14,7 +14,14 @@ class FakeNpcHarness implements NpcHarness {
 
     final List<NpcState> npcs = new ArrayList<>();
     final List<String> writes = new ArrayList<>();
+    /** Block reads for the standable-Y snap; null = none, as before 1.5.101. */
+    NpcGround.Terrain terrain;
     private int nextId = 1;
+
+    @Override
+    public NpcGround.Terrain terrain() {
+        return terrain;
+    }
 
     /** Adds an NPC as if staff had created and tagged it by hand. */
     NpcState put(String key, String name, String world, double x, double y, double z) {

@@ -547,8 +547,8 @@ dispatched `/npc` command (console `/npc create` without `--at` throws an NPE, #
 
 | Subcommand | Description |
 |------------|-------------|
-| `create <key> <name> <world> <x> <y> <z> [yaw] [pitch]` | Create a player NPC at an explicit location and tag it. Refuses a key that exists and suggests `move`. Loads the target chunk first. |
-| `move <key> <world> <x> <y> <z> [yaw] [pitch]` | Teleport the NPC; across worlds it respawns. Omitted yaw/pitch keep the current ones. |
+| `create <key> <name> <world> <x> <y> <z> [yaw] [pitch]` | Create a player NPC at an explicit location and tag it. Refuses a key that exists and suggests `move`. Loads the target chunk first. Snaps Y to standable ground (4 down / 2 up) and prints `snapped 68 -> 67` (1.5.101). |
+| `move <key> <world> <x> <y> <z> [yaw] [pitch]` | Teleport the NPC; across worlds it respawns. Omitted yaw/pitch keep the current ones. Snaps Y like `create`. |
 | `rename <key> <name>` | Change the display name |
 | `remove <key>` | Destroy the Citizens NPC (which also removes the key). A zone region `npc_<key>` is left in place and the command prints the `region remove` line. |
 | `skin <key> <playerName\|url>` | Player-name skins: Citizens fetches async; 5 s later the console gets "texture loaded" or "FAILED". URL skins: generated async (MineSkin via Citizens), applied on the main thread, then "URL skin applied" or "FAILED". |

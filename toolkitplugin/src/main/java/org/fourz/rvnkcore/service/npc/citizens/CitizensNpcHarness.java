@@ -13,12 +13,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.service.npc.NpcKeys;
+import org.fourz.rvnkcore.service.npc.harness.NpcGround;
 import org.fourz.rvnkcore.service.npc.harness.NpcHarness;
 import org.fourz.rvnkcore.service.npc.harness.NpcNameplate;
 import org.fourz.rvnkcore.service.npc.harness.NpcPose;
@@ -47,12 +49,19 @@ import java.util.function.Supplier;
  * {@link CurrentLocation} and Citizens spawns the NPC when the chunk next loads.</p>
  *
  * <p><b>Skins.</b> A player-name skin goes through {@link SkinTrait#setSkinName(String, boolean)};
- * Citizens fetches the profile off the main thread, and 5 seconds later this class reports whether
- * a texture arrived. A URL skin is generated on an async task through Citizens' own
+ * Citizens fetches the profile off the main thread, and only for a spawned NPC. For a spawned NPC,
+ * 5 seconds later this class reports whether a texture arrived; "not yet loaded" is not a failure
+ * (Citizens retries). For a despawned NPC no check runs: the result says Citizens fetches the skin
+ * when the NPC spawns (1.5.101). A URL skin is generated on an async task through Citizens' own
  * {@code MojangSkinGenerator} (reached by reflection, because its return type is a json-simple
  * class that is not on RVNKCore's compile classpath), then applied on the main thread with
  * {@code setSkinPersistent}. The source text is stored as persistent metadata {@code rvnk-skin} so
  * verify can compare it with the spec.</p>
+ *
+ * <p><b>Terrain.</b> {@link #terrain()} reads Bukkit blocks for the standable-Y snap
+ * ({@link NpcGround}): solid = the block has collision ({@code !isPassable()}); passable =
+ * {@code isPassable()} and not lava. Outside the world's height range, nothing is solid and
+ * everything is passable. An unloaded world reads as neither, so the snap keeps the requested Y.</p>
  *
  * <p>Main thread only. Every method catches its own failures and returns a failed result.</p>
  *
@@ -78,6 +87,41 @@ public class CitizensNpcHarness implements NpcHarness {
         this.registry = registry;
         this.plugin = plugin;
         this.warn = warn != null ? warn : message -> { };
+    }
+
+    /** Bukkit block reads for the standable-Y snap. Main thread only; reading a block loads its chunk. */
+    static final NpcGround.Terrain BUKKIT_TERRAIN = new NpcGround.Terrain() {
+        @Override
+        public boolean solid(String world, int x, int y, int z) {
+            Block block = blockAt(world, x, y, z);
+            return block != null && !block.isPassable();
+        }
+
+        @Override
+        public boolean passable(String world, int x, int y, int z) {
+            World bukkitWorld = world == null ? null : Bukkit.getWorld(world);
+            if (bukkitWorld == null) {
+                return false;
+            }
+            if (y < bukkitWorld.getMinHeight() || y >= bukkitWorld.getMaxHeight()) {
+                return true;
+            }
+            Block block = bukkitWorld.getBlockAt(x, y, z);
+            return block.isPassable() && block.getType() != Material.LAVA;
+        }
+
+        private Block blockAt(String world, int x, int y, int z) {
+            World bukkitWorld = world == null ? null : Bukkit.getWorld(world);
+            if (bukkitWorld == null || y < bukkitWorld.getMinHeight() || y >= bukkitWorld.getMaxHeight()) {
+                return null;
+            }
+            return bukkitWorld.getBlockAt(x, y, z);
+        }
+    };
+
+    @Override
+    public NpcGround.Terrain terrain() {
+        return BUKKIT_TERRAIN;
     }
 
     // ── read ───────────────────────────────────────────────────────────────────
@@ -236,8 +280,12 @@ public class CitizensNpcHarness implements NpcHarness {
             trait.setSkinName(source, true);
             npc.data().setPersistent(SKIN_SOURCE_KEY, source);
             save();
-            Bukkit.getScheduler().runTaskLater(plugin, () -> checkNameSkin(normalKey, source, report), SKIN_CHECK_TICKS);
-            return Result.ok("skin set to player '" + source + "'; Citizens fetches it in the background");
+            boolean spawned = npc.isSpawned();
+            if (spawned) {
+                // a despawned NPC is not fetched until it spawns, so a 5 s check would be a false FAILED
+                Bukkit.getScheduler().runTaskLater(plugin, () -> checkNameSkin(normalKey, source, report), SKIN_CHECK_TICKS);
+            }
+            return Result.ok(NpcSkins.requestMessage(source, spawned));
         });
     }
 
@@ -343,14 +391,11 @@ public class CitizensNpcHarness implements NpcHarness {
                 return;
             }
             SkinTrait trait = lookup.npc.getTraitNullable(SkinTrait.class);
-            if (trait != null && trait.getTexture() != null) {
-                report.accept("skin " + key + ": texture for '" + source + "' loaded");
-            } else {
-                report.accept("skin " + key + ": FAILED - no texture for '" + source + "' after 5 s. Check the "
-                        + "player name exists; Mojang may also be rate-limiting. Citizens keeps retrying.");
-            }
+            boolean loaded = trait != null && trait.getTexture() != null;
+            report.accept(NpcSkins.checkMessage(key, source, lookup.npc.isSpawned(), loaded,
+                    trait == null ? "the NPC has no skin trait" : null));
         } catch (RuntimeException | LinkageError e) {
-            report.accept("skin " + key + ": check failed: " + e);
+            report.accept(NpcSkins.checkMessage(key, source, true, false, "skin check failed: " + e));
         }
     }
 

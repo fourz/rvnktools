@@ -10,7 +10,8 @@ import java.util.Map;
  *
  * <p><b>Shape.</b> A square column centred on the NPC's block: x and z from {@code block - radius}
  * to {@code block + radius}, y from the NPC's feet block up {@code height} blocks
- * ({@code feet .. feet + height - 1}). Radius 2, height 3 is a 5 x 3 x 5 box.</p>
+ * ({@code feet .. feet + height - 1}). Radius 2, height 3 is a 5 x 3 x 5 box. The feet block is
+ * the NPC's standable Y (see {@link NpcGround}), not a spec Y the NPC falls from.</p>
  *
  * <p><b>Flags.</b> interact=allow and use=allow, so players can click the NPC and use things near
  * it inside a protected area; mob-spawning=deny, so nothing spawns on top of it. A NEW zone gets
@@ -72,7 +73,34 @@ public record NpcZone(int radius, int height) {
     }
 
     /**
-     * Infers the zone that produced a region, for export.
+     * Whether a box is this zone around a standing NPC, allowing for a settled NPC (1.5.101).
+     *
+     * <p>A zone built at the spec Y stays where it is when the NPC then falls and settles, so the
+     * zone's feet block may sit from the NPC's feet block up to {@code floor(y + raise)}. With
+     * {@code raise} 0 only the exact shape matches.</p>
+     *
+     * @param y     the NPC's standing Y (feet)
+     * @param raise how far above {@code y} the zone's feet may sit, in blocks; 0 for exact
+     */
+    public boolean matches(Cuboid box, double x, double y, double z, double raise) {
+        if (box == null) {
+            return false;
+        }
+        int low = (int) Math.floor(y);
+        int high = (int) Math.floor(y + Math.max(0, raise));
+        for (int feet = low; feet <= high; feet++) {
+            if (box.equals(around(x, feet, z))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Infers the zone that produced a region, for export. The radius and height come from the
+     * region bounds; the box must be centred on the NPC's block, and its feet block may sit up to
+     * {@link NpcGround#SETTLE_TOLERANCE} above the NPC's feet (a zone built at the spec Y around an
+     * NPC that then settled, 1.5.101).
      *
      * @return the zone, or null when the box is not a zone shape around that position
      */
@@ -88,6 +116,6 @@ public record NpcZone(int radius, int height) {
         if (validate(zone.radius, zone.height) != null) {
             return null;
         }
-        return box.equals(zone.around(x, y, z)) ? zone : null;
+        return zone.matches(box, x, y, z, NpcGround.SETTLE_TOLERANCE) ? zone : null;
     }
 }

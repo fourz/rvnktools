@@ -14,8 +14,9 @@ import java.util.function.Predicate;
  *
  * <ul>
  *   <li><b>With a spec:</b> per spec key - missing NPC, a key on two NPCs, world not loaded, and
- *       every field {@link NpcDiff} reports (position over 0.5 blocks, world, name, skin, traits,
- *       zone). Then every tagged key the spec does not declare, as ORPHAN.</li>
+ *       every field {@link NpcDiff} reports (position: X/Z over 0.5 blocks, or a Y that is neither
+ *       the spec Y, the standable Y, nor settled up to 1.5 below the spec Y; world, name, skin,
+ *       traits, zone). Then every tagged key the spec does not declare, as ORPHAN.</li>
  *   <li><b>Without a spec:</b> every tagged key must resolve to one NPC with a location in a
  *       loaded world.</li>
  * </ul>
@@ -39,6 +40,14 @@ public final class NpcVerifier {
      */
     public static List<NpcDrift> verify(List<NpcSpec> specs, List<NpcState> states, Predicate<String> worldLoaded,
                                         IRegionService regions) {
+        return verify(specs, states, worldLoaded, regions, null);
+    }
+
+    /**
+     * @param terrain block reads for the standable-Y snap (same rule as apply), or null
+     */
+    public static List<NpcDrift> verify(List<NpcSpec> specs, List<NpcState> states, Predicate<String> worldLoaded,
+                                        IRegionService regions, NpcGround.Terrain terrain) {
         Map<String, List<NpcState>> byKey = NpcApplyPlanner.index(states);
         List<NpcDrift> drifts = new ArrayList<>();
 
@@ -69,7 +78,7 @@ public final class NpcVerifier {
                         "spec world '" + spec.world() + "' is not loaded; not checked"));
                 continue;
             }
-            for (NpcChange change : NpcDiff.diff(spec, state, regions)) {
+            for (NpcChange change : NpcDiff.diff(spec, state, regions, NpcApplyPlanner.standY(spec, terrain))) {
                 drifts.add(new NpcDrift(spec.key(), NpcDrift.Kind.FIELD, change, change.toString()));
             }
             if (spec.zone() != null && (regions == null || !regions.isAvailable())) {

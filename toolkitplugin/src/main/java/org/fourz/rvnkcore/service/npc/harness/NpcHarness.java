@@ -47,6 +47,18 @@ public interface NpcHarness {
         return Optional.ofNullable(found);
     }
 
+    /**
+     * Block reads for the standable-Y snap ({@link NpcGround}). Callers snap a target location with
+     * {@link NpcGround#snap} before {@link #create} and {@link #move}; the harness itself places the
+     * NPC exactly where it is told.
+     *
+     * @return the terrain, or null when the implementation cannot read blocks
+     * @since 1.5.101-alpha
+     */
+    default NpcGround.Terrain terrain() {
+        return null;
+    }
+
     /** Creates a player NPC at an explicit location and tags it; fails when the key is in use. */
     Result create(String key, String name, Location at);
 

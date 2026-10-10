@@ -14,7 +14,10 @@ import java.util.Optional;
  * The pure field diff between a spec entry and a live NPC (#2248). Shared by the apply planner and
  * by verify, so "apply would change it" and "verify reports it" can never disagree.
  *
- * <p><b>Position.</b> Drift when the 3D distance is over {@value #POSITION_TOLERANCE} block. Yaw
+ * <p><b>Position.</b> Drift when the horizontal (X/Z) distance is over {@value #POSITION_TOLERANCE}
+ * block, or the Y does not match by {@link NpcGround#yMatches}: within {@value #POSITION_TOLERANCE}
+ * of the spec Y or of the standable Y, or up to {@value NpcGround#SETTLE_TOLERANCE} below the spec Y
+ * (the NPC fell and settled, 1.5.101). Yaw
  * and pitch are compared (tolerance {@value #ANGLE_TOLERANCE} degree) only when the spec sets them
  * AND LookClose is off: with LookClose on, Citizens turns the NPC towards nearby players all the
  * time, so its live yaw says nothing about the spec.</p>
@@ -36,6 +39,15 @@ public final class NpcDiff {
      * @return every differing field, in {@link NpcField} order; empty when in sync
      */
     public static List<NpcChange> diff(NpcSpec spec, NpcState state, IRegionService regions) {
+        return diff(spec, state, regions, null);
+    }
+
+    /**
+     * @param standY the standable Y at the spec position ({@link NpcGround#snap}), or null when
+     *               unknown; a live Y within tolerance of it is in sync, and the zone is expected
+     *               around it
+     */
+    public static List<NpcChange> diff(NpcSpec spec, NpcState state, IRegionService regions, Double standY) {
         List<NpcChange> changes = new ArrayList<>();
 
         String wantedName = NpcSpecParser.stripColors(spec.name());
@@ -46,9 +58,10 @@ public final class NpcDiff {
         if (state.world() == null || !state.hasLocation() || !state.world().equals(spec.world())) {
             changes.add(new NpcChange(NpcField.WORLD, state.world() == null ? "none" : state.world(), spec.world()));
         } else {
-            String position = positionDrift(spec, state);
+            String position = positionDrift(spec, state, standY);
             if (position != null) {
-                changes.add(new NpcChange(NpcField.POSITION, position, formatPos(spec.x(), spec.y(), spec.z(), spec.yaw(), spec.pitch())));
+                changes.add(new NpcChange(NpcField.POSITION, position,
+                        formatPos(spec.x(), spec.y(), spec.z(), spec.yaw(), spec.pitch()) + NpcGround.standsAt(spec.y(), standY)));
             }
         }
 
@@ -75,7 +88,7 @@ public final class NpcDiff {
                     state.nameplate() == null ? "on" : state.nameplate().id(), spec.nameplate().id()));
         }
 
-        NpcChange zone = zoneDrift(spec, regions);
+        NpcChange zone = zoneDrift(spec, state, standY, regions);
         if (zone != null) {
             changes.add(zone);
         }
@@ -87,10 +100,16 @@ public final class NpcDiff {
      * zone. Name and position are set by the create itself.
      */
     public static List<NpcChange> createChanges(NpcSpec spec, IRegionService regions) {
+        return createChanges(spec, regions, null);
+    }
+
+    /** @param standY the standable Y at the spec position, or null when unknown */
+    public static List<NpcChange> createChanges(NpcSpec spec, IRegionService regions, Double standY) {
         List<NpcChange> changes = new ArrayList<>();
         changes.add(new NpcChange(NpcField.NAME, "missing", quote(NpcSpecParser.stripColors(spec.name()))));
         changes.add(new NpcChange(NpcField.POSITION, "missing",
-                spec.world() + " " + formatPos(spec.x(), spec.y(), spec.z(), spec.yaw(), spec.pitch())));
+                spec.world() + " " + formatPos(spec.x(), spec.y(), spec.z(), spec.yaw(), spec.pitch())
+                        + NpcGround.standsAt(spec.y(), standY)));
         if (spec.skin() != null) {
             changes.add(new NpcChange(NpcField.SKIN, "default", spec.skin()));
         }
@@ -109,24 +128,39 @@ public final class NpcDiff {
         if (spec.nameplate() != null && spec.nameplate() != NpcNameplate.ON) {
             changes.add(new NpcChange(NpcField.NAMEPLATE, "on", spec.nameplate().id()));
         }
-        NpcChange zone = zoneDrift(spec, regions);
+        NpcChange zone = zoneDrift(spec, null, standY, regions);
         if (zone != null) {
             changes.add(zone);
         }
         return changes;
     }
 
-    /** @return the zone change, or null when the zone matches, is not managed, or cannot be checked */
-    static NpcChange zoneDrift(NpcSpec spec, IRegionService regions) {
+    /**
+     * The zone is in sync when region {@code npc_<key>} is the zone shape around any of: the spec
+     * position, the standable position, or the live NPC's standing position (when the live NPC is in
+     * sync with the spec) with the zone's feet up to {@link NpcGround#SETTLE_TOLERANCE} above the
+     * NPC's feet. The last case is a zone built at the spec Y around an NPC that then settled, and an
+     * export of it (1.5.101). A missing or wrong zone is rebuilt around the standable position.
+     *
+     * @param state  the live NPC, or null for a CREATE
+     * @param standY the standable Y at the spec position, or null when unknown
+     * @return the zone change, or null when the zone matches, is not managed, or cannot be checked
+     */
+    static NpcChange zoneDrift(NpcSpec spec, NpcState state, Double standY, IRegionService regions) {
         if (spec.zone() == null || regions == null || !regions.isAvailable()) {
             return null;
         }
-        Cuboid wanted = spec.zone().around(spec.x(), spec.y(), spec.z());
+        Cuboid wanted = spec.zone().around(spec.x(), standY != null ? standY : spec.y(), spec.z());
         Optional<RegionInfo> info = regions.info(spec.world(), NpcZone.regionId(spec.key()));
         if (info.isEmpty()) {
             return new NpcChange(NpcField.ZONE, "missing", NpcZone.regionId(spec.key()) + " " + wanted);
         }
-        if (!wanted.equals(info.get().bounds())) {
+        Cuboid bounds = info.get().bounds();
+        boolean shapeOk = wanted.equals(bounds)
+                || spec.zone().matches(bounds, spec.x(), spec.y(), spec.z(), 0)
+                || (liveInSync(spec, state, standY)
+                    && spec.zone().matches(bounds, spec.x(), state.y(), spec.z(), NpcGround.SETTLE_TOLERANCE));
+        if (!shapeOk) {
             return new NpcChange(NpcField.ZONE, String.valueOf(info.get().bounds()), wanted.toString());
         }
         List<String> wrongFlags = new ArrayList<>();
@@ -142,13 +176,28 @@ public final class NpcDiff {
         return null;
     }
 
+    /** @return true when the live NPC is in the spec world and its position matches the spec */
+    static boolean liveInSync(NpcSpec spec, NpcState state, Double standY) {
+        return state != null && state.hasLocation() && spec.world().equals(state.world())
+                && Math.hypot(state.x() - spec.x(), state.z() - spec.z()) <= POSITION_TOLERANCE
+                && NpcGround.yMatches(spec.y(), state.y(), standY);
+    }
+
     /** @return a description of the drift, or null when the position matches */
     static String positionDrift(NpcSpec spec, NpcState state) {
+        return positionDrift(spec, state, null);
+    }
+
+    /**
+     * @param standY the standable Y at the spec position, or null when unknown
+     * @return a description of the drift, or null when the position matches
+     */
+    static String positionDrift(NpcSpec spec, NpcState state, Double standY) {
         double dx = state.x() - spec.x();
         double dy = state.y() - spec.y();
         double dz = state.z() - spec.z();
         double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        boolean moved = distance > POSITION_TOLERANCE;
+        boolean moved = Math.hypot(dx, dz) > POSITION_TOLERANCE || !NpcGround.yMatches(spec.y(), state.y(), standY);
 
         boolean lookClose = spec.lookClose() != null ? spec.lookClose() : state.lookClose();
         boolean turned = false;

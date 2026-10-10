@@ -1,6 +1,8 @@
 # RVNKCore NPC Harness and Region Tool
 
 **Since**: 1.5.100-alpha (#2248, epic #2239). Builds on the NPC bridge (#2213, 1.5.99-alpha).
+**1.5.101-alpha**: standable-Y snap and settle tolerance, settle-tolerant zone export, no false
+skin FAILED (Dev QA of #2248).
 
 The harness places, edits and checks Citizens NPCs **from the console**, keyed by RVNK key. NPCs can
 be declared in a YAML spec file and applied idempotently, and the spec doubles as the QA check
@@ -133,8 +135,9 @@ carries it out. Output per key:
   created again. This is how Event's existing 6 NPCs come under the spec.
 - **Write order** per key: create or rename, one move (world, position, rotation), skin, lookclose,
   protected, pose, hold, nameplate, zone.
-- **Skins finish later.** The apply line says the fetch started; the result arrives in the console
-  (and to a player sender) as `skin <key>: texture ... loaded`, `URL skin applied` or `FAILED ...`.
+- **Standable Y.** Create and move snap the target Y to the ground (see [Standable Y](#standable-y)).
+  The step result says so: `position: snapped 68 -> 67`.
+- **Skins finish later.** See [Skins](#skins) for the result lines.
 
 ## verify
 
@@ -156,22 +159,77 @@ The summary line is `clean` when there are no problem kinds, else `DRIFT - N pro
 
 Comparison rules, shared with `apply` so they cannot disagree:
 
-- **Position**: drift when the 3D distance is over **0.5** blocks.
+- **Position**: drift when the X/Z distance is over **0.5** blocks, or the live Y is none of: within
+  0.5 of the spec Y, within 0.5 of the standable Y, or up to **1.5** below the spec Y (settled).
+  See [Standable Y](#standable-y).
 - **Rotation**: yaw/pitch are compared (1 degree tolerance) only when the spec sets them **and**
   LookClose is off. With LookClose on, Citizens turns the NPC toward players all the time.
 - **Name**: compared without colour codes.
 - **Skin**: player names ignore case; URLs must match exactly. The harness stores the source it set
   as NPC metadata `rvnk-skin`; a skin set by hand with `/npc skin` is read from `SkinTrait`.
-- **Zone**: region `npc_<key>` must exist with the zone bounds around the spec position and carry
-  `interact=allow`, `use=allow`, `mob-spawning=deny`.
+- **Zone**: region `npc_<key>` must exist and carry `interact=allow`, `use=allow`,
+  `mob-spawning=deny`. Its bounds must be the zone shape around the spec position, around the
+  standable position, or around the live NPC (when the live position is in sync) with the zone's
+  feet up to 1.5 blocks above the NPC's feet. A missing or wrong zone is rebuilt around the
+  standable position.
 
 ## export
 
-`/rvnk npc export <spec> [--force]` writes every tagged NPC to a spec. Positions are rounded to
-2 decimals and angles to 1, which is inside verify's tolerance, so applying an export at once is
-all NOOP. A zone is written only when `npc_<key>` has the exact zone shape around the NPC. NPCs
-without a location are skipped with a note. It refuses to overwrite an existing file without
-`--force`.
+`/rvnk npc export <spec> [--force]` writes every tagged NPC to a spec. Positions are the live
+(standing) positions, rounded to 2 decimals, and angles are rounded to 1; this is inside verify's
+tolerance, so applying an export at once is all NOOP. A zone is written when `npc_<key>` has the
+zone shape around the NPC: radius and height come from the region bounds, the box is centred on
+the NPC's block, and the zone's feet may sit up to 1.5 blocks above the NPC's feet (a zone built
+at the spec Y before the NPC settled). Otherwise the note `zone left out` is printed. NPCs without
+a location are skipped with a note. It refuses to overwrite an existing file without `--force`.
+
+---
+
+## Standable Y
+
+**Since 1.5.101.** A Citizens player NPC falls under gravity. In 1.5.100 a spec Y one block above
+the ground (`pos: [-95.5, 68, 2.5]` over ground whose top block is 66) made the NPC settle at 67;
+every `apply` then moved it back to 68 and `verify` reported `(1.00 off)` forever.
+
+**Snap rule** (`NpcGround`, on `create`, `move` and `apply`):
+
+1. A Y is **standable** at a feet block when the block below is solid (it has collision) and the
+   feet and head blocks are passable (not lava).
+2. Search at the requested X/Z: the requested feet block first, then **4 blocks down**, then
+   **2 blocks up**. The first standable feet block wins.
+3. If the requested feet block is standable, the requested Y is kept as it is. Otherwise the Y
+   becomes the found feet block, and the result says `snapped 68 -> 67`.
+4. If nothing in the window is standable, the requested Y is kept and the result says
+   `WARNING no standable ground within 4 below / 2 above y 68; kept the requested y`. The step
+   does not fail.
+5. The zone is built around the snapped position.
+
+A `--dry-run` shows the snap ahead: `position: missing -> journey -95.5,68,2.5 (stands at y 67)`.
+
+**Tolerance** (apply, verify and export share it): X/Z within **0.5**; Y within 0.5 of the spec
+Y, or within 0.5 of the standable Y, or up to **1.5 below** the spec Y. A live Y above the spec Y
+(beyond 0.5) is always drift.
+
+The spec file is not rewritten: it can keep `68`. To make it exact, run `export` and use the
+exported Y.
+
+> An NPC meant to float (Citizens gravity off) more than 4 blocks above the ground is outside the
+> search window and keeps its Y. One within 4 blocks of the ground is snapped down to it.
+
+---
+
+## Skins
+
+`skin <key> <player>` and `skin:` in a spec set Citizens' `SkinTrait`. Citizens fetches a skin only
+for a **spawned** NPC.
+
+| Situation | Result line |
+|-----------|-------------|
+| NPC not spawned (no player near, chunk unloaded) | `skin set to player 'Notch'; Citizens fetches it when the NPC spawns`. No 5 s check runs. |
+| Spawned, texture arrived in 5 s | `skin <key>: texture for 'Notch' loaded` |
+| Spawned, no texture after 5 s | `skin <key>: texture for 'Notch' not yet loaded after 5 s (Citizens retries) ...` (warning, not a failure) |
+| The check itself failed | `skin <key>: FAILED - ...` |
+| URL skin | `skin <key>: URL skin applied`, or `FAILED to generate a skin from the URL: ...` |
 
 ---
 
@@ -186,7 +244,8 @@ WorldGuard region **`npc_<key>`** in the NPC's world:
 - **Priority**: a new zone gets priority **10**, so it wins over a priority-0 region around it
   (at equal priority WorldGuard lets `deny` win). An existing zone keeps its priority, flags,
   owners and members; only the bounds and the three flags are rewritten.
-- `protect` uses the NPC's **live** position; a spec zone uses the **spec** position.
+- `protect` uses the NPC's **live** position; a spec zone uses the **standable** position (the
+  spec position snapped to the ground, see [Standable Y](#standable-y)).
 - `remove <key>` leaves the zone in place and prints the `/rvnk region remove` line.
 
 ---
@@ -266,8 +325,8 @@ rvnk region define sotw_vance sotw_deep_0 4 241 6 10 246 12 interact=allow use=a
 
 | Package | Holds | Loads without |
 |---------|-------|---------------|
-| `service.npc.harness` | `NpcSpec`, `NpcSpecParser`, `NpcDiff`, `NpcApplyPlanner`, `NpcVerifier`, `NpcSpecExecutor`, `NpcSpecExporter`, `NpcSpecStore`, `NpcHarness` (interface) | Citizens, WorldGuard |
-| `service.npc.citizens` | `CitizensNpcHarness` (and the #2213 adapter) | - (Citizens only) |
+| `service.npc.harness` | `NpcSpec`, `NpcSpecParser`, `NpcDiff`, `NpcGround` (snap; `Terrain` interface), `NpcApplyPlanner`, `NpcVerifier`, `NpcSpecExecutor`, `NpcSpecExporter`, `NpcSpecStore`, `NpcSkins`, `NpcHarness` (interface) | Citizens, WorldGuard |
+| `service.npc.citizens` | `CitizensNpcHarness` (and the #2213 adapter); it also supplies the Bukkit block reads for `NpcGround.Terrain` | - (Citizens only) |
 | `service.region` | `IRegionService`, `UnavailableRegionService`, `RegionBridge`, `RegionArgs`, `Cuboid` | WorldGuard |
 | `service.region.worldguard` | `WorldGuardRegionService`, `WorldGuardRegionAdapter` | - (WorldGuard only) |
 | `command` | `NpcSubCommand`, `NpcAdminVerbs`, `RegionSubCommand`, `NpcArgs`, `QuotedArgs` | Citizens, WorldGuard |
