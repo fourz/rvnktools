@@ -379,7 +379,7 @@ Generate a comprehensive RCA report:
 - **Fix**: Use try-with-resources, check for missing `.close()` calls
 
 ### Service Not Found
-- **Symptom**: `ServiceNotFoundException` or null from `ServiceRegistry.get()`
+- **Symptom**: `ServiceNotFoundException` or null from `RVNKCore.getServiceSafe()` / `getService()`
 - **Cause**: Service not registered or wrong load order
 - **Fix**: Check `plugin.yml` dependencies, verify registration
 

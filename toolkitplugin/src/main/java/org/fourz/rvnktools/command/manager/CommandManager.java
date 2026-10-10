@@ -445,19 +445,6 @@ public class CommandManager {
     }
     
     /**
-     * Initialize the command manager and register all default commands.
-     * This should be called during plugin startup.
-     */
-    public void initialize() {
-        logger.info("Initializing CommandManager...");
-        
-        // TODO: Register default commands here
-        // This will be implemented in later phases
-        
-        logger.info("CommandManager initialized with " + commands.size() + " commands");
-    }
-    
-    /**
      * Shutdown the command manager and clean up resources.
      * This should be called during plugin shutdown.
      */

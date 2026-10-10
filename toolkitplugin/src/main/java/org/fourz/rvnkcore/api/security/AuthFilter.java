@@ -123,6 +123,18 @@ public class AuthFilter implements Filter {
         }
     }
 
+    /**
+     * True only for a read of the health servlet itself. {@code getServletPath()} is the
+     * normalised path of the servlet Jetty matched (health is mapped at {@code /v1/health/*}),
+     * so dot-segments and path parameters in the raw URI cannot reach another servlet under
+     * this exemption.
+     */
+    static boolean isPublicHealthRequest(HttpServletRequest request) {
+        String method = request.getMethod();
+        if (!"GET".equals(method) && !"HEAD".equals(method)) return false;
+        return "/v1/health".equals(request.getServletPath());
+    }
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) 
             throws IOException, ServletException {
@@ -145,8 +157,11 @@ public class AuthFilter implements Filter {
         // Move API request logging to debug level to reduce verbosity
         logger.debug("API Request: " + method + " " + requestURI + " from IP: " + clientIP);
         
-        // Health endpoint is public — allow unauthenticated probes (Caddy, uptime monitors)
-        if (requestURI.endsWith("/v1/health") || requestURI.contains("/v1/health/")) {
+        // Health endpoint is public — allow unauthenticated probes (Caddy, uptime monitors).
+        // Match the servlet Jetty actually routed to, never the raw URI: a substring test on
+        // getRequestURI() exempted "/v1/health/../players/<uuid>/groups" and
+        // "/v1/players/x/v1/health", which Jetty normalises and serves from protected servlets.
+        if (isPublicHealthRequest(httpRequest)) {
             chain.doFilter(request, response);
             return;
         }

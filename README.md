@@ -151,14 +151,39 @@ RVNKCore Phase 1 is **99% complete** with comprehensive announcement service inf
 
 ## Commands
 
-| Command | Description | Permission |
-|---------|-------------|------------|
-| `/announce` | Manage server announcements | `rvnktools.announce` |
-| `/announce add` | Create a new announcement | `rvnktools.announce.add` |
-| `/announce remove` | Remove an announcement | `rvnktools.announce.remove` |
-| `/announce list` | List all announcements | `rvnktools.announce.list` |
-| `/hat` | Set the item in your hand as a hat | `rvnktools.hat` |
-| `/link` | Manage clickable links | `rvnktools.link` |
+Generated from `toolkitplugin/src/main/resources/plugin.yml`. Usage, subcommands and permissions:
+[docs/plugins/commands/](../../docs/plugins/commands/README.md) in the parent repo.
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `/rvnktools` | `/tools` | Main command for RVNK Tools |
+| `/rvnkcore` |  | RVNKCore diagnostics, testing, and system information |
+| `/rvnk` |  | NPC bridge and harness (Citizens), console-safe WorldGuard regions |
+| `/puthat` |  | Applies a custom Jack-o-Lantern to the nearest mob |
+| `/tps` | `/ping` | Shows the server's current TPS and performance information |
+| `/events` |  | Provides information about scheduled events |
+| `/discord` |  | Provides information about the server's Discord |
+| `/broadcast` |  | Broadcasts a message to all players |
+| `/announcer` |  | Enable or disable the announcements feature |
+| `/countdown` |  | Countdown for restarting the server |
+| `/cyclegamemode` | `/gmc` | Cycle through gamemodes |
+| `/railroad` | `/cycletrainmode` | Cycle through instruction sets |
+| `/trains` | `/train-help` | Manage TrainCarts settings and view help pages |
+| `/logfilter` |  | Manage log filtering for server plugins |
+| `/pstest` |  | Test PlayerService functionality |
+| `/worldswap` | `/ws` | Teleport to your last known location in a specific world |
+| `/event` | `/worldswap` | Teleport between worlds preserving location history |
+| `/teleport` |  | Teleportation utilities and world management |
+| `/tp` |  | Teleport command (vanilla override, disabled by default) |
+| `/tpa` |  | Request to teleport to another player |
+| `/tpahere` |  | Request another player teleport to you |
+| `/tpaccept` |  | Accept a pending teleport request |
+| `/tpdeny` |  | Deny a pending teleport request |
+| `/back` |  | Teleport to your previous location |
+| `/link` |  | Link your account to external services |
+| `/server` |  | Cross-server transfer commands (movement only) |
+| `/portal` | `/portals` | Cross-server portal administration |
+| `/pref` | `/prefs`, `/preferences` | Manage your notification preferences |
 
 ## Configuration
 

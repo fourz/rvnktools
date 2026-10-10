@@ -116,4 +116,25 @@ class AuthTokenStoreTest {
         assertTrue(store.isRateLimited(TEST_UUID),
                 "LOGIN generation must apply rate limit for replay-protection of self-serve flow.");
     }
+
+    @Test
+    @DisplayName("LOGIN token uses the configured link.login-ttl-minutes (#1598)")
+    void loginTtlFromConfig() {
+        AuthTokenStore configured = new AuthTokenStore(plugin, 30);
+        assertEquals(30, configured.getLoginTtlMinutes());
+
+        String token = configured.generateToken(TEST_UUID, TEST_NAME, TEST_GROUPS);
+        ConsumeOutcome outcome = configured.consumeToken(token);
+        long ttl = outcome.token().expiresAt().getEpochSecond()
+                - outcome.token().createdAt().getEpochSecond();
+        assertEquals(30 * 60L, ttl);
+    }
+
+    @Test
+    @DisplayName("Non-positive link.login-ttl-minutes falls back to the 15-minute default (#1598)")
+    void loginTtlRejectsNonPositive() {
+        assertEquals(AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES, new AuthTokenStore(plugin, 0).getLoginTtlMinutes());
+        assertEquals(AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES, new AuthTokenStore(plugin, -5).getLoginTtlMinutes());
+        assertEquals(AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES, store.getLoginTtlMinutes());
+    }
 }

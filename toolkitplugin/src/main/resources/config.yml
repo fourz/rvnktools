@@ -26,15 +26,10 @@ database:
     recheckSeconds: 60
 
   # SQLite Configuration (default)
+  # SQLite is deliberately unpooled: one connection per call, WAL journal mode. There are no
+  # pool settings for it - an old "pool:" block under sqlite in an existing config.yml is ignored (#1590).
   sqlite:
     file: rvnkcore.db
-    pool:
-      maxConnections: 5
-      minIdleConnections: 1
-      connectionTimeoutMs: 30000
-      idleTimeoutMs: 600000
-      maxLifetimeMs: 1800000
-      leakDetectionMs: 0
 
   # MySQL Configuration
   mysql:
@@ -162,6 +157,12 @@ api:
     use-forwarded-headers: true
   security:
     allowed-ips: ""
+  worlds:
+    # Include each world's seed in /api/v1/worlds responses. Default false.
+    # RISK: a seed lets a player find structures and ores off-map, and every holder of
+    # the shared API key can read it on every tier. A missing key also means false.
+    # Read per request: "/rvnkcore reload" applies a change without a restart.
+    exposeSeed: false
 
 # Webhook Configuration
 # Fires HTTP POST to a URL when player/data events occur (join/quit, announcements, shops, trades)

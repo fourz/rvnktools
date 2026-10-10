@@ -94,6 +94,10 @@ public class RVNKCoreCommand extends BaseCommand {
                 "  connectivity plus row totals; alias: database",
                 "RVNKCore's MySQL is cross-host - a hang here usually means a missing",
                 "socketTimeout in connectionParameters, not a dead server."));
+        m.put("firstjoin", java.util.List.of(
+                "/rvnkcore firstjoin backfill",
+                "  restore rvnk_players.first_join from Bukkit's first-played record for every",
+                "  known player; only ever moves a date earlier (#2125)"));
         m.put("version", java.util.List.of(
                 "/rvnkcore version",
                 "  read the running version here, never from a commit message or issue comment"));
@@ -210,6 +214,9 @@ public class RVNKCoreCommand extends BaseCommand {
                 break;
             case "migrate":
                 handleMigrate(sender, args.length > 1 ? args[1].toLowerCase() : "");
+                break;
+            case "firstjoin":
+                handleFirstJoinBackfill(sender, args.length > 1 ? args[1].toLowerCase() : "");
                 break;
             case "netban":
                 handleNetBan(sender,
@@ -384,6 +391,45 @@ public class RVNKCoreCommand extends BaseCommand {
      *
      * <p>Usage: {@code /rvnkcore netban <add|remove|check> <player>}</p>
      */
+    /**
+     * Restores first-join dates overwritten by MariaDB's implicit ON UPDATE (#2125). Bukkit keeps
+     * each player's first-played time in their player data, independent of RVNKCore's tables.
+     */
+    private void handleFirstJoinBackfill(CommandSender sender, String action) {
+        if (!action.equals("backfill")) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ Usage: /rvnkcore firstjoin backfill"));
+            return;
+        }
+        org.fourz.rvnkcore.api.service.PlayerService players =
+                rvnkCore.getService(org.fourz.rvnkcore.api.service.PlayerService.class);
+        if (players == null) {
+            sender.sendMessage(ChatFormat.colorize("&c✖ PlayerService is not available"));
+            return;
+        }
+        // Bukkit reads player data here, on the main thread; the corrections run off it
+        java.util.Map<UUID, Long> firstPlayed = new java.util.LinkedHashMap<>();
+        for (org.bukkit.OfflinePlayer p : Bukkit.getOfflinePlayers()) {
+            long fp = p.getFirstPlayed();
+            if (fp > 0) firstPlayed.put(p.getUniqueId(), fp);
+        }
+        sender.sendMessage(ChatFormat.colorize("&7Checking first_join for " + firstPlayed.size()
+                + " players with a first-played record..."));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            int corrected = 0;
+            int failed = 0;
+            for (java.util.Map.Entry<UUID, Long> e : firstPlayed.entrySet()) {
+                try {
+                    corrected += players.correctFirstJoin(e.getKey(), new java.sql.Timestamp(e.getValue()))
+                            .get(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (Exception ex) {
+                    failed++;
+                }
+            }
+            sender.sendMessage(ChatFormat.colorize("&a✔ first_join corrected for " + corrected + " of "
+                    + firstPlayed.size() + " players" + (failed > 0 ? " &c(" + failed + " failed)" : "")));
+        });
+    }
+
     private void handleNetBan(CommandSender sender, String action, String playerName) {
         if (playerName.isEmpty()
                 || !(action.equals("add") || action.equals("remove") || action.equals("check"))) {
@@ -421,8 +467,11 @@ public class RVNKCoreCommand extends BaseCommand {
                     return;
                 }
 
-                dto.setBanned(target);
-                svc.savePlayer(dto).get();
+                // Dedicated write: the general save no longer carries the ban flag (#2128)
+                if (!svc.setNetworkBan(dto.getId(), target).get()) {
+                    sender.sendMessage(ChatFormat.colorize("&c✖ netban: no player record was updated"));
+                    return;
+                }
                 sender.sendMessage(ChatFormat.colorize("&a✓ " + dto.getCurrentName()
                         + " network ban " + (target ? "&cSET" : "&aCLEARED")));
                 sender.sendMessage(ChatFormat.colorize(

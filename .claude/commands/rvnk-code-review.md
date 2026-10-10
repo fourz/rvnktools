@@ -101,15 +101,15 @@ if (args.length < 1 && !(sender instanceof Player)) {
 ## Step 3: RVNKCore Integration Review
 
 ### 3.1 ServiceRegistry Usage
-- [ ] Services registered via `ServiceRegistry.register()`
-- [ ] Services retrieved via `ServiceRegistry.get()`
+- [ ] Services registered via `RVNKCore.getInstance().getServiceRegistry().registerService()` (instance API — there is no static `ServiceRegistry.register()`)
+- [ ] Services retrieved via `RVNKCore.getInstance().getService()` (hard dep) or `RVNKCore.getServiceSafe()` (soft dep, may return null)
 - [ ] No direct instantiation of services (use DI)
 - [ ] Proper service lifecycle (init → start → stop)
 
 **Check for pattern:**
 ```java
 // ✅ GOOD
-PlayerService playerService = ServiceRegistry.get(PlayerService.class);
+PlayerService playerService = RVNKCore.getInstance().getService(PlayerService.class);
 
 // ❌ BAD
 PlayerService playerService = new PlayerServiceImpl();

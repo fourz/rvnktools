@@ -162,6 +162,8 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     /** Cached mirror for this server, keyed by player. Guarded by {@link #cacheLock}. */
     private volatile java.util.Map<UUID, ServerState> stateCache = java.util.Collections.emptyMap();
     private volatile long stateCacheLoadedAt = 0L;
+    /** True when the last mirror load succeeded, so a missing row really means "no row". */
+    private volatile boolean stateCacheHealthy = false;
     private final Object cacheLock = new Object();
 
     /** How long the mirror snapshot is reused before being reloaded. */
@@ -217,7 +219,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                 }
             }
             stateCache = loaded;
+            stateCacheHealthy = true;
         } catch (SQLException e) {
+            stateCacheHealthy = false;
             // Leave the previous snapshot in place. Reads then fall back to the legacy columns for
             // anything missing, which is still correct — degraded, not wrong.
             logger.warning("Could not load per-server player state (#1812); "
@@ -512,15 +516,15 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                 + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
                 + "VALUES (?, ?, ?, ?, ?, ?) "
                 + "ON DUPLICATE KEY UPDATE current_world = VALUES(current_world), "
-                + "times_joined = VALUES(times_joined), "
-                + "total_playtime_hours = VALUES(total_playtime_hours), "
-                + "last_seen = VALUES(last_seen)"
+                + "times_joined = GREATEST(times_joined, VALUES(times_joined)), "
+                + "total_playtime_hours = GREATEST(total_playtime_hours, VALUES(total_playtime_hours)), "
+                + "last_seen = GREATEST(last_seen, VALUES(last_seen))"
             : "INSERT INTO rvnk_player_server_state "
                 + "(player_id, server_id, current_world, times_joined, total_playtime_hours, last_seen) "
                 + "VALUES (?, ?, ?, ?, ?, ?) "
                 + "ON CONFLICT(player_id, server_id) DO UPDATE SET current_world = excluded.current_world, "
-                + "times_joined = excluded.times_joined, "
-                + "total_playtime_hours = excluded.total_playtime_hours, "
+                + "times_joined = MAX(times_joined, excluded.times_joined), "
+                + "total_playtime_hours = MAX(total_playtime_hours, excluded.total_playtime_hours), "
                 + "last_seen = excluded.last_seen";
 
         try (var conn = localProvider.getConnection();
@@ -546,6 +550,28 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * @param playerName The current name of the player
      * @return CompletableFuture containing the player if found
      */
+    /**
+     * Moves a player's {@code first_join} earlier, never later (#2125). Used to restore the real
+     * date from Bukkit's first-played record after MariaDB's implicit ON UPDATE overwrote it.
+     *
+     * @return rows changed: 1 when corrected, 0 when the stored value was already as early
+     */
+    public CompletableFuture<Integer> correctFirstJoinIfEarlier(UUID playerId, java.sql.Timestamp firstJoin) {
+        return CompletableFuture.supplyAsync(() -> {
+            String query = "UPDATE " + tableName + " SET first_join = ? WHERE id = ? AND first_join > ?";
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement(query)) {
+                stmt.setTimestamp(1, firstJoin);
+                stmt.setString(2, playerId.toString());
+                stmt.setTimestamp(3, firstJoin);
+                return stmt.executeUpdate();
+            } catch (SQLException e) {
+                logger.warning("Failed to correct first_join for " + playerId + ": " + e.getMessage());
+                return 0;
+            }
+        });
+    }
+
     public CompletableFuture<Optional<PlayerDTO>> findByCurrentName(String playerName) {
         return CompletableFuture.supplyAsync(() -> {
             // Create a new QueryBuilder instance for thread safety
@@ -710,6 +736,15 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         // on their first save.
         ServerState state = lookupServerState(playerId);
 
+        // With cluster-shared identity the legacy columns belong to whichever tier saved last, so a
+        // player's first visit here inherited that tier's joins and playtime, and the next save
+        // copied them into this server's mirror (#2128). A healthy mirror with no row means this
+        // server has not seen the player: start from zero. An unhealthy mirror keeps the old
+        // fallback - with forward-only counters a wrong fallback can inflate, never erase.
+        if (state == null && identityIsRemote() && stateCacheHealthy) {
+            state = new ServerState(null, 0, 0f, safeGetTimestamp(rs, "last_seen"));
+        }
+
         PlayerDTO.Builder builder = new PlayerDTO.Builder()
             .id(playerId)
             .currentName(rs.getString("current_name"))
@@ -772,20 +807,47 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
     
     @Override
     protected String buildUpdateQuery() {
-        // Create a new QueryBuilder instance for thread safety
-        QueryBuilder builder = createQueryBuilder();
-        builder = builder.update(tableName);
-        builder.set("current_name", "?")
-               .set("name_history", "?")
-               .set("last_seen", "?")
-               .set("current_world", "?")
-               .set("times_joined", "?")
-               .set("total_playtime_hours", "?")
-               .set("primary_group", "?")
-               .set("groups", "?")
-               .set("banned", "?")
-               .where("id = ?");
-        return builder.build();
+        // Raw SQL: the query builder renders every SET value as a bare "?".
+        //
+        // Saves write a row read up to 30s earlier (#2128), so:
+        //  - banned is not written here at all - a save racing a netban wrote the stale flag back
+        //    and cleared the ban. It has its own write, setBanned().
+        //  - counters and last_seen only move forward, so a stale save cannot undo joins,
+        //    playtime or a newer visit written by another save.
+        String max = maxFunction(connectionProvider);
+        // last_seen is compared only on MySQL: SQLite orders INTEGER before TEXT, so a mix of
+        // stored formats would pin it. Counters are numeric on both.
+        String lastSeen = "GREATEST".equals(max) ? "GREATEST(last_seen, ?)" : "?";
+        return "UPDATE " + tableName + " SET current_name = ?, name_history = ?, "
+                + "last_seen = " + lastSeen + ", current_world = ?, "
+                + "times_joined = " + max + "(times_joined, ?), "
+                + "total_playtime_hours = " + max + "(total_playtime_hours, ?), "
+                + "primary_group = ?, groups = ? WHERE id = ?";
+    }
+
+    /** GREATEST on MySQL/MariaDB; SQLite's two-argument MAX is the same scalar function. */
+    private static String maxFunction(org.fourz.rvnkcore.database.connection.ConnectionProvider provider) {
+        return "mysql".equalsIgnoreCase(provider.getDatabaseType()) ? "GREATEST" : "MAX";
+    }
+
+    /**
+     * Sets or clears the network ban flag, and nothing else (#2128). The general save no longer
+     * writes {@code banned}, so a save from a stale read cannot undo a ban.
+     *
+     * @return true when the player's row was updated
+     */
+    public CompletableFuture<Boolean> setBanned(UUID playerId, boolean banned) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (var conn = connectionProvider.getConnection();
+                 var stmt = conn.prepareStatement("UPDATE " + tableName + " SET banned = ? WHERE id = ?")) {
+                stmt.setBoolean(1, banned);
+                stmt.setString(2, playerId.toString());
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) {
+                logger.error("Failed to set network ban for " + playerId, e);
+                throw new org.fourz.rvnkcore.api.exception.DatabaseException("Network ban update failed", e);
+            }
+        });
     }
     
     @Override
@@ -813,7 +875,6 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         stmt.setFloat(6, entity.getTotalPlaytimeHours());
         stmt.setString(7, entity.getPrimaryGroup());
         stmt.setString(8, new Gson().toJson(entity.getGroups()));
-        stmt.setBoolean(9, entity.isBanned());
-        stmt.setString(10, entity.getId().toString()); // WHERE clause
+        stmt.setString(9, entity.getId().toString()); // WHERE clause (banned has its own write)
     }
 }

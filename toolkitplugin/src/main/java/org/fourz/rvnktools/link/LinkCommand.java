@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 public class LinkCommand extends BaseCommand {
 
     private static final List<String> SUBCOMMANDS = List.of("login", "invite", "matrix", "discord");
-    private static final long DEFAULT_LOGIN_TTL_MINUTES = 15L;
     private static final long DEFAULT_INVITE_TTL_MINUTES = 120L;   // 2h
     private static final long DEFAULT_INVITE_TTL_MAX_MINUTES = 1440L; // 24h hard cap
 
@@ -106,7 +105,8 @@ public class LinkCommand extends BaseCommand {
         TextComponent linkComponent = new TextComponent(ChatFormat.colorize("&b&n" + url));
         linkComponent.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url));
         player.spigot().sendMessage(linkComponent);
-        sender.sendMessage(ChatFormat.colorize("&7This link expires in &f15 minutes &7and can only be used once."));
+        sender.sendMessage(ChatFormat.colorize("&7This link expires in &f"
+                + authTokenStore.getLoginTtlMinutes() + " minutes &7and can only be used once."));
     }
 
     @SuppressWarnings("deprecation")
@@ -146,7 +146,8 @@ public class LinkCommand extends BaseCommand {
         sender.sendMessage(ChatFormat.colorize(
                 "&7Groups: &f" + String.join(", ", groups)));
         sender.sendMessage(ChatFormat.colorize(
-                "&7This link expires in &f15 minutes &7and can only be used once."));
+                "&7This link expires in &f" + authTokenStore.getLoginTtlMinutes()
+                        + " minutes &7and can only be used once."));
     }
 
     /**

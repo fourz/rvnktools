@@ -114,6 +114,12 @@ public class CoreServiceFactory {
             logger.info("Player identity is cluster-shared - " + clusterConnectionProvider.describeTarget());
             return clusterConnectionProvider;
         }
+        if (ConfigLoader.getInstance(plugin).isPlayerIdentityShared()) {
+            // Configured to share identity but the cluster link is down: bans and new players
+            // go to the local roster until restart (#2128). Say so where an operator will see it.
+            logger.error("cluster.share-player-identity is on but the cluster database is unavailable - "
+                    + "player identity and network bans use the LOCAL roster until the next restart");
+        }
         return connectionProvider;
     }
 
@@ -242,12 +248,25 @@ public class CoreServiceFactory {
     /**
      * Registers the PlayerService for player data management.
      */
+    private PlayerRepository playerRepository;
+
+    /**
+     * One PlayerRepository for PlayerService and PlayerWorldService. Two instances kept separate
+     * 30s mirror caches, and a world change wrote the second one's stale joins, playtime and
+     * last_seen back over the first's (#2128).
+     */
+    private synchronized PlayerRepository sharedPlayerRepository() {
+        if (playerRepository == null) {
+            playerRepository = new PlayerRepository(identityProvider(), connectionProvider,
+                    clusterConnectionProvider, new BasicSQLQueryBuilder(), plugin, serverId());
+        }
+        return playerRepository;
+    }
+
     private void registerPlayerService(ServiceRegistry registry) {
         try {
             logger.debug("Constructing PlayerService with dependencies...");
-            BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
-            DefaultPlayerService playerService = new DefaultPlayerService(playerRepository, plugin);
+            DefaultPlayerService playerService = new DefaultPlayerService(sharedPlayerRepository(), plugin);
 
             registry.registerService(PlayerService.class, playerService);
         } catch (Exception e) {
@@ -262,9 +281,8 @@ public class CoreServiceFactory {
     private void registerPlayerWorldService(ServiceRegistry registry) {
         try {
             BasicSQLQueryBuilder queryBuilder = new BasicSQLQueryBuilder();
-            PlayerRepository playerRepository = new PlayerRepository(identityProvider(), connectionProvider, clusterConnectionProvider, queryBuilder, plugin, serverId());
             PlayerWorldDataRepository worldDataRepository = new PlayerWorldDataRepository(connectionProvider, queryBuilder, plugin);
-            DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(playerRepository, worldDataRepository, plugin);
+            DefaultPlayerWorldService playerWorldService = new DefaultPlayerWorldService(sharedPlayerRepository(), worldDataRepository, plugin);
 
             registry.registerService(PlayerWorldService.class, playerWorldService);
             logger.info("PlayerWorldService registered");

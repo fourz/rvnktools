@@ -158,11 +158,8 @@ public abstract class BaseCommand implements RVNKCommand, CommandExecutor, TabCo
             return true;
         }
 
-        // A bare invocation only means "show help" for a command that dispatches to subcommands.
-        // A leaf command must reach executeCommand(), which is the only reason to override it.
-        // This previously returned help unconditionally on zero args, which made every no-argument
-        // command in the plugin unreachable — /ping and /discord both answered with their own usage
-        // text instead of running (#1600).
+        // A bare invocation shows help only for a command with subcommands; a leaf command
+        // must reach executeCommand() (#1600).
         if (args.length == 0) {
             if (!subCommands.isEmpty()) {
                 sendHelp(sender);

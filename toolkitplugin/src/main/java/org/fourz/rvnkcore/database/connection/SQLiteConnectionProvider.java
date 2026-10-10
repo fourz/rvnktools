@@ -18,6 +18,11 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  * This implementation creates fresh connections for each request to avoid
  * connection sharing issues with SQLite in multi-threaded environments.
+ *
+ * <p>Deliberately unpooled (#1590): no HikariCP, one {@link DriverManager} connection per
+ * call, with WAL journaling so readers do not block the writer. The pool settings on
+ * {@code DatabaseConfig} apply to MySQL only, and config.yml has no SQLite {@code pool:}
+ * block.</p>
  * 
  * @since 1.0.0
  */

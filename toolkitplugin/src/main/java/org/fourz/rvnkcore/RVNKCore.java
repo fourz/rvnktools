@@ -161,11 +161,9 @@ public class RVNKCore extends JavaPlugin implements Listener {
      * Builds the primary connection provider, degrading to local SQLite rather than failing the
      * plugin when a MySQL primary cannot be reached (#2103).
      *
-     * <p>Before this, an unreachable database threw out of {@code onEnable}, so Bukkit disabled
-     * RVNKCore — and with it every plugin that hard-depends on it. On 2026-09-19 that turned a
-     * database outage into a production server running vanilla: no lore, no events, no economy, no
-     * shops, and no block logging. A degraded stack on local SQLite is worth far more than a
-     * correct refusal to start.</p>
+     * <p>A failed {@code onEnable} disables RVNKCore and every plugin that hard-depends on it, so a
+     * database outage would leave the server running vanilla. A degraded stack on local SQLite is
+     * worth more than a correct refusal to start.</p>
      *
      * <p>Two cheap guards keep the slow path off the main thread's clock: a TCP probe decides
      * reachability in {@code database.fallback.probeTimeoutMs} instead of HikariCP's 30-second

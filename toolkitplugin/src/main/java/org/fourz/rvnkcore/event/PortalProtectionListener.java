@@ -22,7 +22,6 @@ import org.fourz.rvnkcore.service.portal.PortalSignWriter;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Protects a registered cross-server portal's sign and anchor block from every destruction vector
@@ -271,11 +270,13 @@ public class PortalProtectionListener implements Listener {
         Material trigger = config.getTriggerMaterial();
         if (trigger == null || block.getType() != trigger) return null;
 
-        Optional<Block> sign = PortalSignWriter.findSignOnAnchor(block, portalIdKey, null);
-        if (sign.isEmpty()) return null;
-
-        String id = PortalSignWriter.readPortalId(sign.get(), portalIdKey).orElse(null);
-        return liveId(id, portalService);
+        // Check every mounted sign: taking the first one let a blank decoy on an earlier face
+        // hide the stamped sign and leave the anchor unprotected (#2127)
+        for (Block sign : PortalSignWriter.findSignsOnAnchor(block)) {
+            String id = liveId(PortalSignWriter.readPortalId(sign, portalIdKey).orElse(null), portalService);
+            if (id != null) return id;
+        }
+        return null;
     }
 
     /**

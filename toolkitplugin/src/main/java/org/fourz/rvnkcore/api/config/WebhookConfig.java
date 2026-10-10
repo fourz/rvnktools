@@ -27,10 +27,14 @@ public class WebhookConfig {
     private final int timeoutMs;
     private final String cachePurgeUrl;
     private final String cachePurgeEnv;
+    // Operator opt-in for a LAN/loopback webhook target, e.g. Dev -> the local WebUI (#2122).
+    // The URL is operator-edited config, so the SSRF guard (#607) protects against a mistake;
+    // this key states the intent explicitly and is logged at every boot.
+    private final boolean allowInternal;
 
     private WebhookConfig(boolean enabled, String url, String secret, String serverId,
                           int debounceSeconds, int timeoutMs,
-                          String cachePurgeUrl, String cachePurgeEnv) {
+                          String cachePurgeUrl, String cachePurgeEnv, boolean allowInternal) {
         this.enabled = enabled;
         this.url = url;
         this.secret = secret;
@@ -39,6 +43,7 @@ public class WebhookConfig {
         this.timeoutMs = timeoutMs;
         this.cachePurgeUrl = cachePurgeUrl != null ? cachePurgeUrl.trim() : "";
         this.cachePurgeEnv = cachePurgeEnv != null ? cachePurgeEnv.trim() : "";
+        this.allowInternal = allowInternal;
     }
 
     /**
@@ -49,7 +54,7 @@ public class WebhookConfig {
      */
     public static WebhookConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
-            return new WebhookConfig(false, "", "", "", 10, 5000, "", "");
+            return new WebhookConfig(false, "", "", "", 10, 5000, "", "", false);
         }
         ConfigurationSection purge = section.getConfigurationSection("cache-purge");
         return new WebhookConfig(
@@ -60,7 +65,8 @@ public class WebhookConfig {
             section.getInt("debounce-seconds", 10),
             section.getInt("timeout-ms", 5000),
             purge != null ? purge.getString("url", "") : "",
-            purge != null ? purge.getString("env", "") : ""
+            purge != null ? purge.getString("env", "") : "",
+            section.getBoolean("allow-internal", false)
         );
     }
 
@@ -88,8 +94,14 @@ public class WebhookConfig {
             try {
                 String host = URI.create(url).getHost();
                 if (isInternalHost(host)) {
-                    logger.error("Webhook URL resolves to a private/loopback address - SSRF risk blocked: " + host);
-                    valid = false;
+                    if (allowInternal) {
+                        logger.warning("Webhook URL resolves to a private/loopback address, allowed by "
+                                + "webhook.allow-internal: " + host);
+                    } else {
+                        logger.error("Webhook URL resolves to a private/loopback address - SSRF risk blocked: "
+                                + host + " (set webhook.allow-internal: true if this target is intended)");
+                        valid = false;
+                    }
                 }
             } catch (Exception e) {
                 logger.error("Webhook URL is malformed: " + e.getMessage());
@@ -123,6 +135,7 @@ public class WebhookConfig {
     }
 
     public boolean isEnabled() { return enabled; }
+    public boolean isAllowInternal() { return allowInternal; }
     public String getUrl() { return url; }
     public String getSecret() { return secret; }
     public String getServerId() { return serverId; }

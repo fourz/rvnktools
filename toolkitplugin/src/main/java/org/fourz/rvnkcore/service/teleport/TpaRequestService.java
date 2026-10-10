@@ -80,11 +80,12 @@ public class TpaRequestService {
             cancelRequest(senderUUID);
         }
 
-        // Check if target already has a pending inbound
+        // A pending request from someone else is not replaced. Replacing it let a second player
+        // swap in a /tpahere behind the target's back, so clicking the first player's [Accept]
+        // pulled the target to the second (#2127).
         TpaRequest existingInbound = inboundRequests.get(targetUUID);
-        if (existingInbound != null) {
-            // Cancel the old inbound so the new one takes priority
-            cancelRequestByTarget(targetUUID);
+        if (existingInbound != null && !existingInbound.getSender().equals(senderUUID)) {
+            return Optional.of(target.getName() + " already has a pending teleport request. Try again shortly.");
         }
 
         TpaRequest request = new TpaRequest(senderUUID, targetUUID, type);
@@ -97,6 +98,8 @@ public class TpaRequestService {
 
         outboundRequests.put(senderUUID, request);
         inboundRequests.put(targetUUID, request);
+        // Cooldown starts on send, not only on accept: ignored requests could be sent without limit
+        setCooldown(senderUUID);
 
         logger.debug("TPA request: " + sender.getName() + " -> " + target.getName() + " (" + type + ")");
         return Optional.empty();
@@ -115,6 +118,17 @@ public class TpaRequestService {
      * @return the accepted request, or empty if none pending
      */
     public Optional<TpaRequest> acceptRequest(UUID targetUUID) {
+        return acceptRequest(targetUUID, null);
+    }
+
+    /**
+     * Accepts the pending request only if it came from {@code expectedSender} (null accepts any).
+     * The [Accept] button names its sender, so a click can only accept the request it was shown with.
+     */
+    public Optional<TpaRequest> acceptRequest(UUID targetUUID, UUID expectedSender) {
+        TpaRequest pending = inboundRequests.get(targetUUID);
+        if (pending == null) return Optional.empty();
+        if (expectedSender != null && !pending.getSender().equals(expectedSender)) return Optional.empty();
         TpaRequest request = inboundRequests.remove(targetUUID);
         if (request == null) return Optional.empty();
 
@@ -196,6 +210,11 @@ public class TpaRequestService {
         if (expiry == null) return 0;
         long remaining = (expiry - System.currentTimeMillis()) / 1000;
         return Math.max(0, remaining);
+    }
+
+    /** Starts the shared teleport cooldown for a player, e.g. after /back (#2127). */
+    public void startCooldown(UUID playerUUID) {
+        setCooldown(playerUUID);
     }
 
     private void setCooldown(UUID playerUUID) {
@@ -281,7 +300,8 @@ public class TpaRequestService {
         cancelRequest(playerUUID);
         cancelRequestByTarget(playerUUID);
         cancelWarmup(playerUUID);
-        cooldowns.remove(playerUUID);
+        // Cooldowns are kept: clearing them on quit let a relog skip the cooldown. Entries expire
+        // by time and are dropped on the next check.
     }
 
     /**

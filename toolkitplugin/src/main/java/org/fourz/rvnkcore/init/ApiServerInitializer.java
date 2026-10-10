@@ -28,7 +28,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
  * retrieving services from the ServiceRegistry rather than accepting them
  * as direct constructor parameters.</p>
  *
- * <p>As of 1.4.0, this initializer also registers the {@link IServletRegistrationService}
+ * <p>This initializer also registers the {@link IServletRegistrationService}
  * with the ServiceRegistry, enabling external plugins to register their own HTTP endpoints.</p>
  *
  * @since 1.4.0
@@ -93,7 +93,9 @@ public class ApiServerInitializer {
             logger.debug("  + WorldService retrieved");
 
             // Create AuthTokenStore and register as a service (used by LinkCommand + AuthController)
-            AuthTokenStore authTokenStore = new AuthTokenStore(plugin);
+            // link.login-ttl-minutes is read here once; LinkCommand reads it back from the store (#1598)
+            AuthTokenStore authTokenStore = new AuthTokenStore(plugin, plugin.getConfig().getLong(
+                    "link.login-ttl-minutes", AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES));
             registry.registerService(AuthTokenStore.class, authTokenStore);
             logger.debug("  + AuthTokenStore created and registered");
 

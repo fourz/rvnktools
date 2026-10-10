@@ -5,6 +5,13 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.response.ApiResponse;
+import org.fourz.rvnkcore.api.model.worlds.CreateWorldV2Request;
+import org.fourz.rvnkcore.api.model.worlds.GeneratorInfoDTO;
+import org.fourz.rvnkcore.api.model.worlds.JobDTO;
+import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
+import org.fourz.rvnkcore.api.model.worlds.PreviewDTO;
+import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.WorldGenSettingsDTO;
 import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
 
@@ -189,6 +196,71 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
     @Override
     public CompletableFuture<ApiResponse<?>> restoreWorldSnapshot(String worldName, String requestBody) {
         return writeUnavailable();
+    }
+
+    // ==================== World Forge (#2200) — unavailable without RVNKWorlds ====================
+    //
+    // Every World Forge route, GETs included, answers 501 PLUGIN_NOT_LOADED. GET /generators does
+    // NOT return an empty list: "no generators exist" and "generators cannot be listed here" lead a
+    // client to different decisions (hide the create form vs. say RVNKWorlds is down), and an empty
+    // list reads as the former while meaning the latter — the same rule surveySite follows with
+    // available:false. Only GETs reach this class; the controller answers other methods with 501
+    // before resolving a service, so the write overrides below are belt-and-braces.
+
+    @Override
+    public CompletableFuture<ApiResponse<List<GeneratorInfoDTO>>> listGenerators() {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<GeneratorInfoDTO>> getGenerator(String generatorId) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<List<PresetDTO>>> listPresets(String generatorFilter) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<PresetDTO>> getPreset(String name) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<PresetDTO>> savePreset(PresetDTO preset) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<PresetDTO>> deletePreset(String name) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<JobDTO>> createWorldV2(CreateWorldV2Request request) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<JobDTO>> getJob(String jobId) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<PreviewDTO>> previewTerrain(PreviewRequest request) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<WorldGenSettingsDTO>> getWorldGenSettings(String worldName) {
+        return forgeUnavailable();
+    }
+
+    private static <T> CompletableFuture<ApiResponse<T>> forgeUnavailable() {
+        return CompletableFuture.completedFuture(
+            ApiResponse.error("PLUGIN_NOT_LOADED",
+                "RVNKWorlds plugin is not loaded; World Forge unavailable"));
     }
 
     private static CompletableFuture<ApiResponse<?>> writeUnavailable() {

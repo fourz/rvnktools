@@ -143,13 +143,8 @@ public class ServletRegistrationServiceImpl implements IServletRegistrationServi
         
         String normalizedPath = normalizePath(pathSpec);
 
-        // Re-registration swaps the delegate behind the already-bound wrapper (#1604).
-        //
-        // This used to return false and log "Servlet already registered". Jetty cannot remove a
-        // servlet from a started ServletContextHandler, so the previously-bound servlet stayed
-        // mapped and kept serving the OLD plugin's classes after a hot reload — while the plugin
-        // logged Enabled and the endpoint returned 200. A deployed REST fix simply had no effect,
-        // which reads as "the fix doesn't work" rather than "the fix was never loaded".
+        // Re-registration swaps the delegate behind the bound wrapper. Jetty cannot unmap a servlet
+        // from a started context, so a hot reload would otherwise keep the old classes (#1604).
         DelegatingServlet existing = boundWrappers.get(normalizedPath);
         if (existing != null) {
             existing.setDelegate(servlet, servletContext);

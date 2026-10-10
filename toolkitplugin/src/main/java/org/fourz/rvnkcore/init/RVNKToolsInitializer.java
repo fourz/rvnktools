@@ -15,6 +15,8 @@ import org.fourz.rvnkcore.event.ChatRelayListener;
 import org.fourz.rvnkcore.event.PortalSignListener;
 import org.fourz.rvnkcore.event.PortalStepListener;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
+import org.fourz.rvnkcore.service.npc.NpcBridge;
+import org.fourz.rvnkcore.service.region.RegionBridge;
 import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.transfer.TransferService;
@@ -61,6 +63,7 @@ public class RVNKToolsInitializer {
 
     // Component references for shutdown
     private LuckPermsIntegrationListener luckPermsListener;
+    private NpcBridge npcBridge;
 
     /**
      * Creates a new RVNKToolsInitializer.
@@ -110,6 +113,14 @@ public class RVNKToolsInitializer {
         initializeTransferService();
         logger.debug("  + TransferService initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        // NPC bridge BEFORE commands so /rvnk npc resolves INpcService (#2213)
+        initializeNpcBridge();
+        logger.debug("  + NPC bridge initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        // Region tool BEFORE commands so /rvnk region and /rvnk npc protect resolve IRegionService (#2248)
+        initializeRegionTool();
+        logger.debug("  + Region tool initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -134,6 +145,12 @@ public class RVNKToolsInitializer {
             }
         } catch (Exception e) {
             // Service may not be registered
+        }
+
+        // Unregister the %rvnknpc_*% expansion (Bukkit removes the click listener itself)
+        if (npcBridge != null) {
+            npcBridge.shutdown();
+            npcBridge = null;
         }
 
         // Shutdown LuckPerms listener
@@ -346,6 +363,27 @@ public class RVNKToolsInitializer {
         }
     }
 
+    /**
+     * Installs the RVNK NPC bridge (#2213): registers {@code INpcService} (Citizens-backed, or an
+     * unavailable stand-in when Citizens is absent) and the {@code %rvnknpc_*%} expansion when
+     * PlaceholderAPI is enabled. Never fatal: a failure here leaves the rest of RVNKCore running.
+     */
+    private void initializeNpcBridge() {
+        try {
+            npcBridge = NpcBridge.install(plugin, registry, logger);
+        } catch (RuntimeException | LinkageError e) {
+            logger.error("Failed to install the NPC bridge", e);
+        }
+    }
+
+    private void initializeRegionTool() {
+        try {
+            RegionBridge.install(registry, logger);
+        } catch (RuntimeException | LinkageError e) {
+            logger.error("Failed to install the region tool", e);
+        }
+    }
+
     private void registerBundledComponentCommands() {
         try {
             // Register PlayerPreferencesCommand
@@ -366,6 +404,11 @@ public class RVNKToolsInitializer {
                         new org.fourz.rvnkcore.command.PortalCommand(plugin);
                 commandManager.registerCommand(portalCommand);
                 logger.info("PortalCommand registered");
+
+                // /rvnk npc - NPC bridge staff tooling (#2213). Registered with or without Citizens:
+                // the verbs report "unavailable" rather than vanishing.
+                commandManager.registerCommand(new org.fourz.rvnkcore.command.RvnkCommand(plugin));
+                logger.info("RvnkCommand registered");
             }
 
         } catch (Exception e) {

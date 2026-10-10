@@ -362,12 +362,37 @@ public class PlayerController extends HttpServlet {
         }
     }
 
+    /**
+     * The group list after applying {@code action} ("add", "remove" or "set") to {@code current}.
+     * Order is kept and duplicates are dropped; the first entry becomes the primary group.
+     */
+    static List<String> applyGroupAction(List<String> current, String action, List<String> requested) {
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        switch (action) {
+            case "add" -> {
+                if (current != null) result.addAll(current);
+                result.addAll(requested);
+            }
+            case "remove" -> {
+                if (current != null) result.addAll(current);
+                requested.forEach(result::remove);
+            }
+            default -> result.addAll(requested); // "set"
+        }
+        return new java.util.ArrayList<>(result);
+    }
+
     private void handleUpdateGroups(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
         GroupUpdateRequest request = gson.fromJson(ApiUtils.readRequestBody(req), GroupUpdateRequest.class);
-        if (!request.isValid()) { sendError(resp, 400, "Invalid group update request"); return; }
-        String primary = request.getGroups().isEmpty() ? "" : request.getGroups().get(0);
+        if (request == null || !request.isValid()) { sendError(resp, 400, "Invalid group update request"); return; }
         try {
-            playerService.updatePlayerGroups(uuid, primary, request.getGroups())
+            // Honour the action: "remove" used to replace the whole list with the groups named
+            // for removal (#2126). These groups decide WebUI roles.
+            List<String> current = playerService.getPlayer(uuid).get(15, TimeUnit.SECONDS)
+                    .map(PlayerDTO::getGroups).orElse(List.of());
+            List<String> groups = applyGroupAction(current, request.getAction(), request.getGroups());
+            String primary = groups.isEmpty() ? "" : groups.get(0);
+            playerService.updatePlayerGroups(uuid, primary, groups)
                      .get(15, TimeUnit.SECONDS);
             sendResponse(resp, 200, java.util.Map.of("message", "Groups updated successfully"));
         } catch (Exception ex) {
@@ -536,6 +561,40 @@ public class PlayerController extends HttpServlet {
 
     // ====== End PlayerWorld API Endpoints ======
 
+    /**
+     * Online state for a player row. Reads the main-thread live snapshot first (the same source as
+     * /players/online) and falls back to Bukkit. This runs on a Jetty thread, and the list endpoint
+     * reported online=false for a connected player (#2096).
+     */
+    private boolean isOnline(java.util.UUID playerId) {
+        List<PlayerResponse> snapshot = null;
+        try {
+            snapshot = liveDataCache.getSnapshot().onlinePlayers;
+        } catch (Exception ignored) {
+            // No snapshot yet: the direct lookup decides
+        }
+        return isOnline(playerId, snapshot, id -> Bukkit.getPlayer(id) != null);
+    }
+
+    /**
+     * Online if the live snapshot lists the player, else if the direct lookup finds them.
+     * Package-private and static so the rule is testable without a server (#2096).
+     */
+    static boolean isOnline(java.util.UUID playerId, List<PlayerResponse> snapshot,
+                            java.util.function.Predicate<java.util.UUID> directLookup) {
+        if (playerId == null) return false;
+        if (snapshot != null) {
+            for (PlayerResponse p : snapshot) {
+                if (p != null && playerId.equals(p.getUuid())) return true;
+            }
+        }
+        try {
+            return directLookup.test(playerId);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private PlayerResponse convertToResponse(PlayerDTO player) {
         // Convert Timestamp to LocalDateTime
         LocalDateTime firstSeen = player.getFirstJoin() != null ? 
@@ -546,7 +605,8 @@ public class PlayerController extends HttpServlet {
         return PlayerResponse.builder()
                 .uuid(player.getId())
                 .name(player.getCurrentName())
-                .online(Bukkit.getPlayer(player.getId()) != null)
+                .online(isOnline(player.getId()))
+                .banned(player.isBanned())
                 .firstSeen(firstSeen)
                 .lastSeen(lastSeen)
                 .timesJoined(player.getTimesJoined())

@@ -5,6 +5,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
 import org.bukkit.plugin.Plugin;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -361,8 +362,8 @@ public class DatabaseSetup {
                 "id VARCHAR(36) PRIMARY KEY, " +
                 "current_name VARCHAR(255) NOT NULL, " +
                 "name_history TEXT, " +
-                "first_join TIMESTAMP NOT NULL, " +
-                "last_seen TIMESTAMP NOT NULL, " +
+                "first_join TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
                 "current_world VARCHAR(255), " +
                 "times_joined INT DEFAULT 1, " +
                 "total_playtime_hours FLOAT DEFAULT 0.0, " +
@@ -524,8 +525,8 @@ public class DatabaseSetup {
                 "id VARCHAR(36) PRIMARY KEY, " +
                 "current_name VARCHAR(255) NOT NULL, " +
                 "name_history TEXT, " +
-                "first_join TIMESTAMP NOT NULL, " +
-                "last_seen TIMESTAMP NOT NULL, " +
+                "first_join TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
                 "current_world VARCHAR(255), " +
                 "times_joined INT DEFAULT 1, " +
                 "total_playtime_hours FLOAT DEFAULT 0.0, " +
@@ -539,8 +540,8 @@ public class DatabaseSetup {
             createPlayerWorldDataTable = "CREATE TABLE IF NOT EXISTS " + playerWorldDataTable + " (" +
                 "player_id VARCHAR(36) NOT NULL, " +
                 "world_name VARCHAR(255) NOT NULL, " +
-                "first_visit TIMESTAMP NOT NULL, " +
-                "last_visit TIMESTAMP NOT NULL, " +
+                "first_visit TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "last_visit TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
                 "visit_count INT DEFAULT 1, " +
                 "playtime_seconds BIGINT DEFAULT 0, " +
                 "last_x DOUBLE DEFAULT 0, " +
@@ -1139,7 +1140,53 @@ public class DatabaseSetup {
             logger.warning("Failed to register 'holiday' announcement type: " + e.getMessage());
         }
 
+        // Migration 9: Remove MariaDB's implicit ON UPDATE CURRENT_TIMESTAMP (#2125)
+        fixImplicitTimestampAutoUpdate(connection);
+
         logger.debug("Database migrations completed");
+    }
+
+    /**
+     * With {@code explicit_defaults_for_timestamp=OFF} (MariaDB before 10.10), the first
+     * {@code TIMESTAMP NOT NULL} column of a table declared without a default silently becomes
+     * {@code DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP}. The player save never writes
+     * {@code first_join}, so every save reset it to "now" - the same for
+     * {@code player_world_data.first_visit}. MODIFY without ON UPDATE removes the auto-update; the
+     * real dates are restored from Bukkit's first-played record (#2125).
+     */
+    private void fixImplicitTimestampAutoUpdate(Connection connection) {
+        if (!"MySQL".equalsIgnoreCase(databaseType)) return; // SQLite has no auto-update
+        String[][] columns = {
+                {table(TABLE_PLAYERS), "first_join"},
+                {table(TABLE_PLAYERS), "last_seen"},
+                {table(TABLE_PLAYER_WORLD_DATA), "first_visit"},
+                {table(TABLE_PLAYER_WORLD_DATA), "last_visit"},
+        };
+        for (String[] c : columns) {
+            String extra;
+            try (var check = connection.prepareStatement(
+                    "SELECT EXTRA FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?")) {
+                check.setString(1, c[0]);
+                check.setString(2, c[1]);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (!rs.next()) continue;
+                    extra = rs.getString(1);
+                }
+            } catch (SQLException e) {
+                logger.warning("Could not inspect " + c[0] + "." + c[1] + ": " + e.getMessage());
+                continue;
+            }
+            if (extra == null || !extra.toLowerCase().contains("on update")) continue;
+            try (var stmt = connection.createStatement()) {
+                stmt.execute("ALTER TABLE " + c[0] + " MODIFY " + c[1]
+                        + " TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+                logger.warning("Removed implicit ON UPDATE CURRENT_TIMESTAMP from " + c[0] + "." + c[1]
+                        + " - values written before this fix may be wrong until backfilled (#2125)");
+            } catch (SQLException e) {
+                logger.warning("Failed to fix auto-update on " + c[0] + "." + c[1] + ": " + e.getMessage());
+            }
+        }
     }
 
     /**

@@ -13,6 +13,9 @@ public class PlayerResponse {
     private UUID uuid;
     private String name;
     private boolean online;
+    // Network ban flag (rvnk_players.banned). Serialised so a consumer never reads its absence as
+    // "not banned" (#2096, #1995).
+    private boolean banned;
     private LocalDateTime firstSeen;
     private LocalDateTime lastSeen;
     private int timesJoined;
@@ -33,6 +36,7 @@ public class PlayerResponse {
     public UUID getUuid() { return uuid; }
     public String getName() { return name; }
     public boolean isOnline() { return online; }
+    public boolean isBanned() { return banned; }
     public LocalDateTime getFirstSeen() { return firstSeen; }
     public LocalDateTime getLastSeen() { return lastSeen; }
     public int getTimesJoined() { return timesJoined; }
@@ -57,6 +61,11 @@ public class PlayerResponse {
 
         public Builder online(boolean online) {
             response.online = online;
+            return this;
+        }
+
+        public Builder banned(boolean banned) {
+            response.banned = banned;
             return this;
         }
 

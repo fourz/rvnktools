@@ -173,7 +173,11 @@ public class ServletFactory {
         LogManager worldControllerLogger = LogManager.getInstance(plugin, 
             org.fourz.rvnkcore.api.controller.WorldController.class);
         
-        WorldController worldController = new WorldController(worldService, playerWorldService, gson, worldControllerLogger);
+        // Seed exposure is read per response from the live config, so /rvnkcore reload applies it.
+        // Missing key = false: existing servers never get the key written (#1563 pattern).
+        WorldController worldController = new WorldController(worldService, playerWorldService, gson,
+            worldControllerLogger,
+            () -> plugin.getConfig().getBoolean(WorldController.EXPOSE_SEED_KEY, false));
         context.addServlet(new ServletHolder(worldController), "/v1/worlds/*");
     }
 

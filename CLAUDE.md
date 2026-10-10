@@ -10,7 +10,7 @@
 
 **RVNKTools** components (announcements, permissions, utilities) are bundled inside RVNKCore.
 
-**Tech Stack**: Java 17+, Paper/Spigot 1.20+, Maven, MySQL/SQLite, HikariCP
+**Tech Stack**: Java 21 bytecode, JDK 25, spigot-api 26.1.2 (see build rule), Maven, MySQL/SQLite, HikariCP
 
 **Source**: `repos/rvnktools/toolkitplugin/`
 
@@ -32,13 +32,13 @@ mvn clean package -DskipTests  # Skip tests
 
 ### Primary References
 
-- **Graph Memory** — Plugin status and history: `open_nodes(["RVNKCore"])` or `open_nodes(["RVNKTools"])`
+- **sql-memory** — Plugin status and history: `python scripts/sql-memory/recall.py --bank ravenkraftdev --entity RVNKCore`
 - **GitHub Issues** — Task tracking: `gh issue list --repo fourz/Ravenkaft-Dev --label "board:rvnkcore"`
 - **[README.md](README.md)** — Project overview, architecture, features
 
 ### Standards (Parent Repo)
 
-- [Coding Standards](../../docs/standard/coding-standards.md) — Java 17+ conventions
+- [Coding Standards](../../docs/standard/coding-standards.md) — Java 21 conventions
 - [RVNKCore Integration Guide](../../docs/standard/rvnkcore-integration.md) — ServiceRegistry, Repository, DTO patterns
 - [Database Patterns](../../docs/standard/database-patterns.md) — Repository pattern, HikariCP
 - [REST API Standards](../../docs/standard/rest-api-standards.md) — Endpoint design, JSON structure
@@ -74,6 +74,12 @@ org.fourz.rvnkcore
 ├── init/                # CoreServiceFactory, BundledComponentInitializer
 ├── service/
 │   ├── announcement/    # DefaultAnnouncementService
+│   ├── npc/             # NPC bridge: NpcBridge, NpcKeys, UnavailableNpcService (#2213)
+│   │   ├── citizens/    # Citizens adapter - loaded ONLY when Citizens is enabled
+│   │   ├── harness/     # NPC harness (#2248): spec parser, planner, verifier, executor - no Citizens types
+│   │   └── papi/        # %rvnknpc_*% - loaded ONLY when PlaceholderAPI is enabled
+│   ├── region/          # IRegionService, RegionBridge, RegionArgs, Cuboid (#2248)
+│   │   └── worldguard/  # WorldGuard adapter - loaded ONLY when WorldGuard is enabled
 │   └── registry/        # ServiceRegistry, DefaultServiceRegistry
 ├── validation/          # Validator, ValidationResult
 └── util/log/            # LogManager
@@ -125,10 +131,69 @@ Registered in ServiceRegistry by `CoreServiceFactory`:
 
 ### Service Framework
 
+`ServiceRegistry` is an **instance** owned by RVNKCore, not a static API — there is no
+`ServiceRegistry.register(...)` / `ServiceRegistry.get(...)`.
+
 ```java
-ServiceRegistry.register(MyService.class, new MyServiceImpl());
-MyService service = ServiceRegistry.get(MyService.class);
+// Register (inside RVNKCore, or a plugin holding the core instance)
+RVNKCore.getInstance().getServiceRegistry()
+        .registerService(MyService.class, new MyServiceImpl());
+
+// Hard dependency: throws if RVNKCore is not initialised
+MyService service = RVNKCore.getInstance().getService(MyService.class);
+
+// Soft dependency: returns null when RVNKCore or the service is absent
+MyService maybe = RVNKCore.getServiceSafe(MyService.class);
 ```
+
+### NPC bridge (#2213, since 1.5.99-alpha)
+
+RVNKCore owns the NPC contract; Citizens sits behind it. Consumers (RVNKQuests, RVNKEvents) depend
+only on `INpcService` and `RvnkNpcInteractEvent` and reference an NPC by its **RVNK key**, never by a
+Citizens id. Keys are lower-case `[a-z0-9_-]{1,48}`, unique per server, and staff set them with
+`/rvnk npc tag <key> [npcId]` (perms `rvnkcore.npc.*`).
+
+```java
+// Listen: fired on the main thread, only for NPCs that carry a key. Cancellable - a cancel also
+// cancels the Citizens click (right-click interaction and the NPC's /npc command actions).
+@EventHandler(ignoreCancelled = true)
+public void onNpc(RvnkNpcInteractEvent event) {
+    if (event.getClickType() == RvnkNpcInteractEvent.ClickType.RIGHT
+            && event.getNpcKey().equals("harbour_master")) {
+        Player player = event.getPlayer();
+        // advance a TALK_TO objective ...
+    }
+}
+
+// Query: always registered. Without Citizens it is an "unavailable" stand-in that returns empty
+// and never throws, so check isAvailable() instead of null.
+INpcService npcs = RVNKCore.getServiceSafe(INpcService.class);
+if (npcs != null && npcs.isAvailable()) {
+    npcs.findByKey("harbour_master").ifPresent(ref -> ref.getLocation());
+}
+```
+
+- **Classloading guard**: every Citizens class is in `service/npc/citizens/`, every PlaceholderAPI
+  class in `service/npc/papi/`. `NpcBridge` reaches them only after `isPluginEnabled(...)` is true.
+  Never import either package from anywhere else — `NpcBridgeClassLoadingTest` fails if you do.
+- **Persistence**: the key is Citizens persistent metadata `rvnk-key` in each server's `saves.yml`.
+- **Placeholders** (registered only when PlaceholderAPI is enabled): `%rvnknpc_last_key%`,
+  `%rvnknpc_last_name%`, `%rvnknpc_last_ago_seconds%` (`""` / `""` / `-1` when none). In memory,
+  bounded to 1024 players, empty after a restart.
+
+### NPC harness and region tool (#2248, since 1.5.100-alpha)
+
+Console-safe NPC place/edit (`/rvnk npc create|move|rename|remove|skin|lookclose|pose|hold|protected|nameplate`),
+WorldGuard protect zones (`/rvnk npc protect`), an idempotent YAML spec (`plugins/RVNKCore/npc/<spec>.yml`,
+`/rvnk npc apply|verify|export`), and `/rvnk region define|flag|remove|info` from explicit corners. Perms
+`rvnkcore.npc.admin`, `rvnkcore.region.admin`. Full reference, spec schema and the TFAH sample:
+[toolkitplugin/docs/api/npc-harness.md](toolkitplugin/docs/api/npc-harness.md).
+
+- **Never dispatch `/npc` or `/rg` from code.** Console `/npc create` NPEs without `--at`; `/rg define` needs a
+  WorldEdit selection. Use `NpcHarness` (Citizens API) and `IRegionService` (WorldGuard API).
+- **Same classloading guard**: WorldGuard/WorldEdit classes only in `service/region/worldguard/`; the
+  planner, verifier and parser in `service/npc/harness/` must stay free of Citizens and WorldGuard types
+  so they stay unit-testable. `NpcBridgeClassLoadingTest` hides `com.sk89q` too.
 
 ### Async Operations
 
@@ -141,19 +206,27 @@ database.queryAsync(sql)
 
 ### REST Controller Response
 
+Do not block a Jetty request thread on a future. The `future.get(30, TimeUnit.SECONDS)` calls in the
+current controllers are a known defect (#1552). Do not copy them into new code. Complete the response
+from the future instead:
+
 ```java
-ApiResponse<?> response = future.get(30, TimeUnit.SECONDS);
-ApiUtils.sendJson(resp, gson, 200, response);
+AsyncContext ctx = req.startAsync();   // the servlet holder needs setAsyncSupported(true)
+ctx.setTimeout(30_000);
+HttpServletResponse out = (HttpServletResponse) ctx.getResponse();
+service.findAsync(id)
+    .thenAccept(result -> ApiUtils.sendSuccess(out, gson, result))
+    .exceptionally(ex -> { ApiUtils.sendError(out, gson, 500, "Internal error"); return null; })
+    .whenComplete((v, ex) -> ctx.complete());
 ```
+
+Rule: [REST API Standards](../../docs/standard/rest-api-standards.md#best-practices) (#1594).
 
 ---
 
 ## Status Tracking
 
-- **Graph Memory**: `open_nodes(["RVNKCore"])` — plugin status, version, recent work
+- **sql-memory**: `python scripts/sql-memory/recall.py --bank ravenkraftdev --entity RVNKCore` — plugin status, version, recent work
 - **GitHub Issues**: `gh issue list --repo fourz/Ravenkaft-Dev --label "board:rvnkcore"` — open tasks
 - **Parent Ecosystem**: See parent [CLAUDE.md](../../CLAUDE.md) for cross-project context
 
----
-
-**Last Updated**: March 2026

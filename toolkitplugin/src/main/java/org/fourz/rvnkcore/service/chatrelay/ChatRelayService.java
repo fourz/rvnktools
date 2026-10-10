@@ -200,8 +200,7 @@ public class ChatRelayService {
         if (newConfig == null) return;
         this.config = newConfig;
         this.egress = new ChatRelayEgress(newConfig, logger);
-        // Apply chat-relay.buffer.size on reload, not only at boot — a config key that is parsed and
-        // never consumed is a recurring defect in this codebase (#1590, #1598, #1558, #1605).
+        // Apply chat-relay.buffer.size on reload, not only at boot.
         buffer.resize(newConfig.getBufferSize());
         logger.info("ChatRelayService config refreshed - server-id=" + config.getServerId()
             + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()

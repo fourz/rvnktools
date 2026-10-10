@@ -9,10 +9,9 @@ import java.net.Socket;
  *
  * <p>Why this exists: HikariCP's own failure path is slow by design. It keeps retrying until
  * {@code connectionTimeout} elapses — 30 seconds in every RVNK config — so an unreachable MySQL
- * costs each plugin its own 30-second stall before it can decide to degrade. During the 2026-09-19
- * outage Event took {@code Done (164.865s)} to start, against 41s healthy: six plugins each paying
- * that same wait in sequence. The JDBC {@code connectTimeout=10000} parameter does not shorten it,
- * because Hikari retries inside its own window.</p>
+ * costs each plugin its own 30-second stall before it can decide to degrade, and the plugins pay
+ * it in sequence. The JDBC {@code connectTimeout=10000} parameter does not shorten it, because
+ * Hikari retries inside its own window.</p>
  *
  * <p>A TCP connect answers the only question that matters for the fallback decision — is anything
  * listening — in milliseconds when the host is up, and in exactly {@code timeoutMs} when it is not.

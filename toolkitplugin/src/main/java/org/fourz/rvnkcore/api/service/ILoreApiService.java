@@ -81,8 +81,8 @@ public interface ILoreApiService {
      * another plugin's table name and prefix; this keeps the seam at the service boundary, matching
      * how RVNKQuests consumes {@code IRVNKWorldsApiService}.</p>
      *
-     * <p><b>Deliberately a default method.</b> Plugins here deploy independently and do go out of
-     * step — Event ran RVNKCore 1.5.71 against newer plugins for weeks. An abstract method would
+     * <p><b>Deliberately a default method.</b> Plugins here deploy independently and tiers do go
+     * out of step. An abstract method would
      * make an older RVNKLore throw {@code AbstractMethodError} against a newer core at the first
      * call; this degrades to an honest "unavailable" instead, so a version-skewed tier loses the
      * feature rather than the plugin.</p>
