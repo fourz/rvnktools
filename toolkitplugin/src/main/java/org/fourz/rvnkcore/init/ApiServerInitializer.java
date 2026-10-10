@@ -28,7 +28,7 @@ import org.fourz.rvnkcore.util.log.LogManager;
  * retrieving services from the ServiceRegistry rather than accepting them
  * as direct constructor parameters.</p>
  *
- * <p>As of 1.4.0, this initializer also registers the {@link IServletRegistrationService}
+ * <p>This initializer also registers the {@link IServletRegistrationService}
  * with the ServiceRegistry, enabling external plugins to register their own HTTP endpoints.</p>
  *
  * @since 1.4.0

@@ -7,7 +7,7 @@ import java.util.Set;
  * The gate for {@code /rvnk npc click} (#2255): a pure function, unit-testable without a server.
  *
  * <p>A simulated click advances quests and plays dialogue for a real player, so it must not be a
- * way to push quest state on a tier with players in it. The rule (workshop 2026-10-09, #2251):</p>
+ * way to push quest state on a tier with players in it. The rule (#2251):</p>
  *
  * <ol>
  *   <li>The sender needs {@code rvnkcore.npc.admin}.</li>

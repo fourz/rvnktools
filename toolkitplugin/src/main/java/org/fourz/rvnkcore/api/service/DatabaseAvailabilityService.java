@@ -41,11 +41,9 @@ public interface DatabaseAvailabilityService {
      * Whether {@code host:port} is answering, using the cached primary answer only when it is the
      * same host and port RVNKCore uses.
      *
-     * <p>Callers should prefer this over {@link #isPrimaryReachable()}. On Event 2026-09-20, with
-     * RVNKCore pointed at a dead host and RVNKLore still pointed at the live one, RVNKLore was told
-     * "unreachable" and dropped to SQLite although its own database was healthy — and its recovery
-     * timer kept being refused for the same reason, so it could never climb back out while
-     * RVNKCore stayed down. Different host, different answer.</p>
+     * <p>Callers should prefer this over {@link #isPrimaryReachable()}. A plugin on a different
+     * host than RVNKCore must not inherit RVNKCore's "unreachable" answer, or it drops to SQLite
+     * and its recovery timer never climbs back out. Different host, different answer.</p>
      *
      * @param host the caller's own database host
      * @param port the caller's own database port

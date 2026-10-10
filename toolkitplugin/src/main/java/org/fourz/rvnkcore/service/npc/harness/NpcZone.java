@@ -73,7 +73,7 @@ public record NpcZone(int radius, int height) {
     }
 
     /**
-     * Whether a box is this zone around a standing NPC, allowing for a settled NPC (1.5.101).
+     * Whether a box is this zone around a standing NPC, allowing for a settled NPC.
      *
      * <p>A zone built at the spec Y stays where it is when the NPC then falls and settles, so the
      * zone's feet block may sit from the NPC's feet block up to {@code floor(y + raise)}. With
@@ -100,7 +100,7 @@ public record NpcZone(int radius, int height) {
      * Infers the zone that produced a region, for export. The radius and height come from the
      * region bounds; the box must be centred on the NPC's block, and its feet block may sit up to
      * {@link NpcGround#SETTLE_TOLERANCE} above the NPC's feet (a zone built at the spec Y around an
-     * NPC that then settled, 1.5.101).
+     * NPC that then settled).
      *
      * @return the zone, or null when the box is not a zone shape around that position
      */

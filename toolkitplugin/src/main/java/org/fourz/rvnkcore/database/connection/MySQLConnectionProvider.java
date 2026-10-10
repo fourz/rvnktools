@@ -218,12 +218,7 @@ public class MySQLConnectionProvider implements ConnectionProvider {
             hikariConfig.setMinimumIdle(config.getMinIdleConnections());
             hikariConfig.setConnectionTimeout(config.getConnectionTimeoutMs());
 
-            // Cross-host safe ceiling (following #1817/#1822): the RVNK MySQL host is on a different
-            // machine from the game servers, and network gear silently drops idle TCP with no FIN, so
-            // a pooled connection held past this window comes back dead ("Communications link failure /
-            // Socket is closed"). Cap idle/lifetime here regardless of config so a stale config.yml —
-            // the old 600000/1800000 defaults that saveResource() never overwrites on an existing
-            // server (#1563/#1592) — cannot reintroduce the churn. Config may request LOWER, never higher.
+            // Cap idle/lifetime under the cross-host TCP idle drop; config may only lower them (#1817).
             final long idleTimeout = Math.min(config.getIdleTimeoutMs(), MAX_SAFE_IDLE_TIMEOUT_MS);
             final long maxLifetime = Math.min(config.getMaxLifetimeMs(), MAX_SAFE_MAX_LIFETIME_MS);
             if (idleTimeout != config.getIdleTimeoutMs() || maxLifetime != config.getMaxLifetimeMs()) {

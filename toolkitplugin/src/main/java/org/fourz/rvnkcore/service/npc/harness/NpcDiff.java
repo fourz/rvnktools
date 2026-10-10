@@ -17,7 +17,7 @@ import java.util.Optional;
  * <p><b>Position.</b> Drift when the horizontal (X/Z) distance is over {@value #POSITION_TOLERANCE}
  * block, or the Y does not match by {@link NpcGround#yMatches}: within {@value #POSITION_TOLERANCE}
  * of the spec Y or of the standable Y, or up to {@value NpcGround#SETTLE_TOLERANCE} below the spec Y
- * (the NPC fell and settled, 1.5.101). Yaw
+ * (the NPC fell and settled). Yaw
  * and pitch are compared (tolerance {@value #ANGLE_TOLERANCE} degree) only when the spec sets them
  * AND LookClose is off: with LookClose on, Citizens turns the NPC towards nearby players all the
  * time, so its live yaw says nothing about the spec.</p>
@@ -140,7 +140,7 @@ public final class NpcDiff {
      * position, the standable position, or the live NPC's standing position (when the live NPC is in
      * sync with the spec) with the zone's feet up to {@link NpcGround#SETTLE_TOLERANCE} above the
      * NPC's feet. The last case is a zone built at the spec Y around an NPC that then settled, and an
-     * export of it (1.5.101). A missing or wrong zone is rebuilt around the standable position.
+     * export of it. A missing or wrong zone is rebuilt around the standable position.
      *
      * @param state  the live NPC, or null for a CREATE
      * @param standY the standable Y at the spec position, or null when unknown

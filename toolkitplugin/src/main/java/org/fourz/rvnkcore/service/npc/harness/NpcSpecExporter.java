@@ -23,7 +23,7 @@ import java.util.TreeSet;
  * A zone is exported only when region {@code npc_<key>} has the zone shape around the NPC. The
  * radius and height come from the region bounds, and the zone's feet may sit up to
  * {@link NpcGround#SETTLE_TOLERANCE} above the NPC's feet: a zone built at the spec Y around an NPC
- * that then fell and settled is still its zone (1.5.101). The apply diff accepts the same offset, so
+ * that then fell and settled is still its zone. The apply diff accepts the same offset, so
  * export then apply stays all NOOP.</p>
  *
  * @since 1.5.100-alpha

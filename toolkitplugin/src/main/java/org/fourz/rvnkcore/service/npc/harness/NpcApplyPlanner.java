@@ -17,7 +17,7 @@ import java.util.function.Predicate;
  * whether the harness created it or staff tagged it by hand with {@code /rvnk npc tag} (adoption).
  * Applying the same spec twice gives NOOP for every key on the second pass. With a
  * {@link NpcGround.Terrain} the planner also knows each spec position's standable Y, so an NPC that
- * fell from the spec Y onto the ground is in sync, not a move (1.5.101).</p>
+ * fell from the spec Y onto the ground is in sync, not a move.</p>
  *
  * @since 1.5.100-alpha
  */

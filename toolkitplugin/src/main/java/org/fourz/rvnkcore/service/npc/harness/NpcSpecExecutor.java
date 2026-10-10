@@ -19,7 +19,7 @@ import java.util.function.Consumer;
  * lookclose, protected, pose, hold, nameplate, zone. Skins finish asynchronously; their final line
  * goes to the {@code later} sink.</p>
  *
- * <p><b>Standable Y (1.5.101).</b> Create and move snap the target Y to the standable Y at that X/Z
+ * <p><b>Standable Y (#2248).</b> Create and move snap the target Y to the standable Y at that X/Z
  * ({@link NpcGround#snap}, block reads from {@link NpcHarness#terrain()}), and the step result says
  * so: {@code position: snapped 68 -> 67}. The zone is built around the same standable position.
  * When no standable spot is in the window the requested Y is kept and a WARNING line is added; the

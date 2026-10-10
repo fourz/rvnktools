@@ -3,7 +3,7 @@ package org.fourz.rvnkcore.service.npc.harness;
 import java.util.Locale;
 
 /**
- * Standable-ground rules for NPC positions (#2248, 1.5.101-alpha).
+ * Standable-ground rules for NPC positions (#2248).
  *
  * <p><b>Why.</b> A Citizens player NPC falls under gravity. A spec Y that is not exactly the
  * standing Y (for example {@code pos: [-95.5, 68, 2.5]} over ground whose top is Y 67) makes the

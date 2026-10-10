@@ -52,7 +52,7 @@ import java.util.function.Supplier;
  * Citizens fetches the profile off the main thread, and only for a spawned NPC. For a spawned NPC,
  * 5 seconds later this class reports whether a texture arrived; "not yet loaded" is not a failure
  * (Citizens retries). For a despawned NPC no check runs: the result says Citizens fetches the skin
- * when the NPC spawns (1.5.101). A URL skin is generated on an async task through Citizens' own
+ * when the NPC spawns. A URL skin is generated on an async task through Citizens' own
  * {@code MojangSkinGenerator} (reached by reflection, because its return type is a json-simple
  * class that is not on RVNKCore's compile classpath), then applied on the main thread with
  * {@code setSkinPersistent}. The source text is stored as persistent metadata {@code rvnk-skin} so

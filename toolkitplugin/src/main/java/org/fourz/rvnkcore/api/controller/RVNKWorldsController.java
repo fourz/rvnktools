@@ -262,7 +262,7 @@ public class RVNKWorldsController extends HttpServlet {
                     return;
                 }
                 // Legacy body ({name, environment, seed, templateName, ...}) — passed through
-                // verbatim, exactly as before 1.5.96.
+                // verbatim (#2200).
                 future = apiService.createWorld(body);
             } else if (PRESETS_PATTERN.matcher(pathInfo).matches()) {
                 JsonObject obj = WorldForgeRequests.parseObject(ApiUtils.readRequestBody(req));

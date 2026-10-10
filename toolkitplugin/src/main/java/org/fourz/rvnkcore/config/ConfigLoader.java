@@ -476,8 +476,8 @@ public class ConfigLoader {
      * Whether RVNKCore may serve from local SQLite when the MySQL primary is unreachable (#2103).
      *
      * <p>Default true. With it off, an unreachable database disables RVNKCore — and with it every
-     * plugin that hard-depends on RVNKCore, which is how the 2026-09-19 outage took an entire
-     * server down to vanilla rather than to a degraded stack.</p>
+     * plugin that hard-depends on RVNKCore, so the server drops to vanilla rather than to a
+     * degraded stack.</p>
      */
     public boolean isDatabaseFallbackEnabled() {
         if (coreConfig == null) {

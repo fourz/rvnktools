@@ -37,7 +37,7 @@ public final class NpcSkins {
     public static final String NOT_YET = "not yet loaded";
 
     /**
-     * The immediate result line of a player-name skin request (1.5.101).
+     * The immediate result line of a player-name skin request.
      *
      * @param spawned whether the NPC is spawned now; Citizens fetches a skin only for a spawned NPC
      */
@@ -47,7 +47,7 @@ public final class NpcSkins {
     }
 
     /**
-     * The line of the delayed check of a player-name skin (1.5.101). Only a hard error is FAILED:
+     * The line of the delayed check of a player-name skin. Only a hard error is FAILED:
      * a texture that has not arrived yet is normal for a despawned NPC (Citizens fetches on spawn)
      * and while Mojang is slow or rate-limiting (Citizens retries).
      *

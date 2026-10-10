@@ -27,9 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * This listener captures player join/quit events and location changes to
  * maintain comprehensive player tracking data in the RVNKCore system.
  * 
- * TODO: This will eventually replace individual tracking in other listeners
- * once full migration to RVNKCore is complete.
- * 
  * @since 1.0.0
  */
 public class PlayerTrackingListener implements Listener {

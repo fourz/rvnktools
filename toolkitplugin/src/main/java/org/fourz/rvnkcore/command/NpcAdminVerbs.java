@@ -729,7 +729,7 @@ final class NpcAdminVerbs {
     }
 
     /**
-     * Snaps a target location's Y to the standable Y at its X/Z ({@link NpcGround#snap}, 1.5.101).
+     * Snaps a target location's Y to the standable Y at its X/Z ({@link NpcGround#snap}, #2248).
      * Changes {@code at} in place; keeps the Y when no standable spot is in the search window.
      */
     private static NpcGround.Snap snapToGround(NpcHarness harness, Location at) {
