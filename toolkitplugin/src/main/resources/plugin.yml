@@ -364,7 +364,7 @@ permissions:
     description: Allows showing one RVNK-keyed NPC (/rvnk npc info)
     default: op
   rvnkcore.npc.admin:
-    description: Allows placing, editing, protecting and spec-applying NPCs (/rvnk npc create|move|rename|remove|skin|lookclose|pose|hold|protected|nameplate|protect|apply|verify|export, #2248)
+    description: Allows placing, editing, protecting and spec-applying NPCs (/rvnk npc create|move|rename|remove|skin|lookclose|pose|hold|protected|nameplate|protect|apply|verify|export, #2248), and simulating an NPC click for QA (/rvnk npc click, #2255)
     default: op
   rvnkcore.npc.*:
     description: All NPC bridge permissions
@@ -375,6 +375,15 @@ permissions:
       rvnkcore.npc.list: true
       rvnkcore.npc.info: true
       rvnkcore.npc.admin: true
+
+  # ── QA subject (#2255) ─────────────────────────────────────────────────
+  # Held by the TARGET of /rvnk npc click. On a non-Dev tier the simulated click runs only for a
+  # player with this node, granted by a LuckPerms QA group:
+  #   lp group qa permission set rvnkcore.qa.subject true
+  # Default false, so an op is not a QA subject by accident. Not a child of rvnkcore.npc.*.
+  rvnkcore.qa.subject:
+    description: Marks a player as a QA subject - /rvnk npc click may simulate NPC clicks for them on a non-Dev tier
+    default: false
 
   # ── Region tool (rvnkcore.region.*) — /rvnk region (#2248) ──────────────
   rvnkcore.region.admin:

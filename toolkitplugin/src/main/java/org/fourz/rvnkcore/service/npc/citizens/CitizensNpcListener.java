@@ -10,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent;
 import org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent.ClickType;
+import org.fourz.rvnkcore.service.npc.NpcClickDispatcher;
 import org.fourz.rvnkcore.service.npc.NpcInteractionTracker;
 
 import java.util.function.Consumer;
@@ -27,12 +28,15 @@ import java.util.function.Consumer;
  * consumer's cancel is visible to other plugins' NORMAL handlers of the Citizens events, and it
  * ignores clicks another plugin already cancelled.</p>
  *
+ * <p>The event is built and fired by {@link NpcClickDispatcher}, the same path
+ * {@code /rvnk npc click} uses (#2255), so a simulated click reaches consumers exactly as a real
+ * one does.</p>
+ *
  * @since 1.5.99-alpha
  */
 public class CitizensNpcListener implements Listener {
 
-    private final NpcInteractionTracker tracker;
-    private final Consumer<Event> eventCaller;
+    private final NpcClickDispatcher dispatcher;
     private final Consumer<String> debug;
 
     /**
@@ -41,8 +45,15 @@ public class CitizensNpcListener implements Listener {
      * @param debug       debug-log sink
      */
     public CitizensNpcListener(NpcInteractionTracker tracker, Consumer<Event> eventCaller, Consumer<String> debug) {
-        this.tracker = tracker;
-        this.eventCaller = eventCaller;
+        this(new NpcClickDispatcher(tracker, eventCaller), debug);
+    }
+
+    /**
+     * @param dispatcher the click dispatcher shared with {@code /rvnk npc click} (#2255)
+     * @param debug      debug-log sink
+     */
+    public CitizensNpcListener(NpcClickDispatcher dispatcher, Consumer<String> debug) {
+        this.dispatcher = dispatcher;
         this.debug = debug != null ? debug : message -> { };
     }
 
@@ -74,18 +85,13 @@ public class CitizensNpcListener implements Listener {
             return false;
         }
 
-        RvnkNpcInteractEvent rvnkEvent = new RvnkNpcInteractEvent(
+        RvnkNpcInteractEvent rvnkEvent = dispatcher.dispatch(
                 player, key, npc.getName(), clickType, CitizensNpcService.locationOf(npc));
-        eventCaller.accept(rvnkEvent);
 
         debug.accept("RvnkNpcInteractEvent key=" + key + " player=" + player.getName()
                 + " click=" + clickType + " npcId=" + npc.getId()
                 + (rvnkEvent.isCancelled() ? " CANCELLED" : ""));
 
-        if (rvnkEvent.isCancelled()) {
-            return true;
-        }
-        tracker.record(player.getUniqueId(), key, npc.getName(), clickType);
-        return false;
+        return rvnkEvent.isCancelled();
     }
 }

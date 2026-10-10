@@ -42,6 +42,7 @@ All verbs run from the console. Quote a value that has spaces: `"Warden Tolla"`.
 /rvnk npc apply <spec> [--dry-run]
 /rvnk npc verify [spec]
 /rvnk npc export <spec> [--force]
+/rvnk npc click <key> <player> [right|left]      (QA, #2255; see "Click simulator" below)
 
 /rvnk region define <name> <world> <x1> <y1> <z1> <x2> <y2> <z2> [flag=value ...] [priority=N]
 /rvnk region flag <name> <world> <flag> <value|clear>
@@ -53,10 +54,11 @@ All verbs run from the console. Quote a value that has spaces: `"Warden Tolla"`.
 |------------|--------|---------|
 | `rvnkcore.npc.admin` | every `/rvnk npc` verb above (also a child of `rvnkcore.npc.*`) | op |
 | `rvnkcore.npc.tag` / `untag` / `list` / `info` | the #2213 bridge verbs | op |
+| `rvnkcore.qa.subject` | held by the TARGET player of `click`; needed on every non-Dev tier | **false** |
 | `rvnkcore.region.admin` | every `/rvnk region` verb (child of `rvnkcore.region.*`) | op |
 
 Tab completion: verbs, keys, spec names, worlds, the player's own coordinates, `on`/`off`,
-poses, materials, online player names (skins), region ids, flag names and `allow`/`deny`/`clear`.
+poses, materials, online player names (skins and `click`), `right`/`left`, region ids, flag names and `allow`/`deny`/`clear`.
 
 **Without Citizens** every NPC verb says the harness is unavailable. **Without WorldGuard**,
 `protect` and every region verb print `WorldGuard not installed`; `apply` and `verify` still run and
@@ -321,6 +323,84 @@ rvnk region define sotw_vance sotw_deep_0 4 241 6 10 246 12 interact=allow use=a
 
 ---
 
+## Click simulator (QA, #2255, since 1.5.102-alpha)
+
+```
+/rvnk npc click <key> <player> [right|left]      # default right
+```
+
+Fires `RvnkNpcInteractEvent` for an **online** player as if that player had clicked the NPC. It
+lets an operator walk NPC quest beats and dialogue from the console.
+
+**Same path as a real click.** The Citizens listener and `click` both fire the event through
+`NpcClickDispatcher`. The event has the same fields: player, key, the NPC's name, the click type,
+and the NPC's live location (its stored location when despawned). It fires on the main thread.
+When no listener cancels it, the click is recorded as the player's last interaction
+(`%rvnknpc_last_key%`). So RVNKQuests' `NpcInteractionCoordinator`, `NPC_INTERACT` triggers and
+`TALK_TO` objectives cannot tell a simulated click from a real one. `SimulatedClickParityTest`
+proves the two events and the two records are equal.
+
+**What does not run.** Citizens' own `NPCRightClickEvent` / `NPCLeftClickEvent` and the NPC's
+`/npc command` actions do not fire, because no entity was clicked. The player's distance to the
+NPC is not checked. No RVNK consumer checks it for a real click either.
+
+**Output.** The sender gets one line:
+
+```
+[guide_cavern] Simulated RIGHT click by Shadowmelt on 'Warden Tolla' (#12): fired, not cancelled.
+  Gate: tier 'dev' is Dev. Any dialogue goes to Shadowmelt, not to you.
+```
+
+A listener that cancels the event gives `fired, CANCELLED by a listener. Not recorded as the last
+interaction.` Any NPC dialogue goes to the **target player's** chat, not to the console. RVNKQuests
+reads the line from RVNKLore asynchronously, so it arrives a moment after the command.
+
+### Gate
+
+The gate is a pure function, `NpcClickGate.evaluate(tier, senderIsAdmin, targetIsQaSubject)`.
+`NpcClickGateTest` covers the matrix.
+
+| Tier (`server-id`) | Target has `rvnkcore.qa.subject` | Result |
+|--------------------|----------------------------------|--------|
+| `dev` or `test` | either | allowed |
+| `event`, `nations`, any other set id | yes | allowed |
+| `event`, `nations`, any other set id | no | refused: names the tier and the permission |
+| unset (`local`), blank, or unreadable | either | refused: the tier is unknown |
+| any | either, but the sender lacks `rvnkcore.npc.admin` | refused |
+
+- **Tier source.** RVNKCore's `ConfigLoader.getServerId()`: `chat-relay.server-id`, then
+  `webhook.server-id`, else `local`. RVNKQuests' `ServerTier` reads the same value for its
+  `quest debug` gates. RVNK Dev's id is `dev`. Its chat room is `test`, but that is a different
+  setting.
+- **The target's permission counts, not the sender's.** The console has every permission, so a
+  sender check alone would let any console push quest state on Event.
+- `rvnkcore.qa.subject` has `default: false`, so an op is not a QA subject by accident. It is not a
+  child of `rvnkcore.npc.*`. A LuckPerms `*` grant still matches it, so do not give `*` to a
+  player group.
+
+LuckPerms QA group (Event):
+
+```
+lp creategroup qa
+lp group qa permission set rvnkcore.qa.subject true
+lp user <player> parent add qa
+lp user <player> parent remove qa        # when the QA walk ends
+```
+
+### Audit
+
+Every attempt past argument parsing writes one INFO line to the server log:
+
+```
+[RVNKCore] [npc click] sender=CONSOLE target=Shadowmelt key=guide_cavern click=RIGHT tier=dev npc=#12 gate="tier 'dev' is Dev" result=fired
+[RVNKCore] [npc click] sender=CONSOLE target=Bob key=guide_cavern click=RIGHT tier=event REFUSED: tier 'event' is not Dev and the target player lacks rvnkcore.qa.subject (...)
+```
+
+Refusals, an unknown key (`NOT RUN: no NPC carries the key`) and an unavailable bridge are logged
+too.
+
+---
+
 ## Architecture
 
 | Package | Holds | Loads without |
@@ -329,9 +409,11 @@ rvnk region define sotw_vance sotw_deep_0 4 241 6 10 246 12 interact=allow use=a
 | `service.npc.citizens` | `CitizensNpcHarness` (and the #2213 adapter); it also supplies the Bukkit block reads for `NpcGround.Terrain` | - (Citizens only) |
 | `service.region` | `IRegionService`, `UnavailableRegionService`, `RegionBridge`, `RegionArgs`, `Cuboid` | WorldGuard |
 | `service.region.worldguard` | `WorldGuardRegionService`, `WorldGuardRegionAdapter` | - (WorldGuard only) |
-| `command` | `NpcSubCommand`, `NpcAdminVerbs`, `RegionSubCommand`, `NpcArgs`, `QuotedArgs` | Citizens, WorldGuard |
+| `service.npc` | `NpcClickDispatcher` (the one event path, shared by the Citizens listener and `click`), `NpcClickSimulator` (#2255) | Citizens |
+| `command` | `NpcSubCommand`, `NpcAdminVerbs`, `RegionSubCommand`, `NpcArgs`, `NpcClickGate`, `QuotedArgs` | Citizens, WorldGuard |
 
-- `NpcHarness` is registered in the ServiceRegistry only when Citizens is available.
+- `NpcHarness` and `NpcClickSimulator` are registered in the ServiceRegistry only when Citizens is
+  available.
   `IRegionService` is always registered; without WorldGuard it is `UnavailableRegionService`.
 - The planner, diff, verifier, parser and executor take Citizens and WorldGuard only through
   `NpcHarness` and `IRegionService`, so the tests run them against in-memory fakes, including a

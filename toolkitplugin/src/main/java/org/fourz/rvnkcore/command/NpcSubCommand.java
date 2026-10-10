@@ -26,7 +26,8 @@ import java.util.OptionalInt;
  * <p>Every verb runs from the console. {@code tag} without an NPC id uses the sender's Citizens
  * selection ({@code /npc sel}); the console has to give the id. The admin verbs (create, move,
  * rename, remove, skin, lookclose, pose, hold, protected, nameplate, protect, apply, verify,
- * export) live in {@link NpcAdminVerbs} and need {@code rvnkcore.npc.admin}. Arguments are
+ * export, and the #2255 QA verb click) live in {@link NpcAdminVerbs} and need
+ * {@code rvnkcore.npc.admin}. Arguments are
  * re-split with {@link QuotedArgs}, so {@code "Warden Tolla"} is one argument.</p>
  *
  * <ul>
@@ -56,7 +57,7 @@ public class NpcSubCommand extends BaseSubCommand {
         super(plugin, parent, "npc",
                 "Tag, place, edit and verify Citizens NPCs by RVNK key (console-safe)",
                 "/rvnk npc <tag|untag|list|info|create|move|rename|remove|skin|lookclose|pose|hold|protected"
-                        + "|nameplate|protect|apply|verify|export> [args]",
+                        + "|nameplate|protect|apply|verify|export|click> [args]",
                 null, false);
         this.admin = new NpcAdminVerbs(plugin);
     }
@@ -77,7 +78,9 @@ public class NpcSubCommand extends BaseSubCommand {
                 "/rvnk npc protected guide_test true | nameplate guide_test hover | rename guide_test \"New Name\"",
                 "/rvnk npc protect guide_test 2 3   (WorldGuard region npc_guide_test)",
                 "/rvnk npc apply tfah --dry-run | apply tfah | verify tfah | verify | export tfah",
-                "  specs live in plugins/RVNKCore/npc/<spec>.yml");
+                "  specs live in plugins/RVNKCore/npc/<spec>.yml",
+                "/rvnk npc click guide_test Shadowmelt [right|left]",
+                "  QA: fires the NPC click event for an online player (Dev; elsewhere only for rvnkcore.qa.subject)");
     }
 
     @Override
@@ -266,6 +269,7 @@ public class NpcSubCommand extends BaseSubCommand {
         sendInfoMessage(sender, "  pose <key> stand|sit|sneak | hold <key> <material|none> | protected <key> true|false");
         sendInfoMessage(sender, "  nameplate <key> on|off|hover | protect <key> [radius] [height]");
         sendInfoMessage(sender, "  apply <spec> [--dry-run] | verify [spec] | export <spec> [--force]");
+        sendInfoMessage(sender, "  click <key> <player> [right|left]   (QA click simulator, #2255)");
         sendMessage(sender, "&7Examples: /rvnk help npc");
     }
 

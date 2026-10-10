@@ -12,8 +12,9 @@ import java.util.function.Supplier;
 
 /**
  * Installs the RVNK NPC bridge (#2213): picks the {@link INpcService} implementation, registers it
- * in the ServiceRegistry, registers the write-side {@link NpcHarness} when Citizens is available
- * (#2248), and registers the {@code %rvnknpc_*%} PlaceholderAPI expansion.
+ * in the ServiceRegistry, registers the write-side {@link NpcHarness} and the QA
+ * {@link NpcClickSimulator} when Citizens is available (#2248, #2255), and registers the
+ * {@code %rvnknpc_*%} PlaceholderAPI expansion.
  *
  * <p><b>Classloading guard.</b> This class must never name a Citizens or PlaceholderAPI type in a
  * field, a method signature or a catch clause. Every Citizens class lives in
@@ -55,14 +56,17 @@ public final class NpcBridge {
     public static NpcBridge install(Plugin plugin, ServiceRegistry registry, LogManager logger) {
         PluginManager pluginManager = Bukkit.getPluginManager();
         NpcInteractionTracker tracker = new NpcInteractionTracker();
+        NpcClickDispatcher dispatcher = new NpcClickDispatcher(tracker, event -> Bukkit.getPluginManager().callEvent(event));
 
         INpcService service = selectService(pluginManager.isPluginEnabled(CITIZENS),
-                () -> org.fourz.rvnkcore.service.npc.citizens.CitizensNpcAdapter.start(plugin, tracker, logger),
+                () -> org.fourz.rvnkcore.service.npc.citizens.CitizensNpcAdapter.start(plugin, tracker, dispatcher, logger),
                 logger);
         registry.registerService(INpcService.class, service);
         NpcHarness harness = null;
         if (service.isAvailable()) {
             logger.info("NPC bridge registered: provider=" + service.getProviderName());
+            // #2255: /rvnk npc click fires through the same dispatcher as a real Citizens click.
+            registry.registerService(NpcClickSimulator.class, new NpcClickSimulator(service, dispatcher));
             harness = selectHarness(
                     () -> org.fourz.rvnkcore.service.npc.citizens.CitizensNpcAdapter.harness(plugin, logger), logger);
             if (harness != null) {

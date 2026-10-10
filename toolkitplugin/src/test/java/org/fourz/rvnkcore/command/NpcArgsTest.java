@@ -56,4 +56,47 @@ class NpcArgsTest {
         assertTrue(NpcArgs.zone("k depth=2".split(" "), 1).error().contains("unknown option"));
         assertTrue(NpcArgs.zone("k two".split(" "), 1).error().contains("whole number"));
     }
+    // ── click (#2255) ──────────────────────────────────────────────────────────
+
+    @Test
+    void clickDefaultsToRight() {
+        NpcArgs.Click click = NpcArgs.click("guide_cavern Shadowmelt".split(" "), 0).value();
+        assertEquals("guide_cavern", click.key());
+        assertEquals("Shadowmelt", click.player());
+        assertEquals(org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent.ClickType.RIGHT, click.click());
+    }
+
+    @Test
+    void clickTypeIsCaseInsensitiveWithShortForms() {
+        var left = org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent.ClickType.LEFT;
+        var right = org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent.ClickType.RIGHT;
+        assertEquals(left, NpcArgs.click("k p left".split(" "), 0).value().click());
+        assertEquals(left, NpcArgs.click("k p LEFT".split(" "), 0).value().click());
+        assertEquals(left, NpcArgs.click("k p l".split(" "), 0).value().click());
+        assertEquals(right, NpcArgs.click("k p Right".split(" "), 0).value().click());
+        assertEquals(right, NpcArgs.click("k p r".split(" "), 0).value().click());
+    }
+
+    @Test
+    void clickKeyIsNormalisedAndOffsetHonoured() {
+        NpcArgs.Click click = NpcArgs.click("click Guide_Cavern Bob".split(" "), 1).value();
+        assertEquals("guide_cavern", click.key());
+        assertEquals("Bob", click.player());
+    }
+
+    @Test
+    void rejectsBadClicks() {
+        assertTrue(NpcArgs.click(new String[]{"k"}, 0).error().contains("expected"));
+        assertTrue(NpcArgs.click(new String[]{}, 0).error().contains("expected"));
+        assertTrue(NpcArgs.click("k p right extra".split(" "), 0).error().contains("expected"));
+        assertTrue(NpcArgs.click("k p middle".split(" "), 0).error().contains("right or left"));
+        assertTrue(NpcArgs.click("bad!key p".split(" "), 0).error().contains("invalid key"));
+        assertTrue(NpcArgs.click("k not-a-name".split(" "), 0).error().contains("invalid player"));
+        assertTrue(NpcArgs.click("k waytoolongplayername17".split(" "), 0).error().contains("invalid player"));
+    }
+
+    @Test
+    void bedrockPrefixedNameIsAccepted() {
+        assertEquals(".Steve", NpcArgs.click("k .Steve".split(" "), 0).value().player());
+    }
 }

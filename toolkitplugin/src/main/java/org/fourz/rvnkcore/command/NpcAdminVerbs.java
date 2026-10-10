@@ -8,6 +8,8 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.config.ConfigLoader;
+import org.fourz.rvnkcore.service.npc.NpcClickSimulator;
 import org.fourz.rvnkcore.service.npc.NpcKeys;
 import org.fourz.rvnkcore.service.npc.harness.NpcApplyPlanner;
 import org.fourz.rvnkcore.service.npc.harness.NpcChange;
@@ -47,8 +49,9 @@ import java.util.function.Consumer;
 
 /**
  * The admin verbs of {@code /rvnk npc} (#2248): console-safe place and edit, appearance, the
- * WorldGuard protect zone, and the YAML spec harness (apply, verify, export). All keyed by RVNK key;
- * none needs the sender's position. Permission {@code rvnkcore.npc.admin}.
+ * WorldGuard protect zone, the YAML spec harness (apply, verify, export), and the QA click
+ * simulator ({@code click}, #2255). All keyed by RVNK key; none needs the sender's position.
+ * Permission {@code rvnkcore.npc.admin}.
  *
  * <p>Split out of {@link NpcSubCommand} to keep that class to dispatch and the #2213 verbs.</p>
  *
@@ -59,11 +62,11 @@ final class NpcAdminVerbs {
     static final String PERM_ADMIN = "rvnkcore.npc.admin";
 
     static final List<String> VERBS = List.of("create", "move", "rename", "remove", "skin", "lookclose", "pose",
-            "hold", "protected", "nameplate", "protect", "apply", "verify", "export");
+            "hold", "protected", "nameplate", "protect", "apply", "verify", "export", "click");
 
     /** Verbs whose second argument is an existing key. */
     static final Set<String> KEY_VERBS = Set.of("move", "rename", "remove", "skin", "lookclose", "pose", "hold",
-            "protected", "nameplate", "protect", "untag", "info");
+            "protected", "nameplate", "protect", "untag", "info", "click");
 
     private static final int MAX_ERROR_LINES = 40;
 
@@ -94,6 +97,7 @@ final class NpcAdminVerbs {
             case "apply" -> apply(sender, args);
             case "verify" -> verify(sender, args);
             case "export" -> export(sender, args);
+            case "click" -> click(sender, args);
             default -> error(sender, "Unknown verb " + verb);
         }
     }
@@ -477,6 +481,82 @@ final class NpcAdminVerbs {
                 + step.key() + (step.backingId() >= 0 ? ChatColor.GRAY + " #" + step.backingId() : ""));
     }
 
+    // ── QA click simulator (#2255) ─────────────────────────────────────────────
+
+    /**
+     * {@code click <key> <player> [right|left]}: fires {@link org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent}
+     * for an online player as if they had clicked the NPC. Gated by {@link NpcClickGate}; every
+     * attempt past argument parsing is logged at INFO as an audit trail.
+     */
+    private void click(CommandSender sender, String[] args) {
+        NpcArgs.Parsed<NpcArgs.Click> parsed = NpcArgs.click(args, 0);
+        if (!parsed.ok()) {
+            error(sender, "Usage: " + NpcArgs.CLICK_USAGE + ": " + parsed.error());
+            return;
+        }
+        NpcArgs.Click request = parsed.value();
+        Player target = Bukkit.getPlayerExact(request.player());
+        if (target == null) {
+            error(sender, "Player '" + request.player() + "' is not online. A simulated click needs an online player.");
+            return;
+        }
+
+        String tier = serverTier();
+        NpcClickGate.Decision gate = NpcClickGate.evaluate(tier, sender.hasPermission(PERM_ADMIN),
+                target.hasPermission(NpcClickGate.PERM_QA_SUBJECT));
+        String audit = "[npc click] sender=" + sender.getName() + " target=" + target.getName()
+                + " key=" + request.key() + " click=" + request.click() + " tier=" + (tier == null ? "unknown" : tier);
+        if (!gate.allowed()) {
+            plugin.getLogger().info(audit + " REFUSED: " + gate.reason());
+            error(sender, "Refused: " + gate.reason() + ".");
+            return;
+        }
+
+        NpcClickSimulator simulator = RVNKCore.getServiceSafe(NpcClickSimulator.class);
+        if (simulator == null) {
+            plugin.getLogger().info(audit + " NOT RUN: NPC bridge unavailable");
+            error(sender, "NPC bridge unavailable: Citizens is not installed, not enabled, or its adapter failed to start.");
+            return;
+        }
+        NpcClickSimulator.Outcome outcome = simulator.click(target, request.key(), request.click());
+        switch (outcome.status()) {
+            case UNAVAILABLE -> {
+                plugin.getLogger().info(audit + " NOT RUN: NPC bridge unavailable");
+                error(sender, "NPC bridge unavailable: Citizens is not installed or not enabled.");
+            }
+            case NOT_FOUND -> {
+                plugin.getLogger().info(audit + " NOT RUN: no NPC carries the key");
+                error(sender, "No NPC carries key '" + request.key() + "'. See /rvnk npc list.");
+            }
+            case FIRED, CANCELLED -> {
+                boolean cancelled = outcome.status() == NpcClickSimulator.Status.CANCELLED;
+                plugin.getLogger().info(audit + " npc=#" + outcome.npc().getBackingId() + " gate=\"" + gate.reason()
+                        + "\" result=" + (cancelled ? "fired, CANCELLED by a listener" : "fired"));
+                String npcLabel = "'" + outcome.npc().getDisplayName() + "' (#" + outcome.npc().getBackingId()
+                        + (outcome.npc().isSpawned() ? "" : ", despawned") + ")";
+                if (cancelled) {
+                    sender.sendMessage(ChatColor.YELLOW + "[" + request.key() + "] Simulated " + request.click()
+                            + " click by " + target.getName() + " on " + npcLabel
+                            + ": fired, CANCELLED by a listener. Not recorded as the last interaction.");
+                } else {
+                    success(sender, "[" + request.key() + "] Simulated " + request.click() + " click by "
+                            + target.getName() + " on " + npcLabel + ": fired, not cancelled.");
+                }
+                info(sender, "  Gate: " + gate.reason() + ". Any dialogue goes to " + target.getName()
+                        + ", not to you.");
+            }
+        }
+    }
+
+    /** @return this server's id from RVNKCore config, or null when it cannot be read */
+    private String serverTier() {
+        try {
+            return ConfigLoader.getInstance(plugin).getServerId();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     // ── tab completion ─────────────────────────────────────────────────────────
 
     /**
@@ -507,6 +587,16 @@ final class NpcAdminVerbs {
                     List<String> names = new ArrayList<>();
                     Bukkit.getOnlinePlayers().forEach(p -> names.add(p.getName()));
                     return RegionSubCommand.filter(names, last);
+                }
+            }
+            case "click" -> {
+                if (index == 2) {
+                    List<String> names = new ArrayList<>();
+                    Bukkit.getOnlinePlayers().forEach(p -> names.add(p.getName()));
+                    return RegionSubCommand.filter(names, last);
+                }
+                if (index == 3) {
+                    return RegionSubCommand.filter(List.of("right", "left"), last);
                 }
             }
             case "lookclose", "nameplate", "protected", "pose" -> {

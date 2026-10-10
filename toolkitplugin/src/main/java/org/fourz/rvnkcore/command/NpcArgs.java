@@ -1,9 +1,12 @@
 package org.fourz.rvnkcore.command;
 
+import org.fourz.rvnkcore.api.event.RvnkNpcInteractEvent;
+import org.fourz.rvnkcore.service.npc.NpcKeys;
 import org.fourz.rvnkcore.service.npc.harness.NpcSpecParser;
 import org.fourz.rvnkcore.service.npc.harness.NpcZone;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Pure argument parsing for {@code /rvnk npc} admin verbs (#2248), unit-testable without a server.
@@ -117,6 +120,62 @@ public final class NpcArgs {
         String range = NpcZone.validate(zone.radius(), zone.height());
         return range == null ? new Parsed<>(zone, null) : Parsed.fail(range);
     }
+
+    /**
+     * A parsed {@code click <key> <player> [right|left]} (#2255).
+     *
+     * @param key    the normalised RVNK key
+     * @param player the target player's name as typed
+     * @param click  RIGHT when not given
+     */
+    public record Click(String key, String player, RvnkNpcInteractEvent.ClickType click) {
+    }
+
+    /** Usage line for {@code /rvnk npc click}. */
+    public static final String CLICK_USAGE = "/rvnk npc click <key> <player> [right|left]";
+
+    /**
+     * Parses {@code <key> <player> [right|left]} from {@code args[start..]}; nothing may follow.
+     * The click type is case-insensitive and defaults to right.
+     */
+    public static Parsed<Click> click(String[] args, int start) {
+        int count = args.length - start;
+        if (count < 2 || count > 3) {
+            return Parsed.fail("expected <key> <player> [right|left]");
+        }
+        String key = NpcKeys.normalize(args[start]);
+        if (key == null) {
+            return Parsed.fail("invalid key '" + args[start] + "': use lower-case a-z, 0-9, _ or -, 1-"
+                    + NpcKeys.MAX_LENGTH + " characters");
+        }
+        String player = args[start + 1].trim();
+        if (!VALID_PLAYER_NAME.matcher(player).matches()) {
+            return Parsed.fail("invalid player name '" + args[start + 1] + "'");
+        }
+        RvnkNpcInteractEvent.ClickType click = RvnkNpcInteractEvent.ClickType.RIGHT;
+        if (count == 3) {
+            click = clickType(args[start + 2]);
+            if (click == null) {
+                return Parsed.fail("click must be right or left: " + args[start + 2]);
+            }
+        }
+        return new Parsed<>(new Click(key, player, click), null);
+    }
+
+    /** @return RIGHT for {@code right}/{@code r}, LEFT for {@code left}/{@code l}, else null */
+    static RvnkNpcInteractEvent.ClickType clickType(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "right", "r" -> RvnkNpcInteractEvent.ClickType.RIGHT;
+            case "left", "l" -> RvnkNpcInteractEvent.ClickType.LEFT;
+            default -> null;
+        };
+    }
+
+    /** Minecraft names: 1-16 of a-z A-Z 0-9 _ (Bedrock/Geyser prefixes such as '.' allowed). */
+    private static final Pattern VALID_PLAYER_NAME = Pattern.compile("[.*]?[A-Za-z0-9_]{1,16}");
 
     static Double number(String raw) {
         try {

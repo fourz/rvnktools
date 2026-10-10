@@ -4,6 +4,7 @@ import net.citizensnpcs.api.CitizensAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.service.INpcService;
+import org.fourz.rvnkcore.service.npc.NpcClickDispatcher;
 import org.fourz.rvnkcore.service.npc.NpcInteractionTracker;
 import org.fourz.rvnkcore.service.npc.harness.NpcHarness;
 import org.fourz.rvnkcore.util.log.LogManager;
@@ -25,12 +26,14 @@ public final class CitizensNpcAdapter {
     /**
      * Builds the Citizens-backed service and registers the click listener.
      *
-     * @param plugin  RVNKCore, which owns the listener
-     * @param tracker the shared last-interaction tracker
-     * @param logger  RVNKCore's logger
+     * @param plugin     RVNKCore, which owns the listener
+     * @param tracker    the shared last-interaction tracker
+     * @param dispatcher fires {@code RvnkNpcInteractEvent}; shared with {@code /rvnk npc click} (#2255)
+     * @param logger     RVNKCore's logger
      * @return the service
      */
-    public static INpcService start(Plugin plugin, NpcInteractionTracker tracker, LogManager logger) {
+    public static INpcService start(Plugin plugin, NpcInteractionTracker tracker, NpcClickDispatcher dispatcher,
+                                    LogManager logger) {
         CitizensNpcService service = new CitizensNpcService(
                 CitizensAPI::getNPCRegistry,
                 CitizensAPI::getDefaultNPCSelector,
@@ -38,8 +41,7 @@ public final class CitizensNpcAdapter {
                 tracker,
                 logger::warning);
 
-        CitizensNpcListener listener = new CitizensNpcListener(
-                tracker, event -> Bukkit.getPluginManager().callEvent(event), logger::debug);
+        CitizensNpcListener listener = new CitizensNpcListener(dispatcher, logger::debug);
         Bukkit.getPluginManager().registerEvents(listener, plugin);
         return service;
     }

@@ -71,7 +71,13 @@ class NpcBridgeClassLoadingTest {
             "org.fourz.rvnkcore.service.region.RegionBridge",
             "org.fourz.rvnkcore.service.region.RegionArgs",
             "org.fourz.rvnkcore.command.NpcAdminVerbs",
-            "org.fourz.rvnkcore.command.RegionSubCommand");
+            "org.fourz.rvnkcore.command.RegionSubCommand",
+            // #2255: QA click simulator
+            "org.fourz.rvnkcore.service.npc.NpcClickDispatcher",
+            "org.fourz.rvnkcore.service.npc.NpcClickSimulator",
+            "org.fourz.rvnkcore.service.npc.NpcClickSimulator$Outcome",
+            "org.fourz.rvnkcore.command.NpcClickGate",
+            "org.fourz.rvnkcore.command.NpcArgs");
 
     /** Child-first for org.fourz; refuses every hidden prefix. */
     static final class HidingLoader extends URLClassLoader {

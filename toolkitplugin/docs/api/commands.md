@@ -41,6 +41,7 @@ RVNKTools is the RVNKCore toolkit plugin providing teleportation, messaging, ann
 | `/pstest <subcommand>` | PlayerService test utilities | `rvnktools.admin.pstest` |
 | `/rvnk npc <tag\|untag\|list\|info>` | Tag Citizens NPCs with an RVNK key | `rvnkcore.npc.*` |
 | `/rvnk npc <create\|move\|...\|apply\|verify\|export>` | Place, edit, protect and spec-apply NPCs by key (console-safe) | `rvnkcore.npc.admin` |
+| `/rvnk npc click <key> <player> [right\|left]` | Simulate an NPC click for QA (Dev; elsewhere only for a target with `rvnkcore.qa.subject`) | `rvnkcore.npc.admin` |
 | `/rvnk region <define\|flag\|remove\|info>` | WorldGuard regions from explicit corners (console-safe) | `rvnkcore.region.admin` |
 
 ---
@@ -561,8 +562,30 @@ dispatched `/npc` command (console `/npc create` without `--at` throws an NPE, #
 | `apply <spec> [--dry-run]` | Apply `plugins/RVNKCore/npc/<spec>.yml`. Idempotent: creates missing keys, updates only differing fields, never duplicates, adopts hand-tagged NPCs. Prints a per-key plan or result. |
 | `verify [spec]` | Report drift per key. Without a spec: check that every tagged key resolves to one NPC in a loaded world. |
 | `export <spec> [--force]` | Write every tagged NPC to a spec file (bootstrap from a live server) |
+| `click <key> <player> [right\|left]` | QA (#2255, 1.5.102). Fire `RvnkNpcInteractEvent` for an online player as if they clicked the NPC; default `right`. Reports fired / cancelled and the click type; any dialogue goes to the target player. Gated, see below. |
 
 Spec schema, apply/verify rules and a sample spec: [npc-harness.md](npc-harness.md).
+
+#### `/rvnk npc click` gate (#2255)
+
+The sender needs `rvnkcore.npc.admin`. Then the server tier (`chat-relay.server-id`, else
+`webhook.server-id`) decides:
+
+- `dev` or `test`: allowed for any online player.
+- Any other set id (`event`, `nations`): allowed only when the **target** player has
+  `rvnkcore.qa.subject` (default false).
+- Unset (`local`) or unreadable: refused.
+
+A refusal states the reason. Every attempt is logged at INFO as
+`[npc click] sender=... target=... key=... click=...`. Grant the permission with a LuckPerms QA
+group:
+
+```
+lp group qa permission set rvnkcore.qa.subject true
+lp user <player> parent add qa
+```
+
+Details: [npc-harness.md](npc-harness.md#click-simulator-qa-2255-since-15102-alpha).
 
 ---
 
@@ -667,7 +690,8 @@ rvnk region remove sotw_tolla sotw_city
 | `rvnkcore.npc.untag` | `/rvnk npc untag` |
 | `rvnkcore.npc.list` | `/rvnk npc list` |
 | `rvnkcore.npc.info` | `/rvnk npc info` |
-| `rvnkcore.npc.admin` | `/rvnk npc create\|move\|rename\|remove\|skin\|lookclose\|pose\|hold\|protected\|nameplate\|protect\|apply\|verify\|export` (#2248) |
+| `rvnkcore.npc.admin` | `/rvnk npc create\|move\|rename\|remove\|skin\|lookclose\|pose\|hold\|protected\|nameplate\|protect\|apply\|verify\|export` (#2248), `click` (#2255) |
+| `rvnkcore.qa.subject` | Held by the **target** of `/rvnk npc click`; required on every non-Dev tier. Default **false**; not a child of `rvnkcore.npc.*`. Grant via a LuckPerms QA group (#2255) |
 
 ### Region Tool
 
