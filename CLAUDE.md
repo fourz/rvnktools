@@ -10,7 +10,7 @@
 
 **RVNKTools** components (announcements, permissions, utilities) are bundled inside RVNKCore.
 
-**Tech Stack**: Java 17+, Paper/Spigot 1.20+, Maven, MySQL/SQLite, HikariCP
+**Tech Stack**: Java 21 bytecode, JDK 25, spigot-api 26.1.2 (see build rule), Maven, MySQL/SQLite, HikariCP
 
 **Source**: `repos/rvnktools/toolkitplugin/`
 
@@ -32,13 +32,13 @@ mvn clean package -DskipTests  # Skip tests
 
 ### Primary References
 
-- **Graph Memory** — Plugin status and history: `open_nodes(["RVNKCore"])` or `open_nodes(["RVNKTools"])`
+- **sql-memory** — Plugin status and history: `python scripts/sql-memory/recall.py --bank ravenkraftdev --entity RVNKCore`
 - **GitHub Issues** — Task tracking: `gh issue list --repo fourz/Ravenkaft-Dev --label "board:rvnkcore"`
 - **[README.md](README.md)** — Project overview, architecture, features
 
 ### Standards (Parent Repo)
 
-- [Coding Standards](../../docs/standard/coding-standards.md) — Java 17+ conventions
+- [Coding Standards](../../docs/standard/coding-standards.md) — Java 21 conventions
 - [RVNKCore Integration Guide](../../docs/standard/rvnkcore-integration.md) — ServiceRegistry, Repository, DTO patterns
 - [Database Patterns](../../docs/standard/database-patterns.md) — Repository pattern, HikariCP
 - [REST API Standards](../../docs/standard/rest-api-standards.md) — Endpoint design, JSON structure
@@ -206,19 +206,27 @@ database.queryAsync(sql)
 
 ### REST Controller Response
 
+Do not block a Jetty request thread on a future. The `future.get(30, TimeUnit.SECONDS)` calls in the
+current controllers are a known defect (#1552). Do not copy them into new code. Complete the response
+from the future instead:
+
 ```java
-ApiResponse<?> response = future.get(30, TimeUnit.SECONDS);
-ApiUtils.sendJson(resp, gson, 200, response);
+AsyncContext ctx = req.startAsync();   // the servlet holder needs setAsyncSupported(true)
+ctx.setTimeout(30_000);
+HttpServletResponse out = (HttpServletResponse) ctx.getResponse();
+service.findAsync(id)
+    .thenAccept(result -> ApiUtils.sendSuccess(out, gson, result))
+    .exceptionally(ex -> { ApiUtils.sendError(out, gson, 500, "Internal error"); return null; })
+    .whenComplete((v, ex) -> ctx.complete());
 ```
+
+Rule: [REST API Standards](../../docs/standard/rest-api-standards.md#best-practices) (#1594).
 
 ---
 
 ## Status Tracking
 
-- **Graph Memory**: `open_nodes(["RVNKCore"])` — plugin status, version, recent work
+- **sql-memory**: `python scripts/sql-memory/recall.py --bank ravenkraftdev --entity RVNKCore` — plugin status, version, recent work
 - **GitHub Issues**: `gh issue list --repo fourz/Ravenkaft-Dev --label "board:rvnkcore"` — open tasks
 - **Parent Ecosystem**: See parent [CLAUDE.md](../../CLAUDE.md) for cross-project context
 
----
-
-**Last Updated**: March 2026
