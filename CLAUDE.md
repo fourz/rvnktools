@@ -76,7 +76,10 @@ org.fourz.rvnkcore
 │   ├── announcement/    # DefaultAnnouncementService
 │   ├── npc/             # NPC bridge: NpcBridge, NpcKeys, UnavailableNpcService (#2213)
 │   │   ├── citizens/    # Citizens adapter - loaded ONLY when Citizens is enabled
+│   │   ├── harness/     # NPC harness (#2248): spec parser, planner, verifier, executor - no Citizens types
 │   │   └── papi/        # %rvnknpc_*% - loaded ONLY when PlaceholderAPI is enabled
+│   ├── region/          # IRegionService, RegionBridge, RegionArgs, Cuboid (#2248)
+│   │   └── worldguard/  # WorldGuard adapter - loaded ONLY when WorldGuard is enabled
 │   └── registry/        # ServiceRegistry, DefaultServiceRegistry
 ├── validation/          # Validator, ValidationResult
 └── util/log/            # LogManager
@@ -177,6 +180,20 @@ if (npcs != null && npcs.isAvailable()) {
 - **Placeholders** (registered only when PlaceholderAPI is enabled): `%rvnknpc_last_key%`,
   `%rvnknpc_last_name%`, `%rvnknpc_last_ago_seconds%` (`""` / `""` / `-1` when none). In memory,
   bounded to 1024 players, empty after a restart.
+
+### NPC harness and region tool (#2248, since 1.5.100-alpha)
+
+Console-safe NPC place/edit (`/rvnk npc create|move|rename|remove|skin|lookclose|pose|hold|protected|nameplate`),
+WorldGuard protect zones (`/rvnk npc protect`), an idempotent YAML spec (`plugins/RVNKCore/npc/<spec>.yml`,
+`/rvnk npc apply|verify|export`), and `/rvnk region define|flag|remove|info` from explicit corners. Perms
+`rvnkcore.npc.admin`, `rvnkcore.region.admin`. Full reference, spec schema and the TFAH sample:
+[toolkitplugin/docs/api/npc-harness.md](toolkitplugin/docs/api/npc-harness.md).
+
+- **Never dispatch `/npc` or `/rg` from code.** Console `/npc create` NPEs without `--at`; `/rg define` needs a
+  WorldEdit selection. Use `NpcHarness` (Citizens API) and `IRegionService` (WorldGuard API).
+- **Same classloading guard**: WorldGuard/WorldEdit classes only in `service/region/worldguard/`; the
+  planner, verifier and parser in `service/npc/harness/` must stay free of Citizens and WorldGuard types
+  so they stay unit-testable. `NpcBridgeClassLoadingTest` hides `com.sk89q` too.
 
 ### Async Operations
 

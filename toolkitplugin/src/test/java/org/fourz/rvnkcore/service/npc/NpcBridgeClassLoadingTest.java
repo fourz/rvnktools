@@ -24,7 +24,8 @@ import static org.mockito.Mockito.when;
 /**
  * Proves the NPC bridge's classloading guard (#2213): with Citizens and PlaceholderAPI absent from
  * the classpath, RVNKCore's startup path loads, links, verifies and runs, and registers the
- * unavailable service, with no {@code NoClassDefFoundError}.
+ * unavailable service, with no {@code NoClassDefFoundError}. Since #2248 the same holds for
+ * WorldGuard/WorldEdit ({@code com.sk89q}) and the region tool's adapter package.
  *
  * <p>Runs RVNKCore's own classes through a child-first loader that refuses {@code net.citizensnpcs},
  * {@code me.clip}, and also RVNKCore's own adapter packages ({@code service.npc.citizens},
@@ -37,9 +38,10 @@ import static org.mockito.Mockito.when;
  */
 class NpcBridgeClassLoadingTest {
 
-    private static final List<String> THIRD_PARTY = List.of("net.citizensnpcs.", "me.clip.");
+    private static final List<String> THIRD_PARTY = List.of("net.citizensnpcs.", "me.clip.", "com.sk89q.");
     private static final List<String> ADAPTERS = List.of(
-            "org.fourz.rvnkcore.service.npc.citizens.", "org.fourz.rvnkcore.service.npc.papi.");
+            "org.fourz.rvnkcore.service.npc.citizens.", "org.fourz.rvnkcore.service.npc.papi.",
+            "org.fourz.rvnkcore.service.region.worldguard.");
 
     /** Classes on RVNKCore's enable path for the bridge. */
     private static final List<String> STARTUP_CLASSES = List.of(
@@ -55,7 +57,20 @@ class NpcBridgeClassLoadingTest {
             "org.fourz.rvnkcore.service.npc.NpcBridge",
             "org.fourz.rvnkcore.command.RvnkCommand",
             "org.fourz.rvnkcore.command.NpcSubCommand",
-            "org.fourz.rvnkcore.init.RVNKToolsInitializer");
+            "org.fourz.rvnkcore.init.RVNKToolsInitializer",
+            // #2248: NPC harness, spec tooling and the region tool
+            "org.fourz.rvnkcore.service.npc.harness.NpcHarness",
+            "org.fourz.rvnkcore.service.npc.harness.NpcSpecParser",
+            "org.fourz.rvnkcore.service.npc.harness.NpcApplyPlanner",
+            "org.fourz.rvnkcore.service.npc.harness.NpcVerifier",
+            "org.fourz.rvnkcore.service.npc.harness.NpcSpecExecutor",
+            "org.fourz.rvnkcore.service.npc.harness.NpcSpecExporter",
+            "org.fourz.rvnkcore.service.region.IRegionService",
+            "org.fourz.rvnkcore.service.region.UnavailableRegionService",
+            "org.fourz.rvnkcore.service.region.RegionBridge",
+            "org.fourz.rvnkcore.service.region.RegionArgs",
+            "org.fourz.rvnkcore.command.NpcAdminVerbs",
+            "org.fourz.rvnkcore.command.RegionSubCommand");
 
     /** Child-first for org.fourz; refuses every hidden prefix. */
     static final class HidingLoader extends URLClassLoader {
@@ -117,6 +132,52 @@ class NpcBridgeClassLoadingTest {
     void controlPlaceholderExpansionCannotLoadWithoutPlaceholderApi() {
         assertThrows(NoClassDefFoundError.class, () -> Class.forName(
                 "org.fourz.rvnkcore.service.npc.papi.RvnkNpcPlaceholderExpansion", true, thirdPartyOnly));
+    }
+
+    @Test
+    void controlWorldGuardServiceCannotBeReflectedWithoutWorldGuard() throws Exception {
+        Class<?> service = Class.forName(
+                "org.fourz.rvnkcore.service.region.worldguard.WorldGuardRegionService", false, thirdPartyOnly);
+        assertThrows(NoClassDefFoundError.class, service::getDeclaredMethods);
+    }
+
+    @Test
+    void regionSelectReturnsUnavailableInTheIsolatedLoader() throws Exception {
+        Class<?> bridge = Class.forName("org.fourz.rvnkcore.service.region.RegionBridge", true, strict);
+        Class<?> logManager = Class.forName("org.fourz.rvnkcore.util.log.LogManager", true, strict);
+        Method select = bridge.getMethod("selectService", boolean.class, java.util.function.Supplier.class, logManager);
+        Object service = select.invoke(null, false, null, null);
+        Class<?> api = Class.forName("org.fourz.rvnkcore.service.region.IRegionService", false, strict);
+        assertEquals(false, api.getMethod("isAvailable").invoke(service));
+        assertEquals("WorldGuard not installed", api.getMethod("unavailableReason").invoke(service));
+    }
+
+    @Test
+    void regionInstallRegistersUnavailableServiceWithoutWorldGuard() throws Exception {
+        PluginManager pluginManager = mock(PluginManager.class);
+        when(pluginManager.isPluginEnabled(anyString())).thenReturn(false);
+        Plugin plugin = mock(Plugin.class);
+        when(plugin.getName()).thenReturn("RVNKCore-test");
+
+        Class<?> bridge = Class.forName("org.fourz.rvnkcore.service.region.RegionBridge", true, strict);
+        Class<?> registryType = Class.forName("org.fourz.rvnkcore.service.registry.ServiceRegistry", true, strict);
+        Class<?> logManager = Class.forName("org.fourz.rvnkcore.util.log.LogManager", true, strict);
+        Class<?> api = Class.forName("org.fourz.rvnkcore.service.region.IRegionService", false, strict);
+        Object registry = Mockito.mock(registryType);
+        Object logger = logManager.getMethod("getInstance", Plugin.class, Class.class)
+                .invoke(null, plugin, NpcBridgeClassLoadingTest.class);
+
+        try (MockedStatic<Bukkit> bukkit = Mockito.mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            Object service = bridge.getMethod("install", registryType, logManager).invoke(null, registry, logger);
+            assertEquals(false, api.getMethod("isAvailable").invoke(service));
+        }
+        Invocation register = Mockito.mockingDetails(registry).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("registerService"))
+                .findFirst().orElseThrow(() -> new AssertionError("IRegionService was not registered"));
+        assertSame(api, register.getArgument(0));
+        assertEquals("org.fourz.rvnkcore.service.region.UnavailableRegionService",
+                register.getArgument(1).getClass().getName());
     }
 
     @Test

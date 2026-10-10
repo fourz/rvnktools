@@ -21,10 +21,13 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * {@code /rvnk npc <tag|untag|list|info>} — staff tooling for the NPC bridge (#2213).
+ * {@code /rvnk npc ...} — staff tooling for the NPC bridge (#2213) and the NPC harness (#2248).
  *
  * <p>Every verb runs from the console. {@code tag} without an NPC id uses the sender's Citizens
- * selection ({@code /npc sel}); the console has to give the id.</p>
+ * selection ({@code /npc sel}); the console has to give the id. The admin verbs (create, move,
+ * rename, remove, skin, lookclose, pose, hold, protected, nameplate, protect, apply, verify,
+ * export) live in {@link NpcAdminVerbs} and need {@code rvnkcore.npc.admin}. Arguments are
+ * re-split with {@link QuotedArgs}, so {@code "Warden Tolla"} is one argument.</p>
  *
  * <ul>
  *   <li>{@code tag <key> [npcId]} — {@code rvnkcore.npc.tag}</li>
@@ -45,13 +48,17 @@ public class NpcSubCommand extends BaseSubCommand {
     static final String PERM_LIST = "rvnkcore.npc.list";
     static final String PERM_INFO = "rvnkcore.npc.info";
 
-    private static final List<String> VERBS = List.of("tag", "untag", "list", "info");
+    private static final List<String> BRIDGE_VERBS = List.of("tag", "untag", "list", "info");
+
+    private final NpcAdminVerbs admin;
 
     public NpcSubCommand(RVNKCore plugin, RVNKCommand parent) {
         super(plugin, parent, "npc",
-                "Tag Citizens NPCs with an RVNK key for quests and events",
-                "/rvnk npc <tag <key> [npcId]|untag <key>|list|info <key>>",
+                "Tag, place, edit and verify Citizens NPCs by RVNK key (console-safe)",
+                "/rvnk npc <tag|untag|list|info|create|move|rename|remove|skin|lookclose|pose|hold|protected"
+                        + "|nameplate|protect|apply|verify|export> [args]",
                 null, false);
+        this.admin = new NpcAdminVerbs(plugin);
     }
 
     @Override
@@ -62,17 +69,29 @@ public class NpcSubCommand extends BaseSubCommand {
                 "/rvnk npc info harbour_master",
                 "/rvnk npc list",
                 "/rvnk npc untag harbour_master",
-                "  keys: lower-case a-z 0-9 _ - , 1-48 characters, unique per server");
+                "  keys: lower-case a-z 0-9 _ - , 1-48 characters, unique per server",
+                "/rvnk npc create guide_test \"Warden Test\" journey 10.5 65 20.5 180 0",
+                "/rvnk npc move guide_test journey 12.5 65 20.5",
+                "/rvnk npc skin guide_test Notch   (or an https:// skin URL)",
+                "/rvnk npc lookclose guide_test on | pose guide_test sit | hold guide_test lantern",
+                "/rvnk npc protected guide_test true | nameplate guide_test hover | rename guide_test \"New Name\"",
+                "/rvnk npc protect guide_test 2 3   (WorldGuard region npc_guide_test)",
+                "/rvnk npc apply tfah --dry-run | apply tfah | verify tfah | verify | export tfah",
+                "  specs live in plugins/RVNKCore/npc/<spec>.yml");
     }
 
     @Override
-    protected boolean executeSubCommand(CommandSender sender, String[] args) {
+    protected boolean executeSubCommand(CommandSender sender, String[] rawArgs) {
+        String[] args = QuotedArgs.tokenize(rawArgs);
         if (args.length == 0) {
             sendUsage(sender);
             return true;
         }
         String verb = args[0].toLowerCase(Locale.ROOT);
         String[] rest = Arrays.copyOfRange(args, 1, args.length);
+        if (NpcAdminVerbs.handles(verb)) {
+            return guarded(sender, NpcAdminVerbs.PERM_ADMIN, () -> admin.execute(sender, verb, rest));
+        }
         switch (verb) {
             case "tag":
                 return guarded(sender, PERM_TAG, () -> handleTag(sender, rest));
@@ -241,20 +260,40 @@ public class NpcSubCommand extends BaseSubCommand {
     }
 
     private void sendUsage(CommandSender sender) {
-        sendInfoMessage(sender, "Usage: " + getUsage());
+        sendInfoMessage(sender, "Usage: /rvnk npc tag <key> [npcId] | untag <key> | list | info <key>");
+        sendInfoMessage(sender, "  create <key> <name> <world> <x> <y> <z> [yaw] [pitch] | move <key> <world> <x> <y> <z> [yaw] [pitch]");
+        sendInfoMessage(sender, "  rename <key> <name> | remove <key> | skin <key> <player|url> | lookclose <key> on|off");
+        sendInfoMessage(sender, "  pose <key> stand|sit|sneak | hold <key> <material|none> | protected <key> true|false");
+        sendInfoMessage(sender, "  nameplate <key> on|off|hover | protect <key> [radius] [height]");
+        sendInfoMessage(sender, "  apply <spec> [--dry-run] | verify [spec] | export <spec> [--force]");
         sendMessage(sender, "&7Examples: /rvnk help npc");
     }
 
     @Override
-    protected List<String> getTabCompletions(CommandSender sender, String[] args) {
+    protected List<String> getTabCompletions(CommandSender sender, String[] rawArgs) {
+        String[] args = QuotedArgs.tokenize(rawArgs);
+        if (rawArgs.length > 0 && rawArgs[rawArgs.length - 1].isEmpty()) {
+            args = Arrays.copyOf(args, args.length + 1);
+            args[args.length - 1] = ""; // the word being typed is empty
+        }
+        if (args.length == 0) {
+            return Collections.emptyList();
+        }
         if (args.length == 1) {
+            List<String> verbs = new ArrayList<>(BRIDGE_VERBS);
+            if (sender.hasPermission(NpcAdminVerbs.PERM_ADMIN)) {
+                verbs.addAll(NpcAdminVerbs.VERBS);
+            }
             List<String> matches = new ArrayList<>();
-            for (String verb : VERBS) {
+            for (String verb : verbs) {
                 if (verb.startsWith(args[0].toLowerCase(Locale.ROOT))) {
                     matches.add(verb);
                 }
             }
             return matches;
+        }
+        if (NpcAdminVerbs.handles(args[0].toLowerCase(Locale.ROOT))) {
+            return sender.hasPermission(NpcAdminVerbs.PERM_ADMIN) ? admin.complete(sender, args) : Collections.emptyList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("untag") || args[0].equalsIgnoreCase("info"))) {
             INpcService service = RVNKCore.getServiceSafe(INpcService.class);

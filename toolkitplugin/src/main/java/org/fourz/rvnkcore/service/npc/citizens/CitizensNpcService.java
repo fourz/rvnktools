@@ -208,7 +208,7 @@ public class CitizensNpcService implements INpcService {
         return new NpcRef(key, npc.getName(), worldName(location), location, npc.getId(), npc.isSpawned());
     }
 
-    private static String worldName(Location location) {
+    static String worldName(Location location) {
         if (location == null) {
             return null;
         }

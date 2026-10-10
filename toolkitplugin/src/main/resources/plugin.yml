@@ -5,7 +5,7 @@ main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
 api-version: '26.1'
 website: http://www.fourz.org
-softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault, Citizens]
+softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault, Citizens, WorldGuard]
 
 commands:
   rvnktools:
@@ -136,8 +136,8 @@ commands:
     aliases: [prefs, preferences]
     permission: rvnkcore.prefs
   rvnk:
-    description: RVNK network tools - NPC bridge (tag Citizens NPCs with an RVNK key)
-    usage: /rvnk npc <tag|untag|list|info> [args]
+    description: RVNK network tools - NPC bridge and harness (Citizens), console-safe WorldGuard regions
+    usage: /rvnk <npc|region> <verb> [args] - see /rvnk help npc, /rvnk help region
 
 permissions:
   rvnktools.command:
@@ -363,6 +363,9 @@ permissions:
   rvnkcore.npc.info:
     description: Allows showing one RVNK-keyed NPC (/rvnk npc info)
     default: op
+  rvnkcore.npc.admin:
+    description: Allows placing, editing, protecting and spec-applying NPCs (/rvnk npc create|move|rename|remove|skin|lookclose|pose|hold|protected|nameplate|protect|apply|verify|export, #2248)
+    default: op
   rvnkcore.npc.*:
     description: All NPC bridge permissions
     default: op
@@ -371,3 +374,14 @@ permissions:
       rvnkcore.npc.untag: true
       rvnkcore.npc.list: true
       rvnkcore.npc.info: true
+      rvnkcore.npc.admin: true
+
+  # ── Region tool (rvnkcore.region.*) — /rvnk region (#2248) ──────────────
+  rvnkcore.region.admin:
+    description: Allows defining, flagging, removing and inspecting WorldGuard regions (/rvnk region)
+    default: op
+  rvnkcore.region.*:
+    description: All region tool permissions
+    default: op
+    children:
+      rvnkcore.region.admin: true

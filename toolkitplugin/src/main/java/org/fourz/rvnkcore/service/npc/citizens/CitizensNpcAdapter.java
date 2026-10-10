@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.service.INpcService;
 import org.fourz.rvnkcore.service.npc.NpcInteractionTracker;
+import org.fourz.rvnkcore.service.npc.harness.NpcHarness;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 /**
@@ -41,5 +42,17 @@ public final class CitizensNpcAdapter {
                 tracker, event -> Bukkit.getPluginManager().callEvent(event), logger::debug);
         Bukkit.getPluginManager().registerEvents(listener, plugin);
         return service;
+    }
+
+    /**
+     * Builds the Citizens-backed write side used by {@code /rvnk npc create|move|apply|...} (#2248).
+     * Same rule as {@link #start}: the signature names no Citizens type.
+     *
+     * @param plugin RVNKCore, which owns the async skin tasks
+     * @param logger RVNKCore's logger
+     * @return the harness
+     */
+    public static NpcHarness harness(Plugin plugin, LogManager logger) {
+        return new CitizensNpcHarness(CitizensAPI::getNPCRegistry, plugin, logger::warning);
     }
 }

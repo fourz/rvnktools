@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.fourz.rvnkcore.api.service.INpcService;
+import org.fourz.rvnkcore.service.npc.harness.NpcHarness;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -11,7 +12,8 @@ import java.util.function.Supplier;
 
 /**
  * Installs the RVNK NPC bridge (#2213): picks the {@link INpcService} implementation, registers it
- * in the ServiceRegistry, and registers the {@code %rvnknpc_*%} PlaceholderAPI expansion.
+ * in the ServiceRegistry, registers the write-side {@link NpcHarness} when Citizens is available
+ * (#2248), and registers the {@code %rvnknpc_*%} PlaceholderAPI expansion.
  *
  * <p><b>Classloading guard.</b> This class must never name a Citizens or PlaceholderAPI type in a
  * field, a method signature or a catch clause. Every Citizens class lives in
@@ -32,10 +34,12 @@ public final class NpcBridge {
     public static final String PLACEHOLDER_API = "PlaceholderAPI";
 
     private final INpcService service;
+    private final NpcHarness harness;
     private final Runnable unregisterPlaceholders;
 
-    private NpcBridge(INpcService service, Runnable unregisterPlaceholders) {
+    private NpcBridge(INpcService service, NpcHarness harness, Runnable unregisterPlaceholders) {
         this.service = service;
+        this.harness = harness;
         this.unregisterPlaceholders = unregisterPlaceholders;
     }
 
@@ -56,8 +60,15 @@ public final class NpcBridge {
                 () -> org.fourz.rvnkcore.service.npc.citizens.CitizensNpcAdapter.start(plugin, tracker, logger),
                 logger);
         registry.registerService(INpcService.class, service);
+        NpcHarness harness = null;
         if (service.isAvailable()) {
             logger.info("NPC bridge registered: provider=" + service.getProviderName());
+            harness = selectHarness(
+                    () -> org.fourz.rvnkcore.service.npc.citizens.CitizensNpcAdapter.harness(plugin, logger), logger);
+            if (harness != null) {
+                registry.registerService(NpcHarness.class, harness);
+                logger.info("NPC harness registered: /rvnk npc create|move|apply|verify|export (#2248)");
+            }
         } else {
             logger.info("NPC bridge registered as unavailable ("
                     + (service instanceof UnavailableNpcService u ? u.getReason() : "unknown") + ")");
@@ -79,7 +90,23 @@ public final class NpcBridge {
             logger.debug("PlaceholderAPI not enabled - %rvnknpc_*% not registered");
         }
 
-        return new NpcBridge(service, unregister);
+        return new NpcBridge(service, harness, unregister);
+    }
+
+    /**
+     * Builds the write-side harness (#2248). Never throws.
+     *
+     * @return the harness, or null when the adapter failed to link
+     */
+    public static NpcHarness selectHarness(Supplier<NpcHarness> factory, LogManager logger) {
+        try {
+            return factory.get();
+        } catch (RuntimeException | LinkageError e) {
+            if (logger != null) {
+                logger.warning("Citizens NPC harness failed to start; /rvnk npc create|apply are unavailable: " + e);
+            }
+            return null;
+        }
     }
 
     /**
@@ -111,6 +138,11 @@ public final class NpcBridge {
     /** @return the registered service */
     public INpcService getService() {
         return service;
+    }
+
+    /** @return the write-side harness, or null when Citizens is unavailable (#2248) */
+    public NpcHarness getHarness() {
+        return harness;
     }
 
     /** Unregisters the PlaceholderAPI expansion. Bukkit removes the click listener itself on disable. */

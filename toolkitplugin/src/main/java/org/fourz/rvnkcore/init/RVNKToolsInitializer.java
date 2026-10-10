@@ -16,6 +16,7 @@ import org.fourz.rvnkcore.event.PortalSignListener;
 import org.fourz.rvnkcore.event.PortalStepListener;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
 import org.fourz.rvnkcore.service.npc.NpcBridge;
+import org.fourz.rvnkcore.service.region.RegionBridge;
 import org.fourz.rvnkcore.service.portal.PortalService;
 import org.fourz.rvnkcore.service.registry.ServiceRegistry;
 import org.fourz.rvnkcore.service.transfer.TransferService;
@@ -115,6 +116,10 @@ public class RVNKToolsInitializer {
         // NPC bridge BEFORE commands so /rvnk npc resolves INpcService (#2213)
         initializeNpcBridge();
         logger.debug("  + NPC bridge initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
+
+        // Region tool BEFORE commands so /rvnk region and /rvnk npc protect resolve IRegionService (#2248)
+        initializeRegionTool();
+        logger.debug("  + Region tool initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
@@ -368,6 +373,14 @@ public class RVNKToolsInitializer {
             npcBridge = NpcBridge.install(plugin, registry, logger);
         } catch (RuntimeException | LinkageError e) {
             logger.error("Failed to install the NPC bridge", e);
+        }
+    }
+
+    private void initializeRegionTool() {
+        try {
+            RegionBridge.install(registry, logger);
+        } catch (RuntimeException | LinkageError e) {
+            logger.error("Failed to install the region tool", e);
         }
     }
 
