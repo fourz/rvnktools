@@ -9,6 +9,8 @@ import org.fourz.rvnkcore.api.service.ITeleportService;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 
 /**
  * Core implementation of teleport service.
@@ -20,89 +22,78 @@ import java.util.concurrent.CompletableFuture;
  * - Relative coordinate calculation
  * - Permission verification
  *
+ * Every teleport runs on the main thread, and its future completes with the boolean
+ * {@code Player.teleport} returned, after the teleport ran (#2279).
+ *
  * @since 1.3.0
  */
 public class CoreTeleportService implements ITeleportService {
 
     private final Plugin plugin;
     private final LogManager logger;
+    /** Runs a task on the server main thread; the Bukkit scheduler in production. */
+    private final Executor mainThread;
 
     public CoreTeleportService(Plugin plugin) {
+        this(plugin, task -> Bukkit.getScheduler().runTask(plugin, task));
+    }
+
+    /**
+     * @param mainThread runs a task on the server main thread. Tests pass a direct or queued
+     *                   executor; production uses the Bukkit scheduler.
+     */
+    CoreTeleportService(Plugin plugin, Executor mainThread) {
         this.plugin = plugin;
         this.logger = LogManager.getInstance(plugin);
+        this.mainThread = mainThread;
+    }
+
+    /**
+     * Runs {@code teleport} on the main thread and completes with the value it returns: the
+     * result of {@code Player.teleport}, so a teleport another plugin cancels completes
+     * {@code false}. The future never completes before the teleport has run (#2279).
+     * An exception, or a scheduler that refuses the task, completes {@code false}.
+     */
+    private CompletableFuture<Boolean> onMainThread(String what, BooleanSupplier teleport) {
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        try {
+            mainThread.execute(() -> {
+                boolean landed;
+                try {
+                    landed = teleport.getAsBoolean();
+                } catch (Exception e) {
+                    logger.warning("Error teleporting " + what + ": " + e.getMessage());
+                    landed = false;
+                }
+                result.complete(landed);
+            });
+        } catch (Exception e) {
+            logger.warning("Could not schedule teleport " + what + ": " + e.getMessage());
+            result.complete(false);
+        }
+        return result;
     }
 
     @Override
     public CompletableFuture<Boolean> teleportToPlayer(Player player, Player target) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                if (!player.isOnline()) {
-                    return false;
-                }
-
-                if (!target.isOnline()) {
-                    return false;
-                }
-
-                // Perform teleport on main thread
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.teleport(target.getLocation());
-                });
-
-                return true;
-            } catch (Exception e) {
-                logger.warning("Error teleporting player to player: " + e.getMessage());
-                return false;
-            }
-        });
+        return onMainThread("player to player", () ->
+                player.isOnline() && target.isOnline() && player.teleport(target.getLocation()));
     }
 
     @Override
     public CompletableFuture<Boolean> teleportToCoordinates(Player player, double x, double y, double z) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                if (!player.isOnline()) {
-                    return false;
-                }
-
-                Location targetLocation = new Location(player.getWorld(), x, y, z);
-
-                // Perform teleport on main thread
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    player.teleport(targetLocation);
-                });
-
-                return true;
-            } catch (Exception e) {
-                logger.warning("Error teleporting player to coordinates: " + e.getMessage());
-                return false;
-            }
-        });
+        return onMainThread("player to coordinates", () ->
+                player.isOnline() && player.teleport(new Location(player.getWorld(), x, y, z)));
     }
 
     @Override
     public CompletableFuture<Boolean> teleportPlayerToPlayer(CommandSender commander, Player playerToTeleport, Player target) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                // Permission check
-                if (commander instanceof Player && !hasPermission(commander, ITeleportService.PERM_TP_OTHERS)) {
-                    return false;
-                }
-
-                if (!playerToTeleport.isOnline() || !target.isOnline()) {
-                    return false;
-                }
-
-                // Perform teleport on main thread
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    playerToTeleport.teleport(target.getLocation());
-                });
-
-                return true;
-            } catch (Exception e) {
-                logger.warning("Error teleporting player to player: " + e.getMessage());
+        return onMainThread("player to player", () -> {
+            if (commander instanceof Player && !hasPermission(commander, ITeleportService.PERM_TP_OTHERS)) {
                 return false;
             }
+            return playerToTeleport.isOnline() && target.isOnline()
+                    && playerToTeleport.teleport(target.getLocation());
         });
     }
 
