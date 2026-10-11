@@ -30,9 +30,20 @@ public record Cuboid(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
         return new Cuboid(x1, y1, z1, x2, y2, z2);
     }
 
-    /** @return the number of blocks inside, as a long so a large box cannot overflow */
+    /**
+     * @return the number of blocks inside, saturated at {@link Long#MAX_VALUE}. A box at the
+     *         RegionArgs bounds (60,000,001 x 4,097 x 60,000,001) holds more blocks than a long
+     *         can count (#2280). Each span is computed as a long so it cannot overflow an int.
+     */
     public long volume() {
-        return (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+        long dx = (long) maxX - minX + 1;
+        long dy = (long) maxY - minY + 1;
+        long dz = (long) maxZ - minZ + 1;
+        try {
+            return Math.multiplyExact(Math.multiplyExact(dx, dy), dz);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 
     /** @return {@code x1,y1,z1 -> x2,y2,z2} */

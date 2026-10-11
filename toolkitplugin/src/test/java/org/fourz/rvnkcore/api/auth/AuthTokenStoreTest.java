@@ -137,4 +137,22 @@ class AuthTokenStoreTest {
         assertEquals(AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES, new AuthTokenStore(plugin, -5).getLoginTtlMinutes());
         assertEquals(AuthTokenStore.DEFAULT_LOGIN_TTL_MINUTES, store.getLoginTtlMinutes());
     }
+    @Test
+    @DisplayName("link.login-ttl-minutes above the 7-day cap is clamped in minutes, not advertised (#2280)")
+    void loginTtlClampedToCap() {
+        long cap = 7L * 24L * 60L; // 10,080 minutes
+        AuthTokenStore over = new AuthTokenStore(plugin, cap + 1);
+        assertEquals(cap, over.getLoginTtlMinutes());
+
+        String token = over.generateToken(TEST_UUID, TEST_NAME, TEST_GROUPS);
+        ConsumeOutcome outcome = over.consumeToken(token);
+        long ttl = outcome.token().expiresAt().getEpochSecond()
+                - outcome.token().createdAt().getEpochSecond();
+        assertEquals(cap * 60L, ttl, "the advertised and the real lifetime must agree");
+
+        // Used to overflow loginTtlMinutes * 60L
+        assertEquals(cap, new AuthTokenStore(plugin, Long.MAX_VALUE).getLoginTtlMinutes());
+        // The cap itself is allowed unchanged
+        assertEquals(cap, new AuthTokenStore(plugin, cap).getLoginTtlMinutes());
+    }
 }
