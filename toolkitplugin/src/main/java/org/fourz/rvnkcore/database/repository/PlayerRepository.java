@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Repository implementation for Player data operations.
@@ -554,7 +555,9 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
      * Moves a player's {@code first_join} earlier, never later (#2125). Used to restore the real
      * date from Bukkit's first-played record after MariaDB's implicit ON UPDATE overwrote it.
      *
-     * @return rows changed: 1 when corrected, 0 when the stored value was already as early
+     * @return rows changed: 1 when corrected, 0 when the stored value was already as early. A
+     *         database error completes the future exceptionally, so a caller can tell a failure
+     *         from "already correct" (#2281)
      */
     public CompletableFuture<Integer> correctFirstJoinIfEarlier(UUID playerId, java.sql.Timestamp firstJoin) {
         return CompletableFuture.supplyAsync(() -> {
@@ -567,7 +570,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                 return stmt.executeUpdate();
             } catch (SQLException e) {
                 logger.warning("Failed to correct first_join for " + playerId + ": " + e.getMessage());
-                return 0;
+                throw new CompletionException(e);
             }
         });
     }
