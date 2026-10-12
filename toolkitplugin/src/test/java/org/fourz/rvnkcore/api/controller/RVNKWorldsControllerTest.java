@@ -355,6 +355,29 @@ class RVNKWorldsControllerTest {
         }
 
         @Test
+        @DisplayName("GET /sites lists a world's named sites; 400 without a world, 501 without a provider (#2316)")
+        void sites() throws Exception {
+            RVNKWorldsController c = controller(new ForgeService());
+            org.fourz.rvnkcore.api.service.ISiteLocatorService.Site site =
+                new org.fourz.rvnkcore.api.service.ISiteLocatorService.Site("drowned:trail:1", "dw", 1, -60, 2, "glyph", "First glyph");
+            c.setSitesResolver(() -> new org.fourz.rvnkcore.api.service.ISiteLocatorService() {
+                @Override public Site locate(String world, String key) { return key.equals(site.key()) ? site : null; }
+                @Override public List<Site> list(String world, String prefix) {
+                    return site.key().startsWith(prefix) && world.equals("dw") ? List.of(site) : List.of();
+                }
+            });
+            Result r = call("GET", c, "/sites", null, Map.of("world", "dw", "prefix", "drowned:trail"), "k");
+            assertEquals(200, r.status());
+            JsonObject first = r.body().getAsJsonArray("data").get(0).getAsJsonObject();
+            assertEquals("drowned:trail:1", first.get("key").getAsString());
+            assertEquals(-60, first.get("y").getAsInt());
+            assertEquals(0, call("GET", c, "/sites", null, Map.of("world", "other"), "k").body().getAsJsonArray("data").size());
+            assertEquals(400, get(c, "/sites").status());
+            c.setSitesResolver(() -> null);
+            assertEquals(501, call("GET", c, "/sites", null, Map.of("world", "dw"), "k").status());
+        }
+
+        @Test
         @DisplayName("unknown path is 404")
         void unknown() throws Exception {
             assertEquals(404, get(controller(new ForgeService()), "/forge").status());
