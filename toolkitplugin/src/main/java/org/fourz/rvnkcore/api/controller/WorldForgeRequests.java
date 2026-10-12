@@ -6,14 +6,19 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import org.fourz.rvnkcore.api.model.response.FieldError;
+import org.fourz.rvnkcore.api.model.worlds.CreateGroupRequest;
+import org.fourz.rvnkcore.api.model.worlds.CreateSkyStackRequest;
 import org.fourz.rvnkcore.api.model.worlds.CreateWorldV2Request;
+import org.fourz.rvnkcore.api.model.worlds.GroupWorldRequest;
 import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackSettingsRequest;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -133,6 +138,113 @@ final class WorldForgeRequests {
                         + " samples; the limit is " + maxSide + "x" + maxSide
                         + " (raise step to at least " + ((r.getSize() + maxSide - 1) / maxSide) + ")"));
             }
+        }
+        return new Parsed<>(r, errors);
+    }
+
+    // ── control plane (#2218): groups and sky stacks ─────────────────────────────────────────
+
+    /** Keys {@code PUT /skystacks/{group}} accepts: the {@code skyStack} block of worlds.yml. */
+    static final List<String> SKYSTACK_SETTING_KEYS = List.of("enabled", "landingMode", "ascendCooldownSeconds",
+            "descentTriggerYOffset", "deepTriggerY", "deepAscendOffset");
+
+    /** {@code POST /groups}: {@code {name, inventoryLink?, portalEmulation?}}. */
+    static Parsed<CreateGroupRequest> parseCreateGroup(JsonObject obj) {
+        List<FieldError> errors = new ArrayList<>();
+        CreateGroupRequest r = new CreateGroupRequest();
+        r.setName(requiredString(obj, "name", errors));
+        Boolean link = optionalBoolean(obj, "inventoryLink", errors);
+        Boolean portal = optionalBoolean(obj, "portalEmulation", errors);
+        r.setInventoryLink(link != null && link);
+        r.setPortalEmulation(portal != null && portal);
+        return new Parsed<>(r, errors);
+    }
+
+    /** {@code POST /groups/{name}/worlds}: {@code {world, force?}}. */
+    static Parsed<GroupWorldRequest> parseGroupWorld(JsonObject obj) {
+        List<FieldError> errors = new ArrayList<>();
+        GroupWorldRequest r = new GroupWorldRequest();
+        r.setWorld(requiredString(obj, "world", errors));
+        Boolean force = optionalBoolean(obj, "force", errors);
+        r.setForce(force != null && force);
+        return new Parsed<>(r, errors);
+    }
+
+    /** {@code PUT /groups/{name}/permission}: {@code {requiresPermission}}. */
+    static Parsed<Boolean> parsePermission(JsonObject obj) {
+        List<FieldError> errors = new ArrayList<>();
+        Boolean v = optionalBoolean(obj, "requiresPermission", errors);
+        if (v == null && !hasError(errors, "requiresPermission")) {
+            errors.add(new FieldError("requiresPermission", "is required (true = set the gate, false = clear it)"));
+        }
+        return new Parsed<>(v, errors);
+    }
+
+    /**
+     * {@code POST /skystacks}: {@code {group | bottomWorld, direction?, count, template?, generator?, preset?,
+     * settings?}}. Shape only; the count cap and every name are RVNKWorlds' to check.
+     */
+    static Parsed<CreateSkyStackRequest> parseCreateSkyStack(JsonObject obj) {
+        List<FieldError> errors = new ArrayList<>();
+        CreateSkyStackRequest r = new CreateSkyStackRequest();
+        r.setGroup(optionalString(obj, "group", errors));
+        r.setBottomWorld(optionalString(obj, "bottomWorld", errors));
+        if (r.getGroup() == null && r.getBottomWorld() == null && !hasError(errors, "group", "bottomWorld")) {
+            errors.add(new FieldError("group", "group or bottomWorld is required"));
+        }
+        String direction = optionalString(obj, "direction", errors);
+        if (direction != null) {
+            try {
+                r.setDirection(CreateSkyStackRequest.Direction.valueOf(direction.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                errors.add(new FieldError("direction", "must be up, down or both"));
+            }
+        }
+        Integer count = optionalInt(obj, "count", errors);
+        if (count == null) {
+            if (!hasError(errors, "count")) errors.add(new FieldError("count", "is required"));
+        } else if (count < 1) {
+            errors.add(new FieldError("count", "must be at least 1"));
+        } else {
+            r.setCount(count);
+        }
+        r.setTemplate(optionalString(obj, "template", errors));
+        r.setGenerator(optionalString(obj, "generator", errors));
+        r.setPreset(optionalString(obj, "preset", errors));
+        r.setSettings(optionalObject(obj, "settings", errors));
+        return new Parsed<>(r, errors);
+    }
+
+    /**
+     * {@code PUT /skystacks/{group}}: a partial {@code skyStack} block. Unknown keys are refused, and roof,
+     * floor and seal-band keys get a message that says why: they are frozen per world at creation.
+     */
+    static Parsed<SkyStackSettingsRequest> parseSkyStackSettings(JsonObject obj) {
+        List<FieldError> errors = new ArrayList<>();
+        SkyStackSettingsRequest r = new SkyStackSettingsRequest();
+        for (String key : obj.keySet()) {
+            if (SKYSTACK_SETTING_KEYS.contains(key)) continue;
+            String lower = key.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("roof") || lower.startsWith("floor") || lower.contains("seal")) {
+                errors.add(new FieldError(key, "is a frozen generation setting of each world; it is set when the"
+                        + " layer is created (POST /skystacks settings) and cannot change after"));
+            } else {
+                errors.add(new FieldError(key, "unknown sky-stack setting; supported: "
+                        + String.join(", ", SKYSTACK_SETTING_KEYS)));
+            }
+        }
+        r.setEnabled(optionalBoolean(obj, "enabled", errors));
+        r.setLandingMode(optionalString(obj, "landingMode", errors));
+        r.setAscendCooldownSeconds(optionalInt(obj, "ascendCooldownSeconds", errors));
+        r.setDescentTriggerYOffset(optionalInt(obj, "descentTriggerYOffset", errors));
+        r.setDeepTriggerY(optionalInt(obj, "deepTriggerY", errors));
+        r.setResetDeepTriggerY(obj.has("deepTriggerY") && obj.get("deepTriggerY").isJsonNull());
+        r.setDeepAscendOffset(optionalInt(obj, "deepAscendOffset", errors));
+        boolean any = false;
+        for (String key : SKYSTACK_SETTING_KEYS) any |= obj.has(key);
+        if (!any && errors.isEmpty()) {
+            errors.add(new FieldError("settings", "no setting to change; supported: "
+                    + String.join(", ", SKYSTACK_SETTING_KEYS)));
         }
         return new Parsed<>(r, errors);
     }

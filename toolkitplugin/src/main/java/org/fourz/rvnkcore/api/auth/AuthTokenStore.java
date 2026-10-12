@@ -82,7 +82,8 @@ public class AuthTokenStore {
     /**
      * @param loginTtlMinutes LOGIN token lifetime, from {@code link.login-ttl-minutes}.
      *                        Values &lt;= 0 are rejected with a warning and fall back to
-     *                        {@link #DEFAULT_LOGIN_TTL_MINUTES} (#1598).
+     *                        {@link #DEFAULT_LOGIN_TTL_MINUTES} (#1598). Values above the
+     *                        7-day token cap are clamped to it with a warning (#2280).
      */
     public AuthTokenStore(Plugin plugin, long loginTtlMinutes) {
         this.logger = LogManager.getInstance(plugin, getClass());
@@ -90,6 +91,15 @@ public class AuthTokenStore {
             logger.warning("link.login-ttl-minutes must be positive (got " + loginTtlMinutes
                     + "); using " + DEFAULT_LOGIN_TTL_MINUTES);
             loginTtlMinutes = DEFAULT_LOGIN_TTL_MINUTES;
+        }
+        // Clamp in minutes before the multiply: generateToken caps every token at MAX_TTL_SECONDS,
+        // so a larger value made /link advertise a lifetime the token never had, and a huge one
+        // overflowed here (#2280)
+        long maxMinutes = MAX_TTL_SECONDS / 60L;
+        if (loginTtlMinutes > maxMinutes) {
+            logger.warning("link.login-ttl-minutes is above the " + maxMinutes + "-minute (7-day) cap (got "
+                    + loginTtlMinutes + "); using " + maxMinutes);
+            loginTtlMinutes = maxMinutes;
         }
         this.loginTtlSeconds = loginTtlMinutes * 60L;
 

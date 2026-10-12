@@ -1,6 +1,7 @@
 package org.fourz.rvnktools.command.manager.commands;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.rvnkcore.RVNKCore;
@@ -15,6 +16,7 @@ import org.fourz.rvnktools.command.manager.BaseCommand;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * /tpaccept — Accept a pending teleport request.
@@ -79,34 +81,20 @@ public class TpAcceptCommand extends BaseCommand {
 
         // The back location is recorded only when the teleport lands; setting it here lost the
         // original location whenever the warmup was cancelled (#2127)
-        final org.bukkit.Location from = teleporting.getLocation().clone();
+        final Location from = teleporting.getLocation().clone();
 
         // Execute teleport with warmup
         tpaService.startWarmup(teleporting, () -> {
             // Use ITeleportService for the actual teleport (gets RVNKWorlds handling if available)
             ServiceRegistry registry = plugin.getServiceRegistry();
             if (registry.hasService(ITeleportService.class)) {
-                ITeleportService teleportService = registry.getService(ITeleportService.class);
-                teleportService.teleportToPlayer(teleporting, destination).thenAccept(success -> {
-                    if (success) {
-                        backService.setBackLocation(teleporting.getUniqueId(), from);
-                        teleporting.sendMessage(ChatFormat.colorize("&a✓ Teleported to &f" + destination.getName()));
-                        destination.sendMessage(ChatFormat.colorize("&a✓ &f" + teleporting.getName() + " &ateleported to you."));
-                    } else {
-                        teleporting.sendMessage(ChatFormat.colorize("&c✖ Teleport failed."));
-                    }
-                });
+                teleportAndRecord(registry.getService(ITeleportService.class),
+                        teleporting, destination, from, backService);
             } else {
                 // Fallback: direct Bukkit teleport
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!teleporting.teleport(destination.getLocation())) {
-                        teleporting.sendMessage(ChatFormat.colorize("&c✖ Teleport failed."));
-                        return;
-                    }
-                    backService.setBackLocation(teleporting.getUniqueId(), from);
-                    teleporting.sendMessage(ChatFormat.colorize("&a✓ Teleported to &f" + destination.getName()));
-                    destination.sendMessage(ChatFormat.colorize("&a✓ &f" + teleporting.getName() + " &ateleported to you."));
-                });
+                Bukkit.getScheduler().runTask(plugin, () -> reportTeleport(
+                        teleporting.teleport(destination.getLocation()),
+                        teleporting, destination, from, backService));
             }
         });
 
@@ -119,6 +107,38 @@ public class TpAcceptCommand extends BaseCommand {
         }
 
         return true;
+    }
+
+    /**
+     * Teleports through the service and acts on the result it completes with. The service
+     * completes after the teleport ran, with {@code Player.teleport}'s return value (#2279), so
+     * {@code /back} is written only for a teleport that landed. An exceptional completion counts
+     * as a failure.
+     */
+    static CompletableFuture<Void> teleportAndRecord(ITeleportService teleportService, Player teleporting,
+                                                     Player destination, Location from,
+                                                     BackLocationService backService) {
+        return teleportService.teleportToPlayer(teleporting, destination)
+                .exceptionally(e -> false)
+                .thenAccept(success -> reportTeleport(Boolean.TRUE.equals(success),
+                        teleporting, destination, from, backService));
+    }
+
+    /**
+     * On success, records {@code from} as the back location and tells both players. On failure
+     * (refused, cancelled by another plugin, player offline), tells both players and leaves
+     * {@code /back} untouched (#2127, #2279).
+     */
+    static void reportTeleport(boolean success, Player teleporting, Player destination, Location from,
+                               BackLocationService backService) {
+        if (success) {
+            backService.setBackLocation(teleporting.getUniqueId(), from);
+            teleporting.sendMessage(ChatFormat.colorize("&a✓ Teleported to &f" + destination.getName()));
+            destination.sendMessage(ChatFormat.colorize("&a✓ &f" + teleporting.getName() + " &ateleported to you."));
+        } else {
+            teleporting.sendMessage(ChatFormat.colorize("&c✖ Teleport to &f" + destination.getName() + " &cfailed."));
+            destination.sendMessage(ChatFormat.colorize("&c✖ &f" + teleporting.getName() + " &ccould not be teleported to you."));
+        }
     }
 
     @Override

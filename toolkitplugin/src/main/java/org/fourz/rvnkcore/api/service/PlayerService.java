@@ -42,7 +42,8 @@ public interface PlayerService {
     /**
      * Moves a player's first-join time earlier, never later - e.g. to Bukkit's first-played record.
      *
-     * @return 1 when the stored value was corrected, 0 otherwise
+     * @return 1 when the stored value was corrected, 0 otherwise; completes exceptionally on a
+     *         database error (#2281)
      * @since 1.5.93-alpha
      */
     default CompletableFuture<Integer> correctFirstJoin(UUID playerId, java.sql.Timestamp firstJoin) {

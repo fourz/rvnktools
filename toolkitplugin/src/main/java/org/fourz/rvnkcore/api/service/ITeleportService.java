@@ -32,7 +32,9 @@ public interface ITeleportService {
      *
      * @param player Player to teleport (sender)
      * @param target Target player location
-     * @return CompletableFuture indicating success/failure
+     * @return a future that completes only after the teleport ran, with the value
+     *         {@code Player.teleport} returned ({@code false} when it was refused or cancelled).
+     *         Callers write {@code /back} and announce success only on {@code true} (#2279).
      */
     CompletableFuture<Boolean> teleportToPlayer(Player player, Player target);
 
@@ -47,7 +49,9 @@ public interface ITeleportService {
      * @param x X coordinate (world of player is used)
      * @param y Y coordinate
      * @param z Z coordinate
-     * @return CompletableFuture indicating success/failure
+     * @return a future that completes only after the teleport ran, with the value
+     *         {@code Player.teleport} returned ({@code false} when it was refused or cancelled).
+     *         Callers write {@code /back} and announce success only on {@code true} (#2279).
      */
     CompletableFuture<Boolean> teleportToCoordinates(Player player, double x, double y, double z);
 
@@ -61,7 +65,9 @@ public interface ITeleportService {
      * @param commander Command sender (requires permission check)
      * @param playerToTeleport Player to teleport
      * @param target Target player location
-     * @return CompletableFuture indicating success/failure
+     * @return a future that completes only after the teleport ran, with the value
+     *         {@code Player.teleport} returned ({@code false} when it was refused or cancelled).
+     *         Callers write {@code /back} and announce success only on {@code true} (#2279).
      */
     CompletableFuture<Boolean> teleportPlayerToPlayer(CommandSender commander, Player playerToTeleport, Player target);
 

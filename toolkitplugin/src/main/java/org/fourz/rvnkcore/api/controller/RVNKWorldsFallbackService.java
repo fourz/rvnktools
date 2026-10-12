@@ -11,6 +11,8 @@ import org.fourz.rvnkcore.api.model.worlds.JobDTO;
 import org.fourz.rvnkcore.api.model.worlds.PresetDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewDTO;
 import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackDTO;
+import org.fourz.rvnkcore.api.model.worlds.SkyStackTemplateDTO;
 import org.fourz.rvnkcore.api.model.worlds.WorldGenSettingsDTO;
 import org.fourz.rvnkcore.api.server.jetty.LiveDataCache;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
@@ -254,6 +256,25 @@ class RVNKWorldsFallbackService implements IRVNKWorldsApiService {
 
     @Override
     public CompletableFuture<ApiResponse<WorldGenSettingsDTO>> getWorldGenSettings(String worldName) {
+        return forgeUnavailable();
+    }
+
+    // Control plane (#2218): the read routes answer 501 PLUGIN_NOT_LOADED for the same reason as
+    // World Forge - an empty stack list would read as "no stacks" while meaning "cannot list them".
+    // The writes never reach this class (the controller answers 501 first).
+
+    @Override
+    public CompletableFuture<ApiResponse<List<SkyStackDTO>>> listSkyStacks() {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<SkyStackDTO>> getSkyStack(String groupName) {
+        return forgeUnavailable();
+    }
+
+    @Override
+    public CompletableFuture<ApiResponse<List<SkyStackTemplateDTO>>> listSkyStackTemplates() {
         return forgeUnavailable();
     }
 
