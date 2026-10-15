@@ -20,6 +20,7 @@ import org.fourz.rvnkcore.api.model.worlds.PreviewRequest;
 import org.fourz.rvnkcore.api.model.worlds.SkyStackSettingsRequest;
 import org.fourz.rvnkcore.api.ratelimit.RateLimiter;
 import org.fourz.rvnkcore.api.service.IRVNKWorldsApiService;
+import org.fourz.rvnkcore.api.service.ISiteLocatorService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -55,6 +56,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>World Forge routes (#2200, since 1.5.96):</b></p>
  * <pre>
+ * GET    /sites?world=&amp;prefix=        ISiteLocatorService.list (#2316, since 1.5.106)
  * GET    /generators                 listGenerators()
  * GET    /generators/{id}            getGenerator(id)
  * GET    /presets[?generator=]       listPresets(generator)
@@ -132,6 +134,8 @@ public class RVNKWorldsController extends HttpServlet {
     private static final Pattern COLUMN_PATTERN = Pattern.compile("^/column/?$");
     private static final Pattern HEIGHTMAP_PATTERN = Pattern.compile("^/heightmap/?$");
     private static final Pattern SCATTER_PATTERN = Pattern.compile("^/scatter/?$");
+    /** #2316 - named sites of a world (glyph trail, Atlantis, Dryland), from {@link ISiteLocatorService}. */
+    private static final Pattern SITES_PATTERN = Pattern.compile("^/sites/?$");
     // ── World Forge (#2200) ──
     private static final Pattern GENERATORS_PATTERN = Pattern.compile("^/generators/?$");
     private static final Pattern GENERATOR_ID_PATTERN = Pattern.compile("^/generators/([^/]+)/?$");
@@ -182,6 +186,14 @@ public class RVNKWorldsController extends HttpServlet {
     /** Test seam: previews running plus previews queued. */
     int previewInFlight() {
         return previewExecutor.getActiveCount() + previewExecutor.getQueue().size();
+    }
+
+    /** Resolves the site service per request (#2316); a test replaces it. */
+    private volatile Supplier<ISiteLocatorService> sitesResolver = () -> RVNKCore.getServiceSafe(ISiteLocatorService.class);
+
+    /** Test seam: where /sites finds its service. */
+    void setSitesResolver(Supplier<ISiteLocatorService> resolver) {
+        this.sitesResolver = resolver;
     }
 
     private IRVNKWorldsApiService getApiService() {
@@ -247,6 +259,9 @@ public class RVNKWorldsController extends HttpServlet {
                 future = apiService.heightmapGrid(req.getQueryString());
             } else if (SCATTER_PATTERN.matcher(pathInfo).matches()) {
                 future = apiService.scatterProbe(req.getQueryString());
+            } else if (SITES_PATTERN.matcher(pathInfo).matches()) {
+                sendSites(req, resp);
+                return;
             } else if (GENERATORS_PATTERN.matcher(pathInfo).matches()) {
                 future = apiService.listGenerators();
             } else if ((matcher = GENERATOR_ID_PATTERN.matcher(pathInfo)).matches()) {
@@ -656,6 +671,26 @@ public class RVNKWorldsController extends HttpServlet {
         String code = response.error().code();
         if ("NOT_SUPPORTED".equals(code) || "PLUGIN_NOT_LOADED".equals(code)) return 501;
         return response.error().suggestedHttpStatus();
+    }
+
+    /**
+     * GET /sites?world=&lt;name&gt;[&amp;prefix=&lt;key prefix&gt;] (#2316): the world's named sites, in key order. 400 without a
+     * world, 501 when no plugin provides sites. Served here, not through {@link IRVNKWorldsApiService}: the lookup is
+     * a pure read of the world's generator, with no main-thread work to queue.
+     */
+    private void sendSites(HttpServletRequest req, HttpServletResponse resp) {
+        String world = req.getParameter("world");
+        if (world == null || world.isBlank()) {
+            sendError(resp, 400, "BAD_REQUEST", "world is required");
+            return;
+        }
+        ISiteLocatorService sites = sitesResolver.get();
+        if (sites == null) {
+            sendError(resp, 501, "PLUGIN_NOT_LOADED", "No plugin provides named sites");
+            return;
+        }
+        String prefix = req.getParameter("prefix");
+        sendApiResponse(resp, ApiResponse.success(sites.list(world.trim(), prefix == null ? "" : prefix.trim())));
     }
 
     private void sendApiResponse(HttpServletResponse resp, ApiResponse<?> response) {

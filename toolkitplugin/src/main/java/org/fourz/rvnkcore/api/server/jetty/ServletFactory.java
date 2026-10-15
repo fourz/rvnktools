@@ -19,6 +19,10 @@ import org.fourz.rvnkcore.api.controller.QuestsController;
 import org.fourz.rvnkcore.api.controller.PlayerController;
 import org.fourz.rvnkcore.api.controller.WebUIAccessController;
 import org.fourz.rvnkcore.api.controller.WhitelistController;
+import org.fourz.rvnkcore.service.whitelist.BukkitWhitelistStore;
+import org.fourz.rvnkcore.service.whitelist.MojangProfileLookup;
+import org.fourz.rvnkcore.service.whitelist.WhitelistMembership;
+import org.fourz.rvnkcore.service.whitelist.luckperms.LuckPermsAssigners;
 import org.fourz.rvnkcore.api.controller.WorldController;
 import org.fourz.rvnkcore.api.docs.OpenApiHandler;
 import org.fourz.rvnkcore.api.security.AuthFilter;
@@ -265,9 +269,29 @@ public class ServletFactory {
 
     private void registerWhitelistController(ServletContextHandler context) {
         LogManager whitelistLogger = LogManager.getInstance(plugin, WhitelistController.class);
-        WhitelistController controller = new WhitelistController(gson, whitelistLogger, plugin);
-        context.addServlet(new ServletHolder(controller), "/v1/whitelist/*");
+        WhitelistMembership membership = new WhitelistMembership(
+                new MojangProfileLookup(plugin), new BukkitWhitelistStore(plugin), groupAssigner(whitelistLogger));
+        WhitelistController controller = new WhitelistController(gson, whitelistLogger, membership);
+        ServletHolder holder = new ServletHolder(controller);
+        holder.setAsyncSupported(true); // responses complete from the future (#1552)
+        context.addServlet(holder, "/v1/whitelist/*");
         logger.debug("Whitelist API controller registered at /v1/whitelist/*");
+    }
+
+    /**
+     * The member-group step (#2346). LuckPerms classes load only after the plugin is enabled, so a
+     * server without LuckPerms still whitelists and reports the group as UNAVAILABLE.
+     */
+    private WhitelistMembership.GroupAssigner groupAssigner(LogManager whitelistLogger) {
+        if (plugin.getServer().getPluginManager().isPluginEnabled("LuckPerms")) {
+            try {
+                return LuckPermsAssigners.create();
+            } catch (Throwable e) {
+                whitelistLogger.warning("[whitelist] LuckPerms present but not usable: " + e);
+            }
+        }
+        return (uuid, group) -> java.util.concurrent.CompletableFuture.completedFuture(
+                WhitelistMembership.GroupResult.UNAVAILABLE);
     }
 
     /**
