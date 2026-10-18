@@ -64,6 +64,7 @@ public class RVNKToolsInitializer {
     // Component references for shutdown
     private LuckPermsIntegrationListener luckPermsListener;
     private NpcBridge npcBridge;
+    private org.fourz.rvnkcore.service.netpeers.LoginEventReporter netPeersReporter;
 
     /**
      * Creates a new RVNKToolsInitializer.
@@ -151,6 +152,11 @@ public class RVNKToolsInitializer {
         if (npcBridge != null) {
             npcBridge.shutdown();
             npcBridge = null;
+        }
+
+        if (netPeersReporter != null) {
+            netPeersReporter.shutdown();
+            netPeersReporter = null;
         }
 
         // Shutdown LuckPerms listener
@@ -308,6 +314,9 @@ public class RVNKToolsInitializer {
                     logger.warning("Portal listeners not registered: PortalService unavailable");
                 }
 
+                // Report joins to z-office so a linked player keeps radio access (#2351). Off by default.
+                registerNetPeersReporter();
+
                 // Register LuckPerms integration
                 try {
                     luckPermsListener = new LuckPermsIntegrationListener(plugin, plugin);
@@ -413,6 +422,37 @@ public class RVNKToolsInitializer {
 
         } catch (Exception e) {
             logger.error("Failed to register bundled component commands", e);
+        }
+    }
+
+    /** Registers the z-office login reporter when {@code net-peers} is enabled and complete (#2351). */
+    private void registerNetPeersReporter() {
+        org.fourz.rvnkcore.service.netpeers.NetPeersConfig cfg = org.fourz.rvnkcore.service.netpeers.NetPeersConfig
+                .from(plugin.getConfig().getConfigurationSection("net-peers"));
+        if (!cfg.active()) {
+            if (cfg.enabled()) logger.warning("net-peers: enabled but url or secret is blank; not reporting");
+            return;
+        }
+        try {
+            java.nio.file.Path ca = null;
+            if (!cfg.caCert().isBlank()) {
+                ca = java.nio.file.Path.of(cfg.caCert());
+                if (!ca.isAbsolute()) ca = plugin.getDataFolder().toPath().resolve(ca);
+            }
+            org.fourz.rvnkcore.service.netpeers.HttpLoginTransport transport =
+                    new org.fourz.rvnkcore.service.netpeers.HttpLoginTransport(cfg, ca);
+            netPeersReporter = new org.fourz.rvnkcore.service.netpeers.LoginEventReporter(cfg, transport,
+                    new org.fourz.rvnkcore.service.netpeers.LoginEventReporter.Log() {
+                        @Override public void info(String m) { logger.info(m); }
+                        @Override public void warning(String m) { logger.warning(m); }
+                        @Override public void debug(String m) { logger.debug(m); }
+                    });
+            plugin.getServer().getPluginManager().registerEvents(
+                    new org.fourz.rvnkcore.event.NetPeersLoginListener(netPeersReporter), plugin);
+            logger.info("net-peers: reporting joins to " + java.net.URI.create(cfg.url()).getHost()
+                    + (ca != null ? " (CA " + ca.getFileName() + ")" : " (JVM truststore)"));
+        } catch (Exception e) {
+            logger.warning("net-peers: not reporting: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 }

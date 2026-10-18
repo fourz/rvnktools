@@ -180,6 +180,21 @@ webhook:
                            # uses webhook.secret for HMAC auth — no separate token needed
 
 # ──────────────────────────────────────────
+# z-office login events (#2351)
+# ──────────────────────────────────────────
+# On each join, POSTs {kind, uuid, name, address} to z-office so a player whose UUID is linked there
+# keeps radio and music access. Only the LOCAL server on the internal VLAN can reach z-office.
+# Sends only a public IPv4 address; a LAN or unknown address sends nothing. Async, one retry, never
+# blocks a join. NOTE: a server that already has config.yml does not get this section (#1563).
+net-peers:
+  enabled: false
+  url: "https://z-office.internal.fourz.org/api/net/peers/login-event"
+  secret: ""               # X-Net-Peers-Event-Secret. Set it here only; never in an issue or chat.
+  timeout-ms: 4000         # per attempt (500-10000)
+  ca-cert: ""              # PEM of the internal CA (relative = plugins/RVNKCore/). Blank = JVM truststore.
+  ignore-addresses: []     # public addresses of a proxy in front of this server; a join from one sends nothing
+
+# ──────────────────────────────────────────
 # Cross-Server Chat Relay
 # ──────────────────────────────────────────
 # Shares a "global" chat channel between RVNKCore servers (e.g. Event <-> prod) over the
