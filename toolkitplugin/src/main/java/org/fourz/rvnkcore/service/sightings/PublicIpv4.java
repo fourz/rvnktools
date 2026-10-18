@@ -1,4 +1,4 @@
-package org.fourz.rvnkcore.service.netpeers;
+package org.fourz.rvnkcore.service.sightings;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -7,9 +7,8 @@ import java.util.Optional;
 /**
  * Decides whether an address is a public IPv4 address (#2351).
  *
- * <p>z-office allowlists the address it receives, so a private, shared or reserved address must
- * never be sent. z-office refuses private and loopback addresses itself, but RVNKCore checks first so
- * that a player on the house LAN causes no call at all.</p>
+ * <p>z-office allowlists the address a sighting carries, so a private, shared or reserved address
+ * must never be recorded: a player on the house LAN, or a proxy, produces no sighting at all.</p>
  */
 public final class PublicIpv4 {
 

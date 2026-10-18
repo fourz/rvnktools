@@ -135,6 +135,11 @@ public class AuthFilter implements Filter {
         return "/v1/health".equals(request.getServletPath());
     }
 
+    /** True for any request routed to the sightings servlet ({@code /v1/net-sightings}, #2351). */
+    static boolean isNetSightingsRequest(HttpServletRequest request) {
+        return "/v1/net-sightings".equals(request.getServletPath());
+    }
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) 
             throws IOException, ServletException {
@@ -172,6 +177,20 @@ public class AuthFilter implements Filter {
         if (rateLimiter != null && !rateLimiter.isAllowed(clientIP)) {
             warnRateLimited(clientIP, method, requestURI);
             sendRateLimited(httpResponse);
+            return;
+        }
+
+        // Sightings read path (#2351): opened by its own read token ONLY. The shared X-API-Key does
+        // not open it and the IP allowlist does not apply (z-office's egress address is not static).
+        // Matched on the servlet Jetty routed to, like the health exemption above.
+        if (isNetSightingsRequest(httpRequest)) {
+            if (org.fourz.rvnkcore.service.sightings.SightingsReadToken.matches(
+                    httpRequest.getHeader(org.fourz.rvnkcore.service.sightings.SightingsReadToken.HEADER))) {
+                chain.doFilter(request, response);
+            } else {
+                logger.warning("Sightings read denied - missing or invalid read token from IP: " + clientIP);
+                sendUnauthorized(httpResponse, "Invalid read token");
+            }
             return;
         }
 

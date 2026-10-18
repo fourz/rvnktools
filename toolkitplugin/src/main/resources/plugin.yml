@@ -394,3 +394,6 @@ permissions:
     default: op
     children:
       rvnkcore.region.admin: true
+  rvnkcore.entitlement.admin:
+    description: Allows granting, revoking and listing entitled lists such as mc-dev (/rvnk entitlement, #2351)
+    default: op

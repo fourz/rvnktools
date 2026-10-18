@@ -157,6 +157,12 @@ public class ServletFactory {
         // Whitelist management
         registerWhitelistController(context);
 
+        // Player sightings for z-office (#2351); read-token only, see AuthFilter
+        ServletHolder sightings = new ServletHolder(new org.fourz.rvnkcore.api.controller.NetSightingsController(
+                gson, LogManager.getInstance(plugin, org.fourz.rvnkcore.api.controller.NetSightingsController.class)));
+        sightings.setAsyncSupported(true);
+        context.addServlet(sightings, "/v1/net-sightings");
+
         // WebUI access logging
         registerWebUIAccessController(context);
 

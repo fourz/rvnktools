@@ -64,7 +64,8 @@ public class RVNKToolsInitializer {
     // Component references for shutdown
     private LuckPermsIntegrationListener luckPermsListener;
     private NpcBridge npcBridge;
-    private org.fourz.rvnkcore.service.netpeers.LoginEventReporter netPeersReporter;
+    private org.fourz.rvnkcore.service.sightings.SightingService sightingService;
+    private org.bukkit.scheduler.BukkitTask sightingPrune;
 
     /**
      * Creates a new RVNKToolsInitializer.
@@ -154,9 +155,13 @@ public class RVNKToolsInitializer {
             npcBridge = null;
         }
 
-        if (netPeersReporter != null) {
-            netPeersReporter.shutdown();
-            netPeersReporter = null;
+        if (sightingPrune != null) {
+            sightingPrune.cancel();
+            sightingPrune = null;
+        }
+        if (sightingService != null) {
+            sightingService.shutdown();
+            sightingService = null;
         }
 
         // Shutdown LuckPerms listener
@@ -314,8 +319,8 @@ public class RVNKToolsInitializer {
                     logger.warning("Portal listeners not registered: PortalService unavailable");
                 }
 
-                // Report joins to z-office so a linked player keeps radio access (#2351). Off by default.
-                registerNetPeersReporter();
+                // Player sightings + entitled lists, pulled by z-office (#2351). Recording is off by default.
+                registerSightings();
 
                 // Register LuckPerms integration
                 try {
@@ -425,34 +430,54 @@ public class RVNKToolsInitializer {
         }
     }
 
-    /** Registers the z-office login reporter when {@code net-peers} is enabled and complete (#2351). */
-    private void registerNetPeersReporter() {
-        org.fourz.rvnkcore.service.netpeers.NetPeersConfig cfg = org.fourz.rvnkcore.service.netpeers.NetPeersConfig
-                .from(plugin.getConfig().getConfigurationSection("net-peers"));
-        if (!cfg.active()) {
-            if (cfg.enabled()) logger.warning("net-peers: enabled but url or secret is blank; not reporting");
+    /**
+     * Registers the sighting service, its join listener and an hourly prune (#2351). Sightings live in
+     * this server's own database; entitlements in the cluster database when clustering is on.
+     */
+    private void registerSightings() {
+        org.fourz.rvnkcore.database.connection.ConnectionProvider local =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ConnectionProvider.class);
+        if (local == null) {
+            logger.warning("net-sightings: no database; sightings and entitlements disabled");
             return;
         }
+        org.fourz.rvnkcore.database.connection.ClusterConnectionProvider cluster =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ClusterConnectionProvider.class);
         try {
-            java.nio.file.Path ca = null;
-            if (!cfg.caCert().isBlank()) {
-                ca = java.nio.file.Path.of(cfg.caCert());
-                if (!ca.isAbsolute()) ca = plugin.getDataFolder().toPath().resolve(ca);
-            }
-            org.fourz.rvnkcore.service.netpeers.HttpLoginTransport transport =
-                    new org.fourz.rvnkcore.service.netpeers.HttpLoginTransport(cfg, ca);
-            netPeersReporter = new org.fourz.rvnkcore.service.netpeers.LoginEventReporter(cfg, transport,
-                    new org.fourz.rvnkcore.service.netpeers.LoginEventReporter.Log() {
+            org.fourz.rvnkcore.service.sightings.JdbcSightingStore sightings =
+                    new org.fourz.rvnkcore.service.sightings.JdbcSightingStore(local);
+            sightings.ensureSchema();
+            org.fourz.rvnkcore.service.sightings.JdbcEntitlementStore entitlements =
+                    new org.fourz.rvnkcore.service.sightings.JdbcEntitlementStore(cluster != null ? cluster : local);
+            entitlements.ensureSchema();
+            sightingService = new org.fourz.rvnkcore.service.sightings.SightingService(
+                    sightingsConfig(plugin.getConfig()), sightings, entitlements,
+                    new org.fourz.rvnkcore.service.sightings.SightingService.Log() {
                         @Override public void info(String m) { logger.info(m); }
                         @Override public void warning(String m) { logger.warning(m); }
-                        @Override public void debug(String m) { logger.debug(m); }
-                    });
+                    }, System::currentTimeMillis);
+            registry.registerService(org.fourz.rvnkcore.service.sightings.SightingService.class, sightingService);
             plugin.getServer().getPluginManager().registerEvents(
-                    new org.fourz.rvnkcore.event.NetPeersLoginListener(netPeersReporter), plugin);
-            logger.info("net-peers: reporting joins to " + java.net.URI.create(cfg.url()).getHost()
-                    + (ca != null ? " (CA " + ca.getFileName() + ")" : " (JVM truststore)"));
+                    new org.fourz.rvnkcore.event.SightingJoinListener(sightingService), plugin);
+            final org.fourz.rvnkcore.service.sightings.SightingService svc = sightingService;
+            sightingPrune = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
+                    plugin, svc::pruneNow, 20L * 60, 20L * 60 * 60);
+            org.fourz.rvnkcore.service.sightings.SightingsConfig c = sightingService.config();
+            logger.info("net-sightings: enabled=" + c.enabled() + ", server=" + c.server()
+                    + ", entitlements in " + (cluster != null ? "cluster" : "local") + " database, read tokens="
+                    + c.tokenHashes().size());
         } catch (Exception e) {
-            logger.warning("net-peers: not reporting: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            logger.warning("net-sightings: not registered: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
+    }
+
+    /** The {@code net-sightings} section; the row's server name falls back to the chat-relay id. */
+    public static org.fourz.rvnkcore.service.sightings.SightingsConfig sightingsConfig(
+            org.bukkit.configuration.file.FileConfiguration cfg) {
+        String fallback = cfg.getString("chat-relay.server-id", "").trim();
+        if (fallback.isEmpty()) fallback = cfg.getString("webhook.server-id", "").trim();
+        if (fallback.isEmpty()) fallback = "unknown";
+        return org.fourz.rvnkcore.service.sightings.SightingsConfig.from(
+                cfg.getConfigurationSection("net-sightings"), fallback);
     }
 }

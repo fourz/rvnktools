@@ -180,19 +180,18 @@ webhook:
                            # uses webhook.secret for HMAC auth — no separate token needed
 
 # ──────────────────────────────────────────
-# z-office login events (#2351)
+# Player sightings for z-office (#2351)
 # ──────────────────────────────────────────
-# On each join, POSTs {kind, uuid, name, address} to z-office so a player whose UUID is linked there
-# keeps radio and music access. Only the LOCAL server on the internal VLAN can reach z-office.
-# Sends only a public IPv4 address; a LAN or unknown address sends nothing. Async, one retry, never
-# blocks a join. NOTE: a server that already has config.yml does not get this section (#1563).
-net-peers:
+# Records {uuid, name, public IPv4, server, time, entitled lists} on each join and on each entitlement
+# change of an online player. z-office pulls them from GET /api/v1/net-sightings?after=<cursor>
+# with the X-Net-Sightings-Token read token. Only a public IPv4 is recorded; a LAN or unknown address
+# records nothing. Never blocks a join. Entitled lists (mc-dev) are set by /rvnk entitlement.
+# NOTE: a server that already has config.yml does not get this section (#1563).
+net-sightings:
   enabled: false
-  url: "https://z-office.internal.fourz.org/api/net/peers/login-event"
-  secret: ""               # X-Net-Peers-Event-Secret. Set it here only; never in an issue or chat.
-  timeout-ms: 4000         # per attempt (500-10000)
-  ca-cert: ""              # PEM of the internal CA (relative = plugins/RVNKCore/). Blank = JVM truststore.
-  ignore-addresses: []     # public addresses of a proxy in front of this server; a join from one sends nothing
+  server: ""               # name written into each row; blank = chat-relay.server-id
+  retention-days: 7        # rows older than this are pruned hourly (1-30)
+  read-token-sha256: []    # hex SHA-256 of each accepted read token; the token itself is never stored here
 
 # ──────────────────────────────────────────
 # Cross-Server Chat Relay
