@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.service.chatrelay.ChatInboundToken;
+import org.fourz.rvnkcore.service.chatrelay.MatrixInbound;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.service.chatrelay.ChatMessageBuffer;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
@@ -207,6 +209,23 @@ public class ChatRelayController extends HttpServlet {
         if (dto == null || dto.getMsgId() == null || dto.getMsgId().isBlank()) {
             ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Missing required field: msgId");
             return;
+        }
+
+        // #2376 / #2377: the scoped Matrix token opens this path for the Matrix origin only, and a
+        // Matrix line (by either key) may only enter the MATRIX room, as plain capped text.
+        boolean scoped = Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE));
+        boolean matrix = service.isMatrixOrigin(dto.getOriginServerId());
+        if (scoped && !matrix) {
+            ApiUtils.sendError(resp, gson, 403, "FORBIDDEN", "This token accepts only Matrix-origin lines");
+            return;
+        }
+        if (matrix) {
+            String refusal = MatrixInbound.refusal(dto);
+            if (refusal != null) {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+                return;
+            }
+            MatrixInbound.sanitize(dto);
         }
 
         service.receiveInbound(dto);

@@ -72,6 +72,11 @@ public class ChatMessageDTO {
     public String getMessage() { return message; }
     public long getTimestamp() { return timestamp; }
 
+    // Setters used to sanitise a Matrix bridge line in place (#2376).
+    public void setChannel(String channel) { this.channel = channel; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
+    public void setMessage(String message) { this.message = message; }
+
     public String getRoom() { return room; }
     public void setRoom(String room) { this.room = room; }
 

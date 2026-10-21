@@ -26,8 +26,31 @@ public class ChatRelayConfig {
      * @param tag    Short display tag rendered next to relayed messages (e.g. {@code "P"})
      * @param url    Full inbound URL of the peer, e.g. {@code https://host:port/v1/chat/inbound}
      * @param apiKey The peer's {@code X-API-Key}, sent as the {@code X-API-Key} egress header
+     * @param rooms  Rooms this peer receives, upper case (#2377). Empty = every room (tier peers);
+     *               the Matrix bridge peer gets {@code [MATRIX]} so Global chat never leaves the network
      */
-    public record Peer(String id, String tag, String url, String apiKey) {
+    public record Peer(String id, String tag, String url, String apiKey, List<String> rooms) {
+
+        public Peer {
+            rooms = rooms == null ? List.of() : rooms.stream()
+                    .filter(r -> r != null && !r.isBlank())
+                    .map(r -> r.trim().toUpperCase(java.util.Locale.ROOT))
+                    .toList();
+        }
+
+        public Peer(String id, String tag, String url, String apiKey) {
+            this(id, tag, url, apiKey, List.of());
+        }
+
+        /**
+         * True when this peer receives a line in {@code room}. A line with no room is an older
+         * payload and counts as GLOBAL.
+         */
+        public boolean accepts(String room) {
+            if (rooms.isEmpty()) return true;
+            String r = (room == null || room.isBlank()) ? "GLOBAL" : room.trim().toUpperCase(java.util.Locale.ROOT);
+            return rooms.contains(r);
+        }
     }
 
     /**
@@ -49,10 +72,29 @@ public class ChatRelayConfig {
     private final boolean insecureTls;
     private final String botFormat;
     private final List<Peer> peers;
+    /** {@code originServerId} the Matrix bridge sends with (#2376). */
+    private final String matrixOriginId;
+    /** SHA-256 hashes of the scoped Matrix inbound tokens (#2377); never the tokens. */
+    private final List<String> matrixInboundTokenHashes;
+
+    /** Default {@code originServerId} of the Matrix bridge. */
+    public static final String DEFAULT_MATRIX_ORIGIN = "matrix";
 
     private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
                             int dedupCacheSize, int bufferSize, int timeoutMs, boolean insecureTls,
                             String botFormat, List<Peer> peers) {
+        this(enabled, serverId, serverLabel, channelTrigger, dedupCacheSize, bufferSize, timeoutMs,
+                insecureTls, botFormat, peers, DEFAULT_MATRIX_ORIGIN, List.of());
+    }
+
+    private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
+                            int dedupCacheSize, int bufferSize, int timeoutMs, boolean insecureTls,
+                            String botFormat, List<Peer> peers, String matrixOriginId,
+                            List<String> matrixInboundTokenHashes) {
+        this.matrixOriginId = (matrixOriginId != null && !matrixOriginId.isBlank())
+                ? matrixOriginId.trim() : DEFAULT_MATRIX_ORIGIN;
+        this.matrixInboundTokenHashes = matrixInboundTokenHashes != null
+                ? List.copyOf(matrixInboundTokenHashes) : List.of();
         this.enabled = enabled;
         this.serverId = serverId != null ? serverId.trim() : "";
         // Friendly label for THIS server (e.g. "nations", "event"); stamped on outgoing chatroom
@@ -92,7 +134,8 @@ public class ChatRelayConfig {
                     peer.getString("id", key),
                     peer.getString("tag", ""),
                     peer.getString("url", ""),
-                    peer.getString("api-key", "")
+                    peer.getString("api-key", ""),
+                    peer.getStringList("rooms")
                 ));
             }
         } else {
@@ -105,7 +148,9 @@ public class ChatRelayConfig {
                             asString(map.get("id")),
                             asString(map.get("tag")),
                             asString(map.get("url")),
-                            asString(map.get("api-key"))
+                            asString(map.get("api-key")),
+                            map.get("rooms") instanceof List<?> l
+                                ? l.stream().map(String::valueOf).toList() : List.of()
                         ));
                     }
                 }
@@ -122,8 +167,18 @@ public class ChatRelayConfig {
             section.getInt("timeout-ms", 3000),
             section.getBoolean("insecure-tls", false),
             section.getString("bot-format", DEFAULT_BOT_FORMAT),
-            peers
+            peers,
+            section.getString("matrix.origin-id", DEFAULT_MATRIX_ORIGIN),
+            matrixTokenHashes(section)
         );
+    }
+
+    private static List<String> matrixTokenHashes(ConfigurationSection section) {
+        List<String> hashes = new ArrayList<>(section.getStringList("matrix.inbound-token-sha256"));
+        if (hashes.isEmpty() && section.isString("matrix.inbound-token-sha256")) {
+            hashes.add(section.getString("matrix.inbound-token-sha256"));
+        }
+        return hashes;
     }
 
     private static String asString(Object value) {
@@ -167,6 +222,11 @@ public class ChatRelayConfig {
                 logger.error("Chat relay peer '" + peer.id() + "' has an empty api-key");
                 valid = false;
             }
+            if (matrixOriginId.equals(peer.id()) && peer.rooms().isEmpty()) {
+                logger.error("Chat relay peer '" + peer.id() + "' is the Matrix bridge but has no rooms list"
+                    + " - it would receive ALL chat. Set rooms: [MATRIX]");
+                valid = false;
+            }
             if (serverId.equals(peer.id())) {
                 logger.error("Chat relay peer '" + peer.id() + "' has the same id as this server - would loop");
                 valid = false;
@@ -201,4 +261,11 @@ public class ChatRelayConfig {
     public boolean isInsecureTls() { return insecureTls; }
     public String getBotFormat() { return botFormat; }
     public List<Peer> getPeers() { return peers; }
+    public String getMatrixOriginId() { return matrixOriginId; }
+    public List<String> getMatrixInboundTokenHashes() { return matrixInboundTokenHashes; }
+
+    /** True when {@code originServerId} is the Matrix bridge (#2376). */
+    public boolean isMatrixOrigin(String originServerId) {
+        return originServerId != null && matrixOriginId.equalsIgnoreCase(originServerId.trim());
+    }
 }

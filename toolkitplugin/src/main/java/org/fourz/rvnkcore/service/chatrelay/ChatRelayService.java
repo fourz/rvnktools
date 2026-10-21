@@ -66,6 +66,7 @@ public class ChatRelayService {
         this.logger = logger;
         this.dedupCacheSize = config.getDedupCacheSize();
         this.buffer = new ChatMessageBuffer(config.getBufferSize());
+        ChatInboundToken.configure(config.getMatrixInboundTokenHashes());
     }
 
     /**
@@ -200,11 +201,12 @@ public class ChatRelayService {
         if (newConfig == null) return;
         this.config = newConfig;
         this.egress = new ChatRelayEgress(newConfig, logger);
+        int tokens = ChatInboundToken.configure(newConfig.getMatrixInboundTokenHashes());
         // Apply chat-relay.buffer.size on reload, not only at boot.
         buffer.resize(newConfig.getBufferSize());
         logger.info("ChatRelayService config refreshed - server-id=" + config.getServerId()
             + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()
-            + ", buffer=" + buffer.capacity());
+            + ", buffer=" + buffer.capacity() + ", matrix inbound tokens=" + tokens);
     }
 
     /**
@@ -315,6 +317,9 @@ public class ChatRelayService {
     /** @return this server's id (e.g. {@code event}, {@code prod}). */
     public String getServerId() { return config.getServerId(); }
 
+    /** True when {@code originServerId} is the Matrix bridge (#2376). */
+    public boolean isMatrixOrigin(String originServerId) { return config.isMatrixOrigin(originServerId); }
+
     /** @return this server's friendly label (e.g. {@code event}, {@code nations}). */
     public String getServerLabel() { return config.getServerLabel(); }
 
@@ -419,6 +424,15 @@ public class ChatRelayService {
         if (consumer != null) {
             Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
             logger.debug("Chat relay inbound -> external consumer (" + dto.getMsgId() + ")");
+            return;
+        }
+
+        // No chatroom consumer (RVNKEvents absent): only this fallback renders, and it shows a line
+        // to everyone. A MATRIX line is opt-in and an unknown room may be one, so drop both (#2376).
+        String r = dto.getRoom();
+        if (r != null && !r.isBlank() && !"GLOBAL".equalsIgnoreCase(r.trim())
+                && !"SERVER".equalsIgnoreCase(r.trim()) && !"WORLD".equalsIgnoreCase(r.trim())) {
+            logger.debug("Chat relay inbound dropped (room '" + r + "' needs the chatroom consumer): " + dto.getMsgId());
             return;
         }
 

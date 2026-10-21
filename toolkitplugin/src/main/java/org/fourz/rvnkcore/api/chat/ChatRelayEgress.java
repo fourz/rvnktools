@@ -119,6 +119,9 @@ public class ChatRelayEgress {
             if (peer.url() == null || peer.url().isEmpty()) {
                 continue;
             }
+            if (!shouldSend(peer, dto)) {
+                continue;
+            }
             // Insecure path only applies to https peers; anything else uses the plain HttpClient.
             if (insecureSocketFactory != null && peer.url().startsWith("https://")) {
                 sendInsecure(peer, payload);
@@ -126,6 +129,18 @@ public class ChatRelayEgress {
                 sendToPeer(peer, payload);
             }
         }
+    }
+
+    /**
+     * Per-peer filter (#2377): a peer with a {@code rooms} list gets only those rooms (the Matrix
+     * bridge gets MATRIX only, so Global chat never leaves the network), and a line is never sent
+     * back to the peer it came from.
+     */
+    static boolean shouldSend(ChatRelayConfig.Peer peer, ChatMessageDTO dto) {
+        if (dto.getOriginServerId() != null && dto.getOriginServerId().equals(peer.id())) {
+            return false;
+        }
+        return peer.accepts(dto.getRoom());
     }
 
     /** Secure/default egress via the shared async {@link HttpClient}. */

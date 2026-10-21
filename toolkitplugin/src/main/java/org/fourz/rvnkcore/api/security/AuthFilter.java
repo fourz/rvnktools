@@ -136,6 +136,13 @@ public class AuthFilter implements Filter {
     }
 
     /** True for any request routed to the sightings servlet ({@code /v1/net-sightings}, #2351). */
+    /** {@code POST /v1/chat/inbound}, matched on the servlet Jetty routed to (#2377). */
+    static boolean isChatInboundPost(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && "/v1/chat".equals(request.getServletPath())
+                && "/inbound".equals(request.getPathInfo());
+    }
+
     static boolean isNetSightingsRequest(HttpServletRequest request) {
         return "/v1/net-sightings".equals(request.getServletPath());
     }
@@ -177,6 +184,22 @@ public class AuthFilter implements Filter {
         if (rateLimiter != null && !rateLimiter.isAllowed(clientIP)) {
             warnRateLimited(clientIP, method, requestURI);
             sendRateLimited(httpResponse);
+            return;
+        }
+
+        // Matrix bridge inbound (#2377): a request that carries the scoped chat token opens ONLY
+        // POST /v1/chat/inbound, and the controller then accepts only a Matrix-origin MATRIX line.
+        // Without the header the path keeps the normal X-API-Key check below (tier peers).
+        String chatToken = httpRequest.getHeader(org.fourz.rvnkcore.service.chatrelay.ChatInboundToken.HEADER);
+        if (chatToken != null) {
+            if (isChatInboundPost(httpRequest)
+                    && org.fourz.rvnkcore.service.chatrelay.ChatInboundToken.matches(chatToken)) {
+                httpRequest.setAttribute(org.fourz.rvnkcore.service.chatrelay.ChatInboundToken.ATTRIBUTE, Boolean.TRUE);
+                chain.doFilter(request, response);
+            } else {
+                logger.warning("Chat inbound token denied (" + method + " " + requestURI + ") from IP: " + clientIP);
+                sendUnauthorized(httpResponse, "Invalid chat inbound token");
+            }
             return;
         }
 
