@@ -86,6 +86,9 @@ class MatrixInboundTest {
         assertFalse(org.fourz.rvnkcore.api.chat.ChatRelayEgressAccess.shouldSend(bridge, fromBridge),
                 "never echoed back to the origin peer");
         assertTrue(org.fourz.rvnkcore.api.chat.ChatRelayEgressAccess.shouldSend(prod, fromBridge));
+        assertTrue(org.fourz.rvnkcore.api.presence.PresenceEgressAccess.isTierPeer(prod));
+        assertFalse(org.fourz.rvnkcore.api.presence.PresenceEgressAccess.isTierPeer(bridge),
+                "the bridge never gets presence");
         assertTrue(cfg.isMatrixOrigin("Matrix"));
         assertFalse(cfg.isMatrixOrigin("prod"));
     }
