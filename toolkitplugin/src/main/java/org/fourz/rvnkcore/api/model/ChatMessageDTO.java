@@ -37,6 +37,11 @@ public class ChatMessageDTO {
      * the flat {@code bot-format}. Null falls back to {@link #message} + {@code bot-format}.
      */
     private String components;
+    /**
+     * Channel of a {@code MATRIX}-room line (#2380): {@code [a-z0-9-]{1,32}}. Absent or blank means
+     * {@code general}. Ignored for every other room.
+     */
+    private String mchannel;
 
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
@@ -91,4 +96,7 @@ public class ChatMessageDTO {
 
     public String getComponents() { return components; }
     public void setComponents(String components) { this.components = components; }
+
+    public String getMchannel() { return mchannel; }
+    public void setMchannel(String mchannel) { this.mchannel = mchannel; }
 }

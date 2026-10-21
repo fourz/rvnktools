@@ -76,6 +76,8 @@ public class ChatRelayConfig {
     private final String matrixOriginId;
     /** SHA-256 hashes of the scoped Matrix inbound tokens (#2377); never the tokens. */
     private final List<String> matrixInboundTokenHashes;
+    /** Override for the channel-list URL (#2381); null = derived from the Matrix peer url. */
+    private final String matrixChannelsUrl;
 
     /** Default {@code originServerId} of the Matrix bridge. */
     public static final String DEFAULT_MATRIX_ORIGIN = "matrix";
@@ -84,13 +86,15 @@ public class ChatRelayConfig {
                             int dedupCacheSize, int bufferSize, int timeoutMs, boolean insecureTls,
                             String botFormat, List<Peer> peers) {
         this(enabled, serverId, serverLabel, channelTrigger, dedupCacheSize, bufferSize, timeoutMs,
-                insecureTls, botFormat, peers, DEFAULT_MATRIX_ORIGIN, List.of());
+                insecureTls, botFormat, peers, DEFAULT_MATRIX_ORIGIN, List.of(), null);
     }
 
     private ChatRelayConfig(boolean enabled, String serverId, String serverLabel, String channelTrigger,
                             int dedupCacheSize, int bufferSize, int timeoutMs, boolean insecureTls,
                             String botFormat, List<Peer> peers, String matrixOriginId,
-                            List<String> matrixInboundTokenHashes) {
+                            List<String> matrixInboundTokenHashes, String matrixChannelsUrl) {
+        this.matrixChannelsUrl = (matrixChannelsUrl != null && !matrixChannelsUrl.isBlank())
+                ? matrixChannelsUrl.trim() : null;
         this.matrixOriginId = (matrixOriginId != null && !matrixOriginId.isBlank())
                 ? matrixOriginId.trim() : DEFAULT_MATRIX_ORIGIN;
         this.matrixInboundTokenHashes = matrixInboundTokenHashes != null
@@ -169,7 +173,8 @@ public class ChatRelayConfig {
             section.getString("bot-format", DEFAULT_BOT_FORMAT),
             peers,
             section.getString("matrix.origin-id", DEFAULT_MATRIX_ORIGIN),
-            matrixTokenHashes(section)
+            matrixTokenHashes(section),
+            section.getString("matrix.channels-url", null)
         );
     }
 
@@ -263,6 +268,7 @@ public class ChatRelayConfig {
     public List<Peer> getPeers() { return peers; }
     public String getMatrixOriginId() { return matrixOriginId; }
     public List<String> getMatrixInboundTokenHashes() { return matrixInboundTokenHashes; }
+    public String getMatrixChannelsUrl() { return matrixChannelsUrl; }
 
     /** True when {@code originServerId} is the Matrix bridge (#2376). */
     public boolean isMatrixOrigin(String originServerId) {

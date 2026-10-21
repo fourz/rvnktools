@@ -51,6 +51,9 @@ public class ChatRelayService {
     // minted once here so a client can tell a restart from "nothing was said".
     private final ChatMessageBuffer buffer;
 
+    // Channel list of the MATRIX room, fetched from the Matrix bridge (#2381).
+    private final MatrixChannelRegistry matrixChannels;
+
     /**
      * Creates a new ChatRelayService.
      *
@@ -67,6 +70,26 @@ public class ChatRelayService {
         this.dedupCacheSize = config.getDedupCacheSize();
         this.buffer = new ChatMessageBuffer(config.getBufferSize());
         ChatInboundToken.configure(config.getMatrixInboundTokenHashes());
+        this.matrixChannels = new MatrixChannelRegistry(logger);
+        this.matrixChannels.configure(config);
+    }
+
+    /** Starts the Matrix channel-list fetch (startup, then every 5 minutes). */
+    public void startBackground() {
+        matrixChannels.start();
+    }
+
+    /** Stops the Matrix channel-list fetch. */
+    public void shutdown() {
+        matrixChannels.stop();
+    }
+
+    /**
+     * The cached channel list of the MATRIX room (#2381). Never empty: {@code general} is always
+     * there. RVNKEvents reads it for {@code /chat channels}, join rules and the receive filter.
+     */
+    public MatrixChannelRegistry getMatrixChannels() {
+        return matrixChannels;
     }
 
     /**
@@ -204,6 +227,8 @@ public class ChatRelayService {
         int tokens = ChatInboundToken.configure(newConfig.getMatrixInboundTokenHashes());
         // Apply chat-relay.buffer.size on reload, not only at boot.
         buffer.resize(newConfig.getBufferSize());
+        matrixChannels.configure(newConfig);
+        matrixChannels.refreshNow();
         logger.info("ChatRelayService config refreshed - server-id=" + config.getServerId()
             + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()
             + ", buffer=" + buffer.capacity() + ", matrix inbound tokens=" + tokens);

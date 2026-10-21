@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.api.model.MatrixChannel;
+import org.fourz.rvnkcore.service.chatrelay.MatrixChannelRegistry;
 import org.fourz.rvnkcore.service.chatrelay.ChatInboundToken;
 import org.fourz.rvnkcore.service.chatrelay.MatrixInbound;
 import org.fourz.rvnkcore.api.util.ApiUtils;
@@ -77,6 +79,8 @@ public class ChatRelayController extends HttpServlet {
         try {
             if (pathInfo != null && pathInfo.equals("/recent")) {
                 handleRecent(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/channels")) {
+                handleChannels(resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: GET " + pathInfo);
@@ -138,6 +142,36 @@ public class ChatRelayController extends HttpServlet {
     }
 
     /**
+     * {@code GET /v1/chat/channels} (#2381): this tier's cached copy of the Matrix bridge channel
+     * list, with the time of the last good fetch ({@code 0} = never, only {@code general}) and the
+     * current fetch problem. Read-only; shows no destination and no key.
+     */
+    private void handleChannels(HttpServletResponse resp) throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+        MatrixChannelRegistry reg = service.getMatrixChannels();
+        Map<String, Object> data = new LinkedHashMap<>();
+        // Plain maps, not the record: the compile-time Gson (2.8.9) predates record support.
+        List<Map<String, Object>> channels = new ArrayList<>();
+        for (MatrixChannel c : reg.list()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", c.name());
+            m.put("label", c.label());
+            m.put("readOnly", c.readOnly());
+            m.put("join", c.join());
+            channels.add(m);
+        }
+        data.put("channels", channels);
+        data.put("fetchedAt", reg.getFetchedAt());
+        data.put("problem", reg.getLastProblem());
+        data.put("source", reg.getUrl() != null ? reg.getUrl().toString() : null);
+        ApiUtils.sendSuccess(resp, gson, data);
+    }
+
+    /**
      * Flattens a buffer entry to the wire shape. {@code seq} is a buffer concern rather than part of
      * {@link ChatMessageDTO}, so the two are merged here rather than polluting the relay payload.
      */
@@ -157,6 +191,7 @@ public class ChatRelayController extends HttpServlet {
         m.put("world", dto.getWorld());
         m.put("originServerId", dto.getOriginServerId());
         m.put("serverLabel", dto.getServerLabel());
+        m.put("mchannel", dto.getMchannel());
         return m;
     }
 
@@ -226,6 +261,20 @@ public class ChatRelayController extends HttpServlet {
                 return;
             }
             MatrixInbound.sanitize(dto);
+            // #2381: a Matrix line names its channel; none = general, an unpublished one is refused.
+            String channel = MatrixChannel.resolveName(dto.getMchannel());
+            if (channel == null || !service.getMatrixChannels().contains(channel)) {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "unknown mchannel");
+                return;
+            }
+            dto.setMchannel(channel);
+        } else if ("MATRIX".equalsIgnoreCase(dto.getRoom())) {
+            // A tier-relayed MATRIX line: keep a valid name (the origin may hold a newer list),
+            // read a missing or malformed one as general.
+            String channel = MatrixChannel.resolveName(dto.getMchannel());
+            dto.setMchannel(channel != null ? channel : MatrixChannel.GENERAL);
+        } else {
+            dto.setMchannel(null);
         }
 
         service.receiveInbound(dto);

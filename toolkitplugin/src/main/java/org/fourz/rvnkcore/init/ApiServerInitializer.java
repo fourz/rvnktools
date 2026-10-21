@@ -139,8 +139,10 @@ public class ApiServerInitializer {
                 logger.debug("Chat relay service registered (disabled - no-op mode)");
             }
             ChatRelayEgress chatRelayEgress = new ChatRelayEgress(chatRelayConfig, logger);
-            registry.registerService(ChatRelayService.class,
-                    new ChatRelayService(plugin, chatRelayConfig, chatRelayEgress, logger));
+            ChatRelayService chatRelayService =
+                    new ChatRelayService(plugin, chatRelayConfig, chatRelayEgress, logger);
+            registry.registerService(ChatRelayService.class, chatRelayService);
+            chatRelayService.startBackground(); // Matrix channel list (#2381)
 
             // Register cross-server presence service (#1728) — reuses the chat relay peer set / auth /
             // TLS. Registered here (phase 1) so RVNKToolsInitializer (phase 2) can wire its listener,
@@ -168,7 +170,9 @@ public class ApiServerInitializer {
                 WebhookNotifier notifier = registry.getService(WebhookNotifier.class);
                 if (notifier != null) notifier.shutdown();
                 registry.unregisterService(WebhookNotifier.class);
-                // Unregister chat relay service
+                // Stop + unregister chat relay service
+                ChatRelayService chatRelay = registry.getService(ChatRelayService.class);
+                if (chatRelay != null) chatRelay.shutdown();
                 registry.unregisterService(ChatRelayService.class);
                 // Stop + unregister presence service
                 org.fourz.rvnkcore.service.presence.PresenceService presence =
