@@ -1,6 +1,9 @@
 package org.fourz.rvnkcore.api.controller;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
@@ -8,6 +11,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.model.response.ApiResponse;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.service.sightings.Sighting;
 import org.fourz.rvnkcore.service.sightings.SightingService;
@@ -100,12 +104,33 @@ public class NetSightingsController extends HttpServlet {
                     logger.warning("[net-sightings] read failed: " + ex.getMessage());
                     ApiUtils.sendError(out, gson, 500, "INTERNAL_ERROR", "Sightings read failed");
                 } else {
-                    ApiUtils.sendSuccess(out, gson, body(server, cursor, p));
+                    out.setStatus(200);
+                    out.setContentType("application/json");
+                    out.setCharacterEncoding("UTF-8");
+                    try {
+                        out.getWriter().write(json(gson, body(server, cursor, p)));
+                    } catch (java.io.IOException e) {
+                        logger.warning("[net-sightings] could not write the response: " + e.getMessage());
+                    }
                 }
             } finally {
                 ctx.complete();
             }
         });
+    }
+
+    /**
+     * The success envelope as JSON, with {@code "address": null} kept on a revoke row for an offline
+     * player (#2375). The shared Gson drops null values, so the key would vanish; the tree has no
+     * other nulls, so writing it with serializeNulls adds only these.
+     */
+    static String json(Gson gson, Map<String, Object> data) {
+        JsonObject tree = gson.toJsonTree(ApiResponse.success(data)).getAsJsonObject();
+        for (JsonElement row : tree.getAsJsonObject("data").getAsJsonArray("sightings")) {
+            JsonObject o = row.getAsJsonObject();
+            if (!o.has("address")) o.add("address", JsonNull.INSTANCE);
+        }
+        return gson.newBuilder().serializeNulls().create().toJson(tree);
     }
 
     /** {@code null}/blank/{@code 0} = from the start. Decimal digits only. */
@@ -129,6 +154,8 @@ public class NetSightingsController extends HttpServlet {
             row.put("at", Instant.ofEpochMilli(s.at()).toString());
             row.put("reason", s.reason());
             row.put("lists", s.lists());
+            // #2375: removed lists on a revoke row; [] on join and entitlement rows.
+            row.put("revoked", s.revoked());
             rows.add(row);
             next = s.id();
         }

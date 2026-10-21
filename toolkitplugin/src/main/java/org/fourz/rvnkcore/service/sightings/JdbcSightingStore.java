@@ -37,6 +37,7 @@ public class JdbcSightingStore implements SightingStore {
                     + "server VARCHAR(32) NOT NULL, "
                     + "reason VARCHAR(16) NOT NULL, "
                     + "lists VARCHAR(255) NOT NULL DEFAULT '', "
+                    + "revoked VARCHAR(255) NOT NULL DEFAULT '', "
                     + "at_ms BIGINT NOT NULL, "
                     + "INDEX idx_net_sightings_at (at_ms)"
                     + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
@@ -44,27 +45,58 @@ public class JdbcSightingStore implements SightingStore {
                 : "CREATE TABLE IF NOT EXISTS " + TABLE + " ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "uuid TEXT NOT NULL, name TEXT NOT NULL, address TEXT NOT NULL, server TEXT NOT NULL, "
-                    + "reason TEXT NOT NULL, lists TEXT NOT NULL DEFAULT '', at_ms INTEGER NOT NULL)";
+                    + "reason TEXT NOT NULL, lists TEXT NOT NULL DEFAULT '', revoked TEXT NOT NULL DEFAULT '', "
+                    + "at_ms INTEGER NOT NULL)";
         try (Connection c = db.getConnection(); Statement st = c.createStatement()) {
             st.execute(ddl);
             if (!mysql) st.execute("CREATE INDEX IF NOT EXISTS idx_net_sightings_at ON " + TABLE + " (at_ms)");
+            // #2375: tables made by 1.5.111..1.5.114 have no revoked column. Neither dialect has a
+            // portable ADD COLUMN IF NOT EXISTS, so probe first.
+            if (!columnExists(c, mysql, "revoked")) {
+                st.execute("ALTER TABLE " + TABLE + " ADD COLUMN revoked "
+                        + (mysql ? "VARCHAR(255)" : "TEXT") + " NOT NULL DEFAULT ''");
+            }
         }
+    }
+
+    private static boolean columnExists(Connection c, boolean mysql, String column) throws SQLException {
+        if (mysql) {
+            try (PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?")) {
+                ps.setString(1, TABLE);
+                ps.setString(2, column);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) > 0;
+                }
+            }
+        }
+        try (PreparedStatement ps = c.prepareStatement("PRAGMA table_info(" + TABLE + ")");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public long append(Sighting s) throws SQLException {
-        String sql = "INSERT INTO " + TABLE + " (uuid, name, address, server, reason, lists, at_ms) VALUES (?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO " + TABLE + " (uuid, name, address, server, reason, lists, revoked, at_ms) VALUES (?,?,?,?,?,?,?,?)";
         boolean mysql = "MySQL".equalsIgnoreCase(db.getDatabaseType());
         try (Connection c = db.getConnection();
              PreparedStatement ps = mysql ? c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
                                           : c.prepareStatement(sql)) {
             ps.setString(1, s.uuid().toString());
-            ps.setString(2, s.name());
-            ps.setString(3, s.address());
+            // name is VARCHAR(16). A revoke by UUID for a player this server never saw carries the
+            // UUID as the name (#2375); store no name rather than lose the row.
+            ps.setString(2, s.name() == null || s.name().length() > 16 ? "" : s.name());
+            // address is NOT NULL in the table; a revoke row for an offline player stores ''.
+            ps.setString(3, s.address() == null ? "" : s.address());
             ps.setString(4, s.server());
             ps.setString(5, s.reason());
             ps.setString(6, String.join(",", s.lists()));
-            ps.setLong(7, s.at());
+            ps.setString(7, String.join(",", s.revoked()));
+            ps.setLong(8, s.at());
             ps.executeUpdate();
             if (!mysql) {
                 // sqlite-jdbc does not implement generated keys; the rowid is per connection.
@@ -80,7 +112,7 @@ public class JdbcSightingStore implements SightingStore {
 
     @Override
     public Page after(long after, int limit) throws SQLException {
-        String sql = "SELECT id, uuid, name, address, server, reason, lists, at_ms FROM " + TABLE
+        String sql = "SELECT id, uuid, name, address, server, reason, lists, revoked, at_ms FROM " + TABLE
                 + " WHERE id > ? ORDER BY id LIMIT ?";
         List<Sighting> rows = new ArrayList<>();
         long oldest = 0L;
@@ -90,11 +122,11 @@ public class JdbcSightingStore implements SightingStore {
                 ps.setInt(2, limit + 1);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        String lists = rs.getString("lists");
+                        String address = rs.getString("address");
                         rows.add(new Sighting(rs.getLong("id"), UUID.fromString(rs.getString("uuid")),
-                                rs.getString("name"), rs.getString("address"), rs.getString("server"),
-                                rs.getLong("at_ms"), rs.getString("reason"),
-                                lists == null || lists.isEmpty() ? List.of() : Arrays.asList(lists.split(","))));
+                                rs.getString("name"), address == null || address.isEmpty() ? null : address,
+                                rs.getString("server"), rs.getLong("at_ms"), rs.getString("reason"),
+                                split(rs.getString("lists")), split(rs.getString("revoked"))));
                     }
                 }
             }
@@ -105,6 +137,10 @@ public class JdbcSightingStore implements SightingStore {
         }
         boolean more = rows.size() > limit;
         return new Page(more ? rows.subList(0, limit) : rows, more, oldest);
+    }
+
+    private static List<String> split(String csv) {
+        return csv == null || csv.isEmpty() ? List.of() : Arrays.asList(csv.split(","));
     }
 
     @Override

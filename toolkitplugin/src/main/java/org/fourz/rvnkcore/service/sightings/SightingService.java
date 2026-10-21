@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
  *
  * <p>Never blocks gameplay: a join only queues work. One writer thread stores sightings and
  * entitlement changes; its queue is bounded and drops a sighting when full. Reads for the API run on
- * their own small pool. Only a public IPv4 address is recorded; anything else records nothing.</p>
+ * their own small pool. Only a public IPv4 address is recorded; anything else records nothing. The
+ * exception is a revoke row (#2375), which is written with no address when the player is offline.</p>
  */
 public class SightingService {
 
@@ -103,6 +104,30 @@ public class SightingService {
         return true;
     }
 
+    /**
+     * Queues a revoke row (#2375): {@code lists} empty, {@code revoked} = the removed list. Written
+     * online or offline; the address is the player's public IPv4 when there is one, else null.
+     * z-office closes every open grant on that list for the person, at any address.
+     *
+     * @return false when nothing was queued (off, or no player)
+     */
+    private boolean recordRevoke(UUID uuid, String name, String list, InetAddress address) {
+        SightingsConfig c = config;
+        if (!c.enabled() || uuid == null) return false;
+        String ip = address == null ? null : PublicIpv4.of(address).orElse(null);
+        long at = clock.getAsLong();
+        writer.execute(() -> {
+            try {
+                sightings.append(new Sighting(0L, uuid, name == null ? "" : name, ip, c.server(), at,
+                        Sighting.REVOKE, List.of(), List.of(list)));
+            } catch (SQLException e) {
+                log.warning("net-sightings: could not store a revoke row for " + name + " (" + list + "): "
+                        + e.getMessage());
+            }
+        });
+        return true;
+    }
+
     /** Result of a grant or a revoke. */
     public record Change(boolean changed, boolean sighted, List<String> lists) { }
 
@@ -112,13 +137,17 @@ public class SightingService {
      */
     public CompletableFuture<Change> grant(UUID uuid, String name, String list, String by, InetAddress address) {
         String l = normaliseList(list);
-        return change(() -> entitlements.grant(uuid, l, by), uuid, name, address);
+        return change(() -> entitlements.grant(uuid, l, by), uuid,
+                () -> record(uuid, name, address, Sighting.ENTITLEMENT));
     }
 
-    /** Revokes a list. z-office never revokes from a sighting; access then ends by its own expiry. */
+    /**
+     * Revokes a list. When a row was removed, a {@code revoke} row follows, online or offline (#2375),
+     * so z-office closes the person's grants on that list at once instead of waiting for expiry.
+     */
     public CompletableFuture<Change> revoke(UUID uuid, String name, String list, InetAddress address) {
         String l = normaliseList(list);
-        return change(() -> entitlements.revoke(uuid, l), uuid, name, address);
+        return change(() -> entitlements.revoke(uuid, l), uuid, () -> recordRevoke(uuid, name, l, address));
     }
 
     public CompletableFuture<List<String>> lists(UUID uuid) {
@@ -135,12 +164,12 @@ public class SightingService {
         T run() throws SQLException;
     }
 
-    private CompletableFuture<Change> change(Sql<Boolean> op, UUID uuid, String name, InetAddress address) {
+    private CompletableFuture<Change> change(Sql<Boolean> op, UUID uuid, java.util.function.BooleanSupplier sight) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 boolean changed = op.run();
                 List<String> lists = entitlements.lists(uuid);
-                boolean sighted = changed && record(uuid, name, address, Sighting.ENTITLEMENT);
+                boolean sighted = changed && sight.getAsBoolean();
                 return new Change(changed, sighted, lists);
             } catch (SQLException e) {
                 throw new CompletionException(e);

@@ -133,6 +133,145 @@ class SightingServiceTest {
     }
 
     @Test
+    @DisplayName("#2375: an offline revoke writes a revoke row with no address")
+    void revokeOfflineWritesRevokeRow() throws Exception {
+        entitlements.grant(B, "mc-dev", "test");
+        SightingService.Change c = service.revoke(B, "HORNYC4T", "MC-DEV", null).get(3, TimeUnit.SECONDS);
+        assertTrue(c.changed());
+        assertTrue(c.sighted(), "a revoke row is written even offline");
+        assertEquals(List.of(), entitlements.lists(B));
+        awaitRows(1);
+        Sighting s = all().get(0);
+        assertEquals(Sighting.REVOKE, s.reason());
+        assertNull(s.address());
+        assertEquals(List.of(), s.lists(), "lists is always empty on a revoke row");
+        assertEquals(List.of("mc-dev"), s.revoked());
+        assertEquals(B, s.uuid());
+        assertEquals("dev", s.server());
+    }
+
+    @Test
+    @DisplayName("#2375: an online revoke keeps the public address and still never lists the removed list")
+    void revokeOnlineWritesRevokeRowWithAddress() throws Exception {
+        entitlements.grant(A, "mc-dev", "test");
+        entitlements.grant(A, "radio", "test");
+        assertTrue(service.revoke(A, "wizardoffice", "mc-dev", InetAddress.getByName("8.8.4.4"))
+                .get(3, TimeUnit.SECONDS).sighted());
+        awaitRows(1);
+        Sighting s = all().get(0);
+        assertEquals(Sighting.REVOKE, s.reason());
+        assertEquals("8.8.4.4", s.address());
+        assertEquals(List.of(), s.lists(), "the kept radio list is not reported on a revoke row");
+        assertEquals(List.of("mc-dev"), s.revoked());
+    }
+
+    @Test
+    @DisplayName("#2375: a LAN address on a revoke is dropped, the row is still written")
+    void revokeFromLanAddressHasNoAddress() throws Exception {
+        entitlements.grant(A, "mc-dev", "test");
+        service.revoke(A, "a", "mc-dev", InetAddress.getByName("10.70.10.50")).get(3, TimeUnit.SECONDS);
+        awaitRows(1);
+        assertNull(all().get(0).address());
+    }
+
+    @Test
+    @DisplayName("#2375: a revoke that removes nothing, or with sightings off, writes no row")
+    void revokeWithoutChangeWritesNothing() throws Exception {
+        SightingService.Change c = service.revoke(A, "a", "mc-dev", null).get(3, TimeUnit.SECONDS);
+        assertFalse(c.changed());
+        assertFalse(c.sighted());
+        service.shutdown();
+        service = newService(false);
+        entitlements.grant(A, "mc-dev", "test");
+        SightingService.Change off = service.revoke(A, "a", "mc-dev", null).get(3, TimeUnit.SECONDS);
+        assertTrue(off.changed());
+        assertFalse(off.sighted());
+        Thread.sleep(100);
+        assertTrue(all().isEmpty());
+    }
+
+    @Test
+    @DisplayName("#2375: a revoke row cannot carry lists, even when built by hand")
+    void revokeRowForcesEmptyLists() {
+        Sighting s = new Sighting(0, A, "a", null, "dev", 1L, Sighting.REVOKE, List.of("mc-dev"), List.of("mc-dev"));
+        assertEquals(List.of(), s.lists());
+        Sighting j = new Sighting(0, A, "a", "8.8.8.8", "dev", 1L, Sighting.JOIN, List.of("mc-dev"));
+        assertEquals(List.of(), j.revoked());
+    }
+
+    @Test
+    @DisplayName("#2375: API rows carry revoked, and address null on an offline revoke")
+    void apiShapeOfRevokeRow() throws Exception {
+        entitlements.grant(B, "mc-dev", "test");
+        service.recordJoin(A, "a", InetAddress.getByName("8.8.8.8"));
+        awaitRows(1);
+        service.revoke(B, "HORNYC4T", "mc-dev", null).get(3, TimeUnit.SECONDS);
+        awaitRows(2);
+        Map<String, Object> body = org.fourz.rvnkcore.api.controller.NetSightingsControllerAccess.body(
+                "dev", 0, service.page(0, 10).get(3, TimeUnit.SECONDS));
+        String json = org.fourz.rvnkcore.api.controller.NetSightingsControllerAccess.json(
+                new com.google.gson.Gson(), body);
+        com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(root.get("success").getAsBoolean());
+        assertFalse(root.has("error"), "envelope unchanged: no null keys added");
+        var rows = root.getAsJsonObject("data").getAsJsonArray("sightings");
+        var join = rows.get(0).getAsJsonObject();
+        assertEquals("8.8.8.8", join.get("address").getAsString());
+        assertEquals(0, join.getAsJsonArray("revoked").size());
+        var revoke = rows.get(1).getAsJsonObject();
+        assertEquals("revoke", revoke.get("reason").getAsString());
+        assertTrue(revoke.has("address"));
+        assertTrue(revoke.get("address").isJsonNull());
+        assertEquals(0, revoke.getAsJsonArray("lists").size());
+        assertEquals("mc-dev", revoke.getAsJsonArray("revoked").get(0).getAsString());
+    }
+
+    @Test
+    @DisplayName("#2375: a revoke by UUID for an unseen player (name = UUID) still stores the row")
+    void revokeWithOverlongNameStoresRow() throws Exception {
+        entitlements.grant(B, "mc-dev", "test");
+        service.revoke(B, B.toString(), "mc-dev", null).get(3, TimeUnit.SECONDS);
+        awaitRows(1);
+        assertEquals("", all().get(0).name());
+        assertEquals(List.of("mc-dev"), all().get(0).revoked());
+    }
+
+    @Test
+    @DisplayName("#2375: a 1.5.114 table gains the revoked column, old rows read as revoked=[]")
+    void migratesTableWithoutRevokedColumn() throws Exception {
+        Path old = Files.createTempFile("sightings-old", ".db");
+        try {
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + old);
+                 var st = c.createStatement()) {
+                st.execute("CREATE TABLE " + JdbcSightingStore.TABLE + " (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + "uuid TEXT NOT NULL, name TEXT NOT NULL, address TEXT NOT NULL, server TEXT NOT NULL, "
+                        + "reason TEXT NOT NULL, lists TEXT NOT NULL DEFAULT '', at_ms INTEGER NOT NULL)");
+                st.execute("INSERT INTO " + JdbcSightingStore.TABLE
+                        + " (uuid, name, address, server, reason, lists, at_ms) VALUES ('" + A
+                        + "', 'a', '8.8.8.8', 'event', 'join', 'mc-dev', 1)");
+            }
+            JdbcSightingStore store = new JdbcSightingStore(new ConnectionProvider() {
+                @Override public Connection getConnection() throws SQLException {
+                    return DriverManager.getConnection("jdbc:sqlite:" + old);
+                }
+                @Override public boolean isValid() { return true; }
+                @Override public String getDatabaseType() { return "SQLite"; }
+                @Override public void close() { }
+            });
+            store.ensureSchema();
+            store.ensureSchema(); // idempotent
+            store.append(new Sighting(0, B, "b", null, "event", 2, Sighting.REVOKE, List.of(), List.of("mc-dev")));
+            List<Sighting> rows = store.after(0, 10).sightings();
+            assertEquals(List.of("mc-dev"), rows.get(0).lists());
+            assertEquals(List.of(), rows.get(0).revoked());
+            assertEquals(List.of("mc-dev"), rows.get(1).revoked());
+            assertNull(rows.get(1).address());
+        } finally {
+            Files.deleteIfExists(old);
+        }
+    }
+
+    @Test
     void invalidListNameIsRefused() {
         assertThrows(IllegalArgumentException.class, () -> SightingService.normaliseList("mc dev"));
         assertThrows(IllegalArgumentException.class, () -> SightingService.normaliseList(""));

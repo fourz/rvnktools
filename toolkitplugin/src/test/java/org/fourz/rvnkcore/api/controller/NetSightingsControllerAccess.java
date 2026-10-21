@@ -13,6 +13,10 @@ public final class NetSightingsControllerAccess {
         return NetSightingsController.body(server, after, p);
     }
 
+    public static String json(com.google.gson.Gson gson, Map<String, Object> data) {
+        return NetSightingsController.json(gson, data);
+    }
+
     public static long parseCursor(String raw) {
         return NetSightingsController.parseCursor(raw);
     }
