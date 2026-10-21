@@ -39,6 +39,28 @@ public class TransferConfig {
     }
 
     /**
+     * An access gate on a transfer target (#2378): the player must hold an entitlement list, or the
+     * bypass node, to cross. A denied player stays put and gets {@code denyMessage}.
+     *
+     * <p>RVNKCore cannot see the router allow-list for the destination, so the gate tests the
+     * entitlement that puts a player on that list (for RVNK Dev, {@code mc-dev}, #2351).</p>
+     *
+     * @param entitlement      Entitlement list the player must hold (normalised lower-case)
+     * @param bypassPermission Node that skips the gate (staff, trusted testers)
+     * @param denySound        Namespaced sound key played on denial, or blank for none
+     * @param denyMessage      Lines sent on denial; {@code &} colour codes and {@code {player}}
+     */
+    public record Gate(String entitlement, String bypassPermission, String denySound,
+                       List<String> denyMessage) {
+    }
+
+    /** Default node that skips every transfer gate. */
+    public static final String DEFAULT_GATE_BYPASS = "rvnkcore.transfer.gate.bypass";
+
+    /** Fallback deny line when a gate sets none. The live servers set their own lines. */
+    public static final List<String> DEFAULT_GATE_DENY = List.of("&8The crossing does not answer you.");
+
+    /**
      * In-fiction realm names, keyed by target name.
      *
      * <p>Players do not cross to "prod" or "event" — they cross to the home realm and the Arcology.
@@ -115,6 +137,8 @@ public class TransferConfig {
     private final boolean confirm;
     /** Case-preserving map of target name to destination (insertion ordered). */
     private final Map<String, Target> targets;
+    /** Access gates keyed by target name (#2378); a target without an entry is open. */
+    private final Map<String, Gate> gates;
     /**
      * Themed broadcast shown on the source server when a player transfers (#1763), with {@code {player}}
      * substituted. Blank suppresses the broadcast (the vanilla quit message is still hidden either way).
@@ -146,8 +170,8 @@ public class TransferConfig {
     public static final String DEFAULT_ARRIVAL = "&d{player} &7has crossed into &f{realm}";
 
     private TransferConfig(boolean enabled, int cooldownSeconds, String permission,
-                           boolean confirm, Map<String, Target> targets, String broadcastMessage,
-                           String arrivalMessage) {
+                           boolean confirm, Map<String, Target> targets, Map<String, Gate> gates,
+                           String broadcastMessage, String arrivalMessage) {
         this.enabled = enabled;
         this.cooldownSeconds = cooldownSeconds > 0 ? cooldownSeconds : 10;
         this.permission = (permission != null && !permission.trim().isEmpty())
@@ -155,6 +179,8 @@ public class TransferConfig {
         this.confirm = confirm;
         this.targets = targets != null
                 ? Collections.unmodifiableMap(targets) : Collections.emptyMap();
+        this.gates = gates != null
+                ? Collections.unmodifiableMap(gates) : Collections.emptyMap();
         this.broadcastMessage = (broadcastMessage != null) ? broadcastMessage : DEFAULT_BROADCAST;
         this.arrivalMessage = (arrivalMessage != null) ? arrivalMessage : DEFAULT_ARRIVAL;
     }
@@ -168,10 +194,11 @@ public class TransferConfig {
     public static TransferConfig fromConfigurationSection(ConfigurationSection section) {
         if (section == null) {
             return new TransferConfig(false, 10, "rvnkcore.transfer", true, Collections.emptyMap(),
-                    DEFAULT_BROADCAST, DEFAULT_ARRIVAL);
+                    Collections.emptyMap(), DEFAULT_BROADCAST, DEFAULT_ARRIVAL);
         }
 
         Map<String, Target> targets = new LinkedHashMap<>();
+        Map<String, Gate> gates = new LinkedHashMap<>();
         ConfigurationSection targetsSection = section.getConfigurationSection("targets");
         if (targetsSection != null) {
             for (String name : targetsSection.getKeys(false)) {
@@ -187,6 +214,10 @@ public class TransferConfig {
                         target.getString("world", ""),
                         resolveRealm(name, target.getString("realm", null), display)
                 ));
+                Gate gate = parseGate(target.getConfigurationSection("gate"));
+                if (gate != null) {
+                    gates.put(name, gate);
+                }
             }
         }
 
@@ -196,6 +227,7 @@ public class TransferConfig {
                 section.getString("permission", "rvnkcore.transfer"),
                 section.getBoolean("confirm", true),
                 targets,
+                gates,
                 section.getString("broadcast-message", DEFAULT_BROADCAST),
                 section.getString("arrival-message", DEFAULT_ARRIVAL)
         );
@@ -228,6 +260,55 @@ public class TransferConfig {
             }
         }
         return valid;
+    }
+
+    /**
+     * Parses a {@code targets.<name>.gate} section (#2378).
+     *
+     * <p>A gate needs an {@code entitlement}; without one the section is ignored and the target stays
+     * open. {@code deny-message} may be a list of lines or a single string.</p>
+     *
+     * @param gate The gate section, or null
+     * @return The gate, or null when absent or without an entitlement
+     */
+    static Gate parseGate(ConfigurationSection gate) {
+        if (gate == null) {
+            return null;
+        }
+        String entitlement = gate.getString("entitlement", "");
+        if (entitlement == null || entitlement.isBlank()) {
+            return null;
+        }
+        String bypass = gate.getString("bypass-permission", DEFAULT_GATE_BYPASS);
+        if (bypass == null || bypass.isBlank()) {
+            bypass = DEFAULT_GATE_BYPASS;
+        }
+        List<String> lines = gate.isList("deny-message")
+                ? gate.getStringList("deny-message")
+                : (gate.isString("deny-message") ? List.of(gate.getString("deny-message")) : List.of());
+        if (lines.isEmpty()) {
+            lines = DEFAULT_GATE_DENY;
+        }
+        return new Gate(entitlement.trim().toLowerCase(java.util.Locale.ROOT), bypass.trim(),
+                gate.getString("deny-sound", "").trim(), List.copyOf(lines));
+    }
+
+    /**
+     * The access gate for a target, case-insensitively (#2378).
+     *
+     * @param name The target name
+     * @return The gate, or null when the target is open (or unknown)
+     */
+    public Gate getGate(String name) {
+        if (name == null) {
+            return null;
+        }
+        for (Map.Entry<String, Gate> entry : gates.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     /**

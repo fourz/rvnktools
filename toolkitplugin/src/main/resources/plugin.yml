@@ -327,6 +327,9 @@ permissions:
   rvnkcore.transfer:
     description: Allows use of the /server transfer command. Portals are gated by rvnkcore.portal.use, not this node (#2032)
     default: op
+  rvnkcore.transfer.gate.bypass:
+    description: Crosses a gated transfer target (#2378) without its entitlement. Not given to ops by default - grant it in LuckPerms to staff and trusted testers
+    default: false
 
   # ── Cross-Server Portals (rvnkcore.*) ────────────────────────────────────
   rvnkcore.portal.create:

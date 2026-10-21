@@ -312,7 +312,10 @@ public class PortalStepListener implements Listener {
         TransferService.TransferResult result = portalNode != null
                 ? transferService.transfer(player, targetServer, portalNode)
                 : transferService.transfer(player, targetServer);
-        player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
+        // PENDING (#2378): a gated target is reading entitlements and reports the outcome itself.
+        if (!result.message().isEmpty()) {
+            player.sendMessage((result.isSuccess() ? "§a" : "§c") + result.message());
+        }
         if (result.isSuccess()) {
             logger.info("Portal walk-through transfer: " + player.getName() + " -> '" + targetServer + "'");
         } else {
