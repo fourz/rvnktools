@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.chat.ThrottledWarning;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
 import org.fourz.rvnkcore.api.model.MatrixChannel;
 import org.fourz.rvnkcore.service.chatrelay.MatrixChannelRegistry;
@@ -251,20 +252,21 @@ public class ChatRelayController extends HttpServlet {
         boolean scoped = Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE));
         boolean matrix = service.isMatrixOrigin(dto.getOriginServerId());
         if (scoped && !matrix) {
-            ApiUtils.sendError(resp, gson, 403, "FORBIDDEN", "This token accepts only Matrix-origin lines");
+            refuseMatrix(resp, 403, "FORBIDDEN", "This token accepts only Matrix-origin lines", dto);
             return;
         }
         if (matrix) {
             String refusal = MatrixInbound.refusal(dto);
             if (refusal != null) {
-                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+                refuseMatrix(resp, 400, "BAD_REQUEST", refusal, dto);
                 return;
             }
+            String rawChannel = dto.getMchannel();
             MatrixInbound.sanitize(dto);
             // #2381: a Matrix line names its channel; none = general, an unpublished one is refused.
-            String channel = MatrixChannel.resolveName(dto.getMchannel());
+            String channel = MatrixChannel.resolveName(rawChannel);
             if (channel == null || !service.getMatrixChannels().contains(channel)) {
-                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "unknown mchannel");
+                refuseMatrix(resp, 400, "BAD_REQUEST", "unknown mchannel", dto);
                 return;
             }
             dto.setMchannel(channel);
@@ -279,6 +281,35 @@ public class ChatRelayController extends HttpServlet {
 
         service.receiveInbound(dto);
         ApiUtils.sendSuccess(resp, gson, "Message accepted");
+    }
+
+    /** One WARNING per refusal reason per minute, with a count (#2384). */
+    private final Map<String, ThrottledWarning> refusalLogs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Refuses a line from the Matrix bridge and logs it (#2384). Before this, a refused Matrix line
+     * left no trace on the tier, so a channel that never arrived could not be told apart from one the
+     * tier refused. The log names the reason, room and channel, never the message text.
+     */
+    private void refuseMatrix(HttpServletResponse resp, int status, String code, String reason,
+                              ChatMessageDTO dto) throws IOException {
+        ThrottledWarning w = refusalLogs.computeIfAbsent(reason,
+                r -> new ThrottledWarning(60_000L, System::currentTimeMillis));
+        Integer count = w.hit();
+        if (count != null) {
+            logger.warning("Chat inbound refused (" + status + " " + reason + "): origin="
+                    + logSafe(dto.getOriginServerId()) + " room=" + logSafe(dto.getRoom())
+                    + " mchannel=" + logSafe(dto.getMchannel())
+                    + (count > 1 ? " [" + count + " in the last minute]" : ""));
+        }
+        ApiUtils.sendError(resp, gson, status, code, reason);
+    }
+
+    /** A short, printable form of a client-supplied value for a log line. */
+    static String logSafe(String value) {
+        if (value == null) return "-";
+        String v = value.replaceAll("[^\\x20-\\x7E]", "?");
+        return v.length() > 40 ? v.substring(0, 40) + "..." : v;
     }
 
     /** Upper bound on the serialized {@code components} JSON, guarding the console tellraw dispatch. */
