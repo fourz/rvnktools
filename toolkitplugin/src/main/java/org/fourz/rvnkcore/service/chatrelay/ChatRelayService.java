@@ -72,6 +72,30 @@ public class ChatRelayService {
         ChatInboundToken.configure(config.getMatrixInboundTokenHashes());
         this.matrixChannels = new MatrixChannelRegistry(logger);
         this.matrixChannels.configure(config);
+        egress.setRateLimitedHandler(this::notifyRateLimited);
+    }
+
+    /** Text for a sender whose line the Matrix bridge refused with 429. */
+    static final String RATE_LIMITED_NOTICE =
+        "\u00A77Chat is busy: your last line was not sent to Discord (players in game saw it).";
+
+    /**
+     * Tells the sender (if online) that the Matrix bridge refused their line with 429. Called from an
+     * egress thread; the message is sent on the main thread.
+     */
+    void notifyRateLimited(ChatMessageDTO dto) {
+        String raw = dto.getSenderUuid();
+        if (raw == null || raw.isBlank()) return;
+        UUID id;
+        try {
+            id = UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) p.sendMessage(RATE_LIMITED_NOTICE);
+        });
     }
 
     /** Starts the Matrix channel-list fetch (startup, then every 5 minutes). */
@@ -224,6 +248,7 @@ public class ChatRelayService {
         if (newConfig == null) return;
         this.config = newConfig;
         this.egress = new ChatRelayEgress(newConfig, logger);
+        this.egress.setRateLimitedHandler(this::notifyRateLimited);
         int tokens = ChatInboundToken.configure(newConfig.getMatrixInboundTokenHashes());
         // Apply chat-relay.buffer.size on reload, not only at boot.
         buffer.resize(newConfig.getBufferSize());

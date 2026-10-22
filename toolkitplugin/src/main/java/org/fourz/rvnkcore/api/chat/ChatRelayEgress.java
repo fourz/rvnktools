@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Sends relayed chat messages to configured peer servers over HTTP.
@@ -51,6 +52,13 @@ public class ChatRelayEgress {
     private final SSLSocketFactory insecureSocketFactory;
     private final ChatRelayConfig config;
     private final LogManager logger;
+
+    /** HTTP status the Matrix bridge answers when its per-room cap is reached. */
+    static final int TOO_MANY_REQUESTS = 429;
+    /** One 429 WARNING per minute, with a count. */
+    private final ThrottledWarning rateLimitLog = new ThrottledWarning(60_000L, System::currentTimeMillis);
+    /** Told about a line the Matrix bridge refused with 429; tells the sender. Null = nobody told. */
+    private volatile Consumer<ChatMessageDTO> rateLimitedHandler;
 
     /**
      * Creates a new ChatRelayEgress.
@@ -124,11 +132,40 @@ public class ChatRelayEgress {
             }
             // Insecure path only applies to https peers; anything else uses the plain HttpClient.
             if (insecureSocketFactory != null && peer.url().startsWith("https://")) {
-                sendInsecure(peer, payload);
+                sendInsecure(peer, payload, dto);
             } else {
-                sendToPeer(peer, payload);
+                sendToPeer(peer, payload, dto);
             }
         }
+    }
+
+    /** Sets who is told when the Matrix bridge refuses a line with 429 (the chat relay service). */
+    public void setRateLimitedHandler(Consumer<ChatMessageDTO> handler) {
+        this.rateLimitedHandler = handler;
+    }
+
+    /**
+     * Handles a non-2xx answer. A 429 from the Matrix bridge is its per-room cap: the line already
+     * reached the game, so it is not retried (a late resend would arrive out of order). The WARNING is
+     * throttled to one a minute and the sender is told once per refused line.
+     */
+    void onFailureStatus(ChatRelayConfig.Peer peer, ChatMessageDTO dto, int status, String logTag) {
+        if (status == TOO_MANY_REQUESTS && config.isMatrixOrigin(peer.id())) {
+            Integer count = rateLimitLog.hit();
+            if (count != null) {
+                logger.warning(logTag + " -> 429 rate limited (" + count + " line(s) in the last minute not sent)");
+            }
+            Consumer<ChatMessageDTO> handler = rateLimitedHandler;
+            if (handler != null && dto != null) {
+                try {
+                    handler.accept(dto);
+                } catch (RuntimeException e) {
+                    logger.debug(logTag + " 429 notice failed: " + e.getMessage());
+                }
+            }
+            return;
+        }
+        logger.warning(logTag + " -> " + status);
     }
 
     /**
@@ -144,7 +181,7 @@ public class ChatRelayEgress {
     }
 
     /** Secure/default egress via the shared async {@link HttpClient}. */
-    private void sendToPeer(ChatRelayConfig.Peer peer, String payload) {
+    private void sendToPeer(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -161,7 +198,7 @@ public class ChatRelayEgress {
                     if (status >= 200 && status < 300) {
                         logger.debug(logTag + " -> " + status);
                     } else {
-                        logger.warning(logTag + " -> " + status);
+                        onFailureStatus(peer, dto, status, logTag);
                     }
                 })
                 .exceptionally(e -> {
@@ -178,7 +215,7 @@ public class ChatRelayEgress {
      * verifier, so self-signed peers addressed by IP are reachable. Runs on the common pool
      * (fire-and-forget) so the async chat thread is never blocked on the network call.
      */
-    private void sendInsecure(ChatRelayConfig.Peer peer, String payload) {
+    private void sendInsecure(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
         CompletableFuture.runAsync(() -> {
             HttpsURLConnection conn = null;
@@ -201,7 +238,7 @@ public class ChatRelayEgress {
                 if (status >= 200 && status < 300) {
                     logger.debug(logTag + " -> " + status);
                 } else {
-                    logger.warning(logTag + " -> " + status);
+                    onFailureStatus(peer, dto, status, logTag);
                 }
             } catch (Exception e) {
                 logger.warning(logTag + " failed: " + e.getMessage());
