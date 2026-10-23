@@ -38,6 +38,8 @@ import java.util.Map;
  *       never relayed (#1777). Body: {@code {message, senderName?}}</li>
  *   <li>{@code POST /v1/chat/world} — Post a bot line into the WORLD room: scoped to one world,
  *       relayed to peers only when world-relay allows (#1777). Body: {@code {message, senderName?, world}}</li>
+ *   <li>{@code POST /v1/chat/matrix} — Post a bot line into the MATRIX room: this tier's followers of
+ *       the channel, the tier peers and the Matrix bridge (#2383). Body: {@code {message, senderName?, mchannel?}}</li>
  *   <li>{@code GET /v1/chat/recent} — Cursor-polled tail of recent chat, so a client can read what was
  *       said without scraping the console log (#1870).
  *       Query: {@code since, boot, limit, room, world}</li>
@@ -215,6 +217,8 @@ public class ChatRelayController extends HttpServlet {
                 handleRoom(req, resp, "SERVER");
             } else if (pathInfo != null && pathInfo.equals("/world")) {
                 handleRoom(req, resp, "WORLD");
+            } else if (pathInfo != null && pathInfo.equals("/matrix")) {
+                handleMatrix(req, resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: POST " + pathInfo);
@@ -421,6 +425,48 @@ public class ChatRelayController extends HttpServlet {
 
         service.injectRoom(room, world, optString(obj, "senderName"), message);
         ApiUtils.sendSuccess(resp, gson, room + " post accepted");
+    }
+
+    /**
+     * Handles {@code POST /v1/chat/matrix} (#2383): a chatbot reply into the MATRIX room, so Discord
+     * and Matrix users see it. Body: {@code {message, senderName?, mchannel?}}; {@code mchannel}
+     * defaults to {@code general} and must be listed and not read-only (400 otherwise). Plain text
+     * only. Opened by the X-API-Key; the scoped Matrix token never reaches here (AuthFilter), and is
+     * refused again if it does.
+     */
+    private void handleMatrix(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE))) {
+            ApiUtils.sendError(resp, gson, 403, "FORBIDDEN", "The Matrix token cannot post bot lines");
+            return;
+        }
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+
+        JsonObject obj;
+        try {
+            obj = gson.fromJson(ApiUtils.readRequestBody(req), JsonObject.class);
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid JSON body");
+            return;
+        }
+        if (obj != null && obj.has("components") && !obj.get("components").isJsonNull()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                    "Matrix posts are plain text - use 'message'");
+            return;
+        }
+
+        String refusal = service.postMatrix(optString(obj, "message"), optString(obj, "senderName"),
+                optString(obj, "mchannel"));
+        if (refusal == null) {
+            ApiUtils.sendSuccess(resp, gson, "Matrix post accepted");
+        } else if (refusal.equals(ChatRelayService.RELAY_DISABLED)) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", refusal);
+        } else {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+        }
     }
 
     /** Reads an optional, non-null string member from a JSON object, or null when absent/null. */

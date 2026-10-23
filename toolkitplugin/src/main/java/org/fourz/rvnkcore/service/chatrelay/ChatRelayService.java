@@ -6,6 +6,7 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.chat.ChatRelayEgress;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.api.model.MatrixChannel;
 import org.fourz.rvnkcore.util.ChatFormat;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -327,6 +328,44 @@ public class ChatRelayService {
         }
         logger.debug("Chat broadcast (bot): [" + tag + "] " + sender
             + (hasComponents ? " [styled]" : "") + " (" + msgId + ")");
+    }
+
+    /**
+     * Posts a chatbot line into the MATRIX room through this tier (#2383), so Discord and Matrix
+     * users see the persona reply. The line goes to MATRIX-room players here who follow the channel
+     * (through the chatroom consumer, the same path a relayed MATRIX line takes), to the tier peers,
+     * and to the Matrix bridge, which posts it as a bot puppet and counts it against the 20/min cap.
+     *
+     * @param message    the text (required)
+     * @param senderName the persona (defaults to {@code Bot})
+     * @param mchannel   the channel (defaults to {@code general}); must be listed and not read-only
+     * @return null when accepted, otherwise the refusal reason
+     */
+    /** Refusal from {@link #postMatrix} when the relay is off (the controller answers 503). */
+    public static final String RELAY_DISABLED = "chat relay is disabled";
+
+    public String postMatrix(String message, String senderName, String mchannel) {
+        if (!config.isEnabled()) return RELAY_DISABLED;
+        String channel = MatrixChannel.resolveName(mchannel);
+        String refusal = MatrixBotPost.refusal(message, channel,
+            channel == null ? java.util.Optional.empty() : matrixChannels.get(channel));
+        if (refusal != null) return refusal;
+
+        String msgId = UUID.randomUUID().toString();
+        markSeen(msgId);
+        ChatMessageDTO dto = MatrixBotPost.build(msgId, config.getServerId(), config.getServerLabel(),
+            senderName, message, channel, System.currentTimeMillis());
+        record(dto);
+
+        // Local delivery: a standalone RVNKCore has no MATRIX room, so without a consumer the line
+        // only leaves this tier.
+        Consumer<ChatMessageDTO> consumer = this.externalConsumer;
+        if (consumer != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
+        }
+        egress.send(dto);
+        logger.debug("Chat matrix post (bot): #" + channel + " by " + dto.getSenderName() + " (" + msgId + ")");
+        return null;
     }
 
     /**
