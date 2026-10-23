@@ -1,7 +1,6 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.event.ClusterBanListener;
 import org.fourz.rvnkcore.api.event.PlayerBanListener;
@@ -201,18 +200,12 @@ public class RVNKToolsInitializer {
             return;
         }
 
-        RegisteredServiceProvider<Economy> rsp = plugin.getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
-            logger.info("Economy not found - economy features disabled");
-            return;
-        }
-
-        Economy economy = rsp.getProvider();
-        if (economy != null) {
-            registry.registerService(Economy.class, economy);
-            logger.info("Economy integration enabled");
-        } else {
-            logger.info("Economy not found - economy features disabled");
+        // TokenEconomy enables after RVNKCore, so there is usually no provider yet. The binder
+        // registers it when it arrives and reports a real gap once the server has loaded (#2395).
+        EconomyBinder binder = new EconomyBinder(plugin.getServer(), registry, logger);
+        plugin.getServer().getPluginManager().registerEvents(binder, plugin);
+        if (!binder.bind()) {
+            logger.debug("No economy provider yet - binding when one registers");
         }
     }
 
