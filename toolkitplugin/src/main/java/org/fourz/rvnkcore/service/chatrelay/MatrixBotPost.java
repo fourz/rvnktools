@@ -18,6 +18,8 @@ public final class MatrixBotPost {
     /** Line kind the Matrix bridge reads as a bot post (no UUID, posted as a bot puppet). */
     public static final String CHANNEL = "bot";
     public static final String DEFAULT_PERSONA = "Bot";
+    /** The bridge accepts a bot label of 1-16 chars; a longer one is refused there. */
+    public static final int MAX_LABEL = 16;
 
     private MatrixBotPost() { }
 
@@ -38,7 +40,7 @@ public final class MatrixBotPost {
     /** Builds the MATRIX line for an accepted post. */
     public static ChatMessageDTO build(String msgId, String serverId, String serverLabel,
                                        String persona, String message, String channel, long now) {
-        String sender = MatrixInbound.clean(persona, MatrixInbound.MAX_SENDER);
+        String sender = MatrixInbound.clean(persona, MAX_LABEL);
         if (sender.isEmpty()) sender = DEFAULT_PERSONA;
         ChatMessageDTO dto = new ChatMessageDTO(msgId, serverId, CHANNEL, null, sender,
                 MatrixInbound.clean(message, MatrixInbound.MAX_MESSAGE), now);

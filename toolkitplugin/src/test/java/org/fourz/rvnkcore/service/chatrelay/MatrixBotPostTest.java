@@ -62,9 +62,11 @@ class MatrixBotPostTest {
         ChatMessageDTO dto = MatrixBotPost.build("m2", "dev", "dev", "§cGlint\n" + "y".repeat(80),
                 "§khi\nthere " + longText, "general", 5L);
         assertFalse(dto.getSenderName().contains("§"));
-        assertTrue(dto.getSenderName().length() <= MatrixInbound.MAX_SENDER);
+        assertTrue(dto.getSenderName().length() <= MatrixBotPost.MAX_LABEL);
         assertFalse(dto.getMessage().contains("§") || dto.getMessage().contains("\n"));
         assertTrue(dto.getMessage().length() <= MatrixInbound.MAX_MESSAGE);
         assertEquals("Bot", MatrixBotPost.build("m3", "dev", "dev", "  ", "hi", "general", 5L).getSenderName());
+        assertEquals("Shadowmelt", MatrixBotPost.build("m4", "dev", "dev", "Shadowmelt", "hi", "general", 5L).getLabel());
+        assertEquals("Ravengrub Archiv", MatrixBotPost.build("m5", "dev", "dev", "Ravengrub Archivist", "hi", "general", 5L).getLabel());
     }
 }
