@@ -65,6 +65,7 @@ public class RVNKToolsInitializer {
     private NpcBridge npcBridge;
     private org.fourz.rvnkcore.service.sightings.SightingService sightingService;
     private org.bukkit.scheduler.BukkitTask sightingPrune;
+    private org.fourz.rvnkcore.service.kit.KitService kitService;
 
     /**
      * Creates a new RVNKToolsInitializer.
@@ -161,6 +162,10 @@ public class RVNKToolsInitializer {
         if (sightingService != null) {
             sightingService.shutdown();
             sightingService = null;
+        }
+        if (kitService != null) {
+            kitService.shutdown();
+            kitService = null;
         }
 
         // Shutdown LuckPerms listener
@@ -315,6 +320,9 @@ public class RVNKToolsInitializer {
                 // Player sightings + entitled lists, pulled by z-office (#2351). Recording is off by default.
                 registerSightings();
 
+                // Kits: named item sets granted by /rvnk kit (#2415). Cluster-shared when clustering is on.
+                registerKits();
+
                 // Register LuckPerms integration
                 try {
                     luckPermsListener = new LuckPermsIntegrationListener(plugin, plugin);
@@ -461,6 +469,34 @@ public class RVNKToolsInitializer {
                     + c.tokenHashes().size());
         } catch (Exception e) {
             logger.warning("net-sightings: not registered: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the kit service (#2415). Kit definitions are item data with no world column and no
+     * foreign key, so they live in the cluster database when clustering is on (nations and Event share
+     * them) and in this server's own database otherwise (Dev).
+     */
+    private void registerKits() {
+        org.fourz.rvnkcore.database.connection.ConnectionProvider local =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ConnectionProvider.class);
+        if (local == null) {
+            logger.warning("kits: no database; /rvnk kit disabled");
+            return;
+        }
+        org.fourz.rvnkcore.database.connection.ClusterConnectionProvider cluster =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ClusterConnectionProvider.class);
+        try {
+            org.fourz.rvnkcore.service.kit.JdbcKitStore store =
+                    new org.fourz.rvnkcore.service.kit.JdbcKitStore(cluster != null ? cluster : local);
+            store.ensureSchema();
+            kitService = new org.fourz.rvnkcore.service.kit.KitService(store);
+            registry.registerService(org.fourz.rvnkcore.service.kit.KitService.class, kitService);
+            kitService.warmNames();
+            logger.info("kits: registered, definitions in " + (cluster != null ? "cluster" : "local")
+                    + " database, item codec " + org.fourz.rvnkcore.service.kit.ItemCodec.best().id());
+        } catch (Exception e) {
+            logger.warning("kits: not registered: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 

@@ -4,10 +4,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.chat.ChatStreamHub;
 import org.fourz.rvnkcore.api.chat.ThrottledWarning;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
 import org.fourz.rvnkcore.api.model.MatrixChannel;
@@ -17,9 +22,11 @@ import org.fourz.rvnkcore.service.chatrelay.MatrixInbound;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.service.chatrelay.ChatMessageBuffer;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
+import org.fourz.rvnkcore.service.chatrelay.ChatStreamCursor;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +50,10 @@ import java.util.Map;
  *   <li>{@code GET /v1/chat/recent} — Cursor-polled tail of recent chat, so a client can read what was
  *       said without scraping the console log (#1870).
  *       Query: {@code since, boot, limit, room, world}</li>
+ *   <li>{@code GET /v1/chat/stream} — the same tail pushed as Server-Sent Events, with the same cursor
+ *       and stale/gap semantics and a heartbeat comment every 15 s (#2425). Query: {@code since, boot,
+ *       limit, room, world}; {@code Last-Event-ID} resumes when {@code since}/{@code boot} are absent.
+ *       See {@link ChatStreamHub}. The servlet holder must be async-supported.</li>
  * </ul>
  *
  * <p>The {@link ChatRelayService} is resolved lazily from the ServiceRegistry at request time,
@@ -52,8 +63,14 @@ import java.util.Map;
  */
 public class ChatRelayController extends HttpServlet {
 
+    /** Heartbeat comment interval; below the 30 s connector idle timeout. */
+    static final long STREAM_HEARTBEAT_MS = 15_000L;
+    /** Open stream cap: chat readers are a few tools (tail.py, the ravencast watcher). */
+    static final int MAX_STREAMS = 16;
+
     private final Gson gson;
     private final LogManager logger;
+    private final ChatStreamHub streamHub;
 
     /**
      * Creates a new ChatRelayController.
@@ -64,6 +81,18 @@ public class ChatRelayController extends HttpServlet {
     public ChatRelayController(Gson gson, LogManager logger) {
         this.gson = gson;
         this.logger = logger;
+        // Compact JSON: the shared Gson pretty-prints, and one SSE data line per event keeps line
+        // readers simple. A tree's toString() is compact and drops nulls as the shared Gson does.
+        this.streamHub = new ChatStreamHub(() -> {
+            ChatRelayService s = getService();
+            return s == null ? null : s.getBuffer();
+        }, ChatRelayController::toWire, o -> gson.toJsonTree(o).toString(), STREAM_HEARTBEAT_MS, MAX_STREAMS);
+    }
+
+    @Override
+    public void destroy() {
+        streamHub.shutdown();
+        super.destroy();
     }
 
     /**
@@ -82,6 +111,8 @@ public class ChatRelayController extends HttpServlet {
         try {
             if (pathInfo != null && pathInfo.equals("/recent")) {
                 handleRecent(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/stream")) {
+                handleStream(req, resp);
             } else if (pathInfo != null && pathInfo.equals("/channels")) {
                 handleChannels(resp);
             } else {
@@ -145,6 +176,94 @@ public class ChatRelayController extends HttpServlet {
     }
 
     /**
+     * Opens a Server-Sent Events chat stream (#2425). Parameters as {@link #handleRecent}; when
+     * {@code since} and {@code boot} are both absent, an EventSource {@code Last-Event-ID} of
+     * {@code boot:seq} resumes. The Jetty thread returns at once: {@link ChatStreamHub} writes hello and
+     * the backlog now, and later lines from its own threads as they are recorded.
+     */
+    private void handleStream(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+        if (!req.isAsyncSupported()) {
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Chat stream needs an async servlet");
+            return;
+        }
+        String rawSince = trimToNull(req.getParameter("since"));
+        String boot = trimToNull(req.getParameter("boot"));
+        if (rawSince == null && boot == null) {
+            String[] last = ChatStreamHub.parseLastEventId(req.getHeader("Last-Event-ID"));
+            if (last != null) {
+                boot = last[0];
+                rawSince = last[1];
+            }
+        }
+        long since;
+        try {
+            since = rawSince == null ? 0L : Long.parseLong(rawSince);
+        } catch (NumberFormatException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "since must be an integer");
+            return;
+        }
+        if (streamHub.openCount() >= MAX_STREAMS) {
+            ApiUtils.sendError(resp, gson, 503, "BUSY", "Too many chat streams open; poll /v1/chat/recent");
+            return;
+        }
+        int limit = ApiUtils.getIntParam(req, "limit", ChatMessageBuffer.MAX_LIMIT);
+        ChatStreamCursor cursor = new ChatStreamCursor(service.getBuffer(), boot, since, limit,
+                trimToNull(req.getParameter("room")), trimToNull(req.getParameter("world")));
+
+        resp.setStatus(200);
+        resp.setContentType("text/event-stream");
+        resp.setCharacterEncoding("UTF-8");
+        resp.setHeader("Cache-Control", "no-cache");
+        resp.setHeader("X-Accel-Buffering", "no"); // a reverse proxy must not buffer the stream
+        AsyncContext ctx = req.startAsync();
+        ctx.setTimeout(0); // no async timeout: the heartbeat and the idle timeout find dead clients
+        ServletOutputStream out = resp.getOutputStream();
+        ChatStreamHub.Sink sink = new ChatStreamHub.Sink() {
+            @Override public void send(String frame) throws IOException {
+                out.write(frame.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+            @Override public void close() {
+                try {
+                    ctx.complete();
+                } catch (IllegalStateException ignored) {
+                    // already completed by the container
+                }
+            }
+        };
+        // Listener first: a client that drops while the backlog is written completes the context.
+        java.util.concurrent.atomic.AtomicReference<ChatStreamHub.Stream> stream =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        ctx.addListener(new AsyncListener() {
+            @Override public void onComplete(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onTimeout(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onError(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onStartAsync(AsyncEvent event) { }
+        });
+        try {
+            stream.set(streamHub.open(cursor, sink));
+        } catch (ChatStreamHub.FullException e) {
+            try {
+                sink.send("event: error\ndata: {\"code\":\"BUSY\"}\n\n");
+            } finally {
+                sink.close();
+            }
+            return;
+        }
+        logger.debug("Chat stream opened (room=" + logSafe(req.getParameter("room")) + ", open="
+                + streamHub.openCount() + ")");
+    }
+
+    private static void closeStream(ChatStreamHub.Stream stream) {
+        if (stream != null) stream.close();
+    }
+
+    /**
      * {@code GET /v1/chat/channels} (#2381): this tier's cached copy of the Matrix bridge channel
      * list, with the time of the last good fetch ({@code 0} = never, only {@code general}) and the
      * current fetch problem. Read-only; shows no destination and no key.
@@ -178,7 +297,7 @@ public class ChatRelayController extends HttpServlet {
      * Flattens a buffer entry to the wire shape. {@code seq} is a buffer concern rather than part of
      * {@link ChatMessageDTO}, so the two are merged here rather than polluting the relay payload.
      */
-    private Map<String, Object> toWire(ChatMessageBuffer.Entry entry) {
+    static Map<String, Object> toWire(ChatMessageBuffer.Entry entry) {
         ChatMessageDTO dto = entry.getDto();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("seq", entry.getSeq());

@@ -315,9 +315,10 @@ logfilter:
 # Customize command behavior
 commands:
   override-vanilla-tp: true   # Override /tp with RVNKTools implementation
-                              # Must be true — plugin.yml declares /tp so vanilla is blocked regardless.
-                              # true: /tp routes to RVNKTools (player/coords/worldswap)
-                              # false: /tp is claimed by plugin but has no executor (broken)
+                              # true: /tp routes to RVNKTools (player/coords/worldswap). Command blocks,
+                              #   /execute and vanilla-only syntax (@selectors, rotation, ^, facing)
+                              #   still go to minecraft:tp.
+                              # false: every /tp forwards to minecraft:tp
 
 # WebUI Configuration
 # Hostname and port of the local web portal dev server

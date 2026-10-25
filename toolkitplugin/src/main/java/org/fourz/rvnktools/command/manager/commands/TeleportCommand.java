@@ -9,6 +9,7 @@ import org.fourz.rvnktools.command.manager.BaseCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportCoordsSubCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportHereSubCommand;
 import org.fourz.rvnktools.command.manager.commands.teleport.TeleportPlayerSubCommand;
+import org.fourz.rvnktools.command.manager.commands.teleport.TpRouting;
 
 import org.bukkit.Bukkit;
 
@@ -51,6 +52,16 @@ public class TeleportCommand extends BaseCommand {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         logger.debug("Command executed: " + label + " with " + args.length + " arguments");
 
+        // Command blocks, minecarts, /execute and vanilla-only syntax (selectors, rotation, ^, facing)
+        // go to minecraft:tp. RVNKCore's routing read "@a[...]" as a player name and nobody moved.
+        // Vanilla checks its own permission, so this runs before ours.
+        if (TpRouting.route(TpRouting.kindOf(sender), args, getSubCommandNames())
+                == TpRouting.Route.VANILLA) {
+            logger.debug("Handing " + label + " to vanilla for " + sender.getName());
+            TpRouting.dispatchVanilla(sender, args);
+            return true;
+        }
+
         // Check permission
         if (!hasPermission(sender)) {
             sendNoPermissionMessage(sender);
@@ -59,8 +70,9 @@ public class TeleportCommand extends BaseCommand {
 
         // Smart routing for /tp — always active since /tp is registered in plugin.yml
         // For /teleport, smart routing requires the override-vanilla-tp config flag
-        if (label.equalsIgnoreCase("tp") ||
-                (label.equalsIgnoreCase("teleport") && overrideTp)) {
+        String bare = label.contains(":") ? label.substring(label.indexOf(':') + 1) : label; // rvnkcore:tp
+        if (bare.equalsIgnoreCase("tp") ||
+                (bare.equalsIgnoreCase("teleport") && overrideTp)) {
             return handleTpSmartRouting(sender, args);
         }
 

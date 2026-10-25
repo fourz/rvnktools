@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Bounded in-memory tail of recent chat, so a client can poll for what was said instead of scraping
@@ -54,6 +55,8 @@ public final class ChatMessageBuffer {
     private final String bootId;
     private final ArrayDeque<Entry> entries = new ArrayDeque<>();
     private final Set<String> recordedIds = new HashSet<>();
+    /** Told after each new entry, outside the lock: the {@code /v1/chat/stream} push (#2425). */
+    private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     private int capacity;
     private long nextSeq = 1L;
@@ -89,12 +92,14 @@ public final class ChatMessageBuffer {
         private final long seq;
         private final boolean stale;
         private final List<Entry> messages;
+        private final long head;
 
-        Page(String bootId, long seq, boolean stale, List<Entry> messages) {
+        Page(String bootId, long seq, boolean stale, List<Entry> messages, long head) {
             this.bootId = bootId;
             this.seq = seq;
             this.stale = stale;
             this.messages = messages;
+            this.head = head;
         }
 
         /** Buffer identity for this plugin lifetime; send it back on the next poll. */
@@ -107,6 +112,13 @@ public final class ChatMessageBuffer {
         public boolean isStale() { return stale; }
 
         public List<Entry> getMessages() { return messages; }
+
+        /**
+         * Highest seq the buffer had assigned when this page was read (0 = none yet). A reader that got
+         * fewer than its limit has scanned every entry up to here, so it may move its cursor to the head
+         * even when its filter matched nothing (#2425).
+         */
+        public long getHead() { return head; }
     }
 
     /**
@@ -118,13 +130,31 @@ public final class ChatMessageBuffer {
      * @param dto The message; ignored when null or missing a {@code msgId}
      * @return true when a new entry was added
      */
-    public synchronized boolean record(ChatMessageDTO dto) {
+    public boolean record(ChatMessageDTO dto) {
         if (dto == null || dto.getMsgId() == null || dto.getMsgId().isEmpty()) return false;
-        if (!recordedIds.add(dto.getMsgId())) return false;
-
-        entries.addLast(new Entry(nextSeq++, dto));
-        evictToCapacity();
+        synchronized (this) {
+            if (!recordedIds.add(dto.getMsgId())) return false;
+            entries.addLast(new Entry(nextSeq++, dto));
+            evictToCapacity();
+        }
+        // Outside the lock, so a listener can read the buffer. Listeners must only schedule work.
+        for (Runnable l : listeners) {
+            try {
+                l.run();
+            } catch (RuntimeException ignored) {
+                // a stream fault must never cost the chat line
+            }
+        }
         return true;
+    }
+
+    /** Runs {@code listener} after every new entry, on the recording thread. It must not block. */
+    public void addListener(Runnable listener) {
+        listeners.add(listener);
+    }
+
+    public void removeListener(Runnable listener) {
+        listeners.remove(listener);
     }
 
     /**
@@ -188,7 +218,7 @@ public final class ChatMessageBuffer {
             cursor = sinceSeq;
         }
 
-        return new Page(bootId, cursor, stale, Collections.unmodifiableList(out));
+        return new Page(bootId, cursor, stale, Collections.unmodifiableList(out), nextSeq - 1);
     }
 
     private static boolean matches(ChatMessageDTO dto, String room, String world) {

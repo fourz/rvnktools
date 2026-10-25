@@ -137,7 +137,7 @@ commands:
     permission: rvnkcore.prefs
   rvnk:
     description: RVNK network tools - NPC bridge and harness (Citizens), console-safe WorldGuard regions
-    usage: /rvnk <npc|region> <verb> [args] - see /rvnk help npc, /rvnk help region
+    usage: /rvnk <npc|region|entitlement|kit> <verb> [args] - see /rvnk help npc, /rvnk help region, /rvnk help kit
 
 permissions:
   rvnktools.command:
@@ -399,4 +399,11 @@ permissions:
       rvnkcore.region.admin: true
   rvnkcore.entitlement.admin:
     description: Allows granting, revoking and listing entitled lists such as mc-dev (/rvnk entitlement, #2351)
+    default: op
+
+  # ── Kits (rvnkcore.kit.*) — /rvnk kit (#2415) ───────────────────────────
+  # rvnkcore.kit.<name> lets a player give that one kit to themselves; it is not declared here, so it
+  # defaults to op. Grant it in LuckPerms, e.g. lp group qa permission set rvnkcore.kit.qa-survival true
+  rvnkcore.kit.admin:
+    description: Allows saving, deleting, showing and giving any kit, to any player (/rvnk kit)
     default: op

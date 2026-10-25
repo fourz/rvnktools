@@ -343,15 +343,22 @@ public class CommandManager {
     private void registerTpAlias(RVNKCore plugin, TeleportCommand teleportCommand) {
         boolean shouldOverrideTp = plugin.getConfig().getBoolean("commands.override-vanilla-tp", false);
 
-        if (!shouldOverrideTp) {
-            logger.info("Vanilla /tp override is DISABLED - using vanilla Minecraft teleport");
-            return;
-        }
-
         // Get the /tp command from plugin.yml
         PluginCommand tpCommand = plugin.getCommand("tp");
         if (tpCommand == null) {
             logger.warning("Failed to register /tp alias - command not found in plugin.yml");
+            return;
+        }
+
+        if (!shouldOverrideTp) {
+            // plugin.yml declares tp, so it shadows vanilla even when the override is off. With no
+            // executor set, Bukkit printed the usage line for every /tp. Forward it all to vanilla.
+            tpCommand.setExecutor((sender, cmd, label, args) -> {
+                org.fourz.rvnktools.command.manager.commands.teleport.TpRouting.dispatchVanilla(sender, args);
+                return true;
+            });
+            tpCommand.setTabCompleter(null);
+            logger.info("Vanilla /tp override is DISABLED - /tp forwards to minecraft:tp");
             return;
         }
 

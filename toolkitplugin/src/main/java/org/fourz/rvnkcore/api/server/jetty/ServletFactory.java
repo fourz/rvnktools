@@ -226,7 +226,9 @@ public class ServletFactory {
     private void registerChatRelayController(ServletContextHandler context) {
         LogManager chatLogger = LogManager.getInstance(plugin, ChatRelayController.class);
         ChatRelayController controller = new ChatRelayController(gson, chatLogger);
-        context.addServlet(new ServletHolder(controller), "/v1/chat/*");
+        ServletHolder holder = new ServletHolder(controller);
+        holder.setAsyncSupported(true); // GET /v1/chat/stream answers from an async SSE response (#2425)
+        context.addServlet(holder, "/v1/chat/*");
         logger.debug("Chat relay API controller registered at /v1/chat/*");
     }
 
