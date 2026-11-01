@@ -2,7 +2,33 @@
 
 RVNKTools is a comprehensive Minecraft server plugin that provides a wide array of features to enhance server administration. It includes tools for managing announcements, permissions, events, and much more, tailored for ease of use and scalability.
 
-**Current Status**: RVNKTools is undergoing a major architectural refactor to extract core functionality into RVNKCore, a centralized data and service layer for the RVNK plugin ecosystem. See [ROADMAP.md](ROADMAP.md) for detailed implementation status and timelines.
+## Status
+
+| Server | Version (read 2026-11-01) |
+|--------|---------------------------|
+| RVNK Dev | 1.5.125-alpha |
+| RVNK Event | 1.5.125-alpha |
+| Ravenkraft (prod) | 1.5.125-alpha |
+
+Versions drift between servers. Read the live one with `version RVNKCore` on the server, or the built one in `toolkitplugin/pom.xml`.
+
+## Building
+
+- Compiler: JDK 25 (Temurin). Bytecode: Java 21 (`<release>21</release>`). API: `spigot-api` 26.1.2, `api-version: '26.1'`.
+- maven-compiler-plugin is pinned to 3.13.0 with `<fork>true</fork>`. Do not unpin it: newer versions crash `javac` on JDK 25 (#1929).
+- Bump the pom `<version>` on every deploy. Full rules: `.claude/rules/java-plugin-build.md` in the parent repo (`fourz/Ravenkaft-Dev`).
+
+```bash
+cd toolkitplugin
+mvn clean package -DskipTests
+# output: toolkitplugin/target/rvnkcore.jar
+```
+
+## Source and mirrors
+
+GitHub (`fourz/rvnktools`) is origin. Push there. A read-only mirror is on the internal forge in org `ravenkraft` (path to be added).
+
+**Plugin name**: this repo builds **RVNKCore** (`rvnkcore.jar`), the shared service and data layer for the RVNK plugins. The RVNKTools commands live in it.
 
 ## RVNKCore Data Layer Abstraction
 
@@ -138,13 +164,9 @@ Plugin Root/
 - **Configuration Management**: YAML-based configuration with validation and hot-reloading
 - **Error Handling**: Consistent exception hierarchy and logging patterns
 
-### Current Implementation Status
-
-RVNKCore Phase 1 is **99% complete** with comprehensive announcement service infrastructure. See [ROADMAP.md](ROADMAP.md) for detailed implementation status, timelines, and current progress.
-
 ## Installation
 
-1. Download the latest version of `rvnktools.jar` from the [Releases](https://github.com/fourz/rvnktools/releases) page
+1. Build `rvnkcore.jar` (see Building)
 2. Place the JAR file in your server's `plugins` directory
 3. Restart your server
 4. Configuration files will be generated in the `plugins/RVNKTools` directory
