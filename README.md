@@ -26,7 +26,7 @@ mvn clean package -DskipTests
 
 ## Source and mirrors
 
-GitHub (`fourz/rvnktools`) is origin. Push there. A read-only mirror is on the internal forge in org `ravenkraft` (path to be added).
+GitHub (`fourz/rvnktools`) is origin. Push there. A read-only pull mirror is planned on the internal forge as `ravenkraft/rvnktools`. Rules: [Source and mirrors](https://github.com/fourz/Ravenkaft-Dev/blob/icarus/dev/docs/architecture/source-and-mirrors.md) (`docs/architecture/source-and-mirrors.md` in the parent repo).
 
 **Plugin name**: this repo builds **RVNKCore** (`rvnkcore.jar`), the shared service and data layer for the RVNK plugins. The RVNKTools commands live in it.
 
