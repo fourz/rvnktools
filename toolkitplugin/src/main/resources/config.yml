@@ -364,3 +364,14 @@ teleport:
 # Format: <bukkit-world-name>: <Display Name>   (case-insensitive; blank = raw name)
 world-display-names:
   southmesa: Bankrekka
+
+# QA message tap (#2359). Records the chat, action bar, title and subtitle lines the server sends to
+# players who hold rvnkcore.qa.subject, so a QA session reads them at GET /api/v1/qa/inbox/{player}
+# instead of asking a tester to read them back. Runs only when ALL of these hold: enabled is true,
+# the server id (chat-relay.server-id / webhook.server-id) is dev, test or event, and BKCommonLib is
+# enabled. Never on prod. In memory only; a restart empties it.
+qa:
+  inbox:
+    enabled: false
+    # Lines kept per player (10-2000)
+    capacity: 200

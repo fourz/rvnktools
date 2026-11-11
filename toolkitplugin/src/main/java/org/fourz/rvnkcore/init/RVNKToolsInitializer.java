@@ -63,6 +63,7 @@ public class RVNKToolsInitializer {
     // Component references for shutdown
     private LuckPermsIntegrationListener luckPermsListener;
     private NpcBridge npcBridge;
+    private org.fourz.rvnkcore.service.qa.QaTapService qaTap;
     private org.fourz.rvnkcore.service.sightings.SightingService sightingService;
     private org.bukkit.scheduler.BukkitTask sightingPrune;
     private org.fourz.rvnkcore.service.kit.KitService kitService;
@@ -123,6 +124,10 @@ public class RVNKToolsInitializer {
         initializeRegionTool();
         logger.debug("  + Region tool initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        // QA message tap (#2359): off unless config, tier and BKCommonLib all allow it
+        initializeQaTap();
+        logger.debug("  + QA tap checked (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -153,6 +158,11 @@ public class RVNKToolsInitializer {
         if (npcBridge != null) {
             npcBridge.shutdown();
             npcBridge = null;
+        }
+
+        if (qaTap != null) {
+            qaTap.shutdown();
+            qaTap = null;
         }
 
         if (sightingPrune != null) {
@@ -388,6 +398,17 @@ public class RVNKToolsInitializer {
             npcBridge = NpcBridge.install(plugin, registry, logger);
         } catch (RuntimeException | LinkageError e) {
             logger.error("Failed to install the NPC bridge", e);
+        }
+    }
+
+    /**
+     * Registers the QA message tap (#2359). Never fatal: a failure leaves the rest of RVNKCore running.
+     */
+    private void initializeQaTap() {
+        try {
+            qaTap = org.fourz.rvnkcore.service.qa.QaTapService.install(plugin, registry, logger);
+        } catch (RuntimeException | LinkageError e) {
+            logger.error("Failed to install the QA message tap", e);
         }
     }
 

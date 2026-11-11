@@ -163,6 +163,11 @@ public class ServletFactory {
         sightings.setAsyncSupported(true);
         context.addServlet(sightings, "/v1/net-sightings");
 
+        // QA message tap reader (#2359); answers 503 QA_INBOX_OFF unless the tap runs
+        context.addServlet(new ServletHolder(new org.fourz.rvnkcore.api.controller.QaInboxController(
+                gson, LogManager.getInstance(plugin, org.fourz.rvnkcore.api.controller.QaInboxController.class))),
+                "/v1/qa/*");
+
         // WebUI access logging
         registerWebUIAccessController(context);
 

@@ -5,7 +5,7 @@ main: org.fourz.rvnkcore.RVNKCore
 description: Core unified library for Ravenkraft Minecraft plugins
 api-version: '26.1'
 website: http://www.fourz.org
-softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault, Citizens, WorldGuard]
+softdepend: [Multiverse-Core, PlaceholderAPI, LuckPerms, Vault, Citizens, WorldGuard, BKCommonLib]
 
 commands:
   rvnktools:
