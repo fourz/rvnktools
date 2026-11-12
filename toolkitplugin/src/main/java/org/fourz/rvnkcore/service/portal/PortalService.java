@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.service.portal;
 
+import org.bukkit.Axis;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -10,11 +11,13 @@ import org.fourz.rvnkcore.api.model.PortalDTO;
 import org.fourz.rvnkcore.database.repository.PortalRepository;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Runtime service for cross-server portals.
@@ -415,6 +418,12 @@ public class PortalService {
     public enum Verification {
         /** Trigger block and a correctly-stamped sign are both present. */
         VERIFIED,
+        /**
+         * Trigger block and stamped sign are present, but one or more interior blocks are no longer
+         * {@code NETHER_PORTAL} (#2434). The portal still transfers by coordinate, but players see an
+         * empty frame. {@code /portal repair} refills it.
+         */
+        UNLIT,
         /** The world or chunk is not loaded, so the portal could not be checked. */
         UNVERIFIED,
         /** The trigger block or the stamped sign is missing — the row no longer matches the world. */
@@ -521,11 +530,149 @@ public class PortalService {
             return Verification.ORPHANED;
         }
 
-        return PortalSignWriter
+        if (PortalSignWriter
                 .findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), portalId)
-                .isPresent()
-                ? Verification.VERIFIED
-                : Verification.ORPHANED;
+                .isEmpty()) {
+            return Verification.ORPHANED;
+        }
+
+        // #2434: the frame and sign can be intact while the portal blocks are gone. Check the interior
+        // too, reading only blocks whose chunk is already loaded.
+        InteriorState interior = classifyInterior(portal.getPortalBlocks(), b -> world.isChunkLoaded(b[0] >> 4, b[2] >> 4)
+                ? world.getBlockAt(b[0], b[1], b[2]).getType() : null);
+        return interior.isLit() ? Verification.VERIFIED : Verification.UNLIT;
+    }
+
+    /**
+     * What the registered interior of a portal holds in the world (#2434).
+     *
+     * @param lit      blocks that are {@code NETHER_PORTAL}
+     * @param empty    blocks that are air and can be refilled
+     * @param blocked  blocks holding something else (a player's block); a repair leaves them alone
+     * @param unloaded blocks in a chunk that is not loaded; not read
+     */
+    public record InteriorState(int lit, List<int[]> empty, int blocked, int unloaded) {
+        /** True when no loaded interior block is missing its portal material. */
+        public boolean isLit() {
+            return empty.isEmpty() && blocked == 0;
+        }
+    }
+
+    /**
+     * Sorts registered interior blocks by what the world holds there. Pure, so it is unit-tested.
+     *
+     * @param interior the registered interior blocks; null or empty gives an all-zero state
+     * @param typeAt   the material at a block, or null when its chunk is not loaded
+     */
+    public static InteriorState classifyInterior(List<int[]> interior, Function<int[], Material> typeAt) {
+        int lit = 0;
+        int blocked = 0;
+        int unloaded = 0;
+        List<int[]> empty = new ArrayList<>();
+        if (interior != null) {
+            for (int[] b : interior) {
+                Material type = typeAt.apply(b);
+                if (type == null) {
+                    unloaded++;
+                } else if (type == Material.NETHER_PORTAL) {
+                    lit++;
+                } else if (type == Material.AIR || type == Material.CAVE_AIR || type == Material.VOID_AIR) {
+                    empty.add(b);
+                } else {
+                    blocked++;
+                }
+            }
+        }
+        return new InteriorState(lit, empty, blocked, unloaded);
+    }
+
+    /**
+     * The portal-block axis for a registered interior (#2434): every block on one X gives
+     * {@link Axis#Z} (a Z-Y frame), every block on one Z gives {@link Axis#X} (an X-Y frame).
+     *
+     * @return the axis, or null when the blocks do not lie in one vertical plane, or lie in both
+     *         (a single column), so the caller must detect it from the frame
+     */
+    public static Axis axisOf(List<int[]> interior) {
+        if (interior == null || interior.isEmpty()) return null;
+        boolean sameX = true;
+        boolean sameZ = true;
+        int x = interior.get(0)[0];
+        int z = interior.get(0)[2];
+        for (int[] b : interior) {
+            if (b[0] != x) sameX = false;
+            if (b[2] != z) sameZ = false;
+        }
+        if (sameX == sameZ) return null;
+        return sameX ? Axis.Z : Axis.X;
+    }
+
+    /**
+     * Repairs a portal (#2434): refills its empty interior blocks with {@code NETHER_PORTAL}, then
+     * rewrites and re-stamps its sign as {@link #repairSign} does.
+     *
+     * <p>Only air is refilled. A block a player put inside the frame is left as it is and reported:
+     * removing it is a build decision. The interior is refilled only while the anchor still holds the
+     * trigger material, because a frame that is gone is not something a repair can rebuild.</p>
+     *
+     * <p>Must be called on the main thread.</p>
+     *
+     * @param portalId        the portal id
+     * @param transferService the transfer service used to render the destination line; may be null
+     * @return a result describing both steps
+     */
+    public PortalResult repair(String portalId, org.fourz.rvnkcore.service.transfer.TransferService transferService) {
+        PortalDTO portal = byId.get(portalId);
+        if (portal == null) {
+            return new PortalResult(Status.NOT_FOUND, "No portal registered with id " + portalId, null);
+        }
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null) {
+            return new PortalResult(Status.UNAVAILABLE, "World '" + portal.getWorld() + "' is not loaded", portal);
+        }
+        if (!world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
+            return new PortalResult(Status.UNAVAILABLE,
+                    "Chunk at " + portal.getX() + "," + portal.getZ() + " is not loaded", portal);
+        }
+
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        Material trigger = config.getTriggerMaterial();
+        StringBuilder message = new StringBuilder();
+        boolean anyFixed = false;
+
+        if (trigger != null && anchor.getType() != trigger) {
+            message.append("Interior not refilled: the anchor is ").append(anchor.getType())
+                    .append(", not ").append(trigger).append(" - rebuild the frame first. ");
+        } else {
+            InteriorState state = classifyInterior(portal.getPortalBlocks(), b -> world.isChunkLoaded(b[0] >> 4, b[2] >> 4)
+                    ? world.getBlockAt(b[0], b[1], b[2]).getType() : null);
+            if (state.empty().isEmpty()) {
+                message.append("Interior intact (").append(state.lit()).append(" portal block(s)). ");
+            } else {
+                Axis axis = axisOf(portal.getPortalBlocks());
+                if (axis == null && trigger != null) {
+                    axis = frameBuilder.detect(anchor, trigger).map(PortalFrameBuilder.Frame::axis).orElse(Axis.X);
+                }
+                frameBuilder.fill(world, state.empty(), axis == null ? Axis.X : axis);
+                anyFixed = true;
+                message.append("Refilled ").append(state.empty().size()).append(" of ")
+                        .append(portal.getPortalBlocks().size()).append(" portal block(s). ");
+                logger.info("Portal interior refilled (id " + portalId + "): " + state.empty().size()
+                        + " block(s), axis " + axis + ", at " + portal.getWorld() + " " + portal.getX() + ","
+                        + portal.getY() + "," + portal.getZ());
+            }
+            if (state.blocked() > 0) {
+                message.append(state.blocked()).append(" interior block(s) hold something else and were left alone. ");
+            }
+            if (state.unloaded() > 0) {
+                message.append(state.unloaded()).append(" interior block(s) are in unloaded chunks. ");
+            }
+        }
+
+        PortalResult sign = repairSign(portalId, transferService);
+        message.append(sign.message());
+        boolean ok = anyFixed || sign.isSuccess();
+        return new PortalResult(ok ? Status.SUCCESS : sign.status(), message.toString().trim(), portal);
     }
 
     /**

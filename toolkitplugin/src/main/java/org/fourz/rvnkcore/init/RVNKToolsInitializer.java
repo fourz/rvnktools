@@ -321,6 +321,11 @@ public class RVNKToolsInitializer {
                     // orphaned into a row with no world state behind it.
                     plugin.getServer().getPluginManager().registerEvents(
                             new org.fourz.rvnkcore.event.PortalProtectionListener(plugin), plugin);
+                    // #2434: keep portal interiors from vanilla's obsidian-frame check (Paper event, by name)
+                    if (!org.fourz.rvnkcore.event.PortalProtectionListener.registerShapeGuard(plugin, portalService)) {
+                        logger.warning("Portal interior guard not registered: Paper BlockDestroyEvent not found - "
+                                + "a neighbour update can empty a server portal; /portal repair refills it");
+                    }
                     logger.info("Cross-server portal listeners registered (enabled="
                             + portalService.getConfig().isEnabled() + ")");
                 } else {

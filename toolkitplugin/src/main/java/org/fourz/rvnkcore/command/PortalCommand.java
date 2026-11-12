@@ -201,6 +201,9 @@ public class PortalCommand extends BaseCommand {
         sender.sendMessage(ChatColor.GRAY + "  state      " + colourFor(state) + state.name().toLowerCase(Locale.ROOT));
         if (state == PortalService.Verification.UNVERIFIED) {
             sender.sendMessage(ChatColor.GRAY + "             world or chunk not loaded - not checked, not broken");
+        } else if (state == PortalService.Verification.UNLIT) {
+            sender.sendMessage(ChatColor.GRAY + "             frame and sign intact, portal blocks missing; "
+                    + "refill with /portal repair");
         } else if (state == PortalService.Verification.ORPHANED) {
             sender.sendMessage(ChatColor.GRAY + "             trigger block or stamped sign missing; "
                     + "repair with /portal repair, or remove with /portal delete");
@@ -287,8 +290,9 @@ public class PortalCommand extends BaseCommand {
             return true;
         }
 
+        // #2434: refills empty interior portal blocks, then rewrites the sign.
         PortalService.PortalResult result =
-                service.repairSign(found.get().getPortalId(), plugin.getService(TransferService.class));
+                service.repair(found.get().getPortalId(), plugin.getService(TransferService.class));
         sender.sendMessage((result.isSuccess() ? ChatColor.GREEN : ChatColor.RED) + result.message());
         return true;
     }
@@ -462,6 +466,7 @@ public class PortalCommand extends BaseCommand {
     private ChatColor colourFor(PortalService.Verification state) {
         return switch (state) {
             case VERIFIED -> ChatColor.GREEN;
+            case UNLIT -> ChatColor.GOLD;
             case UNVERIFIED -> ChatColor.YELLOW;
             case ORPHANED -> ChatColor.RED;
             case UNKNOWN -> ChatColor.DARK_GRAY;
