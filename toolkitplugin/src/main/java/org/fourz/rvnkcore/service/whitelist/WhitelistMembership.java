@@ -75,6 +75,27 @@ public class WhitelistMembership {
     }
 
     /**
+     * The name lookup was rate-limited upstream (Mojang HTTP 429, #2448). A client should retry after
+     * {@link #retryAfterSeconds()}, so the REST layer answers 503 with {@code Retry-After}, not 502.
+     */
+    public static class LookupRateLimitedException extends LookupFailedException {
+        /** Used when the upstream gave no usable {@code Retry-After}. */
+        public static final long DEFAULT_RETRY_AFTER_SECONDS = 60;
+
+        private final long retryAfterSeconds;
+
+        public LookupRateLimitedException(String message, long retryAfterSeconds, Throwable cause) {
+            super(message, cause);
+            this.retryAfterSeconds = retryAfterSeconds > 0 ? retryAfterSeconds : DEFAULT_RETRY_AFTER_SECONDS;
+        }
+
+        /** Seconds to wait before a retry; always positive. */
+        public long retryAfterSeconds() {
+            return retryAfterSeconds;
+        }
+    }
+
+    /**
      * Result of an add.
      *
      * @param group       the requested group, or null when none was requested

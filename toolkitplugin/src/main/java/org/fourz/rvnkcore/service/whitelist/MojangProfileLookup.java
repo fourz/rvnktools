@@ -58,19 +58,70 @@ public class MojangProfileLookup implements WhitelistMembership.ProfileLookup {
             .GET()
             .build();
         return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-            .thenApply(resp -> parse(resp.statusCode(), resp.body()))
+            .thenApply(resp -> parse(resp.statusCode(), resp.body(),
+                resp.headers().firstValue("Retry-After").orElse(null)))
             .exceptionallyCompose(ex -> CompletableFuture.failedFuture(
-                new WhitelistMembership.LookupFailedException("Mojang profile lookup failed for " + ign,
-                    ex.getCause() != null ? ex.getCause() : ex)));
+                toLookupFailure(ign, ex.getCause() != null ? ex.getCause() : ex)));
+    }
+
+    /**
+     * Wraps a failed Mojang call for the REST layer (#2448): an HTTP 429 becomes a
+     * {@link WhitelistMembership.LookupRateLimitedException} carrying the retry delay, anything else a
+     * plain {@link WhitelistMembership.LookupFailedException}.
+     */
+    static WhitelistMembership.LookupFailedException toLookupFailure(String ign, Throwable cause) {
+        if (cause instanceof MojangHttpStatusException status && status.status() == 429) {
+            return new WhitelistMembership.LookupRateLimitedException(
+                "Mojang profile lookup rate-limited for " + ign, status.retryAfterSeconds(), cause);
+        }
+        return new WhitelistMembership.LookupFailedException("Mojang profile lookup failed for " + ign, cause);
+    }
+
+    /** A non-200, non-404 answer from the Mojang profile API, with the status kept typed (#2448). */
+    static final class MojangHttpStatusException extends IllegalStateException {
+        private final int status;
+        private final long retryAfterSeconds;
+
+        MojangHttpStatusException(int status, long retryAfterSeconds) {
+            super("Mojang profile lookup returned HTTP " + status);
+            this.status = status;
+            this.retryAfterSeconds = retryAfterSeconds;
+        }
+
+        int status() {
+            return status;
+        }
+
+        /** The upstream {@code Retry-After} in seconds, or -1 when absent or not a number of seconds. */
+        long retryAfterSeconds() {
+            return retryAfterSeconds;
+        }
+    }
+
+    /** Reads a {@code Retry-After} header given in seconds; an HTTP date or junk gives -1. */
+    static long retryAfterSeconds(String header) {
+        if (header == null) return -1;
+        try {
+            long s = Long.parseLong(header.trim());
+            return s > 0 ? s : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    static Optional<WhitelistMembership.Profile> parse(int status, String body) {
+        return parse(status, body, null);
     }
 
     /**
      * Reads a Mojang profile response. 404 and 204 mean "no such account"; any other non-200 fails,
      * so a Mojang outage never reads as "player does not exist".
+     *
+     * @param retryAfter the response's {@code Retry-After} header, or null
      */
-    static Optional<WhitelistMembership.Profile> parse(int status, String body) {
+    static Optional<WhitelistMembership.Profile> parse(int status, String body, String retryAfter) {
         if (status == 404 || status == 204) return Optional.empty();
-        if (status != 200) throw new IllegalStateException("Mojang profile lookup returned HTTP " + status);
+        if (status != 200) throw new MojangHttpStatusException(status, retryAfterSeconds(retryAfter));
         JsonObject o = JsonParser.parseString(body).getAsJsonObject();
         if (!o.has("id")) return Optional.empty();
         return Optional.of(new WhitelistMembership.Profile(undashed(o.get("id").getAsString()),
