@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.api.chat;
 import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.service.chatrelay.MatrixBridgeOutcome;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -118,10 +119,17 @@ public class ChatRelayEgress {
      * Asynchronously POSTs the message to every configured peer.
      * Each send is fire-and-forget; failures are logged at WARN and never propagate.
      *
+     * <p>The returned future tells the Matrix bridge's answer (#2443): its HTTP status,
+     * {@link MatrixBridgeOutcome#FAILED} when the send failed before a status, or
+     * {@link MatrixBridgeOutcome#NOT_SENT} (already complete) when no Matrix peer got the line.
+     * Callers that do not care ignore it; it never completes exceptionally.</p>
+     *
      * @param dto The chat message to relay
+     * @return the Matrix bridge's status
      */
-    public void send(ChatMessageDTO dto) {
-        if (dto == null) return;
+    public CompletableFuture<Integer> send(ChatMessageDTO dto) {
+        CompletableFuture<Integer> matrix = null;
+        if (dto == null) return CompletableFuture.completedFuture(MatrixBridgeOutcome.NOT_SENT);
         String payload = GSON.toJson(dto);
         for (ChatRelayConfig.Peer peer : config.getPeers()) {
             if (peer.url() == null || peer.url().isEmpty()) {
@@ -131,12 +139,17 @@ public class ChatRelayEgress {
                 continue;
             }
             // Insecure path only applies to https peers; anything else uses the plain HttpClient.
+            CompletableFuture<Integer> sent;
             if (insecureSocketFactory != null && peer.url().startsWith("https://")) {
-                sendInsecure(peer, payload, dto);
+                sent = sendInsecure(peer, payload, dto);
             } else {
-                sendToPeer(peer, payload, dto);
+                sent = sendToPeer(peer, payload, dto);
+            }
+            if (config.isMatrixOrigin(peer.id())) {
+                matrix = sent;
             }
         }
+        return matrix != null ? matrix : CompletableFuture.completedFuture(MatrixBridgeOutcome.NOT_SENT);
     }
 
     /** Sets who is told when the Matrix bridge refuses a line with 429 (the chat relay service). */
@@ -181,7 +194,7 @@ public class ChatRelayEgress {
     }
 
     /** Secure/default egress via the shared async {@link HttpClient}. */
-    private void sendToPeer(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
+    private CompletableFuture<Integer> sendToPeer(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -192,21 +205,23 @@ public class ChatRelayEgress {
                 .timeout(Duration.ofMillis(config.getTimeoutMs()))
                 .build();
 
-            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(response -> {
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
                     int status = response.statusCode();
                     if (status >= 200 && status < 300) {
                         logger.debug(logTag + " -> " + status);
                     } else {
                         onFailureStatus(peer, dto, status, logTag);
                     }
+                    return status;
                 })
                 .exceptionally(e -> {
                     logger.warning(logTag + " failed: " + e.getMessage());
-                    return null;
+                    return MatrixBridgeOutcome.FAILED;
                 });
         } catch (Exception e) {
             logger.warning(logTag + " failed to dispatch: " + e.getMessage());
+            return CompletableFuture.completedFuture(MatrixBridgeOutcome.FAILED);
         }
     }
 
@@ -215,9 +230,9 @@ public class ChatRelayEgress {
      * verifier, so self-signed peers addressed by IP are reachable. Runs on the common pool
      * (fire-and-forget) so the async chat thread is never blocked on the network call.
      */
-    private void sendInsecure(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
+    private CompletableFuture<Integer> sendInsecure(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
-        CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             HttpsURLConnection conn = null;
             try {
                 URL url = URI.create(peer.url()).toURL();
@@ -240,8 +255,10 @@ public class ChatRelayEgress {
                 } else {
                     onFailureStatus(peer, dto, status, logTag);
                 }
+                return status;
             } catch (Exception e) {
                 logger.warning(logTag + " failed: " + e.getMessage());
+                return MatrixBridgeOutcome.FAILED;
             } finally {
                 if (conn != null) {
                     conn.disconnect();

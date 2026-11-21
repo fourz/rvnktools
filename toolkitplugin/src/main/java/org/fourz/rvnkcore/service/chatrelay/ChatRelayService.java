@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -339,17 +340,14 @@ public class ChatRelayService {
      * @param message    the text (required)
      * @param senderName the persona (defaults to {@code Bot})
      * @param mchannel   the channel (defaults to {@code general}); must be listed and not read-only
-     * @return null when accepted, otherwise the refusal reason
+     * @return the refusal reason, or the accepted post with the Matrix bridge's answer (#2443)
      */
-    /** Refusal from {@link #postMatrix} when the relay is off (the controller answers 503). */
-    public static final String RELAY_DISABLED = "chat relay is disabled";
-
-    public String postMatrix(String message, String senderName, String mchannel) {
-        if (!config.isEnabled()) return RELAY_DISABLED;
+    public MatrixPost postMatrix(String message, String senderName, String mchannel) {
+        if (!config.isEnabled()) return MatrixPost.refused(RELAY_DISABLED);
         String channel = MatrixChannel.resolveName(mchannel);
         String refusal = MatrixBotPost.refusal(message, channel,
             channel == null ? java.util.Optional.empty() : matrixChannels.get(channel));
-        if (refusal != null) return refusal;
+        if (refusal != null) return MatrixPost.refused(refusal);
 
         String msgId = UUID.randomUUID().toString();
         markSeen(msgId);
@@ -363,9 +361,30 @@ public class ChatRelayService {
         if (consumer != null) {
             Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
         }
-        egress.send(dto);
+        CompletableFuture<Integer> bridge = egress.send(dto);
         logger.debug("Chat matrix post (bot): #" + channel + " by " + dto.getSenderName() + " (" + msgId + ")");
-        return null;
+        return new MatrixPost(null, bridge);
+    }
+
+    /** Refusal from {@link #postMatrix} when the relay is off (the controller answers 503). */
+    public static final String RELAY_DISABLED = "chat relay is disabled";
+
+    /**
+     * Result of {@link #postMatrix}: a refusal (nothing was sent), or an accepted line with the
+     * Matrix bridge's HTTP status to come ({@link ChatRelayEgress#send}).
+     *
+     * @param refusal null when accepted
+     * @param bridge  the bridge's status; null when refused; never completes exceptionally
+     */
+    public record MatrixPost(String refusal, CompletableFuture<Integer> bridge) {
+        static MatrixPost refused(String reason) {
+            return new MatrixPost(reason, null);
+        }
+    }
+
+    /** @return {@code chat-relay.timeout-ms}, for the REST wait on the bridge (#2443) */
+    public int relayTimeoutMs() {
+        return config.getTimeoutMs();
     }
 
     /**

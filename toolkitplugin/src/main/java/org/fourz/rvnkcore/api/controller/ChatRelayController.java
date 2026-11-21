@@ -16,6 +16,7 @@ import org.fourz.rvnkcore.api.chat.ChatStreamHub;
 import org.fourz.rvnkcore.api.chat.ThrottledWarning;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
 import org.fourz.rvnkcore.api.model.MatrixChannel;
+import org.fourz.rvnkcore.service.chatrelay.MatrixBridgeOutcome;
 import org.fourz.rvnkcore.service.chatrelay.MatrixChannelRegistry;
 import org.fourz.rvnkcore.service.chatrelay.ChatInboundToken;
 import org.fourz.rvnkcore.service.chatrelay.MatrixInbound;
@@ -31,6 +32,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * REST API controller for inbound cross-server chat relay messages.
@@ -552,6 +556,11 @@ public class ChatRelayController extends HttpServlet {
      * defaults to {@code general} and must be listed and not read-only (400 otherwise). Plain text
      * only. Opened by the X-API-Key; the scoped Matrix token never reaches here (AuthFilter), and is
      * refused again if it does.
+     *
+     * <p>#2443: an accepted line answers only after the Matrix bridge does, or after
+     * {@link MatrixBridgeOutcome#waitMs} - 200 delivered, 202 not confirmed in time, 429 refused for
+     * the bridge's rate cap, 502 refused or unreachable. The wait completes from the future on an
+     * async response; it never blocks the request thread (#1552).</p>
      */
     private void handleMatrix(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         if (Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE))) {
@@ -577,14 +586,60 @@ public class ChatRelayController extends HttpServlet {
             return;
         }
 
-        String refusal = service.postMatrix(optString(obj, "message"), optString(obj, "senderName"),
-                optString(obj, "mchannel"));
-        if (refusal == null) {
-            ApiUtils.sendSuccess(resp, gson, "Matrix post accepted");
-        } else if (refusal.equals(ChatRelayService.RELAY_DISABLED)) {
-            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", refusal);
+        ChatRelayService.MatrixPost post = service.postMatrix(optString(obj, "message"),
+                optString(obj, "senderName"), optString(obj, "mchannel"));
+        String refusal = post.refusal();
+        if (refusal != null) {
+            if (refusal.equals(ChatRelayService.RELAY_DISABLED)) {
+                ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", refusal);
+            } else {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+            }
+            return;
+        }
+
+        long waitMs = MatrixBridgeOutcome.waitMs(service.relayTimeoutMs());
+        CompletableFuture<Integer> bridge = post.bridge().completeOnTimeout(null, waitMs, TimeUnit.MILLISECONDS);
+        if (bridge.isDone()) {
+            writeMatrixOutcome(resp, bridge.getNow(null), waitMs);
+            return;
+        }
+        AsyncContext ctx = req.startAsync();
+        ctx.setTimeout(waitMs + 2_000L);
+        AtomicBoolean written = new AtomicBoolean();
+        ctx.addListener(new AsyncListener() {
+            @Override public void onTimeout(AsyncEvent event) {
+                if (!written.compareAndSet(false, true)) return;
+                try {
+                    writeMatrixOutcome((HttpServletResponse) ctx.getResponse(), null, waitMs);
+                } finally {
+                    ctx.complete();
+                }
+            }
+            @Override public void onComplete(AsyncEvent event) { }
+            @Override public void onError(AsyncEvent event) { written.set(true); }
+            @Override public void onStartAsync(AsyncEvent event) { }
+        });
+        bridge.whenComplete((status, ex) -> {
+            if (!written.compareAndSet(false, true)) return;
+            try {
+                writeMatrixOutcome((HttpServletResponse) ctx.getResponse(), ex == null ? status : null, waitMs);
+            } finally {
+                ctx.complete();
+            }
+        });
+    }
+
+    /** Answers a bot post from the Matrix bridge's status (null = no answer in time). */
+    private void writeMatrixOutcome(HttpServletResponse out, Integer status, long waitMs) {
+        MatrixBridgeOutcome outcome = MatrixBridgeOutcome.of(status);
+        String message = outcome.message(status, waitMs);
+        if (outcome.success()) {
+            ApiUtils.sendJson(out, gson, outcome.httpStatus(),
+                    org.fourz.rvnkcore.api.model.response.ApiResponse.success(message));
         } else {
-            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+            logger.info("Chat matrix post (bot): " + message);
+            ApiUtils.sendError(out, gson, outcome.httpStatus(), outcome.errorCode(), message);
         }
     }
 
