@@ -42,6 +42,14 @@ public class ChatMessageDTO {
      * {@code general}. Ignored for every other room.
      */
     private String mchannel;
+    /**
+     * The sender's name color as lowercase {@code #rrggbb} (#2468). Null means the default color. Older peers
+     * ignore the field, so a mixed-version relay keeps working.
+     */
+    private String nameColor;
+    /** The sender's LuckPerms chat prefix and suffix as raw {@code &} codes (#2468). Null when none. */
+    private String namePrefix;
+    private String nameSuffix;
 
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
@@ -99,4 +107,11 @@ public class ChatMessageDTO {
 
     public String getMchannel() { return mchannel; }
     public void setMchannel(String mchannel) { this.mchannel = mchannel; }
+
+    public String getNameColor() { return nameColor; }
+    public void setNameColor(String nameColor) { this.nameColor = nameColor; }
+    public String getNamePrefix() { return namePrefix; }
+    public void setNamePrefix(String namePrefix) { this.namePrefix = namePrefix; }
+    public String getNameSuffix() { return nameSuffix; }
+    public void setNameSuffix(String nameSuffix) { this.nameSuffix = nameSuffix; }
 }

@@ -325,6 +325,13 @@ public class CoreServiceFactory {
 
             registry.registerService(PlayerPreferencesService.class, prefsService);
             logger.info("PlayerPreferencesService registered");
+
+            // Name colors ride on the preferences (#2468).
+            registry.registerService(org.fourz.rvnkcore.api.service.NameColorService.class,
+                    new org.fourz.rvnkcore.service.namecolor.DefaultNameColorService(prefsService,
+                            LogManager.getInstance(plugin,
+                                    org.fourz.rvnkcore.service.namecolor.DefaultNameColorService.class)));
+            logger.info("NameColorService registered");
         } catch (Exception e) {
             logger.error("Failed to register PlayerPreferencesService", e);
             throw new RuntimeException("PlayerPreferencesService registration failed", e);
