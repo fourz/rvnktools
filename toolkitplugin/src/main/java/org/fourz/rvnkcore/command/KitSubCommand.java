@@ -206,11 +206,14 @@ public class KitSubCommand extends BaseSubCommand {
                 sendErrorMessage(sender, "Kit " + kit.name() + " not given: " + e.getMessage());
                 return;
             }
-            String extra = dropped > 0 ? " (" + dropped + " stack(s) did not fit and dropped at their feet)" : "";
+            // The sender reads "their feet", the receiver "your feet" (#2477).
+            String overflow = dropped > 0 ? " (" + dropped + " stack(s) did not fit and dropped at " : null;
             if (!now.equals(sender)) {
-                sendSuccessMessage(sender, "Gave kit " + kit.name() + " to " + now.getName() + extra);
+                sendSuccessMessage(sender, "Gave kit " + kit.name() + " to " + now.getName()
+                        + (overflow != null ? overflow + "their feet)" : ""));
             }
-            now.sendMessage("§aYou received kit §f" + kit.name() + "§a" + extra);
+            now.sendMessage("§aYou received kit §f" + kit.name() + "§a"
+                    + (overflow != null ? overflow + "your feet)" : ""));
             logger.info("Kit " + kit.name() + " v" + kit.version() + " given to " + now.getName()
                     + " by " + sender.getName() + (kit.clearFirst() ? " (clear-first)" : ""));
         });
