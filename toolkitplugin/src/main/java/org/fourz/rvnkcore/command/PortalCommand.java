@@ -133,7 +133,7 @@ public class PortalCommand extends BaseCommand {
                         + shortId(portal.getPortalId()) + ChatColor.GRAY + "  "
                         + portal.getWorld() + " " + portal.getX() + "," + portal.getY() + "," + portal.getZ()
                         + ChatColor.WHITE + "  -> " + portal.getTargetServer()
-                        + "  " + colourFor(state) + state.name().toLowerCase(Locale.ROOT));
+                        + "  " + colourFor(state) + label(state));
             }
         }
 
@@ -188,7 +188,8 @@ public class PortalCommand extends BaseCommand {
         }
 
         PortalDTO portal = found.get();
-        PortalService.Verification state = service.verify(portal.getPortalId());
+        PortalService.Inspection inspection = service.inspect(portal.getPortalId());
+        PortalService.Verification state = inspection.state();
         sender.sendMessage(ChatColor.GOLD + "Portal " + ChatColor.WHITE + portal.getPortalId());
         sender.sendMessage(ChatColor.GRAY + "  type       " + ChatColor.WHITE + "SERVER (cross-server)");
         sender.sendMessage(ChatColor.GRAY + "  location   " + ChatColor.WHITE + portal.getWorld()
@@ -198,9 +199,21 @@ public class PortalCommand extends BaseCommand {
                 + (portal.getPortalBlocks() == null ? 0 : portal.getPortalBlocks().size()));
         sender.sendMessage(ChatColor.GRAY + "  owner      " + ChatColor.WHITE
                 + (portal.getOwnerUuid() != null ? portal.getOwnerUuid() : "unknown"));
-        sender.sendMessage(ChatColor.GRAY + "  state      " + colourFor(state) + state.name().toLowerCase(Locale.ROOT));
+        sender.sendMessage(ChatColor.GRAY + "  state      " + colourFor(state) + label(state));
         if (state == PortalService.Verification.UNVERIFIED) {
             sender.sendMessage(ChatColor.GRAY + "             world or chunk not loaded - not checked, not broken");
+        } else if (state == PortalService.Verification.FRAME_BROKEN) {
+            // #2447: name the gaps; repair does not place frame blocks.
+            PortalService.FrameState frame = inspection.frame();
+            sender.sendMessage(ChatColor.GRAY + "             frame has " + frame.gaps().size() + " gap(s) at "
+                    + frame.describeGaps(PortalService.MAX_GAPS_SHOWN) + "; rebuild the frame");
+            if (inspection.interior() != null && !inspection.interior().isLit()) {
+                sender.sendMessage(ChatColor.GRAY + "             portal blocks also missing; "
+                        + "refill with /portal repair");
+            }
+        } else if (state == PortalService.Verification.UNLIT) {
+            sender.sendMessage(ChatColor.GRAY + "             frame and sign intact, portal blocks missing; "
+                    + "refill with /portal repair");
         } else if (state == PortalService.Verification.ORPHANED) {
             sender.sendMessage(ChatColor.GRAY + "             trigger block or stamped sign missing; "
                     + "repair with /portal repair, or remove with /portal delete");
@@ -287,8 +300,9 @@ public class PortalCommand extends BaseCommand {
             return true;
         }
 
+        // #2434: refills empty interior portal blocks, then rewrites the sign.
         PortalService.PortalResult result =
-                service.repairSign(found.get().getPortalId(), plugin.getService(TransferService.class));
+                service.repair(found.get().getPortalId(), plugin.getService(TransferService.class));
         sender.sendMessage((result.isSuccess() ? ChatColor.GREEN : ChatColor.RED) + result.message());
         return true;
     }
@@ -462,10 +476,17 @@ public class PortalCommand extends BaseCommand {
     private ChatColor colourFor(PortalService.Verification state) {
         return switch (state) {
             case VERIFIED -> ChatColor.GREEN;
+            case UNLIT -> ChatColor.GOLD;
+            case FRAME_BROKEN -> ChatColor.GOLD;
             case UNVERIFIED -> ChatColor.YELLOW;
             case ORPHANED -> ChatColor.RED;
             case UNKNOWN -> ChatColor.DARK_GRAY;
         };
+    }
+
+    /** The state as staff read it: lower case, words joined by '-' (FRAME_BROKEN gives frame-broken). */
+    static String label(PortalService.Verification state) {
+        return state.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     private String shortId(String portalId) {

@@ -157,6 +157,17 @@ public class ServletFactory {
         // Whitelist management
         registerWhitelistController(context);
 
+        // Player sightings for z-office (#2351); read-token only, see AuthFilter
+        ServletHolder sightings = new ServletHolder(new org.fourz.rvnkcore.api.controller.NetSightingsController(
+                gson, LogManager.getInstance(plugin, org.fourz.rvnkcore.api.controller.NetSightingsController.class)));
+        sightings.setAsyncSupported(true);
+        context.addServlet(sightings, "/v1/net-sightings");
+
+        // QA message tap reader (#2359); answers 503 QA_INBOX_OFF unless the tap runs
+        context.addServlet(new ServletHolder(new org.fourz.rvnkcore.api.controller.QaInboxController(
+                gson, LogManager.getInstance(plugin, org.fourz.rvnkcore.api.controller.QaInboxController.class))),
+                "/v1/qa/*");
+
         // WebUI access logging
         registerWebUIAccessController(context);
 
@@ -220,7 +231,9 @@ public class ServletFactory {
     private void registerChatRelayController(ServletContextHandler context) {
         LogManager chatLogger = LogManager.getInstance(plugin, ChatRelayController.class);
         ChatRelayController controller = new ChatRelayController(gson, chatLogger);
-        context.addServlet(new ServletHolder(controller), "/v1/chat/*");
+        ServletHolder holder = new ServletHolder(controller);
+        holder.setAsyncSupported(true); // GET /v1/chat/stream answers from an async SSE response (#2425)
+        context.addServlet(holder, "/v1/chat/*");
         logger.debug("Chat relay API controller registered at /v1/chat/*");
     }
 

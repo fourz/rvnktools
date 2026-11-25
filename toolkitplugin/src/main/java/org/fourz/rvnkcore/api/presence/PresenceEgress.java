@@ -220,10 +220,18 @@ public class PresenceEgress {
         }
     }
 
+    /** A tier peer receives everything; a peer with a {@code rooms} list is room-scoped (#2377). */
+    static boolean isTierPeer(ChatRelayConfig.Peer peer) {
+        return peer.rooms().isEmpty();
+    }
+
     public void send(PresenceDTO dto) {
         if (dto == null) return;
         String payload = GSON.toJson(dto);
         for (ChatRelayConfig.Peer peer : config.getPeers()) {
+            // #2377: a room-scoped peer (the Matrix bridge) is not a tier. It gets chat in its rooms
+            // only, never presence: who is online must not leave the network.
+            if (!isTierPeer(peer)) continue;
             String url = presenceUrl(peer.url());
             if (url == null) continue;
             // Backoff is per peer, so one dead peer never delays or silences the others (#1784).

@@ -1,20 +1,25 @@
 package org.fourz.rvnkcore.event;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.config.PortalConfig;
 import org.fourz.rvnkcore.service.portal.PortalService;
@@ -206,6 +211,54 @@ public class PortalProtectionListener implements Listener {
      * @param blocks the mutable block list from the explode event
      * @param vector short description used in the debug log
      */
+    // ---------------------------------------------------------------------------------------------
+    // Shape-update vector: vanilla destroys portal blocks outside an obsidian frame (#2434)
+    // ---------------------------------------------------------------------------------------------
+
+    /** Paper's cancellable "the game is destroying this block" event; absent on plain Spigot. */
+    static final String PAPER_BLOCK_DESTROY_EVENT = "com.destroystokyo.paper.event.block.BlockDestroyEvent";
+
+    /**
+     * Keeps a registered portal's {@code NETHER_PORTAL} blocks from being destroyed by vanilla's frame
+     * check (#2434).
+     *
+     * <p>Vanilla re-checks a nether portal block's frame on every in-plane neighbour update and turns
+     * the block to air when the frame is not obsidian. A server portal's frame is the trigger material
+     * (diamond by default), so one changed block next to the interior empties the whole portal: proven
+     * on Dev 2026-11-11, where removing one interior block took all nine. That removal is a shape
+     * update, which raises no {@code BlockPhysicsEvent}; Paper raises its {@code BlockDestroyEvent}
+     * instead. RVNKCore compiles against spigot-api, so the event is registered by name and handled
+     * through the Bukkit {@link BlockEvent} and {@link Cancellable} types it implements.</p>
+     *
+     * @param plugin        the owning plugin
+     * @param portalService the portal service whose index decides what is protected
+     * @return true when the guard is registered; false on a server without the Paper event
+     */
+    @SuppressWarnings("unchecked")
+    public static boolean registerShapeGuard(Plugin plugin, PortalService portalService) {
+        Class<?> type;
+        try {
+            type = Class.forName(PAPER_BLOCK_DESTROY_EVENT, true, plugin.getClass().getClassLoader());
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
+        if (!Event.class.isAssignableFrom(type) || !Cancellable.class.isAssignableFrom(type)
+                || !BlockEvent.class.isAssignableFrom(type)) {
+            return false;
+        }
+        Listener owner = new Listener() { };
+        Bukkit.getPluginManager().registerEvent((Class<? extends Event>) type, owner, EventPriority.HIGH,
+                (listener, event) -> {
+                    if (!type.isInstance(event)) return;
+                    Block block = ((BlockEvent) event).getBlock();
+                    if (block.getType() != Material.NETHER_PORTAL) return;
+                    if (portalService.isPortalBlock(block.getWorld().getName(), block.getX(), block.getY(), block.getZ())) {
+                        ((Cancellable) event).setCancelled(true);
+                    }
+                }, plugin, true);
+        return true;
+    }
+
     private void shieldFromExplosion(List<Block> blocks, String vector) {
         if (blocks.isEmpty()) return;
         if (RVNKCore.getServiceSafe(PortalService.class) == null) return;

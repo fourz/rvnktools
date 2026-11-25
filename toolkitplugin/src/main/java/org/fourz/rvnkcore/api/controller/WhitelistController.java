@@ -171,7 +171,7 @@ public class WhitelistController extends HttpServlet {
                 ApiUtils.sendError(out, gson, 404, "PLAYER_NOT_FOUND", cause.getMessage());
             } else if (cause instanceof WhitelistMembership.LookupFailedException) {
                 logger.warning("[whitelist] " + cause.getMessage() + ": " + cause.getCause());
-                ApiUtils.sendError(out, gson, 502, "LOOKUP_FAILED", cause.getMessage());
+                sendLookupError(out, gson, cause);
             } else if (cause instanceof java.util.concurrent.TimeoutException) {
                 ApiUtils.sendError(out, gson, 504, "TIMEOUT", "Whitelist operation timed out");
             } else {
@@ -187,6 +187,20 @@ public class WhitelistController extends HttpServlet {
             ApiUtils.sendSuccess(out, gson, data);
         } else {
             ApiUtils.sendJson(out, gson, 200, data);
+        }
+    }
+
+    /**
+     * Writes a failed name lookup (#2448). A rate limit upstream (Mojang 429) is 503
+     * {@code LOOKUP_RATE_LIMITED} with a {@code Retry-After} header, so a client can tell "retry later"
+     * from a real failure; any other lookup failure stays 502 {@code LOOKUP_FAILED}.
+     */
+    static void sendLookupError(HttpServletResponse out, Gson gson, Throwable cause) {
+        if (cause instanceof WhitelistMembership.LookupRateLimitedException limited) {
+            out.setHeader("Retry-After", Long.toString(limited.retryAfterSeconds()));
+            ApiUtils.sendError(out, gson, 503, "LOOKUP_RATE_LIMITED", cause.getMessage());
+        } else {
+            ApiUtils.sendError(out, gson, 502, "LOOKUP_FAILED", cause.getMessage());
         }
     }
 

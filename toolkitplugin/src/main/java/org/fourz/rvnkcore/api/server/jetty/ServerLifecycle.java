@@ -71,15 +71,33 @@ public class ServerLifecycle {
             logger.info("RVNKCore API server stopped successfully");
             
         } catch (Exception e) {
-            logger.error("Error stopping RVNKCore API server", e);
-            logger.error("Server shutdown error details: " + e.getMessage());
-            
-            if (e.getCause() != null) {
-                logger.error("Shutdown root cause: " + e.getCause().getMessage());
+            // Class and cause chain in the text: getMessage() is null for many Jetty and
+            // concurrency exceptions, which logged as "details: null" (#2442).
+            logger.error("Error stopping RVNKCore API server: " + describe(e), e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
             }
         } finally {
             isShuttingDown = false;
         }
+    }
+
+    /**
+     * Describes a throwable as its class name, message when present, and each cause in turn.
+     * Never prints a bare "null".
+     *
+     * @param t the throwable to describe
+     * @return a one-line description of the throwable and its cause chain
+     */
+    static String describe(Throwable t) {
+        StringBuilder sb = new StringBuilder();
+        int depth = 0;
+        for (Throwable c = t; c != null && depth < 8; c = c.getCause(), depth++) {
+            if (depth > 0) sb.append(" <- caused by ");
+            sb.append(c.getClass().getName());
+            if (c.getMessage() != null) sb.append(": ").append(c.getMessage());
+        }
+        return sb.toString();
     }
 
     /**

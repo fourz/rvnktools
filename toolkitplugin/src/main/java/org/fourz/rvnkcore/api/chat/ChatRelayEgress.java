@@ -3,6 +3,7 @@ package org.fourz.rvnkcore.api.chat;
 import com.google.gson.Gson;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.service.chatrelay.MatrixBridgeOutcome;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -20,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Sends relayed chat messages to configured peer servers over HTTP.
@@ -51,6 +53,13 @@ public class ChatRelayEgress {
     private final SSLSocketFactory insecureSocketFactory;
     private final ChatRelayConfig config;
     private final LogManager logger;
+
+    /** HTTP status the Matrix bridge answers when its per-room cap is reached. */
+    static final int TOO_MANY_REQUESTS = 429;
+    /** One 429 WARNING per minute, with a count. */
+    private final ThrottledWarning rateLimitLog = new ThrottledWarning(60_000L, System::currentTimeMillis);
+    /** Told about a line the Matrix bridge refused with 429; tells the sender. Null = nobody told. */
+    private volatile Consumer<ChatMessageDTO> rateLimitedHandler;
 
     /**
      * Creates a new ChatRelayEgress.
@@ -110,26 +119,82 @@ public class ChatRelayEgress {
      * Asynchronously POSTs the message to every configured peer.
      * Each send is fire-and-forget; failures are logged at WARN and never propagate.
      *
+     * <p>The returned future tells the Matrix bridge's answer (#2443): its HTTP status,
+     * {@link MatrixBridgeOutcome#FAILED} when the send failed before a status, or
+     * {@link MatrixBridgeOutcome#NOT_SENT} (already complete) when no Matrix peer got the line.
+     * Callers that do not care ignore it; it never completes exceptionally.</p>
+     *
      * @param dto The chat message to relay
+     * @return the Matrix bridge's status
      */
-    public void send(ChatMessageDTO dto) {
-        if (dto == null) return;
+    public CompletableFuture<Integer> send(ChatMessageDTO dto) {
+        CompletableFuture<Integer> matrix = null;
+        if (dto == null) return CompletableFuture.completedFuture(MatrixBridgeOutcome.NOT_SENT);
         String payload = GSON.toJson(dto);
         for (ChatRelayConfig.Peer peer : config.getPeers()) {
             if (peer.url() == null || peer.url().isEmpty()) {
                 continue;
             }
+            if (!shouldSend(peer, dto)) {
+                continue;
+            }
             // Insecure path only applies to https peers; anything else uses the plain HttpClient.
+            CompletableFuture<Integer> sent;
             if (insecureSocketFactory != null && peer.url().startsWith("https://")) {
-                sendInsecure(peer, payload);
+                sent = sendInsecure(peer, payload, dto);
             } else {
-                sendToPeer(peer, payload);
+                sent = sendToPeer(peer, payload, dto);
+            }
+            if (config.isMatrixOrigin(peer.id())) {
+                matrix = sent;
             }
         }
+        return matrix != null ? matrix : CompletableFuture.completedFuture(MatrixBridgeOutcome.NOT_SENT);
+    }
+
+    /** Sets who is told when the Matrix bridge refuses a line with 429 (the chat relay service). */
+    public void setRateLimitedHandler(Consumer<ChatMessageDTO> handler) {
+        this.rateLimitedHandler = handler;
+    }
+
+    /**
+     * Handles a non-2xx answer. A 429 from the Matrix bridge is its per-room cap: the line already
+     * reached the game, so it is not retried (a late resend would arrive out of order). The WARNING is
+     * throttled to one a minute and the sender is told once per refused line.
+     */
+    void onFailureStatus(ChatRelayConfig.Peer peer, ChatMessageDTO dto, int status, String logTag) {
+        if (status == TOO_MANY_REQUESTS && config.isMatrixOrigin(peer.id())) {
+            Integer count = rateLimitLog.hit();
+            if (count != null) {
+                logger.warning(logTag + " -> 429 rate limited (" + count + " line(s) in the last minute not sent)");
+            }
+            Consumer<ChatMessageDTO> handler = rateLimitedHandler;
+            if (handler != null && dto != null) {
+                try {
+                    handler.accept(dto);
+                } catch (RuntimeException e) {
+                    logger.debug(logTag + " 429 notice failed: " + e.getMessage());
+                }
+            }
+            return;
+        }
+        logger.warning(logTag + " -> " + status);
+    }
+
+    /**
+     * Per-peer filter (#2377): a peer with a {@code rooms} list gets only those rooms (the Matrix
+     * bridge gets MATRIX only, so Global chat never leaves the network), and a line is never sent
+     * back to the peer it came from.
+     */
+    static boolean shouldSend(ChatRelayConfig.Peer peer, ChatMessageDTO dto) {
+        if (dto.getOriginServerId() != null && dto.getOriginServerId().equals(peer.id())) {
+            return false;
+        }
+        return peer.accepts(dto.getRoom());
     }
 
     /** Secure/default egress via the shared async {@link HttpClient}. */
-    private void sendToPeer(ChatRelayConfig.Peer peer, String payload) {
+    private CompletableFuture<Integer> sendToPeer(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -140,21 +205,23 @@ public class ChatRelayEgress {
                 .timeout(Duration.ofMillis(config.getTimeoutMs()))
                 .build();
 
-            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenAccept(response -> {
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
                     int status = response.statusCode();
                     if (status >= 200 && status < 300) {
                         logger.debug(logTag + " -> " + status);
                     } else {
-                        logger.warning(logTag + " -> " + status);
+                        onFailureStatus(peer, dto, status, logTag);
                     }
+                    return status;
                 })
                 .exceptionally(e -> {
                     logger.warning(logTag + " failed: " + e.getMessage());
-                    return null;
+                    return MatrixBridgeOutcome.FAILED;
                 });
         } catch (Exception e) {
             logger.warning(logTag + " failed to dispatch: " + e.getMessage());
+            return CompletableFuture.completedFuture(MatrixBridgeOutcome.FAILED);
         }
     }
 
@@ -163,9 +230,9 @@ public class ChatRelayEgress {
      * verifier, so self-signed peers addressed by IP are reachable. Runs on the common pool
      * (fire-and-forget) so the async chat thread is never blocked on the network call.
      */
-    private void sendInsecure(ChatRelayConfig.Peer peer, String payload) {
+    private CompletableFuture<Integer> sendInsecure(ChatRelayConfig.Peer peer, String payload, ChatMessageDTO dto) {
         String logTag = "ChatRelay -> " + peer.id();
-        CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             HttpsURLConnection conn = null;
             try {
                 URL url = URI.create(peer.url()).toURL();
@@ -186,10 +253,12 @@ public class ChatRelayEgress {
                 if (status >= 200 && status < 300) {
                     logger.debug(logTag + " -> " + status);
                 } else {
-                    logger.warning(logTag + " -> " + status);
+                    onFailureStatus(peer, dto, status, logTag);
                 }
+                return status;
             } catch (Exception e) {
                 logger.warning(logTag + " failed: " + e.getMessage());
+                return MatrixBridgeOutcome.FAILED;
             } finally {
                 if (conn != null) {
                     conn.disconnect();

@@ -6,6 +6,7 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.api.chat.ChatRelayEgress;
 import org.fourz.rvnkcore.api.config.ChatRelayConfig;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.api.model.MatrixChannel;
 import org.fourz.rvnkcore.util.ChatFormat;
 import org.fourz.rvnkcore.util.log.LogManager;
 
@@ -14,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -51,6 +53,9 @@ public class ChatRelayService {
     // minted once here so a client can tell a restart from "nothing was said".
     private final ChatMessageBuffer buffer;
 
+    // Channel list of the MATRIX room, fetched from the Matrix bridge (#2381).
+    private final MatrixChannelRegistry matrixChannels;
+
     /**
      * Creates a new ChatRelayService.
      *
@@ -66,6 +71,51 @@ public class ChatRelayService {
         this.logger = logger;
         this.dedupCacheSize = config.getDedupCacheSize();
         this.buffer = new ChatMessageBuffer(config.getBufferSize());
+        ChatInboundToken.configure(config.getMatrixInboundTokenHashes());
+        this.matrixChannels = new MatrixChannelRegistry(logger);
+        this.matrixChannels.configure(config);
+        egress.setRateLimitedHandler(this::notifyRateLimited);
+    }
+
+    /** Text for a sender whose line the Matrix bridge refused with 429. */
+    static final String RATE_LIMITED_NOTICE =
+        "\u00A77Chat is busy: your last line was not sent to Discord (players in game saw it).";
+
+    /**
+     * Tells the sender (if online) that the Matrix bridge refused their line with 429. Called from an
+     * egress thread; the message is sent on the main thread.
+     */
+    void notifyRateLimited(ChatMessageDTO dto) {
+        String raw = dto.getSenderUuid();
+        if (raw == null || raw.isBlank()) return;
+        UUID id;
+        try {
+            id = UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) p.sendMessage(RATE_LIMITED_NOTICE);
+        });
+    }
+
+    /** Starts the Matrix channel-list fetch (startup, then every 5 minutes). */
+    public void startBackground() {
+        matrixChannels.start();
+    }
+
+    /** Stops the Matrix channel-list fetch. */
+    public void shutdown() {
+        matrixChannels.stop();
+    }
+
+    /**
+     * The cached channel list of the MATRIX room (#2381). Never empty: {@code general} is always
+     * there. RVNKEvents reads it for {@code /chat channels}, join rules and the receive filter.
+     */
+    public MatrixChannelRegistry getMatrixChannels() {
+        return matrixChannels;
     }
 
     /**
@@ -200,11 +250,15 @@ public class ChatRelayService {
         if (newConfig == null) return;
         this.config = newConfig;
         this.egress = new ChatRelayEgress(newConfig, logger);
+        this.egress.setRateLimitedHandler(this::notifyRateLimited);
+        int tokens = ChatInboundToken.configure(newConfig.getMatrixInboundTokenHashes());
         // Apply chat-relay.buffer.size on reload, not only at boot.
         buffer.resize(newConfig.getBufferSize());
+        matrixChannels.configure(newConfig);
+        matrixChannels.refreshNow();
         logger.info("ChatRelayService config refreshed - server-id=" + config.getServerId()
             + ", peers=" + config.getPeers().size() + ", insecure-tls=" + config.isInsecureTls()
-            + ", buffer=" + buffer.capacity());
+            + ", buffer=" + buffer.capacity() + ", matrix inbound tokens=" + tokens);
     }
 
     /**
@@ -278,6 +332,62 @@ public class ChatRelayService {
     }
 
     /**
+     * Posts a chatbot line into the MATRIX room through this tier (#2383), so Discord and Matrix
+     * users see the persona reply. The line goes to MATRIX-room players here who follow the channel
+     * (through the chatroom consumer, the same path a relayed MATRIX line takes), to the tier peers,
+     * and to the Matrix bridge, which posts it as a bot puppet and counts it against the 20/min cap.
+     *
+     * @param message    the text (required)
+     * @param senderName the persona (defaults to {@code Bot})
+     * @param mchannel   the channel (defaults to {@code general}); must be listed and not read-only
+     * @return the refusal reason, or the accepted post with the Matrix bridge's answer (#2443)
+     */
+    public MatrixPost postMatrix(String message, String senderName, String mchannel) {
+        if (!config.isEnabled()) return MatrixPost.refused(RELAY_DISABLED);
+        String channel = MatrixChannel.resolveName(mchannel);
+        String refusal = MatrixBotPost.refusal(message, channel,
+            channel == null ? java.util.Optional.empty() : matrixChannels.get(channel));
+        if (refusal != null) return MatrixPost.refused(refusal);
+
+        String msgId = UUID.randomUUID().toString();
+        markSeen(msgId);
+        ChatMessageDTO dto = MatrixBotPost.build(msgId, config.getServerId(), config.getServerLabel(),
+            senderName, message, channel, System.currentTimeMillis());
+        record(dto);
+
+        // Local delivery: a standalone RVNKCore has no MATRIX room, so without a consumer the line
+        // only leaves this tier.
+        Consumer<ChatMessageDTO> consumer = this.externalConsumer;
+        if (consumer != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
+        }
+        CompletableFuture<Integer> bridge = egress.send(dto);
+        logger.debug("Chat matrix post (bot): #" + channel + " by " + dto.getSenderName() + " (" + msgId + ")");
+        return new MatrixPost(null, bridge);
+    }
+
+    /** Refusal from {@link #postMatrix} when the relay is off (the controller answers 503). */
+    public static final String RELAY_DISABLED = "chat relay is disabled";
+
+    /**
+     * Result of {@link #postMatrix}: a refusal (nothing was sent), or an accepted line with the
+     * Matrix bridge's HTTP status to come ({@link ChatRelayEgress#send}).
+     *
+     * @param refusal null when accepted
+     * @param bridge  the bridge's status; null when refused; never completes exceptionally
+     */
+    public record MatrixPost(String refusal, CompletableFuture<Integer> bridge) {
+        static MatrixPost refused(String reason) {
+            return new MatrixPost(reason, null);
+        }
+    }
+
+    /** @return {@code chat-relay.timeout-ms}, for the REST wait on the bridge (#2443) */
+    public int relayTimeoutMs() {
+        return config.getTimeoutMs();
+    }
+
+    /**
      * Renders a {@code BOT}-room line on the main thread: as a styled {@code tellraw @a <components>}
      * when the DTO carries tellraw JSON (#1773), otherwise as a flat {@code bot-format} broadcast.
      *
@@ -314,6 +424,9 @@ public class ChatRelayService {
 
     /** @return this server's id (e.g. {@code event}, {@code prod}). */
     public String getServerId() { return config.getServerId(); }
+
+    /** True when {@code originServerId} is the Matrix bridge (#2376). */
+    public boolean isMatrixOrigin(String originServerId) { return config.isMatrixOrigin(originServerId); }
 
     /** @return this server's friendly label (e.g. {@code event}, {@code nations}). */
     public String getServerLabel() { return config.getServerLabel(); }
@@ -419,6 +532,15 @@ public class ChatRelayService {
         if (consumer != null) {
             Bukkit.getScheduler().runTask(plugin, () -> consumer.accept(dto));
             logger.debug("Chat relay inbound -> external consumer (" + dto.getMsgId() + ")");
+            return;
+        }
+
+        // No chatroom consumer (RVNKEvents absent): only this fallback renders, and it shows a line
+        // to everyone. A MATRIX line is opt-in and an unknown room may be one, so drop both (#2376).
+        String r = dto.getRoom();
+        if (r != null && !r.isBlank() && !"GLOBAL".equalsIgnoreCase(r.trim())
+                && !"SERVER".equalsIgnoreCase(r.trim()) && !"WORLD".equalsIgnoreCase(r.trim())) {
+            logger.debug("Chat relay inbound dropped (room '" + r + "' needs the chatroom consumer): " + dto.getMsgId());
             return;
         }
 

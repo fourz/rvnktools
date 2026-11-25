@@ -1,7 +1,6 @@
 package org.fourz.rvnkcore.init;
 
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.RegisteredServiceProvider;
 import org.fourz.rvnkcore.RVNKCore;
 import org.fourz.rvnkcore.api.event.ClusterBanListener;
 import org.fourz.rvnkcore.api.event.PlayerBanListener;
@@ -64,6 +63,10 @@ public class RVNKToolsInitializer {
     // Component references for shutdown
     private LuckPermsIntegrationListener luckPermsListener;
     private NpcBridge npcBridge;
+    private org.fourz.rvnkcore.service.qa.QaTapService qaTap;
+    private org.fourz.rvnkcore.service.sightings.SightingService sightingService;
+    private org.bukkit.scheduler.BukkitTask sightingPrune;
+    private org.fourz.rvnkcore.service.kit.KitService kitService;
 
     /**
      * Creates a new RVNKToolsInitializer.
@@ -121,6 +124,10 @@ public class RVNKToolsInitializer {
         initializeRegionTool();
         logger.debug("  + Region tool initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
+        // QA message tap (#2359): off unless config, tier and BKCommonLib all allow it
+        initializeQaTap();
+        logger.debug("  + QA tap checked (" + (System.currentTimeMillis() - startTime) + "ms)");
+
         initializeCommandFramework();
         logger.debug("  + CommandManager initialized (" + (System.currentTimeMillis() - startTime) + "ms)");
 
@@ -151,6 +158,24 @@ public class RVNKToolsInitializer {
         if (npcBridge != null) {
             npcBridge.shutdown();
             npcBridge = null;
+        }
+
+        if (qaTap != null) {
+            qaTap.shutdown();
+            qaTap = null;
+        }
+
+        if (sightingPrune != null) {
+            sightingPrune.cancel();
+            sightingPrune = null;
+        }
+        if (sightingService != null) {
+            sightingService.shutdown();
+            sightingService = null;
+        }
+        if (kitService != null) {
+            kitService.shutdown();
+            kitService = null;
         }
 
         // Shutdown LuckPerms listener
@@ -190,18 +215,12 @@ public class RVNKToolsInitializer {
             return;
         }
 
-        RegisteredServiceProvider<Economy> rsp = plugin.getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
-            logger.info("Economy not found - economy features disabled");
-            return;
-        }
-
-        Economy economy = rsp.getProvider();
-        if (economy != null) {
-            registry.registerService(Economy.class, economy);
-            logger.info("Economy integration enabled");
-        } else {
-            logger.info("Economy not found - economy features disabled");
+        // TokenEconomy enables after RVNKCore, so there is usually no provider yet. The binder
+        // registers it when it arrives and reports a real gap once the server has loaded (#2395).
+        EconomyBinder binder = new EconomyBinder(plugin.getServer(), registry, logger);
+        plugin.getServer().getPluginManager().registerEvents(binder, plugin);
+        if (!binder.bind()) {
+            logger.debug("No economy provider yet - binding when one registers");
         }
     }
 
@@ -302,11 +321,22 @@ public class RVNKToolsInitializer {
                     // orphaned into a row with no world state behind it.
                     plugin.getServer().getPluginManager().registerEvents(
                             new org.fourz.rvnkcore.event.PortalProtectionListener(plugin), plugin);
+                    // #2434: keep portal interiors from vanilla's obsidian-frame check (Paper event, by name)
+                    if (!org.fourz.rvnkcore.event.PortalProtectionListener.registerShapeGuard(plugin, portalService)) {
+                        logger.warning("Portal interior guard not registered: Paper BlockDestroyEvent not found - "
+                                + "a neighbour update can empty a server portal; /portal repair refills it");
+                    }
                     logger.info("Cross-server portal listeners registered (enabled="
                             + portalService.getConfig().isEnabled() + ")");
                 } else {
                     logger.warning("Portal listeners not registered: PortalService unavailable");
                 }
+
+                // Player sightings + entitled lists, pulled by z-office (#2351). Recording is off by default.
+                registerSightings();
+
+                // Kits: named item sets granted by /rvnk kit (#2415). Cluster-shared when clustering is on.
+                registerKits();
 
                 // Register LuckPerms integration
                 try {
@@ -376,6 +406,17 @@ public class RVNKToolsInitializer {
         }
     }
 
+    /**
+     * Registers the QA message tap (#2359). Never fatal: a failure leaves the rest of RVNKCore running.
+     */
+    private void initializeQaTap() {
+        try {
+            qaTap = org.fourz.rvnkcore.service.qa.QaTapService.install(plugin, registry, logger);
+        } catch (RuntimeException | LinkageError e) {
+            logger.error("Failed to install the QA message tap", e);
+        }
+    }
+
     private void initializeRegionTool() {
         try {
             RegionBridge.install(registry, logger);
@@ -414,5 +455,84 @@ public class RVNKToolsInitializer {
         } catch (Exception e) {
             logger.error("Failed to register bundled component commands", e);
         }
+    }
+
+    /**
+     * Registers the sighting service, its join listener and an hourly prune (#2351). Sightings live in
+     * this server's own database; entitlements in the cluster database when clustering is on.
+     */
+    private void registerSightings() {
+        org.fourz.rvnkcore.database.connection.ConnectionProvider local =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ConnectionProvider.class);
+        if (local == null) {
+            logger.warning("net-sightings: no database; sightings and entitlements disabled");
+            return;
+        }
+        org.fourz.rvnkcore.database.connection.ClusterConnectionProvider cluster =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ClusterConnectionProvider.class);
+        try {
+            org.fourz.rvnkcore.service.sightings.JdbcSightingStore sightings =
+                    new org.fourz.rvnkcore.service.sightings.JdbcSightingStore(local);
+            sightings.ensureSchema();
+            org.fourz.rvnkcore.service.sightings.JdbcEntitlementStore entitlements =
+                    new org.fourz.rvnkcore.service.sightings.JdbcEntitlementStore(cluster != null ? cluster : local);
+            entitlements.ensureSchema();
+            sightingService = new org.fourz.rvnkcore.service.sightings.SightingService(
+                    sightingsConfig(plugin.getConfig()), sightings, entitlements,
+                    new org.fourz.rvnkcore.service.sightings.SightingService.Log() {
+                        @Override public void info(String m) { logger.info(m); }
+                        @Override public void warning(String m) { logger.warning(m); }
+                    }, System::currentTimeMillis);
+            registry.registerService(org.fourz.rvnkcore.service.sightings.SightingService.class, sightingService);
+            plugin.getServer().getPluginManager().registerEvents(
+                    new org.fourz.rvnkcore.event.SightingJoinListener(sightingService), plugin);
+            final org.fourz.rvnkcore.service.sightings.SightingService svc = sightingService;
+            sightingPrune = plugin.getServer().getScheduler().runTaskTimerAsynchronously(
+                    plugin, svc::pruneNow, 20L * 60, 20L * 60 * 60);
+            org.fourz.rvnkcore.service.sightings.SightingsConfig c = sightingService.config();
+            logger.info("net-sightings: enabled=" + c.enabled() + ", server=" + c.server()
+                    + ", entitlements in " + (cluster != null ? "cluster" : "local") + " database, read tokens="
+                    + c.tokenHashes().size());
+        } catch (Exception e) {
+            logger.warning("net-sightings: not registered: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers the kit service (#2415). Kit definitions are item data with no world column and no
+     * foreign key, so they live in the cluster database when clustering is on (nations and Event share
+     * them) and in this server's own database otherwise (Dev).
+     */
+    private void registerKits() {
+        org.fourz.rvnkcore.database.connection.ConnectionProvider local =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ConnectionProvider.class);
+        if (local == null) {
+            logger.warning("kits: no database; /rvnk kit disabled");
+            return;
+        }
+        org.fourz.rvnkcore.database.connection.ClusterConnectionProvider cluster =
+                RVNKCore.getServiceSafe(org.fourz.rvnkcore.database.connection.ClusterConnectionProvider.class);
+        try {
+            org.fourz.rvnkcore.service.kit.JdbcKitStore store =
+                    new org.fourz.rvnkcore.service.kit.JdbcKitStore(cluster != null ? cluster : local);
+            store.ensureSchema();
+            kitService = new org.fourz.rvnkcore.service.kit.KitService(store);
+            registry.registerService(org.fourz.rvnkcore.service.kit.KitService.class, kitService);
+            kitService.warmNames();
+            logger.info("kits: registered, definitions in " + (cluster != null ? "cluster" : "local")
+                    + " database, item codec " + org.fourz.rvnkcore.service.kit.ItemCodec.best().id());
+        } catch (Exception e) {
+            logger.warning("kits: not registered: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /** The {@code net-sightings} section; the row's server name falls back to the chat-relay id. */
+    public static org.fourz.rvnkcore.service.sightings.SightingsConfig sightingsConfig(
+            org.bukkit.configuration.file.FileConfiguration cfg) {
+        String fallback = cfg.getString("chat-relay.server-id", "").trim();
+        if (fallback.isEmpty()) fallback = cfg.getString("webhook.server-id", "").trim();
+        if (fallback.isEmpty()) fallback = "unknown";
+        return org.fourz.rvnkcore.service.sightings.SightingsConfig.from(
+                cfg.getConfigurationSection("net-sightings"), fallback);
     }
 }

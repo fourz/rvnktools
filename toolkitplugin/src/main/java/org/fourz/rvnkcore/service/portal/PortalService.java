@@ -1,5 +1,6 @@
 package org.fourz.rvnkcore.service.portal;
 
+import org.bukkit.Axis;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -10,11 +11,13 @@ import org.fourz.rvnkcore.api.model.PortalDTO;
 import org.fourz.rvnkcore.database.repository.PortalRepository;
 import org.fourz.rvnkcore.util.log.LogManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Runtime service for cross-server portals.
@@ -412,9 +415,25 @@ public class PortalService {
      * "not currently readable" as "gone" would condemn healthy portals. Callers must treat the two
      * differently — in particular nothing should ever be auto-deleted on UNVERIFIED.</p>
      */
+    /** How many frame gaps a message names before it says "+N more" (#2447). */
+    public static final int MAX_GAPS_SHOWN = 8;
+
     public enum Verification {
         /** Trigger block and a correctly-stamped sign are both present. */
         VERIFIED,
+        /**
+         * Trigger block and stamped sign are present, but one or more interior blocks are no longer
+         * {@code NETHER_PORTAL} (#2434). The portal still transfers by coordinate, but players see an
+         * empty frame. {@code /portal repair} refills it.
+         */
+        UNLIT,
+        /**
+         * Trigger block and stamped sign are present, but a block of the frame ring around the
+         * interior is air, non-solid or liquid (#2447). {@code /portal repair} reports the gaps and does
+         * not fill them: the frame material is the builder's choice. Takes precedence over
+         * {@link #UNLIT}, because a refill does not fix a frame gap.
+         */
+        FRAME_BROKEN,
         /** The world or chunk is not loaded, so the portal could not be checked. */
         UNVERIFIED,
         /** The trigger block or the stamped sign is missing — the row no longer matches the world. */
@@ -493,7 +512,8 @@ public class PortalService {
 
     /**
      * Checks a registered portal against the world: is its trigger block still the configured
-     * material, and is a sign carrying its id still mounted on it.
+     * material, is a sign carrying its id still mounted on it, is its frame ring closed (#2447), and
+     * are its interior blocks still portal blocks (#2434).
      *
      * <p>Never force-loads a world or chunk — an unloaded portal reports {@link Verification#UNVERIFIED}.
      * Must be called on the main thread (it reads block state).</p>
@@ -502,30 +522,354 @@ public class PortalService {
      * @return the verification outcome
      */
     public Verification verify(String portalId) {
+        return inspect(portalId).state();
+    }
+
+    /**
+     * The full result of a verification (#2447): the state, plus the interior and frame readings it
+     * was decided from. {@code interior} and {@code frame} are null when the check stopped before
+     * reading them (unknown, unverified or orphaned).
+     */
+    public record Inspection(Verification state, InteriorState interior, FrameState frame) {
+    }
+
+    /**
+     * Same check as {@link #verify}, but also returns what it read, so a caller can name the frame
+     * gaps. Must be called on the main thread.
+     *
+     * @param portalId the portal id
+     * @return the inspection; never null
+     */
+    public Inspection inspect(String portalId) {
         PortalDTO portal = byId.get(portalId);
         if (portal == null) {
-            return Verification.UNKNOWN;
+            return new Inspection(Verification.UNKNOWN, null, null);
         }
 
         World world = Bukkit.getWorld(portal.getWorld());
         if (world == null) {
-            return Verification.UNVERIFIED;
+            return new Inspection(Verification.UNVERIFIED, null, null);
         }
         if (!world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
-            return Verification.UNVERIFIED;
+            return new Inspection(Verification.UNVERIFIED, null, null);
         }
 
         Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
         Material triggerMaterial = config.getTriggerMaterial();
         if (triggerMaterial != null && anchor.getType() != triggerMaterial) {
-            return Verification.ORPHANED;
+            return new Inspection(Verification.ORPHANED, null, null);
         }
 
-        return PortalSignWriter
+        if (PortalSignWriter
                 .findSignOnAnchor(anchor, PortalSignWriter.portalIdKey(plugin), portalId)
-                .isPresent()
-                ? Verification.VERIFIED
-                : Verification.ORPHANED;
+                .isEmpty()) {
+            return new Inspection(Verification.ORPHANED, null, null);
+        }
+
+        // #2434: the frame and sign can be intact while the portal blocks are gone. Check the interior
+        // too, reading only blocks whose chunk is already loaded.
+        Function<int[], Material> typeAt = b -> world.isChunkLoaded(b[0] >> 4, b[2] >> 4)
+                ? world.getBlockAt(b[0], b[1], b[2]).getType() : null;
+        InteriorState interior = classifyInterior(portal.getPortalBlocks(), typeAt);
+        // #2447: and the frame ring around it, which the guard does not protect.
+        FrameState frame = readFrame(portal, anchor, triggerMaterial, typeAt);
+        return new Inspection(decide(interior, frame), interior, frame);
+    }
+
+    /**
+     * Reads the frame ring of a portal in the world (#2447). The plane comes from the registered
+     * blocks; for a single column it comes from the anchor, and as a last resort from frame detection.
+     * When no plane can be found the frame is not checked (an all-zero, intact state).
+     */
+    private FrameState readFrame(PortalDTO portal, Block anchor, Material trigger, Function<int[], Material> typeAt) {
+        Axis axis = planeAxis(portal.getPortalBlocks(), portal.getX(), portal.getZ());
+        if (axis == null && trigger != null) {
+            axis = frameBuilder.detect(anchor, trigger).map(PortalFrameBuilder.Frame::axis).orElse(null);
+        }
+        if (axis == null) {
+            return new FrameState(List.of(), 0, 0);
+        }
+        return classifyFrame(frameRing(portal.getPortalBlocks(), axis), typeAt, Material::isSolid);
+    }
+
+    /**
+     * Decides the state of a portal whose anchor and sign are intact (#2447). Pure, so it is
+     * unit-tested. A frame gap wins over missing portal blocks: a refill does not close the frame,
+     * so the state names the defect staff must fix by hand.
+     *
+     * @param interior the interior reading; null counts as lit
+     * @param frame    the frame reading; null counts as intact
+     */
+    public static Verification decide(InteriorState interior, FrameState frame) {
+        if (frame != null && !frame.isIntact()) {
+            return Verification.FRAME_BROKEN;
+        }
+        if (interior != null && !interior.isLit()) {
+            return Verification.UNLIT;
+        }
+        return Verification.VERIFIED;
+    }
+
+    /**
+     * What the frame ring of a portal holds in the world (#2447).
+     *
+     * @param gaps     ring blocks that are air, liquid or not solid, in ring order
+     * @param solid    ring blocks that are solid
+     * @param unloaded ring blocks in a chunk that is not loaded; not read, not counted as gaps
+     */
+    public record FrameState(List<int[]> gaps, int solid, int unloaded) {
+        /** True when no loaded ring block is a gap. */
+        public boolean isIntact() {
+            return gaps.isEmpty();
+        }
+
+        /** The gaps as {@code x,y,z} separated by spaces, at most {@code max} of them, then "+N more". */
+        public String describeGaps(int max) {
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < gaps.size() && i < max; i++) {
+                if (i > 0) out.append(' ');
+                int[] g = gaps.get(i);
+                out.append(g[0]).append(',').append(g[1]).append(',').append(g[2]);
+            }
+            if (gaps.size() > max) {
+                out.append(" +").append(gaps.size() - max).append(" more");
+            }
+            return out.toString();
+        }
+    }
+
+    /**
+     * The frame ring of a registered interior (#2447): every block one step outside the interior in
+     * the portal plane, along the in-plane axes only (up, down and the two sideways directions). This
+     * is the same boundary {@link PortalFrameBuilder} accepts as a frame, so the corners are not
+     * included. Pure, so it is unit-tested.
+     *
+     * @param interior the registered interior blocks
+     * @param axis     {@link Axis#X} for an X-Y frame (fixed Z), {@link Axis#Z} for a Z-Y frame (fixed X)
+     * @return the ring, sorted by y, then x, then z; empty when the interior is empty or the axis is null
+     */
+    public static List<int[]> frameRing(List<int[]> interior, Axis axis) {
+        if (interior == null || interior.isEmpty() || axis == null || axis == Axis.Y) {
+            return List.of();
+        }
+        java.util.Set<String> inside = new java.util.HashSet<>();
+        for (int[] b : interior) {
+            inside.add(b[0] + "," + b[1] + "," + b[2]);
+        }
+        Map<String, int[]> ring = new java.util.LinkedHashMap<>();
+        int[][] steps = axis == Axis.X
+                ? new int[][] {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}}
+                : new int[][] {{0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+        for (int[] b : interior) {
+            for (int[] d : steps) {
+                int[] n = {b[0] + d[0], b[1] + d[1], b[2] + d[2]};
+                String key = n[0] + "," + n[1] + "," + n[2];
+                if (!inside.contains(key)) {
+                    ring.putIfAbsent(key, n);
+                }
+            }
+        }
+        List<int[]> out = new ArrayList<>(ring.values());
+        out.sort(java.util.Comparator.<int[]>comparingInt(c -> c[1])
+                .thenComparingInt(c -> c[0]).thenComparingInt(c -> c[2]));
+        return out;
+    }
+
+    /**
+     * Sorts frame ring blocks by what the world holds there (#2447). Pure, so it is unit-tested: the
+     * solidity test is passed in because {@link Material#isSolid()} needs a running server.
+     *
+     * @param ring   the ring from {@link #frameRing}
+     * @param typeAt the material at a block, or null when its chunk is not loaded
+     * @param solid  true for a material that closes the frame
+     */
+    public static FrameState classifyFrame(List<int[]> ring, Function<int[], Material> typeAt,
+                                           java.util.function.Predicate<Material> solid) {
+        List<int[]> gaps = new ArrayList<>();
+        int solidCount = 0;
+        int unloaded = 0;
+        if (ring != null) {
+            for (int[] b : ring) {
+                Material type = typeAt.apply(b);
+                if (type == null) {
+                    unloaded++;
+                } else if (type == Material.AIR || type == Material.CAVE_AIR || type == Material.VOID_AIR
+                        || type == Material.WATER || type == Material.LAVA || !solid.test(type)) {
+                    gaps.add(b);
+                } else {
+                    solidCount++;
+                }
+            }
+        }
+        return new FrameState(gaps, solidCount, unloaded);
+    }
+
+    /**
+     * The portal plane for a registered interior, using the anchor when the interior alone cannot
+     * tell (#2447). A single column fits both planes; the anchor is a frame block in the plane, so an
+     * anchor at another X means an X-Y frame and an anchor at another Z means a Z-Y frame.
+     *
+     * @return the axis, or null when neither the blocks nor the anchor decide it
+     */
+    public static Axis planeAxis(List<int[]> interior, int anchorX, int anchorZ) {
+        Axis axis = axisOf(interior);
+        if (axis != null || interior == null || interior.isEmpty()) {
+            return axis;
+        }
+        int x = interior.get(0)[0];
+        int z = interior.get(0)[2];
+        boolean column = true;
+        for (int[] b : interior) {
+            if (b[0] != x || b[2] != z) column = false;
+        }
+        if (!column) return null;
+        if (anchorX != x && anchorZ == z) return Axis.X;
+        if (anchorZ != z && anchorX == x) return Axis.Z;
+        return null;
+    }
+
+    /**
+     * What the registered interior of a portal holds in the world (#2434).
+     *
+     * @param lit      blocks that are {@code NETHER_PORTAL}
+     * @param empty    blocks that are air and can be refilled
+     * @param blocked  blocks holding something else (a player's block); a repair leaves them alone
+     * @param unloaded blocks in a chunk that is not loaded; not read
+     */
+    public record InteriorState(int lit, List<int[]> empty, int blocked, int unloaded) {
+        /** True when no loaded interior block is missing its portal material. */
+        public boolean isLit() {
+            return empty.isEmpty() && blocked == 0;
+        }
+    }
+
+    /**
+     * Sorts registered interior blocks by what the world holds there. Pure, so it is unit-tested.
+     *
+     * @param interior the registered interior blocks; null or empty gives an all-zero state
+     * @param typeAt   the material at a block, or null when its chunk is not loaded
+     */
+    public static InteriorState classifyInterior(List<int[]> interior, Function<int[], Material> typeAt) {
+        int lit = 0;
+        int blocked = 0;
+        int unloaded = 0;
+        List<int[]> empty = new ArrayList<>();
+        if (interior != null) {
+            for (int[] b : interior) {
+                Material type = typeAt.apply(b);
+                if (type == null) {
+                    unloaded++;
+                } else if (type == Material.NETHER_PORTAL) {
+                    lit++;
+                } else if (type == Material.AIR || type == Material.CAVE_AIR || type == Material.VOID_AIR) {
+                    empty.add(b);
+                } else {
+                    blocked++;
+                }
+            }
+        }
+        return new InteriorState(lit, empty, blocked, unloaded);
+    }
+
+    /**
+     * The portal-block axis for a registered interior (#2434): every block on one X gives
+     * {@link Axis#Z} (a Z-Y frame), every block on one Z gives {@link Axis#X} (an X-Y frame).
+     *
+     * @return the axis, or null when the blocks do not lie in one vertical plane, or lie in both
+     *         (a single column), so the caller must detect it from the frame
+     */
+    public static Axis axisOf(List<int[]> interior) {
+        if (interior == null || interior.isEmpty()) return null;
+        boolean sameX = true;
+        boolean sameZ = true;
+        int x = interior.get(0)[0];
+        int z = interior.get(0)[2];
+        for (int[] b : interior) {
+            if (b[0] != x) sameX = false;
+            if (b[2] != z) sameZ = false;
+        }
+        if (sameX == sameZ) return null;
+        return sameX ? Axis.Z : Axis.X;
+    }
+
+    /**
+     * Repairs a portal (#2434): refills its empty interior blocks with {@code NETHER_PORTAL}, then
+     * rewrites and re-stamps its sign as {@link #repairSign} does.
+     *
+     * <p>Only air is refilled. A block a player put inside the frame is left as it is and reported:
+     * removing it is a build decision. The interior is refilled only while the anchor still holds the
+     * trigger material, because a frame that is gone is not something a repair can rebuild.</p>
+     *
+     * <p>A gap in the frame ring (#2447) is reported with its coordinates and left alone: the frame
+     * material is the builder's choice.</p>
+     *
+     * <p>Must be called on the main thread.</p>
+     *
+     * @param portalId        the portal id
+     * @param transferService the transfer service used to render the destination line; may be null
+     * @return a result describing both steps
+     */
+    public PortalResult repair(String portalId, org.fourz.rvnkcore.service.transfer.TransferService transferService) {
+        PortalDTO portal = byId.get(portalId);
+        if (portal == null) {
+            return new PortalResult(Status.NOT_FOUND, "No portal registered with id " + portalId, null);
+        }
+        World world = Bukkit.getWorld(portal.getWorld());
+        if (world == null) {
+            return new PortalResult(Status.UNAVAILABLE, "World '" + portal.getWorld() + "' is not loaded", portal);
+        }
+        if (!world.isChunkLoaded(portal.getX() >> 4, portal.getZ() >> 4)) {
+            return new PortalResult(Status.UNAVAILABLE,
+                    "Chunk at " + portal.getX() + "," + portal.getZ() + " is not loaded", portal);
+        }
+
+        Block anchor = world.getBlockAt(portal.getX(), portal.getY(), portal.getZ());
+        Material trigger = config.getTriggerMaterial();
+        StringBuilder message = new StringBuilder();
+        boolean anyFixed = false;
+
+        if (trigger != null && anchor.getType() != trigger) {
+            message.append("Interior not refilled: the anchor is ").append(anchor.getType())
+                    .append(", not ").append(trigger).append(" - rebuild the frame first. ");
+        } else {
+            InteriorState state = classifyInterior(portal.getPortalBlocks(), b -> world.isChunkLoaded(b[0] >> 4, b[2] >> 4)
+                    ? world.getBlockAt(b[0], b[1], b[2]).getType() : null);
+            if (state.empty().isEmpty()) {
+                message.append("Interior intact (").append(state.lit()).append(" portal block(s)). ");
+            } else {
+                Axis axis = axisOf(portal.getPortalBlocks());
+                if (axis == null && trigger != null) {
+                    axis = frameBuilder.detect(anchor, trigger).map(PortalFrameBuilder.Frame::axis).orElse(Axis.X);
+                }
+                frameBuilder.fill(world, state.empty(), axis == null ? Axis.X : axis);
+                anyFixed = true;
+                message.append("Refilled ").append(state.empty().size()).append(" of ")
+                        .append(portal.getPortalBlocks().size()).append(" portal block(s). ");
+                logger.info("Portal interior refilled (id " + portalId + "): " + state.empty().size()
+                        + " block(s), axis " + axis + ", at " + portal.getWorld() + " " + portal.getX() + ","
+                        + portal.getY() + "," + portal.getZ());
+            }
+            if (state.blocked() > 0) {
+                message.append(state.blocked()).append(" interior block(s) hold something else and were left alone. ");
+            }
+            if (state.unloaded() > 0) {
+                message.append(state.unloaded()).append(" interior block(s) are in unloaded chunks. ");
+            }
+        }
+
+        // #2447: report a gap in the frame ring, but never place frame blocks - the frame material is
+        // the builder's choice.
+        FrameState frame = readFrame(portal, anchor, trigger, b -> world.isChunkLoaded(b[0] >> 4, b[2] >> 4)
+                ? world.getBlockAt(b[0], b[1], b[2]).getType() : null);
+        if (!frame.isIntact()) {
+            message.append("Frame not repaired: ").append(frame.gaps().size()).append(" gap(s) at ")
+                    .append(frame.describeGaps(MAX_GAPS_SHOWN)).append("; rebuild the frame by hand. ");
+        }
+
+        PortalResult sign = repairSign(portalId, transferService);
+        message.append(sign.message());
+        boolean ok = anyFixed || sign.isSuccess();
+        return new PortalResult(ok ? Status.SUCCESS : sign.status(), message.toString().trim(), portal);
     }
 
     /**

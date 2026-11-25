@@ -80,8 +80,11 @@ public class ServerTransferCommand extends BaseCommand {
         }
 
         TransferService.TransferResult result = service.transfer(player, targetName);
-        ChatColor color = result.isSuccess() ? ChatColor.AQUA : ChatColor.RED;
-        player.sendMessage(color + result.message());
+        // PENDING (#2378): a gated target is reading entitlements and reports the outcome itself.
+        if (!result.message().isEmpty()) {
+            ChatColor color = result.isSuccess() ? ChatColor.AQUA : ChatColor.RED;
+            player.sendMessage(color + result.message());
+        }
         return true;
     }
 

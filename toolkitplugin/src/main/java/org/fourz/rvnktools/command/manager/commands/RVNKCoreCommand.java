@@ -750,6 +750,11 @@ public class RVNKCoreCommand extends BaseCommand {
                         cfg.getConfigurationSection("chat-relay")));
                 refreshed++;
             }
+            if (reg.hasService(org.fourz.rvnkcore.service.sightings.SightingService.class)) {
+                reg.getService(org.fourz.rvnkcore.service.sightings.SightingService.class).refreshConfig(
+                    org.fourz.rvnkcore.init.RVNKToolsInitializer.sightingsConfig(cfg));
+                refreshed++;
+            }
             sender.sendMessage(ChatFormat.colorize(
                 "&7   • &a✓ &fCross-server services refreshed: " + refreshed));
 

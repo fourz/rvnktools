@@ -180,6 +180,20 @@ webhook:
                            # uses webhook.secret for HMAC auth — no separate token needed
 
 # ──────────────────────────────────────────
+# Player sightings for z-office (#2351)
+# ──────────────────────────────────────────
+# Records {uuid, name, public IPv4, server, time, entitled lists} on each join and on each entitlement
+# change of an online player. z-office pulls them from GET /api/v1/net-sightings?after=<cursor>
+# with the X-Net-Sightings-Token read token. Only a public IPv4 is recorded; a LAN or unknown address
+# records nothing. Never blocks a join. Entitled lists (mc-dev) are set by /rvnk entitlement.
+# NOTE: a server that already has config.yml does not get this section (#1563).
+net-sightings:
+  enabled: false
+  server: ""               # name written into each row; blank = chat-relay.server-id
+  retention-days: 7        # rows older than this are pruned hourly (1-30)
+  read-token-sha256: []    # hex SHA-256 of each accepted read token; the token itself is never stored here
+
+# ──────────────────────────────────────────
 # Cross-Server Chat Relay
 # ──────────────────────────────────────────
 # Shares a "global" chat channel between RVNKCore servers (e.g. Event <-> prod) over the
@@ -206,6 +220,18 @@ chat-relay:
   #    tag: "P"                                            # short tag rendered on relayed lines
   #    url: "https://<prod-host>:<port>/v1/chat/inbound"   # peer inbound endpoint
   #    api-key: "<peer-x-api-key>"                         # peer's api.auth.key
+  #    rooms: []                                           # rooms this peer receives; empty = all (#2377)
+  #  - id: "matrix"                                        # the Matrix bridge (#2376): MUST list rooms
+  #    url: "https://<bridge-host>/v1/chat/inbound"
+  #    api-key: "<bridge-egress-key>"
+  #    rooms: [MATRIX]                                     # Global chat never leaves the network
+  # Matrix bridge INBOUND (#2376, #2377). The bridge posts to /v1/chat/inbound with the header
+  # X-Chat-Inbound-Token, never this server's api.auth.key. That token opens only that path, and only
+  # originServerId=<origin-id> + room MATRIX. Lines from the bridge are plain text: room forced to
+  # MATRIX, styled components dropped, section codes removed, sender 48 / message 256 chars.
+  matrix:
+    origin-id: "matrix"
+    inbound-token-sha256: []   # hex SHA-256 of each accepted bridge token; the token itself is never stored here
 
 # ──────────────────────────────────────────
 # Native Cross-Server Transfer (movement only)
@@ -289,9 +315,10 @@ logfilter:
 # Customize command behavior
 commands:
   override-vanilla-tp: true   # Override /tp with RVNKTools implementation
-                              # Must be true — plugin.yml declares /tp so vanilla is blocked regardless.
-                              # true: /tp routes to RVNKTools (player/coords/worldswap)
-                              # false: /tp is claimed by plugin but has no executor (broken)
+                              # true: /tp routes to RVNKTools (player/coords/worldswap). Command blocks,
+                              #   /execute and vanilla-only syntax (@selectors, rotation, ^, facing)
+                              #   still go to minecraft:tp.
+                              # false: every /tp forwards to minecraft:tp
 
 # WebUI Configuration
 # Hostname and port of the local web portal dev server
@@ -337,3 +364,14 @@ teleport:
 # Format: <bukkit-world-name>: <Display Name>   (case-insensitive; blank = raw name)
 world-display-names:
   southmesa: Bankrekka
+
+# QA message tap (#2359). Records the chat, action bar, title and subtitle lines the server sends to
+# players who hold rvnkcore.qa.subject, so a QA session reads them at GET /api/v1/qa/inbox/{player}
+# instead of asking a tester to read them back. Runs only when ALL of these hold: enabled is true,
+# the server id (chat-relay.server-id / webhook.server-id) is dev, test or event, and BKCommonLib is
+# enabled. Never on prod. In memory only; a restart empties it.
+qa:
+  inbox:
+    enabled: false
+    # Lines kept per player (10-2000)
+    capacity: 200

@@ -4,12 +4,14 @@ import com.google.gson.Gson;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.fourz.rvnkcore.api.model.NameColor;
 import org.fourz.rvnkcore.api.model.PlayerDTO;
 import org.fourz.rvnkcore.api.model.request.GroupUpdateRequest;
 import org.fourz.rvnkcore.api.model.request.LocationUpdateRequest;
 import org.fourz.rvnkcore.api.model.response.PagedResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerNameHistoryResponse;
 import org.fourz.rvnkcore.api.model.response.PlayerResponse;
+import org.fourz.rvnkcore.api.service.NameColorService;
 import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.rvnkcore.api.service.PlayerWorldService;
 import org.fourz.rvnkcore.api.util.ApiUtils;
@@ -107,6 +109,8 @@ public class PlayerController extends HttpServlet {
                             // Check if this is a UUID-based player world query
                             if (parts.length > 1 && "worlds".equals(parts[1].toLowerCase())) {
                                 handlePlayerWorldEndpoints(uuid, parts, req, resp);
+                            } else if (parts.length > 1 && "name-color".equals(parts[1].toLowerCase())) {
+                                handleGetNameColor(uuid, resp);
                             } else {
                                 handleGetPlayer(uuid, resp);
                             }
@@ -201,6 +205,9 @@ public class PlayerController extends HttpServlet {
                     break;
                 case "groups":
                     handleUpdateGroups(uuid, req, resp);
+                    break;
+                case "name-color":
+                    handleSetNameColor(uuid, req, resp);
                     break;
                 default:
                     sendError(resp, 404, "Unknown operation: " + operation);
@@ -645,6 +652,98 @@ public class PlayerController extends HttpServlet {
                 .build();
     }
 
+    // ── Name color (#2468) ───────────────────────────────────────────────────
+
+    /**
+     * {@code GET /v1/players/{uuid}/name-color}: {@code color} (lowercase #rrggbb, absent when the player has none),
+     * {@code hasColor}, {@code allowed} (holds rvnk.chat.namecolor; absent when LuckPerms cannot be asked),
+     * {@code minBrightness} and the {@code named} colors.
+     */
+    private void handleGetNameColor(UUID uuid, HttpServletResponse resp) throws IOException {
+        NameColorService svc = org.fourz.rvnkcore.RVNKCore.getServiceSafe(NameColorService.class);
+        if (svc == null) { sendError(resp, 503, "Name colors are not available"); return; }
+        try {
+            if (playerService.getPlayer(uuid).get(15, TimeUnit.SECONDS).isEmpty()) {
+                sendError(resp, 404, "Player not found");
+                return;
+            }
+            Optional<String> color = svc.getColor(uuid).get(10, TimeUnit.SECONDS);
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            out.put("uuid", uuid.toString());
+            out.put("color", color.orElse(null));
+            out.put("hasColor", color.isPresent());
+            out.put("allowed", allowed(svc, uuid));
+            out.put("minBrightness", NameColor.MIN_BRIGHTNESS);
+            out.put("named", new java.util.TreeMap<>(NameColor.NAMED));
+            sendResponse(resp, 200, out);
+        } catch (Exception ex) {
+            logger.error("Error reading name color", ex instanceof CompletionException ? ex.getCause() : ex);
+            sendError(resp, 500, "Failed to read name color");
+        }
+    }
+
+    /**
+     * {@code PUT /v1/players/{uuid}/name-color} with {@code {"color": "#ff8800" | "gold" | "reset", "force": false}}.
+     * A color needs rvnk.chat.namecolor in LuckPerms unless {@code force} is true (staff tools). A reset is always
+     * allowed. 400 carries the reason a color was refused, ready to show to the player.
+     */
+    private void handleSetNameColor(UUID uuid, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        NameColorService svc = org.fourz.rvnkcore.RVNKCore.getServiceSafe(NameColorService.class);
+        if (svc == null) { sendError(resp, 503, "Name colors are not available"); return; }
+        com.google.gson.JsonObject body;
+        try {
+            body = gson.fromJson(ApiUtils.readRequestBody(req), com.google.gson.JsonObject.class);
+        } catch (RuntimeException e) {
+            sendError(resp, 400, "Body must be JSON: {\"color\": \"#RRGGBB\"}");
+            return;
+        }
+        String color = body != null && body.has("color") && !body.get("color").isJsonNull()
+                ? body.get("color").getAsString() : null;
+        boolean force = body != null && body.has("force") && body.get("force").getAsBoolean();
+        NameColor.Result parsed = NameColor.parse(color);
+        if (!parsed.ok()) { sendError(resp, 400, parsed.error()); return; }
+        try {
+            if (playerService.getPlayer(uuid).get(15, TimeUnit.SECONDS).isEmpty()) {
+                sendError(resp, 404, "Player not found");
+                return;
+            }
+            if (!force && !parsed.reset()) {
+                Boolean allowed = allowed(svc, uuid);
+                if (allowed == null) {
+                    sendError(resp, 403, "Cannot check " + NameColor.PERMISSION + " (LuckPerms not available); send force:true");
+                    return;
+                }
+                if (!allowed) {
+                    sendError(resp, 403, "Player does not have " + NameColor.PERMISSION);
+                    return;
+                }
+            }
+            String hex = svc.setColor(uuid, color).get(10, TimeUnit.SECONDS);
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            out.put("uuid", uuid.toString());
+            out.put("color", hex);
+            out.put("hasColor", hex != null);
+            logger.info("Name color of " + uuid + " set to " + (hex == null ? "default" : hex)
+                    + (force ? " (force)" : "") + " via REST from " + ApiUtils.getClientIP(req));
+            sendResponse(resp, 200, out);
+        } catch (Exception ex) {
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            if (cause instanceof IllegalArgumentException) { sendError(resp, 400, cause.getMessage()); return; }
+            logger.error("Error setting name color", cause);
+            sendError(resp, 500, "Failed to set name color");
+        }
+    }
+
+    /** rvnk.chat.namecolor in LuckPerms, or null when it cannot be checked. */
+    private Boolean allowed(NameColorService svc, UUID uuid) {
+        try {
+            return svc.mayUse(uuid).get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            logger.warning("Name color permission check failed for " + uuid + ": " + e.getMessage());
+            return null;
+        }
+    }
+
     private void sendResponse(HttpServletResponse resp, int status, Object data) {
         ApiUtils.sendSuccess(resp, gson, data);
     }
@@ -653,8 +752,10 @@ public class PlayerController extends HttpServlet {
         String code = switch (status) {
             case 400 -> "BAD_REQUEST";
             case 401 -> "UNAUTHORIZED";
+            case 403 -> "FORBIDDEN";
             case 404 -> "NOT_FOUND";
             case 500 -> "INTERNAL_ERROR";
+            case 503 -> "UNAVAILABLE";
             default -> "ERROR";
         };
         ApiUtils.sendError(resp, gson, status, code, message);

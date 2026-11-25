@@ -4,21 +4,37 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.fourz.rvnkcore.RVNKCore;
+import org.fourz.rvnkcore.api.chat.ChatStreamHub;
+import org.fourz.rvnkcore.api.chat.ThrottledWarning;
 import org.fourz.rvnkcore.api.model.ChatMessageDTO;
+import org.fourz.rvnkcore.api.model.MatrixChannel;
+import org.fourz.rvnkcore.service.chatrelay.MatrixBridgeOutcome;
+import org.fourz.rvnkcore.service.chatrelay.MatrixChannelRegistry;
+import org.fourz.rvnkcore.service.chatrelay.ChatInboundToken;
+import org.fourz.rvnkcore.service.chatrelay.MatrixInbound;
 import org.fourz.rvnkcore.api.util.ApiUtils;
 import org.fourz.rvnkcore.service.chatrelay.ChatMessageBuffer;
 import org.fourz.rvnkcore.service.chatrelay.ChatRelayService;
+import org.fourz.rvnkcore.service.chatrelay.ChatStreamCursor;
 import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * REST API controller for inbound cross-server chat relay messages.
@@ -33,9 +49,15 @@ import java.util.Map;
  *       never relayed (#1777). Body: {@code {message, senderName?}}</li>
  *   <li>{@code POST /v1/chat/world} — Post a bot line into the WORLD room: scoped to one world,
  *       relayed to peers only when world-relay allows (#1777). Body: {@code {message, senderName?, world}}</li>
+ *   <li>{@code POST /v1/chat/matrix} — Post a bot line into the MATRIX room: this tier's followers of
+ *       the channel, the tier peers and the Matrix bridge (#2383). Body: {@code {message, senderName?, mchannel?}}</li>
  *   <li>{@code GET /v1/chat/recent} — Cursor-polled tail of recent chat, so a client can read what was
  *       said without scraping the console log (#1870).
  *       Query: {@code since, boot, limit, room, world}</li>
+ *   <li>{@code GET /v1/chat/stream} — the same tail pushed as Server-Sent Events, with the same cursor
+ *       and stale/gap semantics and a heartbeat comment every 15 s (#2425). Query: {@code since, boot,
+ *       limit, room, world}; {@code Last-Event-ID} resumes when {@code since}/{@code boot} are absent.
+ *       See {@link ChatStreamHub}. The servlet holder must be async-supported.</li>
  * </ul>
  *
  * <p>The {@link ChatRelayService} is resolved lazily from the ServiceRegistry at request time,
@@ -45,8 +67,14 @@ import java.util.Map;
  */
 public class ChatRelayController extends HttpServlet {
 
+    /** Heartbeat comment interval; below the 30 s connector idle timeout. */
+    static final long STREAM_HEARTBEAT_MS = 15_000L;
+    /** Open stream cap: chat readers are a few tools (tail.py, the ravencast watcher). */
+    static final int MAX_STREAMS = 16;
+
     private final Gson gson;
     private final LogManager logger;
+    private final ChatStreamHub streamHub;
 
     /**
      * Creates a new ChatRelayController.
@@ -57,6 +85,18 @@ public class ChatRelayController extends HttpServlet {
     public ChatRelayController(Gson gson, LogManager logger) {
         this.gson = gson;
         this.logger = logger;
+        // Compact JSON: the shared Gson pretty-prints, and one SSE data line per event keeps line
+        // readers simple. A tree's toString() is compact and drops nulls as the shared Gson does.
+        this.streamHub = new ChatStreamHub(() -> {
+            ChatRelayService s = getService();
+            return s == null ? null : s.getBuffer();
+        }, ChatRelayController::toWire, o -> gson.toJsonTree(o).toString(), STREAM_HEARTBEAT_MS, MAX_STREAMS);
+    }
+
+    @Override
+    public void destroy() {
+        streamHub.shutdown();
+        super.destroy();
     }
 
     /**
@@ -75,6 +115,10 @@ public class ChatRelayController extends HttpServlet {
         try {
             if (pathInfo != null && pathInfo.equals("/recent")) {
                 handleRecent(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/stream")) {
+                handleStream(req, resp);
+            } else if (pathInfo != null && pathInfo.equals("/channels")) {
+                handleChannels(resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: GET " + pathInfo);
@@ -136,10 +180,128 @@ public class ChatRelayController extends HttpServlet {
     }
 
     /**
+     * Opens a Server-Sent Events chat stream (#2425). Parameters as {@link #handleRecent}; when
+     * {@code since} and {@code boot} are both absent, an EventSource {@code Last-Event-ID} of
+     * {@code boot:seq} resumes. The Jetty thread returns at once: {@link ChatStreamHub} writes hello and
+     * the backlog now, and later lines from its own threads as they are recorded.
+     */
+    private void handleStream(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+        if (!req.isAsyncSupported()) {
+            ApiUtils.sendError(resp, gson, 500, "INTERNAL_ERROR", "Chat stream needs an async servlet");
+            return;
+        }
+        String rawSince = trimToNull(req.getParameter("since"));
+        String boot = trimToNull(req.getParameter("boot"));
+        if (rawSince == null && boot == null) {
+            String[] last = ChatStreamHub.parseLastEventId(req.getHeader("Last-Event-ID"));
+            if (last != null) {
+                boot = last[0];
+                rawSince = last[1];
+            }
+        }
+        long since;
+        try {
+            since = rawSince == null ? 0L : Long.parseLong(rawSince);
+        } catch (NumberFormatException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "since must be an integer");
+            return;
+        }
+        if (streamHub.openCount() >= MAX_STREAMS) {
+            ApiUtils.sendError(resp, gson, 503, "BUSY", "Too many chat streams open; poll /v1/chat/recent");
+            return;
+        }
+        int limit = ApiUtils.getIntParam(req, "limit", ChatMessageBuffer.MAX_LIMIT);
+        ChatStreamCursor cursor = new ChatStreamCursor(service.getBuffer(), boot, since, limit,
+                trimToNull(req.getParameter("room")), trimToNull(req.getParameter("world")));
+
+        resp.setStatus(200);
+        resp.setContentType("text/event-stream");
+        resp.setCharacterEncoding("UTF-8");
+        resp.setHeader("Cache-Control", "no-cache");
+        resp.setHeader("X-Accel-Buffering", "no"); // a reverse proxy must not buffer the stream
+        AsyncContext ctx = req.startAsync();
+        ctx.setTimeout(0); // no async timeout: the heartbeat and the idle timeout find dead clients
+        ServletOutputStream out = resp.getOutputStream();
+        ChatStreamHub.Sink sink = new ChatStreamHub.Sink() {
+            @Override public void send(String frame) throws IOException {
+                out.write(frame.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+            @Override public void close() {
+                try {
+                    ctx.complete();
+                } catch (IllegalStateException ignored) {
+                    // already completed by the container
+                }
+            }
+        };
+        // Listener first: a client that drops while the backlog is written completes the context.
+        java.util.concurrent.atomic.AtomicReference<ChatStreamHub.Stream> stream =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        ctx.addListener(new AsyncListener() {
+            @Override public void onComplete(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onTimeout(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onError(AsyncEvent event) { closeStream(stream.get()); }
+            @Override public void onStartAsync(AsyncEvent event) { }
+        });
+        try {
+            stream.set(streamHub.open(cursor, sink));
+        } catch (ChatStreamHub.FullException e) {
+            try {
+                sink.send("event: error\ndata: {\"code\":\"BUSY\"}\n\n");
+            } finally {
+                sink.close();
+            }
+            return;
+        }
+        logger.debug("Chat stream opened (room=" + logSafe(req.getParameter("room")) + ", open="
+                + streamHub.openCount() + ")");
+    }
+
+    private static void closeStream(ChatStreamHub.Stream stream) {
+        if (stream != null) stream.close();
+    }
+
+    /**
+     * {@code GET /v1/chat/channels} (#2381): this tier's cached copy of the Matrix bridge channel
+     * list, with the time of the last good fetch ({@code 0} = never, only {@code general}) and the
+     * current fetch problem. Read-only; shows no destination and no key.
+     */
+    private void handleChannels(HttpServletResponse resp) throws IOException {
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+        MatrixChannelRegistry reg = service.getMatrixChannels();
+        Map<String, Object> data = new LinkedHashMap<>();
+        // Plain maps, not the record: the compile-time Gson (2.8.9) predates record support.
+        List<Map<String, Object>> channels = new ArrayList<>();
+        for (MatrixChannel c : reg.list()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", c.name());
+            m.put("label", c.label());
+            m.put("readOnly", c.readOnly());
+            m.put("join", c.join());
+            channels.add(m);
+        }
+        data.put("channels", channels);
+        data.put("fetchedAt", reg.getFetchedAt());
+        data.put("problem", reg.getLastProblem());
+        data.put("source", reg.getUrl() != null ? reg.getUrl().toString() : null);
+        ApiUtils.sendSuccess(resp, gson, data);
+    }
+
+    /**
      * Flattens a buffer entry to the wire shape. {@code seq} is a buffer concern rather than part of
      * {@link ChatMessageDTO}, so the two are merged here rather than polluting the relay payload.
      */
-    private Map<String, Object> toWire(ChatMessageBuffer.Entry entry) {
+    static Map<String, Object> toWire(ChatMessageBuffer.Entry entry) {
         ChatMessageDTO dto = entry.getDto();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("seq", entry.getSeq());
@@ -155,6 +317,7 @@ public class ChatRelayController extends HttpServlet {
         m.put("world", dto.getWorld());
         m.put("originServerId", dto.getOriginServerId());
         m.put("serverLabel", dto.getServerLabel());
+        m.put("mchannel", dto.getMchannel());
         return m;
     }
 
@@ -177,6 +340,8 @@ public class ChatRelayController extends HttpServlet {
                 handleRoom(req, resp, "SERVER");
             } else if (pathInfo != null && pathInfo.equals("/world")) {
                 handleRoom(req, resp, "WORLD");
+            } else if (pathInfo != null && pathInfo.equals("/matrix")) {
+                handleMatrix(req, resp);
             } else {
                 ApiUtils.sendError(resp, gson, 404, "NOT_FOUND",
                         "Unknown chat relay endpoint: POST " + pathInfo);
@@ -209,8 +374,69 @@ public class ChatRelayController extends HttpServlet {
             return;
         }
 
+        // #2376 / #2377: the scoped Matrix token opens this path for the Matrix origin only, and a
+        // Matrix line (by either key) may only enter the MATRIX room, as plain capped text.
+        boolean scoped = Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE));
+        boolean matrix = service.isMatrixOrigin(dto.getOriginServerId());
+        if (scoped && !matrix) {
+            refuseMatrix(resp, 403, "FORBIDDEN", "This token accepts only Matrix-origin lines", dto);
+            return;
+        }
+        if (matrix) {
+            String refusal = MatrixInbound.refusal(dto);
+            if (refusal != null) {
+                refuseMatrix(resp, 400, "BAD_REQUEST", refusal, dto);
+                return;
+            }
+            String rawChannel = dto.getMchannel();
+            MatrixInbound.sanitize(dto);
+            // #2381: a Matrix line names its channel; none = general, an unpublished one is refused.
+            String channel = MatrixChannel.resolveName(rawChannel);
+            if (channel == null || !service.getMatrixChannels().contains(channel)) {
+                refuseMatrix(resp, 400, "BAD_REQUEST", "unknown mchannel", dto);
+                return;
+            }
+            dto.setMchannel(channel);
+        } else if ("MATRIX".equalsIgnoreCase(dto.getRoom())) {
+            // A tier-relayed MATRIX line: keep a valid name (the origin may hold a newer list),
+            // read a missing or malformed one as general.
+            String channel = MatrixChannel.resolveName(dto.getMchannel());
+            dto.setMchannel(channel != null ? channel : MatrixChannel.GENERAL);
+        } else {
+            dto.setMchannel(null);
+        }
+
         service.receiveInbound(dto);
         ApiUtils.sendSuccess(resp, gson, "Message accepted");
+    }
+
+    /** One WARNING per refusal reason per minute, with a count (#2384). */
+    private final Map<String, ThrottledWarning> refusalLogs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Refuses a line from the Matrix bridge and logs it (#2384). Before this, a refused Matrix line
+     * left no trace on the tier, so a channel that never arrived could not be told apart from one the
+     * tier refused. The log names the reason, room and channel, never the message text.
+     */
+    private void refuseMatrix(HttpServletResponse resp, int status, String code, String reason,
+                              ChatMessageDTO dto) throws IOException {
+        ThrottledWarning w = refusalLogs.computeIfAbsent(reason,
+                r -> new ThrottledWarning(60_000L, System::currentTimeMillis));
+        Integer count = w.hit();
+        if (count != null) {
+            logger.warning("Chat inbound refused (" + status + " " + reason + "): origin="
+                    + logSafe(dto.getOriginServerId()) + " room=" + logSafe(dto.getRoom())
+                    + " mchannel=" + logSafe(dto.getMchannel())
+                    + (count > 1 ? " [" + count + " in the last minute]" : ""));
+        }
+        ApiUtils.sendError(resp, gson, status, code, reason);
+    }
+
+    /** A short, printable form of a client-supplied value for a log line. */
+    static String logSafe(String value) {
+        if (value == null) return "-";
+        String v = value.replaceAll("[^\\x20-\\x7E]", "?");
+        return v.length() > 40 ? v.substring(0, 40) + "..." : v;
     }
 
     /** Upper bound on the serialized {@code components} JSON, guarding the console tellraw dispatch. */
@@ -322,6 +548,99 @@ public class ChatRelayController extends HttpServlet {
 
         service.injectRoom(room, world, optString(obj, "senderName"), message);
         ApiUtils.sendSuccess(resp, gson, room + " post accepted");
+    }
+
+    /**
+     * Handles {@code POST /v1/chat/matrix} (#2383): a chatbot reply into the MATRIX room, so Discord
+     * and Matrix users see it. Body: {@code {message, senderName?, mchannel?}}; {@code mchannel}
+     * defaults to {@code general} and must be listed and not read-only (400 otherwise). Plain text
+     * only. Opened by the X-API-Key; the scoped Matrix token never reaches here (AuthFilter), and is
+     * refused again if it does.
+     *
+     * <p>#2443: an accepted line answers only after the Matrix bridge does, or after
+     * {@link MatrixBridgeOutcome#waitMs} - 200 delivered, 202 not confirmed in time, 429 refused for
+     * the bridge's rate cap, 502 refused or unreachable. The wait completes from the future on an
+     * async response; it never blocks the request thread (#1552).</p>
+     */
+    private void handleMatrix(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (Boolean.TRUE.equals(req.getAttribute(ChatInboundToken.ATTRIBUTE))) {
+            ApiUtils.sendError(resp, gson, 403, "FORBIDDEN", "The Matrix token cannot post bot lines");
+            return;
+        }
+        ChatRelayService service = getService();
+        if (service == null) {
+            ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", "Chat relay service not available");
+            return;
+        }
+
+        JsonObject obj;
+        try {
+            obj = gson.fromJson(ApiUtils.readRequestBody(req), JsonObject.class);
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", "Invalid JSON body");
+            return;
+        }
+        if (obj != null && obj.has("components") && !obj.get("components").isJsonNull()) {
+            ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST",
+                    "Matrix posts are plain text - use 'message'");
+            return;
+        }
+
+        ChatRelayService.MatrixPost post = service.postMatrix(optString(obj, "message"),
+                optString(obj, "senderName"), optString(obj, "mchannel"));
+        String refusal = post.refusal();
+        if (refusal != null) {
+            if (refusal.equals(ChatRelayService.RELAY_DISABLED)) {
+                ApiUtils.sendError(resp, gson, 503, "SERVICE_UNAVAILABLE", refusal);
+            } else {
+                ApiUtils.sendError(resp, gson, 400, "BAD_REQUEST", refusal);
+            }
+            return;
+        }
+
+        long waitMs = MatrixBridgeOutcome.waitMs(service.relayTimeoutMs());
+        CompletableFuture<Integer> bridge = post.bridge().completeOnTimeout(null, waitMs, TimeUnit.MILLISECONDS);
+        if (bridge.isDone()) {
+            writeMatrixOutcome(resp, bridge.getNow(null), waitMs);
+            return;
+        }
+        AsyncContext ctx = req.startAsync();
+        ctx.setTimeout(waitMs + 2_000L);
+        AtomicBoolean written = new AtomicBoolean();
+        ctx.addListener(new AsyncListener() {
+            @Override public void onTimeout(AsyncEvent event) {
+                if (!written.compareAndSet(false, true)) return;
+                try {
+                    writeMatrixOutcome((HttpServletResponse) ctx.getResponse(), null, waitMs);
+                } finally {
+                    ctx.complete();
+                }
+            }
+            @Override public void onComplete(AsyncEvent event) { }
+            @Override public void onError(AsyncEvent event) { written.set(true); }
+            @Override public void onStartAsync(AsyncEvent event) { }
+        });
+        bridge.whenComplete((status, ex) -> {
+            if (!written.compareAndSet(false, true)) return;
+            try {
+                writeMatrixOutcome((HttpServletResponse) ctx.getResponse(), ex == null ? status : null, waitMs);
+            } finally {
+                ctx.complete();
+            }
+        });
+    }
+
+    /** Answers a bot post from the Matrix bridge's status (null = no answer in time). */
+    private void writeMatrixOutcome(HttpServletResponse out, Integer status, long waitMs) {
+        MatrixBridgeOutcome outcome = MatrixBridgeOutcome.of(status);
+        String message = outcome.message(status, waitMs);
+        if (outcome.success()) {
+            ApiUtils.sendJson(out, gson, outcome.httpStatus(),
+                    org.fourz.rvnkcore.api.model.response.ApiResponse.success(message));
+        } else {
+            logger.info("Chat matrix post (bot): " + message);
+            ApiUtils.sendError(out, gson, outcome.httpStatus(), outcome.errorCode(), message);
+        }
     }
 
     /** Reads an optional, non-null string member from a JSON object, or null when absent/null. */

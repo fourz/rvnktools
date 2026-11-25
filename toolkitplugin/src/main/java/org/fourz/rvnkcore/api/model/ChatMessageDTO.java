@@ -37,6 +37,19 @@ public class ChatMessageDTO {
      * the flat {@code bot-format}. Null falls back to {@link #message} + {@code bot-format}.
      */
     private String components;
+    /**
+     * Channel of a {@code MATRIX}-room line (#2380): {@code [a-z0-9-]{1,32}}. Absent or blank means
+     * {@code general}. Ignored for every other room.
+     */
+    private String mchannel;
+    /**
+     * The sender's name color as lowercase {@code #rrggbb} (#2468). Null means the default color. Older peers
+     * ignore the field, so a mixed-version relay keeps working.
+     */
+    private String nameColor;
+    /** The sender's LuckPerms chat prefix and suffix as raw {@code &} codes (#2468). Null when none. */
+    private String namePrefix;
+    private String nameSuffix;
 
     /** No-arg constructor for gson deserialization. */
     public ChatMessageDTO() {
@@ -72,6 +85,11 @@ public class ChatMessageDTO {
     public String getMessage() { return message; }
     public long getTimestamp() { return timestamp; }
 
+    // Setters used to sanitise a Matrix bridge line in place (#2376).
+    public void setChannel(String channel) { this.channel = channel; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
+    public void setMessage(String message) { this.message = message; }
+
     public String getRoom() { return room; }
     public void setRoom(String room) { this.room = room; }
 
@@ -86,4 +104,14 @@ public class ChatMessageDTO {
 
     public String getComponents() { return components; }
     public void setComponents(String components) { this.components = components; }
+
+    public String getMchannel() { return mchannel; }
+    public void setMchannel(String mchannel) { this.mchannel = mchannel; }
+
+    public String getNameColor() { return nameColor; }
+    public void setNameColor(String nameColor) { this.nameColor = nameColor; }
+    public String getNamePrefix() { return namePrefix; }
+    public void setNamePrefix(String namePrefix) { this.namePrefix = namePrefix; }
+    public String getNameSuffix() { return nameSuffix; }
+    public void setNameSuffix(String nameSuffix) { this.nameSuffix = nameSuffix; }
 }

@@ -38,10 +38,12 @@ import static org.mockito.Mockito.when;
  */
 class NpcBridgeClassLoadingTest {
 
-    private static final List<String> THIRD_PARTY = List.of("net.citizensnpcs.", "me.clip.", "com.sk89q.");
+    private static final List<String> THIRD_PARTY = List.of("net.citizensnpcs.", "me.clip.", "com.sk89q.",
+            "com.bergerkiller.");
     private static final List<String> ADAPTERS = List.of(
             "org.fourz.rvnkcore.service.npc.citizens.", "org.fourz.rvnkcore.service.npc.papi.",
-            "org.fourz.rvnkcore.service.region.worldguard.");
+            "org.fourz.rvnkcore.service.region.worldguard.",
+            "org.fourz.rvnkcore.service.qa.bkc.");
 
     /** Classes on RVNKCore's enable path for the bridge. */
     private static final List<String> STARTUP_CLASSES = List.of(
@@ -58,6 +60,11 @@ class NpcBridgeClassLoadingTest {
             "org.fourz.rvnkcore.command.RvnkCommand",
             "org.fourz.rvnkcore.command.NpcSubCommand",
             "org.fourz.rvnkcore.init.RVNKToolsInitializer",
+            // QA message tap (#2359): must load with BKCommonLib and service.qa.bkc hidden
+            "org.fourz.rvnkcore.service.qa.QaTapService",
+            "org.fourz.rvnkcore.service.qa.QaInbox",
+            "org.fourz.rvnkcore.service.qa.QaPacketText",
+            "org.fourz.rvnkcore.api.controller.QaInboxController",
             // #2248: NPC harness, spec tooling and the region tool
             "org.fourz.rvnkcore.service.npc.harness.NpcHarness",
             "org.fourz.rvnkcore.service.npc.harness.NpcSpecParser",
