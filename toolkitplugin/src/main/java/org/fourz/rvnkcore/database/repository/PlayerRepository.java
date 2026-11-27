@@ -463,6 +463,10 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
         try (var localConn = localProvider.getConnection();
              var clusterConn = clusterProvider.getConnection()) {
 
+            // The target can be SQLite: on a MySQL outage the pool falls back to it, and
+            // INSERT IGNORE is a syntax error there (#2479). Read the dialect off the connection.
+            String insert = insertIgnore(isMysql(clusterConn));
+
             for (int t = 0; t < tables.length; t++) {
                 String table = tables[t][0];
                 String cols = tables[t][1];
@@ -471,7 +475,7 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
                 try (PreparedStatement read = localConn.prepareStatement(
                         "SELECT " + cols + " FROM " + table);
                      PreparedStatement write = clusterConn.prepareStatement(
-                        "INSERT IGNORE INTO " + table + " (" + cols + ") VALUES (" + placeholders + ")");
+                        insert + table + " (" + cols + ") VALUES (" + placeholders + ")");
                      ResultSet rs = read.executeQuery()) {
 
                     int colCount = rs.getMetaData().getColumnCount();
@@ -489,6 +493,21 @@ public class PlayerRepository extends BaseRepository<PlayerDTO, UUID> {
             throw new RuntimeException("Preference union failed: " + e.getMessage(), e);
         }
         return inserted;
+    }
+
+    /** The insert-if-absent prefix of a dialect: {@code INSERT IGNORE} on MySQL, {@code INSERT OR IGNORE} on SQLite. */
+    static String insertIgnore(boolean mysql) {
+        return mysql ? "INSERT IGNORE INTO " : "INSERT OR IGNORE INTO ";
+    }
+
+    /** True when the connection's driver is MySQL (or MariaDB's MySQL driver); false for SQLite. */
+    static boolean isMysql(java.sql.Connection conn) {
+        try {
+            String driver = conn.getMetaData().getDriverName();
+            return driver != null && driver.toLowerCase(java.util.Locale.ROOT).contains("mysql");
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     /** Unions two comma-separated name histories, preserving order and dropping duplicates. */
